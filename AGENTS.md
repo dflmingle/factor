@@ -14,3 +14,9 @@
 - 优先使用仓库内的 `vendor/skill-pandaai-factor-online/SKILL.md` 和 `python scripts/pandaai.py ...`；不要依赖某台机器的绝对 Skill 路径。
 - PandaAI 登录令牌只保存在当前电脑的本地配置中，不得提交到仓库。
 - 完整迁移步骤见 `CONTINUE.md`。
+
+## 启动约定
+
+- 用户在此项目中说“启动”时，运行 `python scripts/start.py --login-if-needed`。
+- 启动脚本可以安装 CLI、运行预检并引导交互式登录；启动阶段不得自动创建因子或运行回测。
+- 启动完成后报告环境状态，等待用户指定研究任务。

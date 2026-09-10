@@ -19,13 +19,13 @@ Python 需要 3.10 或更高版本。推荐用 `uv` 安装 CLI：
 uv tool install pandaai-cli
 ```
 
-没有 `uv` 时，也可以使用 `pipx install pandaai-cli`。然后运行项目入口进行无计算预检：
+没有 `uv` 时，也可以使用 `pipx install pandaai-cli`。然后运行项目启动入口进行安装、登录和无计算预检：
 
 ```bash
-python scripts/pandaai.py bootstrap
+python scripts/start.py --login-if-needed
 ```
 
-如果显示未登录，直接运行交互式登录：
+如果不希望启动入口自动进入登录，也可以按原始步骤手动执行：
 
 ```bash
 pandaai-cli login

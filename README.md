@@ -11,6 +11,7 @@
 - `*.results/`：已保存的 PandaAI 原始运行结果
 - `vendor/skill-pandaai-factor-online/`：随项目保存的 PandaAI Skill 快照
 - `scripts/pandaai.py`：跨电脑调用 Skill 脚本的统一入口
+- `scripts/start.py`：换电脑后的环境安装、预检和登录入口
 
 ## 默认研究口径
 
@@ -22,4 +23,4 @@
 
 回测结果是历史样本研究记录，不代表未来收益，也不构成投资建议。仓库不包含 PandaAI 登录凭据；重新运行需要本地配置已登录的 `pandaai-cli`。
 
-换电脑继续研究请阅读 [`CONTINUE.md`](./CONTINUE.md)。
+换电脑继续研究请阅读 [`CONTINUE.md`](./CONTINUE.md)；启动规则见 [`START.md`](./START.md)。
