@@ -1,0 +1,4 @@
+# Literature-backed formula variants. Formal window: 2021-09-07 to 2026-09-07.
+# FS8 is the same eight-signal fundamental-strength proxy used in the prior batch.
+NONHT-FSCORELIKE-REV40-INTERACT ~ RANK(1 - RETURNS(CLOSE,40)) * RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8) ~ 1
+NONHT-RESVOL-MAX-INTERACT-21D ~ RANK(-residual_volatility) * RANK(-TS_MAX(RETURNS(CLOSE,1),21)) ~ 1

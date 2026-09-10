@@ -1,0 +1,10 @@
+# Non-Huatai literature directions.
+# Formal window: 2021-09-07 to 2026-09-07; 10-day rebalance; 10 groups; one-way cost: 0.30%.
+# The F-Score line is an 8-signal accounting-strength proxy: the original no-new-share
+# component is unavailable in the confirmed formula field mapping.
+NONHT-MAX-LOW-21D ~ RANK(-TS_MAX(RETURNS(CLOSE,1),21)) ~ 1
+NONHT-RESVOL-LOW ~ RANK(-residual_volatility) ~ 1
+NONHT-SKEW-LOW-60D ~ RANK(-TS_SKEW(RETURNS(CLOSE,1),60)) ~ 1
+NONHT-FSCORELIKE-REV40 ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)) / 2 ~ 1
+NONHT-CASH-CONVERSION ~ RANK(cfd_surplus_cash_multi_ttm) ~ 1
+NONHT-LOW-BETA ~ RANK(-beta) ~ 1

@@ -1,0 +1,5 @@
+# Formal window: 2021-09-07 to 2026-09-07; 10-day rebalance; 10 groups; one-way cost: 0.30%.
+# Long-term momentum: keep the lower 80% of trailing absolute daily returns and skip the latest 21 days.
+NONHT-LTMOM-EXHIGH-252-21 ~ RANK(SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),252)-SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),21)) ~ 1
+# Chip-cost proxy: current price below a 250-day volume-weighted average transaction price.
+NONHT-CHIP-COST-250 ~ RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) ~ 1

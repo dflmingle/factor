@@ -1,0 +1,15 @@
+# OSR2-RET40 value-tilted follow-up.
+# All candidates are higher-is-better: 40-day reversal plus a value or value-quality sleeve.
+# Formal five-year comparison: 2021-09-07 to 2026-09-07, 5-day rebalance, 10 groups.
+OSR3-RET40-BP-EQ ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm)) / 2 ~ 1
+OSR3-RET40-BP-REV2 ~ (2 * RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm)) / 3 ~ 1
+OSR3-RET40-BP-VAL2 ~ (RANK(1 - RETURNS(CLOSE,40)) + 2 * RANK(ratio_bm_ttm)) / 3 ~ 1
+OSR3-RET40-EP-EQ ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_ep_ttm)) / 2 ~ 1
+OSR3-RET40-BP-EP ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm) + RANK(ratio_ep_ttm)) / 3 ~ 1
+OSR3-RET40-BP-CFP ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm) + RANK(ratio_cfp_ttm)) / 3 ~ 1
+OSR3-RET40-BP-EP-CFP ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm) + RANK(ratio_ep_ttm) + RANK(ratio_cfp_ttm)) / 4 ~ 1
+OSR3-RET40-BP-ROE ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm) + RANK(oper_roe_ttm)) / 3 ~ 1
+OSR3-RET40-BP-EP-ROE ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm) + RANK(ratio_ep_ttm) + RANK(oper_roe_ttm)) / 4 ~ 1
+OSR3-RET40-BP-MA63 ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(MA(ratio_bm_ttm,63))) / 2 ~ 1
+OSR3-RET40-BP-TSRANK756 ~ (RANK(1 - RETURNS(CLOSE,40)) + RANK(TS_RANK(ratio_bm_ttm,756))) / 2 ~ 1
+OSR3-RET40-BP-INTERACT ~ RANK(1 - RETURNS(CLOSE,40)) * (0.5 + 0.5 * RANK(ratio_bm_ttm)) ~ 1

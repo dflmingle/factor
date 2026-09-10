@@ -1,0 +1,38 @@
+# Huatai Multifactor Series 1-13: five-year PandaAI candidates.
+# Format: name ~ formula ~ direction. direction 1 = highest decile long; 0 = lowest decile long.
+# TTM fields are public-financial proxies for the original Wind fields.
+# OCFP is represented by low operating P/CF, hence direction 0.
+
+HT13-VALUE-BP ~ ratio_bm_ttm ~ 1
+HT13-VALUE-EP ~ ratio_ep_ttm ~ 1
+HT13-VALUE-SP ~ ratio_sp_ttm ~ 1
+HT13-VALUE-OCFP-LOW-PCF ~ ratio_pcf_ocf_ttm ~ 0
+
+HT13-GROWTH-NP ~ gr_net_profit_ttm ~ 1
+HT13-GROWTH-OCF ~ gr_ocf_ttm ~ 1
+
+HT13-REVERSAL-20D ~ 1 - RETURNS(CLOSE,20) ~ 1
+HT13-MOMENTUM-120D ~ RETURNS(CLOSE,120) ~ 1
+
+HT13-TURN-BIAS-1M ~ MA(TURNOVER,21) / MA(TURNOVER,504) - 1 ~ 0
+HT13-TURN-STD-1M ~ STDDEV(TURNOVER,21) ~ 0
+HT13-VOL-STD-1M ~ STDDEV(RETURNS(CLOSE,1),21) ~ 0
+
+HT13-QUALITY-ROE ~ oper_roe_ttm ~ 1
+HT13-QUALITY-CASH-DEBT ~ cfd_ocf_to_debt_ttm ~ 1
+
+HT13-HIST-EP-2Q ~ TS_RANK(ratio_ep_ttm,126) ~ 1
+HT13-HIST-ROA-6Q ~ TS_RANK(oper_roa_net_ttm,756) ~ 1
+
+HT13-ALPHA3 ~ -1 * CORR(RANK(OPEN), RANK(VOLUME), 10) ~ 1
+HT13-ALPHA13 ~ -1 * RANK(COV(RANK(CLOSE), RANK(VOLUME), 5)) ~ 1
+HT13-ALPHA15 ~ -1 * SUM(RANK(CORR(RANK(HIGH), RANK(VOLUME), 3)), 3) ~ 1
+HT13-ALPHA16 ~ -1 * RANK(COV(RANK(HIGH), RANK(VOLUME), 5)) ~ 1
+HT13-ALPHA44 ~ -1 * CORR(HIGH, RANK(VOLUME), 5) ~ 1
+# Original Alpha50 uses VWAP; typical price is the explicit proxy here.
+HT13-ALPHA50-TP ~ -1 * TS_MAX(RANK(CORR(RANK(VOLUME), RANK((HIGH + LOW + CLOSE) / 3), 5)), 5) ~ 1
+HT13-ALPHA55 ~ -1 * CORR(RANK((CLOSE - TS_MIN(LOW,12)) / (TS_MAX(HIGH,12) - TS_MIN(LOW,12))), RANK(VOLUME), 6) ~ 1
+
+# Report 10 proxy: cross-sectional rank equal weight, not dynamic historical IC/PCA weighting.
+HT13-VALUE-EQ ~ (RANK(ratio_bm_ttm) + RANK(ratio_ep_ttm) + RANK(ratio_sp_ttm) - RANK(ratio_pcf_ocf_ttm)) / 4 ~ 1
+HT13-STYLE-EQ ~ (RANK(ratio_bm_ttm) + RANK(gr_net_profit_ttm) + RANK(oper_roe_ttm) + RANK(1 - RETURNS(CLOSE,20)) + RANK(1 - MA(TURNOVER,21)) + RANK(1 - STDDEV(RETURNS(CLOSE,1),21))) / 6 ~ 1

@@ -1,0 +1,6 @@
+# Three low-frequency proxies for washout, distribution risk, and intraday absorption.
+# Five-year window: 2021-09-07 to 2026-09-07; 10 groups; one-way cost: 0.30%; rebalance: 10 days.
+
+WASHOUT-RECOVERY-10D ~ (RANK(1 - CLOSE / TS_MAX(CLOSE,120)) + RANK(-RETURNS(CLOSE,20)) + RANK(-cal_open_30min_return) + RANK(cal_open_5min_vol_ratio) + RANK(cal_close_30min_return) + RANK(ABS(cal_close_15min_vol_price_corr))) / 6 ~ 1
+DISTRIBUTION-RISK-10D ~ (RANK(RETURNS(CLOSE,60)) + RANK(cal_close_30min_vol_ratio) + RANK(-cal_close_30min_return) + RANK(-cal_close_15min_vol_price_corr) + RANK(MA(TURNOVER,21) / MA(TURNOVER,252))) / 5 ~ 0
+INTRADAY-ABSORPTION-10D ~ (RANK(-cal_open_30min_return) + RANK(cal_open_5min_vol_ratio) + RANK(cal_close_15min_vol_ratio) + RANK(cal_close_30min_return) + RANK(ABS(cal_close_15min_vol_price_corr))) / 5 ~ 1
