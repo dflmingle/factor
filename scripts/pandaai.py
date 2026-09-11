@@ -25,9 +25,13 @@ SCRIPT_NAMES = {
     "batch": "batch.py",
     "analyze": "analyze.py",
     "collect": "collect_results.py",
+    "sync-registry": "sync_workflow_registry.py",
     "selftest": "selftest.py",
     "composites": "build_composites.py",
     "competition-proxy": "competition_proxy.py",
+}
+PROJECT_SCRIPT_NAMES = {
+    "sync-registry": PROJECT_ROOT / "scripts" / "sync_workflow_registry.py",
 }
 
 
@@ -89,15 +93,20 @@ def main() -> int:
         print(skill)
         return 0
 
-    script_name = SCRIPT_NAMES.get(command)
-    if script_name is None:
+    project_script = PROJECT_SCRIPT_NAMES.get(command)
+    if project_script is not None:
+        script = project_script
+    else:
+        script_name = SCRIPT_NAMES.get(command)
+        if script_name is None:
+            print(f"Unknown command: {command}", file=sys.stderr)
+            usage()
+            return 2
+        script = skill / "scripts" / script_name
+
+    if not script.is_file():
         print(f"Unknown command: {command}", file=sys.stderr)
         usage()
-        return 2
-
-    script = skill / "scripts" / script_name
-    if not script.is_file():
-        print(f"Skill script is missing: {script}", file=sys.stderr)
         return 2
 
     completed = subprocess.run([sys.executable, str(script), *sys.argv[2:]], cwd=PROJECT_ROOT)

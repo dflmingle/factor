@@ -1,0 +1,243 @@
+# PandaAI Workflow Registry
+
+同步时间：`2026-09-11T10:48:46.149014+00:00`。本文件由只读 `factor_list`/`factor_info` 查询生成，未创建、修改、运行或删除工作流。
+
+## 盘点
+
+平台当前工作流：**171**；本地状态条目：**159**；按 `factor_id` 匹配：**153**。
+当前平台对象但本地没有状态记录：**18**；本地记录但平台已不存在：**6**。
+
+`node_title` 是平台接口返回的画布节点标题。当前大多数 CLI 工作流的标题都是 `因子分析`；工作流显示名和 `_id` 才是定位对象的主键。
+
+## 本地补充映射
+
+平台 `factor_info` 对多节点工作流只返回单个 `content` 时，以下内容来自项目内保存的画布截图/分析报告，并标注了推断依据。
+
+### STFILTER-T10-SIZE-H03-T10-20260911
+
+来源：current-stfilter-workflow.png, corr-t10-size-vs-h03-20260911.md。The platform list exposes two factor-analysis nodes while factor_info exposes only one content field. Node order is mapped from the saved canvas screenshot and the saved correlation report.
+
+| 角色 | node_id | 公式 | 映射说明 |
+|---|---|---|---|
+| T10-SIZE | 388faa80-4f7c-40b9-b32c-5d475b91a855 | (RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP)))) / 4 | inferred from saved canvas node order |
+| H03-T10-SINGLE | 5618284d-a13a-41f9-a48a-cf88e7e42632 | RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) | inferred from saved canvas node order and factor_info |
+
+### CORR-20260911-T10-SIZE-H03-T10
+
+来源：corr-t10-size-vs-h03-20260911.md。The correlation workflow has no feature_tag factor nodes in factor_list; inputs are recorded from the saved correlation report.
+
+| 角色 | node_id | 公式 | 映射说明 |
+|---|---|---|---|
+| T10-SIZE |  | (RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP)))) / 4 | 平台接口未返回节点 ID |
+| H03-T10-SINGLE |  | RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) | 平台接口未返回节点 ID |
+
+
+## 当前平台对象但本地缺记录
+
+| 工作流名 | workflow_id | 最近 run_id | 来源 | 节点 | 公式/内容 |
+|---|---|---|---|---|---|
+| T10-NONLINEAR-XGB-20260911 | 6aa3d4df3e7967143f8faf55 | 6aa3d504a7f535324660ba88 | web | 因子分析 (03121ba5-2fe7-4e72-8bc5-83f77150a2a5) |  |
+| STFILTER-T10-SIZE-H03-T10-20260911 | 6aa3871b51cdfe29b2e0bc47 | 6aa38c5dcffa1665a210173c | web | 因子分析 (388faa80-4f7c-40b9-b32c-5d475b91a855), 因子分析 (5618284d-a13a-41f9-a48a-cf88e7e42632) | RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) |
+| CORR-20260911-T10-SIZE-H03-T10 | 6aa371b551cdfe29b2e0bc34 | 6aa371b5ecb163ea7228d004 | cli | 接口未返回 | RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) |
+| CORR-20260909-CHIP250-OSR2-5Y | 6aa131a86df2a192a47e78ec | 6aa1320d51cdfe29b2e0b7e0 | web | 接口未返回 | RANK(1 - RETURNS(CLOSE,40)) |
+| BPZ-APT-K40-F1 | 6a9e5e8e52393bc2bd995cad | 6a9e5e98f8982abefd86e239 | cli | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) | ZSCORE((0.061988216581)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(0.00653559410589)*(AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(-0.0549343046093)*(AS_FLOAT(RANK(oper_roe_lyr) <= 0.5))+(-1.33359505041)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.5))+(-0.229286580945)*(AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5))+(-1.01918399464)*(AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5))+(1.15731415929)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.25))+(1.65225940276)*(AS_FLOAT(RANK(oper_roe_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-1.52157621537)*(AS_FLOAT(RANK(oper_roe_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(2.37348457161)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-3.11857235292)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(-0.29138646532)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.25) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.5))+(-0.944577249371)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.75))+(-0.0877722333946)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.75))+(-0.404751910837)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5))+(-0.701260189951)*(AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5))+(2.19607684341)*(AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-1.97134347041)*(AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(1.71097437879)*(AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-2.51325059507)*(AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(-0.467359415534)*(AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5))+(-0.401706118535)*(AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5))+(-0.535132431998)*(AS_FLOAT(RANK(gr_total_asset_lyr) > 0.25) * AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5))+(-1.32032125509)*(AS_FLOAT(RANK(gr_total_asset_lyr) > 0.75))+(1.42679722235)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.125))+(0.608308381678)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.25) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5))+(0.640978607751)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.25) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5))+(1.11662110118)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-0.505828937646)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(1.3588765729)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-0.47713636314)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(-0.411284607332)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.75))+(0.501034032348)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.75))+(1.57251490488)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-0.930748662651)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(1.36921212177)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) <= 0.5))+(-0.296326311496)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(MARKET_CAP) > 0.5))+(-0.0537717562232)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.5))+(0.267782523374)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.5) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5))+(0.404027328747)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.125) * AS_FLOAT(RANK(oper_roe_lyr) <= 0.5))+(1.35786082417)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.125) * AS_FLOAT(RANK(oper_roe_lyr) > 0.5))+(0.306602890134)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.125) * AS_FLOAT(RANK(gr_total_asset_lyr) <= 0.5))+(1.48692323308)*(AS_FLOAT(RANK(MARKET_CAP) <= 0.125) * AS_FLOAT(RANK(gr_total_asset_lyr) > 0.5))) |
+| 因子分析-克隆 | 6a9647dad3d1ffea2f8fa5b5 | 6a969424bda27a65e29a6a82 | web | 因子分析 (0ad8b5b7-f5d1-4b7b-ad7f-5c183837fd12) |  |
+| Alpha191因子_121 | 6a96932f8c8978304d7d41ec |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| Alpha101因子_003 | 6a9657324b2c22a9c68c69c9 |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| Alpha191因子_016 | 6a964fedbda27a65e29a682c |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| 30日最高最低价的时间距离 | 6a9646f0bda27a65e29a67eb |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| 30日最高最低价的时间距离 | 6a9642e3d5a023b98a273e36 |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| Alpha191因子_190 | 6a955e48d5a023b98a273c01 |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| 下午前一小时的涨幅 | 6a9509c0d5a023b98a273a6c |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| Alpha101因子_040 | 6a9507f2ebdbf39d3048649c |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| Alpha191因子_042 | 6a9500b6ebdbf39d3048648b | 6a9503c7fef4b09355240144 | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| Alpha101因子_040 | 6a94f5ff4b2c22a9c68c64ae |  | web | 因子分析 (300e12f5-4814-44c2-9810-c95a4567283c) |  |
+| demo-1-克隆 | 6a94f4f54e214cea5e4a58da |  | web | 接口未返回 |  |
+| demo-克隆 | 69e736c5ba37882939b49a43 | 69e736d2c73820afef77acfd | web | 因子分析 (0ad8b5b7-f5d1-4b7b-ad7f-5c183837fd12) |  |
+
+## 本地记录但平台已不存在
+
+| 本地候选名 | factor_id | run_id | 状态文件 |
+|---|---|---|---|
+| COMBO-DIRECT-OSR2-CHIP-TURN-NOMCAP-EQ | 6aa14aea6df2a192a47e7919 |  | combo-direct-4factor-20260909-candidates.txt.state.json |
+| DLS14-STREV-20D | 6a9e6545f8982abefd86e240 | 6a9e65459a167ed86a7f1b68 | dls2014-candidates.txt.state.json |
+| DLS14-NCF-PROXY-20D | 6a9e6558f8982abefd86e241 | 6a9e6558f8982abefd86e242 | dls2014-candidates.txt.state.json |
+| paper-derived-roe | 6a9e2f96b2a0c66c6431012a | 6a9e2f97b2a0c66c6431012b | paper-derived-full.txt.state.json |
+| paper-derived-asset-growth | 6a9e2fde05a51446c21e7672 | 6a9e2fdf05a51446c21e7673 | paper-derived-full.txt.state.json |
+| paper-derived-profitability | 6a9e30249a167ed86a7f1ae1 | 6a9e30249a167ed86a7f1ae2 | paper-derived-full.txt.state.json |
+
+## 全量当前平台索引
+
+| 工作流名 | workflow_id | 最近 run_id | 本地登记 | 节点 ID/标题 | 平台公式/参数状态 |
+|---|---|---|---|---|---|
+| T10-NONLINEAR-XGB-20260911 | 6aa3d4df3e7967143f8faf55 | 6aa3d504a7f535324660ba88 | 否 | 03121ba5-2fe7-4e72-8bc5-83f77150a2a5 / 因子分析 | 已取得 |
+| t10-more-additions-20260911-T10-ADD-AGG-IMPACT-20260911 | 6aa3ca136df2a192a47e7d33 | 6aa3ca1451cdfe29b2e0bce4 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-more-additions-20260911-T10-ADD-FSCORE-20260911 | 6aa3c986a7f535324660ba76 | 6aa3c986a7f535324660ba77 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-more-additions-20260911-T10-ADD-DOWNSIDE-IMPACT-20260911 | 6aa3c920ecb163ea7228d078 | 6aa3c9208b01f62dc5146090 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-additions-20260911-T10-ADD-BM-20260911 | 6aa3c6d1a7f535324660ba70 | 6aa3c6d25d52c44d2f55c45b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-additions-20260911-T10-ADD-DD120-20260911 | 6aa3c66cecb163ea7228d075 | 6aa3c66d6df2a192a47e7d28 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-additions-20260911-T10-ADD-G13-20260911 | 6aa3c613ecb163ea7228d06e | 6aa3c61451cdfe29b2e0bcdd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-nomcap-plus-impact-20260911-T10-NOMCAP-PLUS-IMPACT | 6aa3c06bd5536b11c13ee096 | 6aa3c06cd5536b11c13ee097 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| size-only-20260911-SIZE-ONLY-20260911 | 6aa3b8573e7967143f8faf29 | 6aa3b8576df2a192a47e7cfe | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| STFILTER-T10-SIZE-H03-T10-20260911 | 6aa3871b51cdfe29b2e0bc47 | 6aa38c5dcffa1665a210173c | 否 | 388faa80-4f7c-40b9-b32c-5d475b91a855 / 因子分析, 5618284d-a13a-41f9-a48a-cf88e7e42632 / 因子分析 | 已取得 |
+| CORR-20260911-T10-SIZE-H03-T10 | 6aa371b551cdfe29b2e0bc34 | 6aa371b5ecb163ea7228d004 | 否 | 无 feature_tag | 已取得 |
+| h03-t10-20260911-H03-T10-SINGLE | 6aa36bd3cffa1665a2101716 | 6aa36bd3ecb163ea7228cffe | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-new-20260911-T10-SIZE-PLUS-IMPACT-WC | 6aa3690aecb163ea7228cffa | 6aa3690a6df2a192a47e7c60 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-new-20260911-T10-SIZE-PLUS-WC-MCAP | 6aa368b9ecb163ea7228cff9 | 6aa368baa7f535324660b9a5 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-new-20260911-T10-SIZE-PLUS-IMPACT | 6aa368586df2a192a47e7c5d | 6aa368586df2a192a47e7c5e | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| VERIFY10-G260910-13 | 6aa28ea3a7f535324660b83a | 6aa28ea43e7967143f8fae33 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| VERIFY10-F260910-12 | 6aa28e555d52c44d2f55c2dc | 6aa28e56a7f535324660b838 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| VERIFY10-E260910-04 | 6aa28e090f6165ec8f7f378b | 6aa28e0a5d52c44d2f55c2da | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| VERIFY-G260910-13 | 6aa28d80cffa1665a210157c | 6aa28d80cffa1665a210157d | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| VERIFY-F260910-12 | 6aa28d3851cdfe29b2e0ba93 | 6aa28d3951cdfe29b2e0ba94 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| VERIFY-E260910-04 | 6aa28cf2a7f535324660b832 | 6aa28cf3cffa1665a210157a | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| REPORT-HIST-ASSETTURN-6Q-10D-20260910 | 6aa253f4a7f535324660b773 | 6aa253f5cffa1665a21014bd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| REPORT-HIST-NETMARGIN-6Q-10D-20260910 | 6aa253b9cffa1665a21014b8 | 6aa253baa7f535324660b76f | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| REPORT-ROIC-TTM-10D-20260910 | 6aa2537ccffa1665a21014b0 | 6aa2537da7f535324660b768 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| base3-20260910-BASE-DIV-YIELD-TTM | 6aa23b2ecffa1665a21013fa | 6aa23b2fcffa1665a21013fb | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| base3-20260910-BASE-ACCRUAL-CASH-TTM | 6aa23b2b3e7967143f8fad9d | 6aa23b2b3e7967143f8fad9e | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| base3-20260910-BASE-GROSSPROFIT-ASSET-TTM | 6aa23b273e7967143f8fad9c | 6aa23b28cffa1665a21013f8 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| hp5-20260910-NEW-VALUE-EVEBITDA | 6aa233bf6df2a192a47e79f1 | 6aa233c051cdfe29b2e0b958 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| hp5-20260910-NEW-HIST-ADJPROFIT-6Q | 6aa2338dcffa1665a21013e9 | 6aa2338e5d52c44d2f55c227 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| hp5-20260910-NEW-HIST-ROE-6Q | 6aa2335b3e7967143f8fad87 | 6aa2335b6df2a192a47e79ef | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| hp5-20260910-NEW-GROWTH-ROE-TTM | 6aa2331b51cdfe29b2e0b957 | 6aa2331cecb163ea7228ce53 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| hp5-20260910-NEW-GROWTH-REV-TTM | 6aa232daa7f535324660b6c8 | 6aa232da5d52c44d2f55c225 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-size-2026ytd-COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ-2026YTD | 6aa159b851cdfe29b2e0b84f | 6aa159b851cdfe29b2e0b850 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-paper-combo-20260909-COMBO-DIRECT-OSR2-CHIP-TURN-PAPER-EQ | 6aa15326a7f535324660b5d5 | 6aa15327cffa1665a21012d2 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| t10-size-20260909-COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ | 6aa150cb3e7967143f8face0 | 6aa150cbcffa1665a21012bd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| direct-3factor-20260909-COMBO-DIRECT-OSR2-CHIP-TURN-EQ | 6aa148c86df2a192a47e7916 | 6aa148c8cffa1665a21012b2 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| direct-combo-20260909-COMBO-DIRECT-OSR2-CHIP-EQ | 6aa14416ecb163ea7228cd95 | 6aa1441751cdfe29b2e0b805 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| CORR-20260909-CHIP250-OSR2-5Y | 6aa131a86df2a192a47e78ec | 6aa1320d51cdfe29b2e0b7e0 | 否 | 无 feature_tag | 已取得 |
+| NONHT-REPORT-20260909-NONHT-VAL-RESIDUAL | 6aa124136df2a192a47e78d7 | 6aa124136df2a192a47e78d8 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NONHT-REPORT-20260909-NONHT-CHIP-COST-250 | 6aa1239c6df2a192a47e78d4 | 6aa1239c6df2a192a47e78d5 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NONHT-REPORT-20260909-NONHT-LTMOM-EXHIGH-252-21 | 6aa12350cffa1665a2101260 | 6aa12350cffa1665a2101261 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NONHT-MAX5-LOW-21D | 6aa1061451cdfe29b2e0b76f | 6aa106153e7967143f8fac67 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NONHT-RESVOL-MAX-INTERACT-21D | 6aa1059651cdfe29b2e0b76a | 6aa1059651cdfe29b2e0b76b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NONHT-FSCORELIKE-REV40-INTERACT | 6aa1051decb163ea7228cd46 | 6aa1051eecb163ea7228cd47 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NHT6-20260909-NONHT-LOW-BETA | 6aa0ea1a5d52c44d2f55c0f2 | 6aa0ea1a5d52c44d2f55c0f3 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NHT6-20260909-NONHT-CASH-CONVERSION | 6aa0e9d6cffa1665a21011ab | 6aa0e9d7cffa1665a21011ac | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NHT6-20260909-NONHT-FSCORELIKE-REV40 | 6aa0e96acffa1665a21011aa | 6aa0e96ba7f535324660b4d0 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NHT6-20260909-NONHT-SKEW-LOW-60D | 6aa0e9283e7967143f8fac42 | 6aa0e9293e7967143f8fac43 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NHT6-20260909-NONHT-RESVOL-LOW | 6aa0e8ef5d52c44d2f55c0f1 | 6aa0e8f0a7f535324660b4ce | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| NHT6-20260909-NONHT-MAX-LOW-21D | 6aa0e8a76df2a192a47e781e | 6aa0e8a8cffa1665a21011a8 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT13-EXPWRET-6M | 6aa0e126a7f535324660b4c4 | 6aa0e127a7f535324660b4c5 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT13-EXPWRET-3M | 6aa0e083ecb163ea7228cd22 | 6aa0e0843e7967143f8fac3b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT13-WGTRET-1M | 6aa0e03e51cdfe29b2e0b728 | 6aa0e03e51cdfe29b2e0b729 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| DISTRIBUTION-INTRADAY-3SIGNAL-10D | 6aa0dc3d51cdfe29b2e0b725 | 6aa0dc3e51cdfe29b2e0b726 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| DISTRIBUTION-RISK-CORE-10D | 6aa0d9d551cdfe29b2e0b71c | 6aa0d9d6cffa1665a210118d | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-MKTBEHAV-20260908-INTRADAY-ABSORPTION-10D | 6aa0d18a5d52c44d2f55c0db | 6aa0d18a5d52c44d2f55c0dc | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-MKTBEHAV-20260908-DISTRIBUTION-RISK-10D | 6aa0d12ba7f535324660b4a2 | 6aa0d12b6df2a192a47e7801 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-MKTBEHAV-20260908-WASHOUT-RECOVERY-10D | 6aa0d1186df2a192a47e77fe | 6aa0d1196df2a192a47e77ff | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10OSRTURNPAPER-NOMCAP-2026YTD-20260909-OSR2-RET40-TURN-BIAS-PAPER-NOMCAP-EQ-2026-YTD | 6aa0ca52a7f535324660b497 | 6aa0ca52a7f535324660b498 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10OSRTURNPAPER-2026YTD-20260909-OSR2-RET40-TURN-BIAS-PAPER-EQ-2026-YTD | 6aa0c7b56df2a192a47e77e2 | 6aa0c7b55d52c44d2f55c0c0 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10CMP-NOMCAP-20260909-PAPER-DERIVED-COMPOSITE-NOMCAP | 6aa0c28251cdfe29b2e0b6ea | 6aa0c2836df2a192a47e77c5 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10OSRTURNPAPER-NOMCAP-20260909-OSR2-RET40-TURN-BIAS-PAPER-NOMCAP-EQ | 6aa0c0435d52c44d2f55c0b9 | 6aa0c0433e7967143f8fabf6 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10OSRTURNPAPER-20260908-OSR2-RET40-TURN-BIAS-PAPER-EQ | 6a9fe1363e7967143f8fab47 | 6a9fe1366df2a192a47e76a5 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10OSRTURN-20260908-OSR2-RET40-TURN-BIAS-EQ | 6a9fdd605d52c44d2f55c013 | 6a9fdd605d52c44d2f55c014 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10CMP-20260908-paper-derived-composite | 6a9fd5536df2a192a47e766d | 6a9fd554cffa1665a2100f4b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10POS-20260908-HT13-TURN-BIAS-1M | 6a9fcdb251cdfe29b2e0b56b | 6a9fcdb23e7967143f8faaee | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10POS-20260908-OSR2-DD120 | 6a9fcd73ecb163ea7228cbed | 6a9fcd73ecb163ea7228cbee | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10POS-20260908-OSR2-RET40 | 6a9fcd2d6df2a192a47e765b | 6a9fcd2e6df2a192a47e765c | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-HT13-ALPHA13 | 6a9fb95651cdfe29b2e0b54d | 6a9fb9563e7967143f8faadc | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-HT13-ALPHA44 | 6a9fb90aa7f535324660b2fa | 6a9fb90aa7f535324660b2fb | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-OSR-RSI14-20D | 6a9fb8c8a7f535324660b2f5 | 6a9fb8c9a7f535324660b2f6 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-HT-WREV-21D | 6a9fb8870f6165ec8f7f34e8 | 6a9fb887cffa1665a2100ef0 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-OSR2-RET20 | 6a9fb83f0f6165ec8f7f34e3 | 6a9fb8400f6165ec8f7f34e4 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-HT13-REVERSAL-20D | 6a9fb802cffa1665a2100ee8 | 6a9fb803cffa1665a2100ee9 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| T10-20260908-HT-WREV-LOWTURN-21D | 6a9fb7b4ecb163ea7228cbd2 | 6a9fb7b46df2a192a47e762c | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT-NEW26-HT13-NEW-HIST-OPPROFIT-6Q | 6a9fa5f06df2a192a47e75f7 | 6a9fa5f10f6165ec8f7f34cd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT-NEW26-HT13-NEW-ALPHA40 | 6a9fa5a2cffa1665a2100ecf | 6a9fa5a3cffa1665a2100ed0 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT-NEW26-HT13-NEW-HIST-GPM-6Q | 6a9fa567a7f535324660b2ce | 6a9fa568a7f535324660b2cf | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT-RR26-HT-WREV-LOWTURN-21D | 6a9f93c051cdfe29b2e0b4fe | 6a9f93c06df2a192a47e75bc | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT-RR26-HT-EXPWREV-63D | 6a9f93766df2a192a47e75bb | 6a9f9376a7f535324660b2a9 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| HT-RR26-HT-WREV-21D | 6a9f9336cffa1665a2100e7e | 6a9f9337cffa1665a2100e7f | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-PCF | 6a9f797aa7f535324660b238 | 6a9f797ba7f535324660b239 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-SP | 6a9f7922cffa1665a2100e1a | 6a9f7922cffa1665a2100e1b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-TSRANK756 | 6a9f78c7a7f535324660b22c | 6a9f78c7ecb163ea7228cb78 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-MA63 | 6a9f786e5d52c44d2f55bf6b | 6a9f786e51cdfe29b2e0b4af | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-VAL3 | 6a9f78153e7967143f8faa6a | 6a9f78165d52c44d2f55bf65 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-VAL2 | 6a9f77be0f6165ec8f7f34a1 | 6a9f77bf0f6165ec8f7f34a2 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-REV3 | 6a9f776ccffa1665a2100e11 | 6a9f776ca7f535324660b223 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr4-OSR4-RET40-BP-CFP-REV2 | 6a9f771bcffa1665a2100e10 | 6a9f771ca7f535324660b221 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-INTERACT | 6a9f75703e7967143f8faa67 | 6a9f7571a7f535324660b21f | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-TSRANK756 | 6a9f751c51cdfe29b2e0b49e | 6a9f751c51cdfe29b2e0b49f | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-MA63 | 6a9f74c7cffa1665a2100e07 | 6a9f74c7cffa1665a2100e08 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-EP-ROE | 6a9f747251cdfe29b2e0b49d | 6a9f74733e7967143f8faa62 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-ROE | 6a9f741dcffa1665a2100e06 | 6a9f741ea7f535324660b21d | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-EP-CFP | 6a9f73b9a7f535324660b21c | 6a9f73ba6df2a192a47e755c | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-CFP | 6a9f735ccffa1665a2100e03 | 6a9f735ccffa1665a2100e04 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-EP | 6a9f73036df2a192a47e7559 | 6a9f73036df2a192a47e755a | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-EP-EQ | 6a9f72b63e7967143f8faa61 | 6a9f72b76df2a192a47e7555 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-VAL2 | 6a9f725e5d52c44d2f55bf62 | 6a9f725e5d52c44d2f55bf63 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-REV2 | 6a9f7209a7f535324660b21b | 6a9f720a0f6165ec8f7f349a | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| osr3-OSR3-RET40-BP-EQ | 6a9f71b551cdfe29b2e0b49c | 6a9f71b56df2a192a47e7551 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-TURN-BIAS-1M-POS | 6a9e9449a7f535324660b07d | 6a9e944aa7f535324660b07e | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-STYLE-EQ | 6a9e8efa6df2a192a47e739a | 6a9e8efb6df2a192a47e739b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-VALUE-EQ | 6a9e8eaa3e7967143f8fa94f | 6a9e8eaa6df2a192a47e7398 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA55 | 6a9e8e5ccffa1665a2100bed | 6a9e8e5ccffa1665a2100bee | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA50-TP | 6a9e8e163e7967143f8fa93b | 6a9e8e173e7967143f8fa93c | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA44 | 6a9e8dd7cffa1665a2100be0 | 6a9e8dd8cffa1665a2100be1 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA16 | 6a9e8d983e7967143f8fa938 | 6a9e8d983e7967143f8fa939 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA15 | 6a9e8d56cffa1665a2100bdd | 6a9e8d57cffa1665a2100bde | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA13 | 6a9e8d15ecb163ea7228ca89 | 6a9e8d1551cdfe29b2e0b32e | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-ALPHA3 | 6a9e8cd3cffa1665a2100bda | 6a9e8cd4cffa1665a2100bdb | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-HIST-ROA-6Q | 6a9e8ca3a7f535324660b05a | 6a9e8ca4a7f535324660b05b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-HIST-EP-2Q | 6a9e8c64a7f535324660b059 | 6a9e8c643e7967143f8fa936 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-QUALITY-CASH-DEBT | 6a9e8c26cffa1665a2100bd9 | 6a9e8c2751cdfe29b2e0b32c | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-QUALITY-ROE | 6a9e8be9a7f535324660b058 | 6a9e8beacffa1665a2100bd7 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-VOL-STD-1M | 6a9e8ba8cffa1665a2100bd6 | 6a9e8ba85d52c44d2f55be5d | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-TURN-STD-1M | 6a9e8b63cffa1665a2100bd5 | 6a9e8b636df2a192a47e7393 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-TURN-BIAS-1M | 6a9e8b253e7967143f8fa933 | 6a9e8b263e7967143f8fa934 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-MOMENTUM-120D | 6a9e8ae0ecb163ea7228ca86 | 6a9e8ae0ecb163ea7228ca87 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-REVERSAL-20D | 6a9e8a9a6df2a192a47e7390 | 6a9e8a9a6df2a192a47e7391 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-GROWTH-OCF | 6a9e8a61ecb163ea7228ca81 | 6a9e8a61ecb163ea7228ca82 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-GROWTH-NP | 6a9e8a21cffa1665a2100bd3 | 6a9e8a22a7f535324660b054 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-VALUE-OCFP-LOW-PCF | 6a9e89e0cffa1665a2100bcf | 6a9e89e1cffa1665a2100bd0 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-VALUE-SP | 6a9e899ca7f535324660b053 | 6a9e899d5d52c44d2f55be5b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-VALUE-EP | 6a9e895b5d52c44d2f55be5a | 6a9e895c51cdfe29b2e0b328 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| huatai13-HT13-VALUE-BP | 6a9e891a0f6165ec8f7f33d9 | 6a9e891acffa1665a2100bcd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-SMOOTH-RSI28 | 6a9e7790ecb163ea7228ca65 | 6a9e7b8f5d52c44d2f55be49 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-DD120 | 6a9e77906df2a192a47e7347 | 6a9e7b46ecb163ea7228ca6d | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-DD60 | 6a9e7790cffa1665a2100b83 | 6a9e7afc6df2a192a47e7356 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-RET40 | 6a9e778fecb163ea7228ca64 | 6a9e7abba7f535324660b013 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-RET20 | 6a9e778fecb163ea7228ca63 | 6a9e7a7c51cdfe29b2e0b306 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-RET20-REC5 | 6a9e778eecb163ea7228ca62 | 6a9e7a4251cdfe29b2e0b301 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-PRICE-CROSS-MA5 | 6a9e778ea7f535324660affd | 6a9e7a086df2a192a47e7350 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-RSI-CROSS30 | 6a9e778d6df2a192a47e7346 | 6a9e79c0a7f535324660b00a | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-MA20-REC5 | 6a9e778decb163ea7228ca61 | 6a9e797551cdfe29b2e0b2fc | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-DD60-REC5 | 6a9e778cecb163ea7228ca60 | 6a9e792951cdfe29b2e0b2f8 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-RSI35-REC5 | 6a9e778cecb163ea7228ca5f | 6a9e78da5d52c44d2f55be3f | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-RSI35-REC3 | 6a9e778b6df2a192a47e7345 | 6a9e7888a7f535324660b004 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-MODERATE-DD60 | 6a9e778b51cdfe29b2e0b2f5 | 6a9e783ecffa1665a2100b89 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-MODERATE-BIAS5 | 6a9e778becb163ea7228ca5e | 6a9e77f3cffa1665a2100b84 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR2-full-OSR2-MODERATE-RSI35 | 6a9e778a3e7967143f8fa90c | 6a9e77a3a7f535324660afff | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-SCALED-RET5-20D | 6a9e6f57b2a0c66c643101c6 | 6a9e724c52393bc2bd995ccd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-CAPITULATION-20D | 6a9e6f57b2a0c66c643101c5 | 6a9e720d05a51446c21e76c4 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-RET5-DD20-20D | 6a9e6f5605a51446c21e76b8 | 6a9e71c8fada315e619d3928 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-RET5-RSI14-20D | 6a9e6f5605a51446c21e76b7 | 6a9e718200f37f69c51fbcf1 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-Z20-20D | 6a9e6f55b2a0c66c643101c4 | 6a9e7137f8982abefd86e25e | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-MFI14-20D | 6a9e6f55b2a0c66c643101c3 | 6a9e70edf8982abefd86e25c | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-RSI14-20D | 6a9e6f5405a51446c21e76b6 | 6a9e70a8b2a0c66c643101cd | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-MA20-20D | 6a9e6f54b2a0c66c643101c2 | 6a9e705ffada315e619d3926 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-DD20-20D | 6a9e6f5305a51446c21e76b5 | 6a9e701605a51446c21e76b9 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-RET10-20D | 6a9e6f53b2a0c66c643101c1 | 6a9e6fcfb2a0c66c643101cb | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| OSR-full-OSR-RET5-20D | 6a9e6f52b2a0c66c643101c0 | 6a9e6f85b2a0c66c643101c7 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| DLS14-fund-DLS14-DR-BROAD-20D | 6a9e691752393bc2bd995cb8 | 6a9e69189a167ed86a7f1b73 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| DLS14-fund-DLS14-DR-OPCF-20D | 6a9e68c3b2a0c66c643101a6 | 6a9e68c3b2a0c66c643101a7 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| DLS14-full-DLS14-NCF-PROXY-20D | 6a9e6614b2a0c66c6431019c | 6a9e66149a167ed86a7f1b6b | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| DLS14-full-DLS14-STREV-20D | 6a9e65c3fada315e619d3912 | 6a9e65c47f3a31832eb8bd17 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| BPZ-APT-K40-F1 | 6a9e5e8e52393bc2bd995cad | 6a9e5e98f8982abefd86e239 | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| paper-derived-full-paper-derived-composite | 6a9e306152393bc2bd995c4b | 6a9e30629a167ed86a7f1ae4 | 是 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| 因子分析-克隆 | 6a9647dad3d1ffea2f8fa5b5 | 6a969424bda27a65e29a6a82 | 否 | 0ad8b5b7-f5d1-4b7b-ad7f-5c183837fd12 / 因子分析 | 已取得 |
+| Alpha191因子_121 | 6a96932f8c8978304d7d41ec |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| Alpha101因子_003 | 6a9657324b2c22a9c68c69c9 |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| Alpha191因子_016 | 6a964fedbda27a65e29a682c |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| 30日最高最低价的时间距离 | 6a9646f0bda27a65e29a67eb |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| 30日最高最低价的时间距离 | 6a9642e3d5a023b98a273e36 |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| Alpha191因子_190 | 6a955e48d5a023b98a273c01 |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| 下午前一小时的涨幅 | 6a9509c0d5a023b98a273a6c |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| Alpha101因子_040 | 6a9507f2ebdbf39d3048649c |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| Alpha191因子_042 | 6a9500b6ebdbf39d3048648b | 6a9503c7fef4b09355240144 | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| Alpha101因子_040 | 6a94f5ff4b2c22a9c68c64ae |  | 否 | 300e12f5-4814-44c2-9810-c95a4567283c / 因子分析 | 已取得 |
+| demo-1-克隆 | 6a94f4f54e214cea5e4a58da |  | 否 | 无 feature_tag | 已取得 |
+| demo-克隆 | 69e736c5ba37882939b49a43 | 69e736d2c73820afef77acfd | 否 | 0ad8b5b7-f5d1-4b7b-ad7f-5c183837fd12 / 因子分析 | 已取得 |
