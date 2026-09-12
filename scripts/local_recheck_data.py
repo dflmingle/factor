@@ -26,7 +26,7 @@ DEFAULT_CACHE_ROOT = PROJECT_ROOT / "quantlab" / ".quantlab" / "cache" / "resear
 DEFAULT_SOURCE = Path(
     os.environ.get("FACTOR_RESEARCH_CACHE_ROOT", str(DEFAULT_CACHE_ROOT))
 ).expanduser()
-DEFAULT_ARCHIVE = PROJECT_ROOT.parent / "factor-local-recheck-data.tar.gz"
+DEFAULT_ARCHIVE = PROJECT_ROOT / "data" / "local_recheck" / "factor-local-recheck-data.tar.gz"
 DEFAULT_MANIFEST = PROJECT_ROOT / "research_reports" / "platform_alignment" / "local_recheck_data_manifest.json"
 ARCHIVE_ROOT = "cn_equity"
 MANIFEST_NAME = "manifest.json"

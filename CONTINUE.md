@@ -5,28 +5,32 @@
 ## 1. 克隆项目
 
 ```bash
+git lfs install
 git clone --recurse-submodules https://github.com/dflmingle/factor.git
 cd factor
+git lfs pull
 ```
 
 项目已经随仓库包含 PandaAI Skill 和 `quantlab` 子模块，不依赖当前电脑上的 `/home/minkefu/.codex/` 路径。
 
 ## 2. 搬运本地 Tushare 数据
 
-本地复现使用的日线 Parquet 缓存约 0.8 GB，未放入普通 Git 历史。换电脑时，在旧电脑导出数据包，再把数据包复制到新电脑：
+本地复现使用的日线 Parquet 缓存约 0.8 GB，作为 Git LFS 文件随 GitHub 仓库获取。新电脑拉取 LFS 文件后，在项目根目录执行一次导入：
 
 ```bash
-python scripts/local_recheck_data.py export --output ../factor-local-recheck-data.tar.gz
-```
-
-新电脑克隆仓库并完成子模块初始化后，在项目根目录执行：
-
-```bash
-python scripts/local_recheck_data.py import --archive ../factor-local-recheck-data.tar.gz
+python scripts/local_recheck_data.py import --archive data/local_recheck/factor-local-recheck-data.tar.gz
+python scripts/local_recheck_data.py verify --archive data/local_recheck/factor-local-recheck-data.tar.gz
 python scripts/local_recheck_data.py verify
 ```
 
-默认会恢复到 `quantlab/.quantlab/cache/research/cn_equity`。如果数据放在独立磁盘，可指定缓存根目录；该目录需要直接对应 `cn_equity`：
+默认会恢复到 `quantlab/.quantlab/cache/research/cn_equity`。如果 `git lfs pull` 后看到的归档只有几十字节，说明当前电脑还没有拉到 LFS 对象；先安装并初始化 Git LFS，再重新执行：
+
+```bash
+git lfs install
+git lfs pull
+```
+
+如果数据放在独立磁盘，可指定缓存根目录；该目录需要直接对应 `cn_equity`：
 
 ```bash
 export FACTOR_RESEARCH_CACHE_ROOT=/data/factor/cn_equity
@@ -38,11 +42,20 @@ PowerShell 等价写法：
 
 ```powershell
 $env:FACTOR_RESEARCH_CACHE_ROOT = 'D:\factor-data\cn_equity'
-python scripts/local_recheck_data.py import --archive 'D:\factor-local-recheck-data.tar.gz' --destination-root 'D:\factor-data'
+python scripts/local_recheck_data.py import --archive 'data\local_recheck\factor-local-recheck-data.tar.gz' --destination-root 'D:\factor-data'
 python scripts/local_recheck_data.py verify --source 'D:\factor-data\cn_equity'
 ```
 
 如果目标目录已有数据，导入命令会拒绝覆盖；确认需要替换时再显式加 `--replace`。
+
+如果以后重新下载了完整数据，需要更新 GitHub 上的快照，在旧电脑执行：
+
+```bash
+python scripts/local_recheck_data.py export --output data/local_recheck/factor-local-recheck-data.tar.gz
+git add data/local_recheck/factor-local-recheck-data.tar.gz research_reports/platform_alignment/local_recheck_data_manifest.json
+git commit -m "data: update local recheck snapshot"
+git push
+```
 
 当前复现命令：
 

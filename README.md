@@ -13,6 +13,7 @@
 - `scripts/pandaai.py`：跨电脑调用 Skill 脚本的统一入口
 - `scripts/start.py`：换电脑后的环境安装、预检和登录入口
 - `scripts/local_recheck_data.py`：本地 Tushare 复现数据的导出、导入和校验
+- `data/local_recheck/factor-local-recheck-data.tar.gz`：通过 Git LFS 管理的本地复现数据快照
 
 ## 默认研究口径
 
@@ -24,4 +25,4 @@
 
 回测结果是历史样本研究记录，不代表未来收益，也不构成投资建议。仓库不包含 PandaAI 登录凭据；重新运行需要本地配置已登录的 `pandaai-cli`。
 
-换电脑继续研究请阅读 [`CONTINUE.md`](./CONTINUE.md)；启动规则见 [`START.md`](./START.md)。本地 Tushare 复现数据不进入普通 Git 历史，使用迁移脚本搬运数据包。
+换电脑继续研究请阅读 [`CONTINUE.md`](./CONTINUE.md)；启动规则见 [`START.md`](./START.md)。本地 Tushare 复现数据通过 Git LFS 随仓库获取。
