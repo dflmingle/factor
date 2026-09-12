@@ -26,7 +26,10 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 QUANTLAB_ROOT = PROJECT_ROOT / "quantlab"
-CACHE_ROOT = QUANTLAB_ROOT / ".quantlab" / "cache" / "research" / "cn_equity"
+DEFAULT_CACHE_ROOT = QUANTLAB_ROOT / ".quantlab" / "cache" / "research" / "cn_equity"
+CACHE_ROOT = Path(
+    os.environ.get("FACTOR_RESEARCH_CACHE_ROOT", str(DEFAULT_CACHE_ROOT))
+).expanduser()
 DATA_ROOT = CACHE_ROOT / "tushare_factor_recheck" / "stfilter_local"
 BATCH_ROOT = DATA_ROOT / "daily_batches"
 REPORT_ROOT = CACHE_ROOT / "reports" / "stfilter_local"

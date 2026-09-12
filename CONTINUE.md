@@ -5,13 +5,53 @@
 ## 1. 克隆项目
 
 ```bash
-git clone https://github.com/dflmingle/factor.git
+git clone --recurse-submodules https://github.com/dflmingle/factor.git
 cd factor
 ```
 
-项目已经随仓库包含 PandaAI Skill，不依赖当前电脑上的 `/home/minkefu/.codex/` 路径。
+项目已经随仓库包含 PandaAI Skill 和 `quantlab` 子模块，不依赖当前电脑上的 `/home/minkefu/.codex/` 路径。
 
-## 2. 准备 Python 和 CLI
+## 2. 搬运本地 Tushare 数据
+
+本地复现使用的日线 Parquet 缓存约 0.8 GB，未放入普通 Git 历史。换电脑时，在旧电脑导出数据包，再把数据包复制到新电脑：
+
+```bash
+python scripts/local_recheck_data.py export --output ../factor-local-recheck-data.tar.gz
+```
+
+新电脑克隆仓库并完成子模块初始化后，在项目根目录执行：
+
+```bash
+python scripts/local_recheck_data.py import --archive ../factor-local-recheck-data.tar.gz
+python scripts/local_recheck_data.py verify
+```
+
+默认会恢复到 `quantlab/.quantlab/cache/research/cn_equity`。如果数据放在独立磁盘，可指定缓存根目录；该目录需要直接对应 `cn_equity`：
+
+```bash
+export FACTOR_RESEARCH_CACHE_ROOT=/data/factor/cn_equity
+python scripts/local_recheck_data.py import --archive /path/to/factor-local-recheck-data.tar.gz --destination-root /data/factor
+python scripts/local_recheck_data.py verify --source /data/factor/cn_equity
+```
+
+PowerShell 等价写法：
+
+```powershell
+$env:FACTOR_RESEARCH_CACHE_ROOT = 'D:\factor-data\cn_equity'
+python scripts/local_recheck_data.py import --archive 'D:\factor-local-recheck-data.tar.gz' --destination-root 'D:\factor-data'
+python scripts/local_recheck_data.py verify --source 'D:\factor-data\cn_equity'
+```
+
+如果目标目录已有数据，导入命令会拒绝覆盖；确认需要替换时再显式加 `--replace`。
+
+当前复现命令：
+
+```bash
+python scripts/stfilter_local_recheck.py --mode analyze --data-start 20190701 --start 20210907 --end 20260907 --price-mode qfq
+python scripts/extra_factor_local_compare.py
+```
+
+## 3. 准备 Python 和 CLI
 
 Python 需要 3.10 或更高版本。推荐用 `uv` 安装 CLI：
 
@@ -37,7 +77,7 @@ pandaai-cli login
 python scripts/pandaai.py skill-path
 ```
 
-## 3. 继续已有研究
+## 4. 继续已有研究
 
 只查看已有结果，不消耗计算额度：
 
@@ -60,7 +100,7 @@ python scripts/pandaai.py analyze corr factor-a.csv factor-b.csv
 python scripts/pandaai.py analyze turnover factor-a.csv --direction 1 --cycle 10
 ```
 
-## 4. 同步自己的进展
+## 5. 同步自己的进展
 
 ```bash
 git pull --ff-only
@@ -77,14 +117,14 @@ gh auth setup-git --hostname github.com
 git push
 ```
 
-## 5. 研究边界
+## 6. 研究边界
 
 - 统一默认窗口为 2021-09-07 至 2026-09-07，10 日调仓、10 组、0.3% 单边成本。
 - 新回测前先列候选、目的和额度，默认每轮最多 3 个候选。
 - 回测报告是历史样本记录，不是收益承诺，也不构成投资建议。
 - 不要把 `~/.pandaai/config.yaml`、密码、令牌或其他凭据复制到项目中。
 
-## 6. 最近一次研究状态：非线性组合
+## 7. 最近一次研究状态：非线性组合
 
 2026-09-11 已在 PandaAI 网页端完成一次 XGBoost 非线性组合，未修改原工作流：
 
