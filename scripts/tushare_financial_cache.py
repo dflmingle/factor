@@ -26,6 +26,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = PROJECT_ROOT / "quantlab" / ".quantlab" / "cache" / "research" / "cn_equity"
 FINANCIAL_ROOT = DATA_ROOT / "financial"
+FULL_A_QFQ_ROOT = DATA_ROOT / "tushare_factor_recheck" / "qfq" / "daily_batches"
 
 ENDPOINTS: dict[str, dict[str, str]] = {
     "fina_indicator": {
@@ -144,8 +145,8 @@ def tushare_client(token: str) -> Any:
     return client
 
 
-def batch_path(endpoint: str, batch_number: int) -> Path:
-    return FINANCIAL_ROOT / endpoint / f"batch_{batch_number:04d}.parquet"
+def batch_path(endpoint: str, batch_number: int, root: Path = FINANCIAL_ROOT) -> Path:
+    return root / endpoint / f"batch_{batch_number:04d}.parquet"
 
 
 def fetch_batch(
@@ -195,14 +196,15 @@ def download_endpoint(
     workers: int,
     retries: int,
     refresh: bool,
+    root: Path,
 ) -> dict[str, int]:
     spec = ENDPOINTS[endpoint]
-    endpoint_root = FINANCIAL_ROOT / endpoint
+    endpoint_root = root / endpoint
     endpoint_root.mkdir(parents=True, exist_ok=True)
     pending = [
         (number, codes)
         for number, codes in enumerate(codes_batches, start=1)
-        if refresh or not batch_path(endpoint, number).exists()
+        if refresh or not batch_path(endpoint, number, root).exists()
     ]
     reused = len(codes_batches) - len(pending)
     downloaded = 0
@@ -224,7 +226,7 @@ def download_endpoint(
         for future in as_completed(futures):
             number, codes = futures[future]
             frame = future.result()
-            write_parquet(batch_path(endpoint, number), frame)
+            write_parquet(batch_path(endpoint, number, root), frame)
             downloaded += 1
             rows += len(frame)
             print(
@@ -249,6 +251,23 @@ def load_pool() -> list[str]:
     return sorted(str(value) for value in load_local_pool())
 
 
+def load_full_a_codes() -> list[str]:
+    paths = sorted(FULL_A_QFQ_ROOT.glob("batch_*.parquet"))
+    if not paths:
+        raise FileNotFoundError(f"Full-A qfq cache is missing: {FULL_A_QFQ_ROOT}")
+    codes: set[str] = set()
+    for path in paths:
+        frame = pd.read_parquet(path, columns=["instrument"])
+        codes.update(
+            value
+            for value in frame["instrument"].astype(str)
+            if value.endswith((".SH", ".SZ"))
+        )
+    if len(codes) < 5000:
+        raise RuntimeError(f"Unexpectedly small full-A universe: {len(codes)}")
+    return sorted(codes)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start-date", default="20180101")
@@ -257,6 +276,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--retries", type=int, default=5)
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--universe", choices=["st_pool", "full_a"], default="st_pool")
+    parser.add_argument("--output-root", default=str(FINANCIAL_ROOT))
     return parser.parse_args()
 
 
@@ -268,7 +289,7 @@ def main() -> int:
     if args.batch_size < 1 or args.batch_size > 100:
         raise SystemExit("--batch-size must be between 1 and 100")
 
-    codes = load_pool()
+    codes = load_pool() if args.universe == "st_pool" else load_full_a_codes()
     batches = [codes[offset : offset + args.batch_size] for offset in range(0, len(codes), args.batch_size)]
     print(f"pool={len(codes)} batches={len(batches)} batch_size={args.batch_size}", flush=True)
     summary: dict[str, Any] = {
@@ -276,6 +297,8 @@ def main() -> int:
         "start_date": day_text(args.start_date),
         "end_date": day_text(args.end_date),
         "pool_count": len(codes),
+        "universe": args.universe,
+        "output_root": args.output_root,
         "batch_size": args.batch_size,
         "endpoints": {},
     }
@@ -288,8 +311,9 @@ def main() -> int:
             args.workers,
             args.retries,
             args.refresh,
+            Path(args.output_root),
         )
-    manifest = FINANCIAL_ROOT / "manifest.json"
+    manifest = Path(args.output_root) / "manifest.json"
     manifest.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"manifest={manifest}", flush=True)
     return 0

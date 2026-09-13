@@ -152,6 +152,23 @@ def extract(payload: dict, direction: str, group_number: int | None = None) -> d
     """
     # `factor_run` nests analysis under results; `factor_result` returns it at the top level.
     analysis = payload.get("factor_analysis") or (payload.get("results") or {}).get("factor_analysis") or {}
+    if not analysis:
+        # Some factor_run responses keep the completed analysis as a JSON string on the
+        # analysis node, while factor_result exposes the same data at factor_analysis.
+        for node in ((payload.get("results") or {}).get("nodes") or {}).values():
+            raw = node.get("result_json") if isinstance(node, dict) else None
+            if not isinstance(raw, str):
+                continue
+            try:
+                nested = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if nested.get("factor_data_analysis") and nested.get("group_return_analysis"):
+                analysis = {
+                    "query_factor_analysis_data": nested["factor_data_analysis"],
+                    "query_group_return_analysis": nested["group_return_analysis"],
+                }
+                break
     # CLI 0.1.3 calls the value `factor_value`; older payloads and some workflow nodes use
     # `factor1`. Accept both so a successful run cannot silently lose its IC metrics.
     indicators = {r["indicator"]: r.get("factor1", r.get("factor_value"))
@@ -365,6 +382,23 @@ def main() -> int:
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
 
     if args.report_only:
+        # Repair a successful run whose first-pass parser predated the nested result_json
+        # fallback above, without calling the service or spending another run.
+        repaired = False
+        for cand in candidates:
+            entry = state.get(cand["name"], {})
+            if entry.get("metrics") or not entry.get("raw_result"):
+                continue
+            raw_path = args.file.parent / entry["raw_result"]
+            try:
+                payload = json.loads(raw_path.read_text(encoding="utf-8"))
+                entry["metrics"] = extract(payload, cand["direction"], args.group_number)
+                entry.pop("error", None)
+                repaired = True
+            except (OSError, TypeError, ValueError) as exc:
+                entry["error"] = f"result: {exc}"
+        if repaired:
+            save(state_path, state)
         report(state, candidates, args.cycle, args.round_trip, hypotheses, args.group_number)
         md_path, csv_path = write_reports(args.file, state, candidates, args.cycle, args.round_trip,
                                           hypotheses, args.group_number)

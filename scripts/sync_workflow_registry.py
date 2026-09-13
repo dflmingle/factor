@@ -17,6 +17,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from platform_test_config_report import write_outputs as write_config_outputs
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_JSON = PROJECT_ROOT / "pandaai-workflow-registry.json"
@@ -370,9 +371,12 @@ def main() -> int:
             encoding="utf-8",
         )
         REGISTRY_MD.write_text(build_markdown(registry), encoding="utf-8")
+        write_config_outputs(registry)
         print(json.dumps(registry["summary"], ensure_ascii=False, indent=2))
         print(f"wrote {REGISTRY_JSON.name}")
         print(f"wrote {REGISTRY_MD.name}")
+        print("wrote pandaai-platform-test-configs.json")
+        print("wrote pandaai-platform-test-configs.md")
         return 0
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"sync failed: {exc}", file=sys.stderr)

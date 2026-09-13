@@ -158,3 +158,32 @@ git push
 完整公式、六个输入特征、XGBoost 参数和全部分组结果见：`t10-nonlinear-xgb-20260911.md`。平台工作流索引已更新：`pandaai-workflow-registry.md` 和 `pandaai-workflow-registry.json`。
 
 下一步先做无计算诊断：检查六个输入的截面 Spearman 相关性、模型特征重要性和模型输出分布。若重新测试，先用等权 Rank 组合作为线性基准，再预先固定一个与横截面排序/top10%目标更一致的模型方案；不要直接继续搜索 XGBoost 超参数。
+
+## 8. 2026-09-13 全 A 数据补齐与平台口径核对
+
+本轮没有创建新因子或运行新的 PandaAI 回测。平台配置已从本地工作流登记表保存：171 个工作流中 167 个明确使用 `沪深全A` 股票池。
+
+已使用本地 Tushare 凭据补齐并打包以下数据：
+
+- qfq 行情：2018-01-02 至 2026-09-07，107 个批次；
+- `daily_basic`：2018-01-02 至 2026-09-07，共 2,107 个交易日；
+- `fina_indicator`、`income`、`balancesheet`、`cashflow`：全 A 5,449 只股票，各 69 个批次；
+- 全 A 正收益记录：45/45 可重建，数据不可用为 0；
+- `TS_RANK756` 的 756 个交易日暖机缺口已补齐。
+
+当前 Git LFS 数据快照为 `data/local_recheck/factor-local-recheck-data.tar.gz`，包含 4,836 个文件、约 688 MB 原始数据；配套 SHA-256 清单是 `research_reports/platform_alignment/local_recheck_data_manifest.json`。快照只保留本轮全 A 复现所需的数据和报告，未包含旧 ST 专项缓存。
+
+在新电脑拉取后执行：
+
+```powershell
+git lfs install
+git lfs pull
+python scripts/local_recheck_data.py import --archive data/local_recheck/factor-local-recheck-data.tar.gz
+python scripts/local_recheck_data.py verify
+```
+
+当前逐期诊断报告位于：
+
+`quantlab/.quantlab/cache/research/cn_equity/reports/positive_factor_delta_diagnosis_full_a/diagnosis.md`
+
+按净超额差绝对值 `>=2pp`，仍有 30/45 条记录较大，其中 29 条有完整平台收益曲线。后续优先核对：直接价格因子的复权/未来收益标签/停牌行处理；CFP 和纸面财务因子的字段定义、公告日和 TTM；2026 YTD 短样本不作为等价性判断。完整重跑命令见 `research_reports/platform_alignment/positive_factor_local_reproduction_20260913.md`。

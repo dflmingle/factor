@@ -52,6 +52,9 @@ PLATFORM_REFERENCE: dict[str, dict[str, float]] = {
 
 DAILY_COLUMNS = ["date", "instrument", "open", "close", "volume"]
 _thread_state = threading.local()
+_api_rate_lock = threading.Lock()
+_next_api_call = 0.0
+API_INTERVAL_SECONDS = 0.75
 
 
 def cache_paths(price_mode: str) -> tuple[Path, Path]:
@@ -84,7 +87,9 @@ def load_trade_dates(warmup: pd.Timestamp, end: pd.Timestamp) -> list[pd.Timesta
 
     frames = [pd.read_parquet(path, columns=["trade_date", "is_open"]) for path in paths]
     calendar = pd.concat(frames, ignore_index=True)
-    calendar["trade_date"] = pd.to_datetime(calendar["trade_date"].astype(str), format="%Y%m%d")
+    calendar["trade_date"] = pd.to_datetime(
+        calendar["trade_date"].astype(str), format="mixed", errors="coerce"
+    )
     calendar = calendar[calendar["is_open"].astype(int) == 1]
     dates = sorted(calendar.loc[calendar["trade_date"].between(warmup, end), "trade_date"].unique())
     result = [pd.Timestamp(value) for value in dates]
@@ -106,6 +111,15 @@ def tushare_client(token: str) -> Any:
         client = ts.pro_api(token)
         _thread_state.client = client
     return client
+
+
+def wait_for_api_slot() -> None:
+    global _next_api_call
+    with _api_rate_lock:
+        wait = _next_api_call - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _next_api_call = time.monotonic() + API_INTERVAL_SECONDS
 
 
 def normalize_daily(raw: pd.DataFrame, trade_date: pd.Timestamp, price_mode: str) -> pd.DataFrame:
@@ -144,6 +158,7 @@ def fetch_one_day(
     for attempt in range(retries):
         try:
             client = tushare_client(token)
+            wait_for_api_slot()
             if price_mode == "raw":
                 raw = client.daily(trade_date=date_text)
             else:

@@ -9,6 +9,7 @@ present in the local snapshot are retained in the report as unsupported.
 from __future__ import annotations
 
 import csv
+import argparse
 import json
 import re
 import sys
@@ -24,6 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from platform_aligned_factor_compare import read_platform_run  # noqa: E402
+from full_a_local_data import load_full_a_data  # noqa: E402
 from financial_factor_local import (  # noqa: E402
     FINANCIAL_HANDLERS,
     build_financial_factor,
@@ -32,8 +34,8 @@ from financial_factor_local import (  # noqa: E402
 from stfilter_local_recheck import (  # noqa: E402
     CACHE_ROOT,
     ensure_calendar,
-    load_data,
-    load_pool,
+    load_data as load_st_data,
+    load_pool as load_st_pool,
 )
 
 
@@ -43,6 +45,7 @@ PLATFORM_START = pd.Timestamp("2021-09-07")
 GROUPS = 10
 ROUND_TRIP_COST = 0.006
 OUTPUT_ROOT = CACHE_ROOT / "reports" / "positive_factor_compare"
+REGISTRY_PATH = PROJECT_ROOT / "pandaai-workflow-registry.json"
 
 
 def normalize_formula(formula: str) -> str:
@@ -71,6 +74,34 @@ def formula_catalog() -> dict[str, set[str]]:
                 continue
             catalog.setdefault(parts[0].strip(), set()).add(parts[1].strip())
     return catalog
+
+
+def platform_configs() -> dict[str, dict[str, Any]]:
+    if not REGISTRY_PATH.exists():
+        return {}
+    try:
+        registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for workflow in registry.get("workflows", []):
+        factor_id = workflow.get("_id")
+        if not factor_id:
+            continue
+        info = workflow.get("factor_info") or {}
+        result[str(factor_id)] = {
+            "factor_id": factor_id,
+            "workflow_name": workflow.get("name"),
+            "run_id": workflow.get("last_run_id"),
+            "market": info.get("market"),
+            "stock_pool": info.get("stock_pool"),
+            "start_date": info.get("start_date"),
+            "end_date": info.get("end_date"),
+            "adjustment_cycle": info.get("adjustment_cycle"),
+            "group_number": info.get("group_number"),
+            "factor_direction": info.get("factor_direction"),
+        }
+    return result
 
 
 def report_cycle(report_name: str) -> int | None:
@@ -179,6 +210,8 @@ def positive_records(catalog: dict[str, set[str]]) -> tuple[list[dict[str, Any]]
                     "name": name,
                     "report": report_path.name,
                     "direction": int(row["direction"]),
+                    "factor_id": row.get("factor_id"),
+                    "run_id": row.get("run_id"),
                     "platform_net_excess_pct": platform_net,
                     "platform_rank_ic": float(row["rank_ic"]) if row.get("rank_ic") else None,
                     "platform_ic_mean": float(row["ic_mean"]) if row.get("ic_mean") else None,
@@ -464,22 +497,32 @@ def write_outputs(
     supported: list[dict[str, Any]],
     unsupported: list[dict[str, Any]],
     rows: list[dict[str, Any]],
+    output_root: Path,
+    universe: str,
+    pool_count: int,
+    data_start: pd.Timestamp,
 ) -> None:
-    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    output_root.mkdir(parents=True, exist_ok=True)
+    local_universe = (
+        "full-A Tushare qfq rows joined with daily_basic and filtered to .SH/.SZ"
+        if universe == "full_a"
+        else "fixed ST-filter workflow pool"
+    )
     payload = {
         "settings": {
-            "data_start": DATA_START.strftime("%Y%m%d"),
+            "data_start": data_start.strftime("%Y%m%d"),
             "end": END.strftime("%Y%m%d"),
             "groups": GROUPS,
             "round_trip_cost": ROUND_TRIP_COST,
-            "pool_count": 4879,
+            "pool_count": pool_count,
+            "local_universe": local_universe,
             "supported_records": len(supported),
             "unsupported_records": len(unsupported),
         },
         "results": rows,
         "unsupported": unsupported,
     }
-    (OUTPUT_ROOT / "positive_factor_local_compare.json").write_text(
+    (output_root / "positive_factor_local_compare.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=json_default) + "\n",
         encoding="utf-8",
     )
@@ -487,7 +530,8 @@ def write_outputs(
         "# Positive-net-excess factors: local reproduction",
         "",
         "The catalog contains every completed saved run whose platform `net_excess_pct` is greater than zero.",
-        "The local side uses the fixed 4,879-symbol pool from the ST-filter workflow and qfq Tushare daily data.",
+        f"The local side uses `{local_universe}` and qfq Tushare daily data.",
+        f"The platform pool is shown per row from the saved workflow registry; local membership follows the selected `{universe}` mode.",
         "Local net excess = arithmetic gross excess - annualized turnover cost using 0.30% one-way cost.",
         "",
         f"- positive records: `{len(supported) + len(unsupported)}`",
@@ -496,8 +540,8 @@ def write_outputs(
         "",
         "## Locally reproduced",
         "",
-        "| run | handler | cycle | dates | platform net | local net | delta net (pp) | platform RankIC | local RankIC | platform gross excess | local gross excess | platform turnover | local turnover | Top20 |",
-        "|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| run | handler | platform pool | cycle | dates | platform net | local net | delta net (pp) | platform RankIC | local RankIC | platform gross excess | local gross excess | platform turnover | local turnover | Top20 |",
+        "|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         def pct(value: Any) -> str:
@@ -510,7 +554,7 @@ def write_outputs(
         local_net = row["local_net_excess"]
         delta = None if local_net is None else 100 * local_net - platform_net
         lines.append(
-            f"| {row['id']} | {row['handler']} | {row['cycle']} | {row['date_source']} ({row['platform_chart_periods']}) | {platform_net:.2f}% | {pct(local_net)} | {'n/a' if delta is None else f'{delta:.2f}'} | {num(row['platform_rank_ic'])} | {num(row['local_rank_ic'])} | {pct(row['platform_gross_excess'])} | {pct(row['local_gross_excess'])} | {pct(row['platform_turnover'])} | {pct(row['local_turnover'])} | {row['top20_overlap'] if row['top20_overlap'] is not None else 'n/a'}/20 |"
+            f"| {row['id']} | {row['handler']} | {row.get('platform_stock_pool', 'unknown')} | {row['cycle']} | {row['date_source']} ({row['platform_chart_periods']}) | {platform_net:.2f}% | {pct(local_net)} | {'n/a' if delta is None else f'{delta:.2f}'} | {num(row['platform_rank_ic'])} | {num(row['local_rank_ic'])} | {pct(row['platform_gross_excess'])} | {pct(row['local_gross_excess'])} | {pct(row['platform_turnover'])} | {pct(row['local_turnover'])} | {row['top20_overlap'] if row['top20_overlap'] is not None else 'n/a'}/20 |"
         )
     lines.extend(
         [
@@ -520,7 +564,7 @@ def write_outputs(
             "- Financial records use announcement-date point-in-time joins. Tushare consolidated statements (`comp_type=1`) are selected, and quarterly cumulative statements are converted to TTM.",
             "- `MA(...,63)` and `TS_RANK(...,756)` use daily point-in-time ratios. The local daily cache starts at 2019-07-01, so 756-day formulas have a warmup gap and fewer valid periods than the platform chart.",
             "- `residual_volatility` is a market-model residual-volatility proxy, not the platform's internal Barra field.",
-            "- Close net-excess differences do not prove exact field equivalence; they are comparisons against saved platform metrics using the same ST-filtered pool and local cost convention.",
+            "- Close net-excess differences do not prove exact field equivalence; local membership follows the selected universe mode.",
             "",
             "## Not reproducible from current local cache",
             "",
@@ -532,13 +576,36 @@ def write_outputs(
         lines.append(
             f"| {row['id']} | {row['platform_net_excess_pct']:.2f}% | `{row.get('formula') or '?'}` | {row['reason']} |"
         )
-    (OUTPUT_ROOT / "positive_factor_local_compare.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (output_root / "positive_factor_local_compare.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> int:
-    calendar = [pd.Timestamp(value).normalize() for value in ensure_calendar(DATA_START, END, token=None)]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--universe", choices=["st_pool", "full_a"], default="st_pool")
+    parser.add_argument(
+        "--price-root",
+        default=str(CACHE_ROOT / "tushare_factor_recheck" / "qfq" / "daily_batches"),
+    )
+    parser.add_argument(
+        "--cap-root",
+        default=str(CACHE_ROOT / "tushare_factor_recheck" / "daily_basic_full_a"),
+    )
+    parser.add_argument("--financial-root", default=str(CACHE_ROOT / "financial"))
+    parser.add_argument("--output", default=str(OUTPUT_ROOT))
+    parser.add_argument("--data-start", default=DATA_START.strftime("%Y%m%d"))
+    args = parser.parse_args()
+
+    data_start = pd.Timestamp(
+        pd.to_datetime(args.data_start, format="%Y%m%d" if len(args.data_start) == 8 else None)
+    ).normalize()
+    if data_start > DATA_START:
+        raise SystemExit("--data-start cannot be later than the platform comparison start")
+    calendar = [pd.Timestamp(value).normalize() for value in ensure_calendar(data_start, END, token=None)]
     catalog = formula_catalog()
     supported, unsupported = positive_records(catalog)
+    configs = platform_configs()
+    for record in supported + unsupported:
+        record["platform_config"] = configs.get(str(record.get("factor_id")))
     if not supported and not unsupported:
         raise SystemExit("No positive-net-excess records found")
 
@@ -551,9 +618,18 @@ def main() -> int:
     supported = [record for record in supported if (PROJECT_ROOT / record["raw_result"]).exists()]
 
     print(f"positive_records={len(supported) + len(unsupported)} supported={len(supported)} unsupported={len(unsupported)}", flush=True)
-    frame = load_data(DATA_START, END)
-    pool = load_pool()
-    frame = frame[frame["instrument"].isin(pool)].copy()
+    if args.universe == "full_a":
+        frame = load_full_a_data(
+            Path(args.price_root),
+            Path(args.cap_root),
+            data_start,
+            END,
+        )
+        pool = set(frame["instrument"].astype(str).unique())
+    else:
+        frame = load_st_data(DATA_START, END)
+        pool = load_st_pool()
+        frame = frame[frame["instrument"].isin(pool)].copy()
     frame = frame.sort_values(["instrument", "date"], ignore_index=True)
     print(f"local_rows={len(frame)} pool={len(pool)}", flush=True)
     close = panel_close(frame, calendar)
@@ -562,7 +638,7 @@ def main() -> int:
     financial_records = [record for record in supported if record["handler"] in FINANCIAL_HANDLERS]
     if financial_records:
         try:
-            financial = load_financial_cache(CACHE_ROOT / "financial")
+            financial = load_financial_cache(Path(args.financial_root))
             print(
                 f"financial_cache=loaded records={len(financial_records)} "
                 f"fina_rows={len(financial['fina_indicator'])}",
@@ -625,6 +701,15 @@ def main() -> int:
                 "report": record["report"],
                 "formula": record["formula"],
                 "handler": handler,
+                "platform_factor_id": record.get("factor_id"),
+                "platform_run_id": record.get("run_id"),
+                "platform_stock_pool": (record.get("platform_config") or {}).get("stock_pool", "unknown"),
+                "platform_market": (record.get("platform_config") or {}).get("market"),
+                "platform_start_date": (record.get("platform_config") or {}).get("start_date"),
+                "platform_end_date": (record.get("platform_config") or {}).get("end_date"),
+                "platform_configured_cycle": (record.get("platform_config") or {}).get("adjustment_cycle"),
+                "platform_group_number": (record.get("platform_config") or {}).get("group_number"),
+                "platform_factor_direction": (record.get("platform_config") or {}).get("factor_direction"),
                 "cycle": cycle,
                 "platform_net_excess_pct": record["platform_net_excess_pct"],
                 "local_net_excess": result["net_excess"],
@@ -652,8 +737,9 @@ def main() -> int:
         del values
 
     rows.sort(key=lambda row: row["id"])
-    write_outputs(supported, unsupported, rows)
-    print(f"report={OUTPUT_ROOT / 'positive_factor_local_compare.md'}", flush=True)
+    output_root = Path(args.output)
+    write_outputs(supported, unsupported, rows, output_root, args.universe, len(pool), data_start)
+    print(f"report={output_root / 'positive_factor_local_compare.md'}", flush=True)
     return 0
 
 

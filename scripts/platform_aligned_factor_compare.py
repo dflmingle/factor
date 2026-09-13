@@ -155,16 +155,17 @@ def factor_analysis_payload(raw: dict[str, Any]) -> dict[str, Any]:
 def read_platform_run(path: Path) -> dict[str, Any]:
     raw = json.loads(path.read_text(encoding="utf-8-sig"))
     analysis = factor_analysis_payload(raw)
+    factor_rows = analysis.get("query_factor_analysis_data") or analysis.get("factor_data_analysis") or []
     metrics = {
         str(row.get("indicator")): as_float(row.get("factor1"))
-        for row in analysis.get("query_factor_analysis_data", [])
+        for row in factor_rows
         if isinstance(row, dict)
     }
 
     dates, rank_ic_values = chart_series(analysis.get("query_rank_ic_sequence_chart"))
     _, returns = chart_series(analysis.get("query_return_chart"))
     _, excess = chart_series(analysis.get("query_factor_excess_chart"))
-    groups = analysis.get("query_group_return_analysis") or []
+    groups = analysis.get("query_group_return_analysis") or analysis.get("group_return_analysis") or []
     group_metrics: dict[int, dict[str, float | None]] = {}
     for row in groups:
         if not isinstance(row, dict):
