@@ -364,13 +364,17 @@ def forward_returns(
     calendar: list[pd.Timestamp],
     signal_dates: list[pd.Timestamp],
     cycle: int,
+    label_offset: int = 0,
 ) -> pd.DataFrame:
-    positions = [calendar.index(date) + cycle for date in signal_dates]
-    if max(positions, default=-1) >= len(calendar):
+    current_positions = [calendar.index(date) + label_offset for date in signal_dates]
+    future_positions = [position + cycle for position in current_positions]
+    if min(current_positions, default=0) < 0 or max(future_positions, default=-1) >= len(calendar):
         raise RuntimeError("Local data does not cover the platform forward target")
-    current = close.loc[signal_dates].stack(dropna=False).rename("current_close").reset_index()
+    current = close.iloc[current_positions].copy()
+    current.index = signal_dates
+    current = current.stack(dropna=False).rename("current_close").reset_index()
     current = current.rename(columns={"level_0": "date", "level_1": "instrument"})
-    future = close.iloc[positions].copy()
+    future = close.iloc[future_positions].copy()
     future.index = signal_dates
     future = future.stack(dropna=False).rename("future_close").reset_index()
     future = future.rename(columns={"level_0": "date", "level_1": "instrument"})
@@ -393,11 +397,12 @@ def evaluate(
     signal_dates: list[pd.Timestamp],
     calendar: list[pd.Timestamp],
     cycle: int,
+    label_offset: int = 0,
 ) -> dict[str, Any]:
     factor_frame = frame[["date", "instrument"]].copy()
     factor_frame["factor"] = factor_values.to_numpy(dtype=float)
     factor_frame = factor_frame[factor_frame["date"].isin(signal_dates)]
-    returns = forward_returns(close, calendar, signal_dates, cycle)
+    returns = forward_returns(close, calendar, signal_dates, cycle, label_offset)
     data = factor_frame.merge(returns, on=["date", "instrument"], how="left")
     data = data.replace([np.inf, -np.inf], np.nan).dropna()
 
@@ -501,6 +506,7 @@ def write_outputs(
     universe: str,
     pool_count: int,
     data_start: pd.Timestamp,
+    label_offset: int,
 ) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     local_universe = (
@@ -514,6 +520,8 @@ def write_outputs(
             "end": END.strftime("%Y%m%d"),
             "groups": GROUPS,
             "round_trip_cost": ROUND_TRIP_COST,
+            "label_offset": label_offset,
+            "return_label": f"close(t+{label_offset}) -> close(t+{label_offset}+cycle)",
             "pool_count": pool_count,
             "local_universe": local_universe,
             "supported_records": len(supported),
@@ -532,6 +540,7 @@ def write_outputs(
         "The catalog contains every completed saved run whose platform `net_excess_pct` is greater than zero.",
         f"The local side uses `{local_universe}` and qfq Tushare daily data.",
         f"The platform pool is shown per row from the saved workflow registry; local membership follows the selected `{universe}` mode.",
+        f"Local forward return label: `close(t+{label_offset}) -> close(t+{label_offset}+cycle)`.",
         "Local net excess = arithmetic gross excess - annualized turnover cost using 0.30% one-way cost.",
         "",
         f"- positive records: `{len(supported) + len(unsupported)}`",
@@ -593,6 +602,12 @@ def main() -> int:
     parser.add_argument("--financial-root", default=str(CACHE_ROOT / "financial"))
     parser.add_argument("--output", default=str(OUTPUT_ROOT))
     parser.add_argument("--data-start", default=DATA_START.strftime("%Y%m%d"))
+    parser.add_argument(
+        "--label-offset",
+        type=int,
+        default=0,
+        help="Trading-day offset applied to both the current and future close in the forward label.",
+    )
     args = parser.parse_args()
 
     data_start = pd.Timestamp(
@@ -694,7 +709,17 @@ def main() -> int:
         handler_dates = sorted({date for record, _, dates, _, _ in items for date in dates})
         values = build_factor(frame, handler, financial=financial, signal_dates=handler_dates)
         for record, platform, signal_dates, cycle, date_source in items:
-            result = evaluate(frame, values, close, platform, record["direction"], signal_dates, calendar, cycle)
+            result = evaluate(
+                frame,
+                values,
+                close,
+                platform,
+                record["direction"],
+                signal_dates,
+                calendar,
+                cycle,
+                args.label_offset,
+            )
             output = {
                 "id": record["id"],
                 "name": record["name"],
@@ -738,7 +763,16 @@ def main() -> int:
 
     rows.sort(key=lambda row: row["id"])
     output_root = Path(args.output)
-    write_outputs(supported, unsupported, rows, output_root, args.universe, len(pool), data_start)
+    write_outputs(
+        supported,
+        unsupported,
+        rows,
+        output_root,
+        args.universe,
+        len(pool),
+        data_start,
+        args.label_offset,
+    )
     print(f"report={output_root / 'positive_factor_local_compare.md'}", flush=True)
     return 0
 

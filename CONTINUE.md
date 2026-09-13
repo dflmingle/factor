@@ -187,3 +187,22 @@ python scripts/local_recheck_data.py verify
 `quantlab/.quantlab/cache/research/cn_equity/reports/positive_factor_delta_diagnosis_full_a/diagnosis.md`
 
 按净超额差绝对值 `>=2pp`，仍有 30/45 条记录较大，其中 29 条有完整平台收益曲线。后续优先核对：直接价格因子的复权/未来收益标签/停牌行处理；CFP 和纸面财务因子的字段定义、公告日和 TTM；2026 YTD 短样本不作为等价性判断。完整重跑命令见 `research_reports/platform_alignment/positive_factor_local_reproduction_20260913.md`。
+
+## 9. 2026-09-14 final full-A alignment audit
+
+The earlier same-day local return comparison is superseded by the label-1 output below. It uses the saved platform signal dates and the verified label `close(t+1) -> close(t+cycle+1)`.
+
+- all 45/45 saved positive records rebuild from the local snapshot; no records are data-unavailable;
+- 5/45 are within 1 percentage point of platform net excess; 29/45 still differ by at least 2 points;
+- mean absolute net-excess gap is 2.67 pp, with local results generally lower;
+- the remaining large gaps are 18 financial/paper records, 9 direct price/turnover records, and 2 short 2026 YTD records;
+- the corrected label reduces mean absolute error from 2.97 pp to 2.67 pp, but does not establish full semantic equivalence.
+
+Final report: `research_reports/platform_alignment/positive_factor_alignment_20260914.md`
+
+Reproduce the final comparison after restoring the snapshot:
+
+```powershell
+python scripts/positive_factor_local_compare.py --universe full_a --data-start 20180101 --price-root quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches --cap-root quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a --financial-root quantlab/.quantlab/cache/research/cn_equity/financial_full_a --output quantlab/.quantlab/cache/research/cn_equity/reports/positive_factor_compare_full_a_label1 --label-offset 1
+python scripts/build_final_alignment_report.py
+```
