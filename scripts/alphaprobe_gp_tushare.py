@@ -36,7 +36,6 @@ from alphagen.data.expression import (  # noqa: E402
 from alphagen.models.alpha_pool import AlphaPool  # noqa: E402
 from alphagen.utils.correlation import (  # noqa: E402
     batch_pearsonr,
-    batch_spearmanr,
 )
 from alphagen.utils.pytorch_utils import normalize_by_day  # noqa: E402
 from alphagen_generic import features as generic_features  # noqa: E402
@@ -406,6 +405,24 @@ def finite_as_nan(value: torch.Tensor) -> torch.Tensor:
     return torch.where(torch.isfinite(value), value, torch.full_like(value, torch.nan))
 
 
+def _ordinal_rank_by_day(value: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
+    """Rank each cross-section without AlphaPROBE's quadratic tie matrix."""
+    safe_value = torch.where(valid, value, torch.full_like(value, torch.inf))
+    order = torch.argsort(safe_value, dim=1)
+    ranks = torch.empty_like(safe_value, dtype=torch.float32)
+    positions = torch.arange(value.shape[1], device=value.device, dtype=torch.float32)
+    ranks.scatter_(1, order, positions.expand(value.shape[0], -1))
+    return ranks.masked_fill(~valid, torch.nan)
+
+
+def batch_spearmanr_linear(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """Calculate daily rank correlation in O(days * stocks) memory."""
+    valid = torch.isfinite(x) & torch.isfinite(y)
+    ranked_x = _ordinal_rank_by_day(x, valid)
+    ranked_y = _ordinal_rank_by_day(y, valid)
+    return batch_pearsonr(ranked_x, ranked_y)
+
+
 def expression_namespace() -> dict[str, object]:
     namespace: dict[str, object] = {}
     from alphagen.data import expression as expression_module
@@ -424,12 +441,26 @@ def metric_summary(expression: object, data: TushareStockData, target: object) -
     factor = normalize_by_day(factor)
     target_values = finite_as_nan(target.evaluate(data))  # type: ignore[attr-defined]
     pearson = torch.nan_to_num(batch_pearsonr(factor, target_values), nan=0.0)
-    spearman = torch.nan_to_num(batch_spearmanr(factor, target_values), nan=0.0)
+    spearman = torch.nan_to_num(batch_spearmanr_linear(factor, target_values), nan=0.0)
     return {
         "ic_mean": float(pearson.mean().item()),
         "rank_ic_mean": float(spearman.mean().item()),
         "observations": int(torch.isfinite(target_values).sum().item()),
     }
+
+
+def pool_metrics(pool: AlphaPool, data: TushareStockData, target: object) -> tuple[float, float]:
+    """Evaluate an AlphaPool while avoiding the upstream quadratic Rank IC path."""
+    with torch.no_grad():
+        factors = []
+        for index in range(pool.size):
+            factor = pool._normalize_by_day(pool.exprs[index].evaluate(data))  # type: ignore[union-attr]
+            factors.append(factor * pool.weights[index])
+        combined_factor = sum(factors)
+        target_factor = target.evaluate(data)  # type: ignore[attr-defined]
+        ic = batch_pearsonr(combined_factor, target_factor).mean().item()
+        rank_ic = batch_spearmanr_linear(combined_factor, target_factor).mean().item()
+        return float(ic), float(rank_ic)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -596,8 +627,8 @@ def main() -> int:
             pool.force_load_exprs(expressions)
             if pool.size > 1:
                 pool._optimize(alpha=5e-3, lr=5e-4, n_iter=args.pool_opt_iterations)
-            ic_test, rank_ic_test = pool.test_ensemble(test_data, target)
-            ic_valid, rank_ic_valid = pool.test_ensemble(valid_data, target)
+            ic_test, rank_ic_test = pool_metrics(pool, test_data, target)
+            ic_valid, rank_ic_valid = pool_metrics(pool, valid_data, target)
             return {
                 "capacity": capacity,
                 "expression_count": len(expressions),
