@@ -231,8 +231,18 @@ def resolve_universe(
     limit: int | None,
 ) -> list[str] | None:
     spec = specification.strip()
-    if spec.lower() in {"all", "auto", "full_a"}:
+    if spec.lower() in {"all", "auto"}:
         values: list[str] | None = None
+    elif spec.lower() == "full_a":
+        values = [
+            value
+            for value in load_stock_basic_universe(cache_root)
+            if value.endswith((".SH", ".SZ"))
+        ]
+        if not values:
+            raise FileNotFoundError(
+                "--universe full_a needs stock_basic/data.parquet with .SH/.SZ codes"
+            )
     else:
         candidate = Path(spec).expanduser()
         if not candidate.is_absolute():
