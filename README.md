@@ -26,3 +26,17 @@
 回测结果是历史样本研究记录，不代表未来收益，也不构成投资建议。仓库不包含 PandaAI 登录凭据；重新运行需要本地配置已登录的 `pandaai-cli`。
 
 换电脑继续研究请阅读 [`CONTINUE.md`](./CONTINUE.md)；启动规则见 [`START.md`](./START.md)。本地 Tushare 复现数据通过 Git LFS 随仓库获取。
+
+## AlphaPROBE GFlowNet 本地挖掘
+
+`scripts/alphaprobe_gfn_tushare.py` 使用 AlphaPROBE 的 GFlowNet 轨迹平衡搜索器，读取本地 Tushare qfq 与 `daily_basic` 全 A 缓存，不调用 PandaAI 回测接口。当前兼容依赖固定在 [`requirements-alphaprobe-gfn.txt`](./requirements-alphaprobe-gfn.txt)；AlphaPROBE 源码按 `torchgfn 1.2.1` API 运行。
+
+训练和逐因子评估使用统一 label-1、5 日周期和全 A 口径：
+
+```bash
+python -m pip install -r requirements-alphaprobe-gfn.txt
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
+python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
+```
+
+训练结果包含 `final_pool.json`、`training_history.json`、检查点和 `factor_metrics.csv`。当前最近一次全量训练结果位于 `quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_run2/`。

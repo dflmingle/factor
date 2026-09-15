@@ -303,3 +303,19 @@ python scripts/tushare_financial_cache.py --universe full_a --start-date 2018010
 ```
 
 当前工作区没有 `TUSHARE_TOKEN`，现有财务缓存仍是旧窄列，因此目前实际激活 254 个公式名；代码已声明并校验完整 348/4,744 名称，财务缓存刷新后会自动扩展 GP 终端。两个分类字段 `classified_by_continuity_operation`、`classified_by_ownership` 没有可靠的 Tushare 数值等价物，始终标记为 unavailable，不作为搜索终端。
+
+## 14. AlphaPROBE GFlowNet + Tushare
+
+本地 GFlowNet 因子挖掘入口为 `scripts/alphaprobe_gfn_tushare.py`，使用 AlphaPROBE 的 trajectory-balance GFlowNet、AlphaPool 和表达式 token 环境；数据使用现有 Tushare qfq 价格、`daily_basic.total_mv` 和 `amount/volume` VWAP 缓存。它不调用 PandaAI 在线回测接口。
+
+环境必须使用 `requirements-alphaprobe-gfn.txt` 中的 `torchgfn==1.2.1`。AlphaPROBE 当前源码使用旧版 `torchgfn` 的 `device_str` 和策略头 API，直接安装 2.x 会在环境初始化阶段失败。若目标机器已有其他 NumPy 元数据损坏，先清理该环境后再安装依赖；不要把修复产生的环境文件放进仓库。
+
+训练口径固定为：沪深全 A、qfq、label-1（`close(t+1) -> close(t+1+cycle)`）、5 日周期、2021-09-07 至 2026-09-07，训练/验证/测试分别为 2021-09-07..2024-09-06、2024-09-09..2025-09-05、2025-09-08..2026-09-07。运行：
+
+```bash
+python -m pip install -r requirements-alphaprobe-gfn.txt
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
+python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
+```
+
+评估脚本使用线性内存的逐日 Spearman，避免 AlphaPROBE 原始 `batch_spearmanr` 在全 A 股票数上创建二次方矩阵。最近一次全量 10,000 episode 结果在 `quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_run2/`，包含 50 条表达式、检查点、`final_pool.json`、`training_history.json` 和 `factor_metrics.csv/json`。该轮 ensemble 的 train/valid/test Rank IC 为 `-0.0877/-0.0900/-0.0572`，说明当前 GFlowNet pool 没有通过验证集泛化筛选；不要直接把 test 最优单因子当成已验证因子。
