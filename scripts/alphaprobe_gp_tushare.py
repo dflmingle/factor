@@ -9,6 +9,7 @@ files, so Qlib is not used for data loading or calendar lookup.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -40,6 +41,26 @@ from alphagen.utils.correlation import (  # noqa: E402
 from alphagen.utils.pytorch_utils import normalize_by_day  # noqa: E402
 from alphagen_generic import features as generic_features  # noqa: E402
 from alphagen_generic import operators as generic_operators  # noqa: E402
+from full_a_local_data import load_full_a_data  # noqa: E402
+from pandaai_fields_local import (  # noqa: E402
+    PandaAIFieldStore,
+    PRICE_VOLUME_FIELDS,
+    build_pandaai_namespace,
+    formula_field_name_set,
+)
+from platform_alignment_rules import (  # noqa: E402
+    ALIGNMENT_DATA_START,
+    ALIGNMENT_CORRELATION_METHOD,
+    ALIGNMENT_END,
+    ALIGNMENT_GROUPS,
+    ALIGNMENT_LABEL_OFFSET,
+    ALIGNMENT_ROUND_TRIP_COST,
+    ALIGNMENT_RULES_DOCUMENT,
+    ALIGNMENT_RULE_VERSION,
+    ALIGNMENT_START,
+    alignment_config_snapshot,
+    validate_alignment_config,
+)
 from utils.gplearn.fitness import make_fitness  # noqa: E402
 from utils.gplearn.functions import make_function  # noqa: E402
 from utils.gplearn.genetic import SymbolicRegressor  # noqa: E402
@@ -56,6 +77,7 @@ DEFAULT_CACHE_ROOT = (
 DEFAULT_BATCH_ROOT = (
     DEFAULT_CACHE_ROOT / "tushare_factor_recheck" / "qfq" / "daily_batches"
 )
+DEFAULT_FINANCIAL_ROOT = DEFAULT_CACHE_ROOT / "financial_full_a"
 DEFAULT_OUTPUT_ROOT = (
     DEFAULT_CACHE_ROOT / "reports" / "alphaprobe_gp_tushare"
 )
@@ -68,6 +90,15 @@ FEATURE_COLUMNS = {
 }
 ALL_FEATURES = list(FeatureType)
 BATCH_PATTERN = re.compile(r"^batch_(\d{8})_(\d{8})$")
+ALIGNED_START = pd.Timestamp(ALIGNMENT_START)
+ALIGNED_END = pd.Timestamp(ALIGNMENT_END)
+ALIGNED_DATA_START = pd.Timestamp(ALIGNMENT_DATA_START)
+ALIGNED_CYCLE = 5
+ALIGNED_LABEL_OFFSET = ALIGNMENT_LABEL_OFFSET
+ALIGNED_GROUPS = ALIGNMENT_GROUPS
+ALIGNED_ROUND_TRIP_COST = ALIGNMENT_ROUND_TRIP_COST
+ALIGNED_CANDIDATE_RANK_CORR_THRESHOLD = 0.999
+ALIGNED_MIN_PERIODS = 200
 
 
 def parse_date(value: str) -> pd.Timestamp:
@@ -278,6 +309,7 @@ class TushareStockData:
         max_future_days: int = 30,
         device: torch.device = torch.device("cpu"),
         freq: str = "day",
+        financial_root: Path | None = None,
     ) -> None:
         if freq != "day":
             raise ValueError("The local Tushare AlphaPROBE adapter currently supports day data only")
@@ -289,6 +321,8 @@ class TushareStockData:
         self.device = device
         self.max_backtrack_days = max_backtrack_days
         self.max_future_days = max_future_days
+        self.financial_root = financial_root
+        self._pandaai_field_store: PandaAIFieldStore | None = None
         self._start_time = parse_date(start_time)
         self._end_time = parse_date(end_time)
         if self._start_time > self._end_time:
@@ -355,6 +389,128 @@ class TushareStockData:
         self.df_bak = frame
         self.fallback_high_low = True
 
+    @classmethod
+    def from_aligned_frame(
+        cls,
+        *,
+        frame: pd.DataFrame,
+        calendar: Sequence[pd.Timestamp],
+        instrument: Sequence[str],
+        start_time: str,
+        end_time: str,
+        max_backtrack_days: int,
+        max_future_days: int,
+        device: torch.device,
+        financial_root: Path | None = None,
+    ) -> "TushareStockData":
+        """Build an AlphaPROBE panel from the local aligned full-A snapshot.
+
+        Price fields are forward-filled only for the expression panel.  The
+        evaluator separately masks each signal date to rows observed in the
+        aligned Tushare/daily_basic join, so a suspended name cannot enter a
+        portfolio merely because its last price was carried forward.
+        """
+        if max_backtrack_days < 0 or max_future_days < 0:
+            raise ValueError("Lookback and future padding must be non-negative")
+
+        obj = cls.__new__(cls)
+        obj.raw = False
+        obj.freq = "day"
+        obj.device = device
+        obj.max_backtrack_days = max_backtrack_days
+        obj.max_future_days = max_future_days
+        obj.financial_root = financial_root
+        obj._pandaai_field_store = None
+        obj._start_time = parse_date(start_time)
+        obj._end_time = parse_date(end_time)
+        if obj._start_time > obj._end_time:
+            raise ValueError("start_time must not be later than end_time")
+        obj._features = list(ALL_FEATURES)
+        obj._calendar = [pd.Timestamp(value).normalize() for value in calendar]
+        obj._evaluation_dates = [
+            value for value in obj._calendar if obj._start_time <= value <= obj._end_time
+        ]
+        if not obj._evaluation_dates:
+            raise ValueError(
+                f"No aligned trading dates between {date_text(obj._start_time)} "
+                f"and {date_text(obj._end_time)}"
+            )
+
+        before = [value for value in obj._calendar if value < obj._evaluation_dates[0]]
+        after = [value for value in obj._calendar if value > obj._evaluation_dates[-1]]
+        obj._pre_dates = before[-max_backtrack_days:] if max_backtrack_days else []
+        obj._post_dates = after[:max_future_days] if max_future_days else []
+        obj._pre_padding = max_backtrack_days - len(obj._pre_dates)
+        obj._post_padding = max_future_days - len(obj._post_dates)
+        real_dates = obj._pre_dates + obj._evaluation_dates + obj._post_dates
+
+        stock_index = pd.Index(list(dict.fromkeys(instrument)), dtype="object")
+        if stock_index.empty:
+            raise ValueError("The aligned full-A snapshot contains no instruments")
+        indexed = frame.set_index(["date", "instrument"])
+        real_index = pd.DatetimeIndex(real_dates)
+        values = np.full(
+            (
+                len(real_dates) + obj._pre_padding + obj._post_padding,
+                len(ALL_FEATURES),
+                len(stock_index),
+            ),
+            np.nan,
+            dtype=np.float32,
+        )
+        source_columns = {
+            FeatureType.OPEN: "open_qfq",
+            FeatureType.CLOSE: "close_qfq",
+            FeatureType.HIGH: "high_qfq",
+            FeatureType.LOW: "low_qfq",
+            FeatureType.VOLUME: "volume",
+        }
+        for feature, column in source_columns.items():
+            wide = indexed[column].unstack("instrument")
+            wide = wide.reindex(index=real_index, columns=stock_index)
+            if feature == FeatureType.VOLUME:
+                wide = wide.fillna(0.0)
+            else:
+                wide = wide.ffill()
+            feature_values = wide.to_numpy(dtype=np.float32, copy=True)
+            values[
+                obj._pre_padding : obj._pre_padding + len(real_dates),
+                int(feature),
+                :,
+            ] = feature_values
+
+        obj.data = torch.tensor(values, dtype=torch.float32, device=device)
+        obj._dates = pd.DatetimeIndex(
+            [pd.NaT] * obj._pre_padding
+            + real_dates
+            + [pd.NaT] * obj._post_padding
+        )
+        obj._stock_ids = stock_index
+        obj._n_days = len(obj._evaluation_dates)
+        obj.df_bak = frame
+        obj.fallback_high_low = False
+        return obj
+
+    @property
+    def pandaai_field_store(self) -> PandaAIFieldStore:
+        if self._pandaai_field_store is None:
+            self._pandaai_field_store = PandaAIFieldStore(
+                data=self,
+                frame=self.df_bak,
+                financial_root=self.financial_root,
+            )
+        return self._pandaai_field_store
+
+    def get_named_feature(
+        self,
+        name: str,
+        period: slice = slice(0, 1),
+    ) -> torch.Tensor:
+        return self.pandaai_field_store.get_named_feature(name, period)
+
+    def field_coverage(self) -> dict[str, Any]:
+        return self.pandaai_field_store.coverage_report()
+
     @property
     def n_features(self) -> int:
         return len(self._features)
@@ -401,25 +557,239 @@ class TushareStockData:
         }
 
 
+class AlignedNetExcessContext:
+    """Score factors with the project's local platform-alignment proxy."""
+
+    def __init__(
+        self,
+        *,
+        frame: pd.DataFrame,
+        calendar: Sequence[pd.Timestamp],
+        data: TushareStockData,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
+        cycle: int,
+        label_offset: int,
+        groups: int,
+        round_trip_cost: float,
+    ) -> None:
+        self.calendar = [pd.Timestamp(value).normalize() for value in calendar]
+        self.data = data
+        self.start_date = pd.Timestamp(start_date).normalize()
+        self.end_date = pd.Timestamp(end_date).normalize()
+        self.cycle = cycle
+        self.label_offset = label_offset
+        self.groups = groups
+        self.round_trip_cost = round_trip_cost
+        self.stock_ids = list(data._stock_ids)
+        self._calendar_positions = {date: index for index, date in enumerate(self.calendar)}
+        evaluation_positions = {
+            date: index for index, date in enumerate(data._evaluation_dates)
+        }
+
+        if self.start_date not in self._calendar_positions:
+            raise ValueError(f"Aligned start date is absent from the local calendar: {self.start_date}")
+        start_position = self._calendar_positions[self.start_date]
+        self.signal_dates: list[pd.Timestamp] = []
+        self.signal_calendar_positions: list[int] = []
+        self.signal_data_positions: list[int] = []
+        for position in range(start_position, len(self.calendar), cycle):
+            date = self.calendar[position]
+            if date > self.end_date:
+                break
+            future_position = position + label_offset + cycle
+            if future_position >= len(self.calendar):
+                continue
+            if date not in evaluation_positions:
+                continue
+            self.signal_dates.append(date)
+            self.signal_calendar_positions.append(position)
+            self.signal_data_positions.append(evaluation_positions[date])
+        if not self.signal_dates:
+            raise ValueError("No aligned rebalance dates were generated")
+
+        indexed = frame.set_index(["date", "instrument"])
+        observed = indexed["close_qfq"].unstack("instrument")
+        observed = observed.reindex(index=self.calendar, columns=self.stock_ids)
+        self.close_panel = observed.ffill().to_numpy(dtype=np.float32, copy=True)
+
+        eligible = indexed["total_mv"].unstack("instrument")
+        eligible = eligible.reindex(index=self.calendar, columns=self.stock_ids)
+        self.eligible = eligible.notna().to_numpy(dtype=bool, copy=True)
+
+        returns = []
+        eligible_rows = []
+        for position in self.signal_calendar_positions:
+            current = self.close_panel[position + label_offset]
+            future = self.close_panel[position + label_offset + cycle]
+            returns.append(future / current - 1.0)
+            eligible_rows.append(self.eligible[position])
+        self.forward_returns = torch.tensor(
+            np.asarray(returns, dtype=np.float32),
+            dtype=torch.float32,
+            device=data.device,
+        )
+        self.signal_eligible = torch.tensor(
+            np.asarray(eligible_rows, dtype=bool),
+            dtype=torch.bool,
+            device=data.device,
+        )
+
+    def _selected_indices(
+        self,
+        start_date: pd.Timestamp | None,
+        end_date: pd.Timestamp | None,
+    ) -> list[int]:
+        start = self.start_date if start_date is None else pd.Timestamp(start_date).normalize()
+        end = self.end_date if end_date is None else pd.Timestamp(end_date).normalize()
+        return [
+            index
+            for index, date in enumerate(self.signal_dates)
+            if start <= date <= end
+        ]
+
+    def score(
+        self,
+        factor: torch.Tensor,
+        *,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None,
+    ) -> dict[str, float | int | None]:
+        if factor.ndim != 2:
+            raise ValueError(f"Expected a two-dimensional factor panel, got shape {tuple(factor.shape)}")
+        indices = self._selected_indices(start_date, end_date)
+        if not indices:
+            return {
+                "periods": 0,
+                "gross_excess": None,
+                "turnover": None,
+                "annual_cost": None,
+                "net_excess": None,
+            }
+
+        data_positions = [self.signal_data_positions[index] for index in indices]
+        factor_rows = factor[data_positions]
+        returns = self.forward_returns[indices]
+        eligible = self.signal_eligible[indices]
+        valid = torch.isfinite(factor_rows) & eligible & torch.isfinite(returns)
+        counts = valid.sum(dim=1)
+        keep = counts >= self.groups * 10
+        if not bool(keep.any().item()):
+            return {
+                "periods": 0,
+                "gross_excess": None,
+                "turnover": None,
+                "annual_cost": None,
+                "net_excess": None,
+            }
+
+        factor_rows = factor_rows[keep]
+        returns = returns[keep]
+        valid = valid[keep]
+        counts = counts[keep]
+        selected_counts = torch.div(
+            counts + self.groups - 1,
+            self.groups,
+            rounding_mode="floor",
+        ).to(dtype=torch.long)
+        max_selected = int(selected_counts.max().item())
+        ranked = torch.where(valid, factor_rows, torch.full_like(factor_rows, -torch.inf))
+        selected = torch.topk(
+            ranked,
+            k=max_selected,
+            dim=1,
+            largest=True,
+            sorted=False,
+        ).indices
+        rank_positions = torch.arange(max_selected, device=factor.device).unsqueeze(0)
+        selected_rank_mask = rank_positions < selected_counts.unsqueeze(1)
+        selected_returns = returns.gather(1, selected)
+        gross = (
+            selected_returns * selected_rank_mask.to(dtype=returns.dtype)
+        ).sum(dim=1) / selected_counts.to(dtype=returns.dtype)
+        benchmark = (
+            torch.where(valid, returns, torch.zeros_like(returns)).sum(dim=1)
+            / counts.to(dtype=returns.dtype)
+        )
+        gross_excess = gross - benchmark
+        selected_members = torch.zeros_like(valid)
+        selected_members.scatter_(1, selected, selected_rank_mask)
+        turnovers = (
+            1.0
+            - (selected_members[1:] & selected_members[:-1]).sum(dim=1).to(dtype=returns.dtype)
+            / selected_counts[1:].to(dtype=returns.dtype)
+        )
+
+        periods = int(gross_excess.shape[0])
+        if periods == 0:
+            return {
+                "periods": 0,
+                "gross_excess": None,
+                "turnover": None,
+                "annual_cost": None,
+                "net_excess": None,
+            }
+        years = periods * self.cycle / 252.0
+        gross_annualized = float(gross_excess.sum().detach().item()) / years
+        turnover = float(turnovers.mean().detach().item()) if len(turnovers) else 0.0
+        annual_cost = turnover * (252.0 / self.cycle) * self.round_trip_cost
+        return {
+            "periods": periods,
+            "gross_excess": gross_annualized,
+            "turnover": turnover,
+            "annual_cost": annual_cost,
+            "net_excess": gross_annualized - annual_cost,
+        }
+
+
 def finite_as_nan(value: torch.Tensor) -> torch.Tensor:
     return torch.where(torch.isfinite(value), value, torch.full_like(value, torch.nan))
 
 
-def _ordinal_rank_by_day(value: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
-    """Rank each cross-section without AlphaPROBE's quadratic tie matrix."""
+def _average_rank_by_day(value: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
+    """Rank each cross-section with pandas/SciPy-compatible average ties.
+
+    AlphaPROBE's bundled implementation builds a ``days x stocks x stocks``
+    equality tensor.  The local full-A panel is too large for that path, so
+    compute tie groups after sorting in linear memory instead.
+    """
     safe_value = torch.where(valid, value, torch.full_like(value, torch.inf))
-    order = torch.argsort(safe_value, dim=1)
-    ranks = torch.empty_like(safe_value, dtype=torch.float32)
+    order = torch.argsort(safe_value, dim=1, stable=True)
+    sorted_value = safe_value.gather(1, order)
+    sorted_valid = valid.gather(1, order)
+    previous_value = torch.cat(
+        [torch.full_like(sorted_value[:, :1], torch.inf), sorted_value[:, :-1]],
+        dim=1,
+    )
+    previous_valid = torch.cat(
+        [torch.zeros_like(sorted_valid[:, :1]), sorted_valid[:, :-1]],
+        dim=1,
+    )
+    starts = sorted_valid & (~previous_valid | (sorted_value != previous_value))
+    group_ids = torch.cumsum(starts.to(dtype=torch.long), dim=1) - 1
+    safe_group_ids = group_ids.clamp_min(0)
     positions = torch.arange(value.shape[1], device=value.device, dtype=torch.float32)
-    ranks.scatter_(1, order, positions.expand(value.shape[0], -1))
+    valid_float = sorted_valid.to(dtype=torch.float32)
+    rank_sums = torch.zeros_like(sorted_value, dtype=torch.float32)
+    rank_counts = torch.zeros_like(sorted_value, dtype=torch.float32)
+    rank_sums.scatter_add_(1, safe_group_ids, positions.expand(value.shape[0], -1) * valid_float)
+    rank_counts.scatter_add_(1, safe_group_ids, valid_float)
+    average_sorted = rank_sums.gather(1, safe_group_ids).div(rank_counts.gather(1, safe_group_ids))
+    average_sorted = torch.where(
+        rank_counts.gather(1, safe_group_ids) > 0,
+        average_sorted,
+        torch.zeros_like(average_sorted),
+    )
+    ranks = torch.empty_like(safe_value, dtype=torch.float32)
+    ranks.scatter_(1, order, average_sorted)
     return ranks.masked_fill(~valid, torch.nan)
 
 
 def batch_spearmanr_linear(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """Calculate daily rank correlation in O(days * stocks) memory."""
     valid = torch.isfinite(x) & torch.isfinite(y)
-    ranked_x = _ordinal_rank_by_day(x, valid)
-    ranked_y = _ordinal_rank_by_day(y, valid)
+    ranked_x = _average_rank_by_day(x, valid)
+    ranked_y = _average_rank_by_day(y, valid)
     return batch_pearsonr(ranked_x, ranked_y)
 
 
@@ -429,7 +799,132 @@ def expression_namespace() -> dict[str, object]:
 
     namespace.update(vars(expression_module))
     namespace.update(vars(generic_features))
+    # The local adapter resolves these leaves through the PIT Tushare store.
+    # Keep the full PandaAI formula namespace available even when a field is
+    # unavailable in the current cache; the terminal builder filters those
+    # fields before GP starts.
+    namespace.update(build_pandaai_namespace())
+    # Accept the operator spellings used by PandaAI formula mode when a saved
+    # candidate is reproduced locally. AlphaPROBE expressions remain valid as
+    # well, so this is only an alias layer.
+    operator_aliases = {
+        "ABS": "Abs",
+        "SIGN": "Sign",
+        "LOG": "Log",
+        "RANK": "Rank",
+        "REF": "Ref",
+        "MA": "TsMean",
+        "SUM": "TsSum",
+        "STDDEV": "TsStd",
+        "TS_IR": "TsIr",
+        "TS_MAX_MIN_DIFF": "TsMinMaxDiff",
+        "TS_MAX_DIFF": "TsMaxDiff",
+        "TS_MIN_DIFF": "TsMinDiff",
+        "VAR": "TsVar",
+        "TS_SKEW": "TsSkew",
+        "TS_KURT": "TsKurt",
+        "TS_MAX": "TsMax",
+        "TS_MIN": "TsMin",
+        "TS_MEDIAN": "TsMed",
+        "TS_MAD": "TsMad",
+        "TS_RANK": "TsRank",
+        "DIFF": "TsDelta",
+        "RETURNS": "TsPctChange",
+        "TS_DIV": "TsDiv",
+        "WMA": "TsWMA",
+        "EMA": "TsEMA",
+        "TS_COV": "TsCov",
+        "TS_CORR": "TsCorr",
+        "POWER": "Pow",
+        "MAX": "GetGreater",
+        "MIN": "GetLess",
+    }
+    namespace.update(
+        {
+            alias: getattr(expression_module, target)
+            for alias, target in operator_aliases.items()
+        }
+    )
     return namespace
+
+
+def local_terminals(
+    data: TushareStockData,
+    *,
+    mode: str = "all",
+    field_file: Path | None = None,
+) -> list[str]:
+    """Return the requested locally resolvable PandaAI search terminals."""
+    active = set(data.pandaai_field_store.active_search_fields(include_period_variants=True))
+    if field_file is not None:
+        requested: set[str] = set()
+        for raw_line in field_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.split("#", 1)[0].strip().lower()
+            if not line:
+                continue
+            requested.update(item for item in line.replace(",", " ").split() if item)
+    elif mode == "price_volume":
+        requested = set(PRICE_VOLUME_FIELDS)
+    elif mode == "base":
+        requested = set(formula_field_name_set(include_period_variants=False))
+    elif mode == "all":
+        requested = active
+    else:
+        raise ValueError(f"Unsupported search field mode: {mode}")
+    terminals = sorted(active.intersection(requested))
+    if terminals:
+        return terminals
+    return ["open_", "close", "high", "low", "volume"]
+
+
+def write_field_coverage(
+    data: TushareStockData,
+    output: Path,
+    alignment: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist the full field inventory and a compact human-readable summary."""
+    coverage = data.field_coverage()
+    coverage["alignment"] = alignment or {
+        "alignment_rule_version": ALIGNMENT_RULE_VERSION,
+        "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
+        "correlation_method_reference": ALIGNMENT_CORRELATION_METHOD,
+    }
+    write_json(output / "field_coverage.json", coverage)
+    counts = coverage["status_counts"]
+    lines = [
+        "# PandaAI local field coverage",
+        "",
+        f"- Platform base fields: `{coverage['platform_base_fields']}`",
+        f"- Formula names including period variants: `{coverage['formula_names']}`",
+        f"- Active search fields: `{len(coverage['active_search_fields'])}`",
+        f"- Alignment rules: `{coverage['alignment']['alignment_rule_version']}`",
+        "",
+        "| status | count |",
+        "| --- | ---: |",
+    ]
+    for status, count in sorted(counts.items()):
+        lines.append(f"| {status} | {count} |")
+    lines.extend(
+        [
+            "",
+            "## Base-field status",
+            "",
+            "| status | count |",
+            "| --- | ---: |",
+        ]
+    )
+    for status, count in sorted(coverage["base_status_counts"].items()):
+        lines.append(f"| {status} | {count} |")
+    lines.extend(
+        [
+            "",
+            "## Active fields",
+            "",
+            ", ".join(f"`{name}`" for name in coverage["active_search_fields"]),
+        ]
+    )
+    (output / "field_coverage.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return coverage
 
 
 def evaluate_formula(formula: str, namespace: dict[str, object]) -> object:
@@ -463,10 +958,613 @@ def pool_metrics(pool: AlphaPool, data: TushareStockData, target: object) -> tup
         return float(ic), float(rank_ic)
 
 
+def expression_to_panda_formula(formula: str) -> str:
+    """Translate an AlphaPROBE expression into the closest formula-mode form."""
+    tree = ast.parse(formula, mode="eval")
+    panda_fields = formula_field_name_set(include_period_variants=True)
+    names = {
+        "open_": "OPEN",
+        "Open": "OPEN",
+        "OPEN": "OPEN",
+        "close": "CLOSE",
+        "Close": "CLOSE",
+        "CLOSE": "CLOSE",
+        "high": "HIGH",
+        "High": "HIGH",
+        "HIGH": "HIGH",
+        "low": "LOW",
+        "Low": "LOW",
+        "LOW": "LOW",
+        "volume": "VOLUME",
+        "Volume": "VOLUME",
+        "VOLUME": "VOLUME",
+    }
+    unary = {
+        "Abs": "ABS",
+        "Sign": "SIGN",
+        "Log": "LOG",
+        "Rank": "RANK",
+    }
+    rolling = {
+        "Ref": "REF",
+        "TsMean": "MA",
+        "TsSum": "SUM",
+        "TsStd": "STDDEV",
+        "TsVar": "VAR",
+        "TsSkew": "TS_SKEW",
+        "TsKurt": "TS_KURT",
+        "TsMax": "TS_MAX",
+        "TsMin": "TS_MIN",
+        "TsMed": "TS_MEDIAN",
+        "TsMad": "TS_MAD",
+        "TsRank": "TS_RANK",
+        "TsDelta": "DIFF",
+        "TsPctChange": "RETURNS",
+        "TsWMA": "WMA",
+        "TsEMA": "EMA",
+    }
+    pair_rolling = {
+        "TsCov": "TS_COV",
+        "TsCorr": "TS_CORR",
+    }
+
+    def render(node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            if node.id not in names:
+                normalized = node.id.lower()
+                if normalized not in panda_fields:
+                    raise ValueError(f"unsupported AlphaPROBE name: {node.id}")
+                return normalized.upper()
+            return names[node.id]
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            if isinstance(node.value, int) or float(node.value).is_integer():
+                return str(int(node.value))
+            return repr(float(node.value))
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            return f"(-{render(node.operand)})"
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.UAdd):
+            return f"(+{render(node.operand)})"
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            name = node.func.id
+            args = [render(argument) for argument in node.args]
+            if name == "Constant":
+                if len(args) != 1:
+                    raise ValueError("Constant expects one argument")
+                return args[0]
+            if name in unary:
+                if len(args) != 1:
+                    raise ValueError(f"{name} expects one argument")
+                return f"{unary[name]}({args[0]})"
+            if name == "SLog1p":
+                if len(args) != 1:
+                    raise ValueError("SLog1p expects one argument")
+                return f"(SIGN({args[0]})*LOG(1+ABS({args[0]})))"
+            if name == "Inv":
+                if len(args) != 1:
+                    raise ValueError("Inv expects one argument")
+                return f"(1/({args[0]}))"
+            if name in {"Add", "Sub", "Mul", "Div", "Pow", "Greater", "Less"}:
+                if len(args) != 2:
+                    raise ValueError(f"{name} expects two arguments")
+                operators = {
+                    "Add": "+",
+                    "Sub": "-",
+                    "Mul": "*",
+                    "Div": "/",
+                }
+                if name in operators:
+                    return f"({args[0]}{operators[name]}{args[1]})"
+                if name == "Pow":
+                    return f"POWER({args[0]},{args[1]})"
+                function = "MAX" if name == "Greater" else "MIN"
+                return f"{function}({args[0]},{args[1]})"
+            if name == "TsDiv":
+                if len(args) != 2:
+                    raise ValueError("TsDiv expects an expression and a window")
+                return f"({args[0]}/MA({args[0]},{args[1]}))"
+            if name == "TsIr":
+                if len(args) != 2:
+                    raise ValueError("TsIr expects an expression and a window")
+                return f"(MA({args[0]},{args[1]})/STDDEV({args[0]},{args[1]}))"
+            if name == "TsMinMaxDiff":
+                if len(args) != 2:
+                    raise ValueError("TsMinMaxDiff expects an expression and a window")
+                return f"(TS_MAX({args[0]},{args[1]})-TS_MIN({args[0]},{args[1]}))"
+            if name in {"TsMaxDiff", "TsMinDiff"}:
+                if len(args) != 2:
+                    raise ValueError(f"{name} expects an expression and a window")
+                extreme = "TS_MAX" if name == "TsMaxDiff" else "TS_MIN"
+                return f"({args[0]}-{extreme}({args[0]},{args[1]}))"
+            if name in pair_rolling:
+                if len(args) != 3:
+                    raise ValueError(f"{name} expects two expressions and a window")
+                return f"{pair_rolling[name]}({args[0]},{args[1]},{args[2]})"
+            if name in rolling:
+                if len(args) != 2:
+                    raise ValueError(f"{name} expects an expression and a window")
+                return f"{rolling[name]}({args[0]},{args[1]})"
+            raise ValueError(f"unsupported AlphaPROBE operator: {name}")
+        if isinstance(node, ast.BinOp):
+            if isinstance(node.op, ast.Pow):
+                return f"POWER({render(node.left)},{render(node.right)})"
+            operators = {
+                ast.Add: "+",
+                ast.Sub: "-",
+                ast.Mult: "*",
+                ast.Div: "/",
+            }
+            operator = operators.get(type(node.op))
+            if operator is None:
+                raise ValueError(f"unsupported expression operator: {type(node.op).__name__}")
+            return f"({render(node.left)}{operator}{render(node.right)})"
+        raise ValueError(f"unsupported AlphaPROBE syntax: {type(node).__name__}")
+
+    return render(tree.body)
+
+
+def run_aligned_net_excess(
+    args: argparse.Namespace,
+    cache_root: Path,
+    batch_root: Path,
+    run_output: Path,
+) -> int:
+    """Run GP with the local full-A, cost-adjusted long-side objective."""
+    if args.universe.lower() != "full_a":
+        raise ValueError("--objective aligned_net_excess requires --universe full_a")
+    if args.universe_limit is not None:
+        raise ValueError("--objective aligned_net_excess does not support --universe-limit")
+    if args.aligned_cycle < 1 or args.aligned_cycle > 10:
+        raise ValueError("--aligned-cycle must be between 1 and 10")
+    if args.aligned_groups < 2 or args.aligned_groups > 10:
+        raise ValueError("--aligned-groups must be between 2 and 10")
+    if args.aligned_label_offset < 0:
+        raise ValueError("--aligned-label-offset must be non-negative")
+    if args.aligned_round_trip_cost < 0:
+        raise ValueError("--aligned-round-trip-cost must be non-negative")
+
+    aligned_start = parse_date(args.aligned_start)
+    aligned_end = parse_date(args.aligned_end)
+    data_start = parse_date(args.aligned_data_start)
+    alignment_config = alignment_config_snapshot()
+    alignment_config.update(
+        {
+            "data_start": data_start.strftime("%Y%m%d"),
+            "start": aligned_start.strftime("%Y%m%d"),
+            "end": aligned_end.strftime("%Y%m%d"),
+            "groups": args.aligned_groups,
+            "label_offset": args.aligned_label_offset,
+            "round_trip_cost": args.aligned_round_trip_cost,
+        }
+    )
+    validate_alignment_config(alignment_config)
+    if aligned_start >= aligned_end:
+        raise ValueError("--aligned-start must be earlier than --aligned-end")
+    calendar = load_trade_dates(cache_root)
+    if aligned_start not in calendar or aligned_end not in calendar:
+        raise ValueError("Aligned dates must exist in the cached trading calendar")
+    data_start_position = next(
+        (index for index, date in enumerate(calendar) if date >= data_start),
+        None,
+    )
+    if data_start_position is None:
+        raise ValueError(f"No cached trading date is on or after {date_text(data_start)}")
+    data_start = calendar[data_start_position]
+    start_position = calendar.index(aligned_start)
+    lookback = max(1, args.aligned_lookback)
+    if start_position - data_start_position < lookback:
+        raise ValueError(
+            f"The local calendar needs {lookback} trading days before {date_text(aligned_start)}"
+        )
+    analysis_calendar = [
+        date for date in calendar if data_start <= date <= aligned_end
+    ]
+    cap_root = args.cap_root.expanduser().resolve()
+    print("objective=aligned_net_excess", flush=True)
+    print("data_source=local_tushare_qfq_daily_basic", flush=True)
+    print(f"price_root={batch_root}", flush=True)
+    print(f"cap_root={cap_root}", flush=True)
+    print(
+        f"alignment={date_text(aligned_start)}..{date_text(aligned_end)} "
+        f"cycle={args.aligned_cycle} label_offset={args.aligned_label_offset} "
+        f"groups={args.aligned_groups} round_trip_cost={args.aligned_round_trip_cost}",
+        flush=True,
+    )
+
+    frame = load_full_a_data(batch_root, cap_root, data_start, aligned_end)
+    frame = frame.sort_values(["instrument", "date"], ignore_index=True)
+    stock_ids = sorted(frame["instrument"].astype(str).unique())
+    print(f"aligned_rows={len(frame)} aligned_instruments={len(stock_ids)}", flush=True)
+
+    device = torch.device(args.device)
+    if device.type == "cuda" and not torch.cuda.is_available():
+        print(f"[note] {device} is unavailable; falling back to cpu", flush=True)
+        device = torch.device("cpu")
+    print(f"device={device}", flush=True)
+    data = TushareStockData.from_aligned_frame(
+        frame=frame,
+        calendar=analysis_calendar,
+        instrument=stock_ids,
+        start_time=date_text(aligned_start),
+        end_time=date_text(aligned_end),
+        max_backtrack_days=lookback,
+        max_future_days=0,
+        device=device,
+        financial_root=args.financial_root.expanduser().resolve(),
+    )
+    context = AlignedNetExcessContext(
+        frame=frame,
+        calendar=analysis_calendar,
+        data=data,
+        start_date=aligned_start,
+        end_date=aligned_end,
+        cycle=args.aligned_cycle,
+        label_offset=args.aligned_label_offset,
+        groups=args.aligned_groups,
+        round_trip_cost=args.aligned_round_trip_cost,
+    )
+    if args.aligned_min_periods < 1 or args.aligned_min_periods > len(context.signal_dates):
+        raise ValueError(
+            "--aligned-min-periods must be between 1 and the number of aligned signal dates "
+            f"({len(context.signal_dates)})"
+        )
+    print(f"data={data.summary()}", flush=True)
+    print(
+        f"signal_dates={len(context.signal_dates)} min_periods={args.aligned_min_periods}",
+        flush=True,
+    )
+    field_coverage = write_field_coverage(
+        data,
+        run_output,
+        alignment={
+            "alignment_rule_version": ALIGNMENT_RULE_VERSION,
+            "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
+            "correlation_method_reference": ALIGNMENT_CORRELATION_METHOD,
+            "universe": "full_a",
+            "price_mode": "qfq",
+            "market_cap_field": "total_mv",
+            "start_date": date_text(aligned_start),
+            "end_date": date_text(aligned_end),
+            "cycle": args.aligned_cycle,
+            "label_offset": args.aligned_label_offset,
+            "groups": args.aligned_groups,
+            "round_trip_cost": args.aligned_round_trip_cost,
+            "financial_join": "announcement_date_pit_comp_type_1_ttm",
+        },
+    )
+    terminals = local_terminals(
+        data,
+        mode=args.search_field_mode,
+        field_file=args.search_field_file,
+    )
+    print(
+        f"pandaai_fields base={field_coverage['platform_base_fields']} "
+        f"formula_names={field_coverage['formula_names']} active={len(terminals)}",
+        flush=True,
+    )
+
+    namespace = expression_namespace()
+    cache: dict[str, float] = {}
+    cache_stats: dict[str, dict[str, float | int | None]] = {}
+    cache_errors: dict[str, str] = {}
+
+    def score_formula(_y: object, formula_values: object, _weights: object) -> float:
+        formula = str(np.asarray(formula_values, dtype=object).reshape(-1)[0])
+        if formula in cache:
+            return cache[formula]
+        try:
+            expression = evaluate_formula(formula, namespace)
+            if not bool(getattr(expression, "is_featured", False)):
+                score = -1.0
+            else:
+                with torch.no_grad():
+                    factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
+                    stats = context.score(factor)
+                cache_stats[formula] = stats
+                score_value = stats.get("net_excess")
+                periods = int(stats.get("periods") or 0)
+                score = (
+                    float(score_value)
+                    if score_value is not None and periods >= args.aligned_min_periods
+                    else -1.0
+                )
+                if not np.isfinite(score):
+                    score = -1.0
+        except Exception as exc:  # Invalid generated expressions are terminal candidates.
+            score = -1.0
+            cache_errors[formula] = f"{type(exc).__name__}: {exc}"
+        cache[formula] = score
+        return score
+
+    metric = make_fitness(function=score_formula, greater_is_better=True)
+    functions = [make_function(**operator._asdict()) for operator in generic_operators.funcs]
+    active_terminal_count = len(terminals)
+    terminals = terminals + [
+        f"Constant({value})"
+        for value in [
+            -30.0,
+            -10.0,
+            -5.0,
+            -2.0,
+            -1.0,
+            -0.5,
+            -0.01,
+            0.01,
+            0.5,
+            1.0,
+            2.0,
+            5.0,
+            10.0,
+            30.0,
+        ]
+    ]
+    x_train = np.asarray([terminals], dtype=object)
+    y_train = np.asarray([[1]], dtype=object)
+    generation_results: list[dict[str, Any]] = []
+
+    def top_records(limit: int = 20) -> list[dict[str, Any]]:
+        records = []
+        for formula, score in sorted(cache.items(), key=lambda item: item[1], reverse=True)[:limit]:
+            stats = cache_stats.get(formula, {})
+            records.append({
+                "formula": formula,
+                "net_excess": score,
+                "gross_excess": stats.get("gross_excess"),
+                "turnover": stats.get("turnover"),
+                "annual_cost": stats.get("annual_cost"),
+                "periods": stats.get("periods"),
+                "coverage": (
+                    float(stats["periods"]) / len(context.signal_dates)
+                    if stats.get("periods") is not None
+                    else None
+                ),
+            })
+        return records
+
+    def on_generation() -> None:
+        generation = len(generation_results) + 1
+        record = {
+            "generation": generation,
+            "cache_size": len(cache),
+            "top_formulas": top_records(),
+        }
+        generation_results.append(record)
+        write_json(run_output / f"generation_{generation:03d}.json", record)
+        print(json.dumps(record, ensure_ascii=False, default=json_default), flush=True)
+
+    estimator = SymbolicRegressor(
+        population_size=args.population_size,
+        generations=args.generations,
+        init_depth=(2, 6),
+        tournament_size=args.tournament_size,
+        stopping_criteria=1.0,
+        p_crossover=0.3,
+        p_subtree_mutation=0.1,
+        p_hoist_mutation=0.01,
+        p_point_mutation=0.1,
+        p_point_replace=0.6,
+        max_samples=0.9,
+        verbose=1,
+        parsimony_coefficient=0.001,
+        random_state=args.seed,
+        function_set=functions,
+        metric=metric,
+        const_range=None,
+        n_jobs=args.n_jobs,
+    )
+    estimator.fit(x_train, y_train, callback=on_generation)
+
+    best_program = estimator._program
+    if best_program is None:
+        raise RuntimeError("AlphaPROBE GP did not return a best program")
+    best_formula_values = best_program.execute(x_train)
+    best_formula = str(np.asarray(best_formula_values, dtype=object).reshape(-1)[0])
+    best_expression = evaluate_formula(best_formula, namespace)
+    with torch.no_grad():
+        best_factor = finite_as_nan(best_expression.evaluate(data))  # type: ignore[attr-defined]
+    best_stats = context.score(best_factor)
+    try:
+        best_panda_formula = expression_to_panda_formula(best_formula)
+    except ValueError:
+        best_panda_formula = best_formula
+    late_stats = context.score(
+        best_factor,
+        start_date=pd.Timestamp("2025-01-01"),
+        end_date=aligned_end,
+    )
+    early_stats = context.score(
+        best_factor,
+        start_date=aligned_start,
+        end_date=pd.Timestamp("2024-12-31"),
+    )
+
+    selected: list[dict[str, Any]] = []
+    selected_signal_factors: list[torch.Tensor] = []
+    seen_formulas: set[str] = set()
+    for item in top_records(limit=max(50, args.output_candidates * 10)):
+        raw_formula = str(item["formula"])
+        if item.get("gross_excess") is None or item.get("turnover") is None:
+            continue
+        if int(item.get("periods") or 0) < args.aligned_min_periods:
+            continue
+        try:
+            panda_formula = expression_to_panda_formula(raw_formula)
+        except ValueError:
+            panda_formula = raw_formula
+        if panda_formula in seen_formulas:
+            continue
+
+        try:
+            expression = evaluate_formula(raw_formula, namespace)
+            if not bool(getattr(expression, "is_featured", False)):
+                continue
+            with torch.no_grad():
+                factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
+                signal_factor = factor[context.signal_data_positions]
+                prior_rank_correlations = [
+                    batch_spearmanr_linear(signal_factor, prior).nanmean().item()
+                    for prior in selected_signal_factors
+                ]
+        except Exception as exc:
+            cache_errors.setdefault(raw_formula, f"candidate selection: {type(exc).__name__}: {exc}")
+            continue
+
+        finite_correlations = [value for value in prior_rank_correlations if np.isfinite(value)]
+        max_rank_correlation = max(finite_correlations) if finite_correlations else None
+        if (
+            max_rank_correlation is not None
+            and max_rank_correlation >= args.aligned_candidate_rank_corr_threshold
+        ):
+            continue
+        seen_formulas.add(panda_formula)
+        item = dict(item)
+        item["panda_formula"] = panda_formula
+        item["max_rank_corr_to_selected"] = max_rank_correlation
+        selected.append(item)
+        selected_signal_factors.append(signal_factor)
+        if len(selected) >= args.output_candidates:
+            break
+
+    candidate_path = PROJECT_ROOT / f"{run_output.name}-candidates.txt"
+    candidate_lines = [
+        "# AlphaPROBE local aligned-net-excess candidates; direction=1",
+        f"# alignment={date_text(aligned_start)}..{date_text(aligned_end)} cycle={args.aligned_cycle} "
+        f"label_offset={args.aligned_label_offset} groups={args.aligned_groups} "
+        f"round_trip_cost={args.aligned_round_trip_cost}",
+    ]
+    for index, item in enumerate(selected, start=1):
+        candidate_lines.append(f"F-NET{index:02d} ~ {item['panda_formula']} ~ 1")
+    candidate_path.write_text("\n".join(candidate_lines) + "\n", encoding="utf-8")
+
+    result = {
+        "status": "completed",
+        "objective": "aligned_net_excess",
+        "data_source": "local_tushare_qfq_daily_basic",
+        "cache_root": cache_root,
+        "batch_root": batch_root,
+        "cap_root": cap_root,
+        "financial_root": args.financial_root.expanduser().resolve(),
+        "output": run_output,
+        "candidate_file": candidate_path,
+        "alignment": {
+            "start_date": aligned_start,
+            "end_date": aligned_end,
+            "cycle": args.aligned_cycle,
+            "label_offset": args.aligned_label_offset,
+            "groups": args.aligned_groups,
+            "round_trip_cost": args.aligned_round_trip_cost,
+            "signal_dates": len(context.signal_dates),
+            "min_periods": args.aligned_min_periods,
+            "instruments": len(stock_ids),
+        },
+        "settings": {
+            "seed": args.seed,
+            "device": str(device),
+            "population_size": args.population_size,
+            "generations": args.generations,
+            "tournament_size": args.tournament_size,
+            "aligned_lookback": lookback,
+            "aligned_min_periods": args.aligned_min_periods,
+            "search_field_mode": args.search_field_mode,
+            "search_field_file": args.search_field_file,
+            "output_candidates": args.output_candidates,
+            "candidate_rank_corr_threshold": args.aligned_candidate_rank_corr_threshold,
+        },
+        "dataset": data.summary(),
+        "field_coverage": {
+            "platform_base_fields": field_coverage["platform_base_fields"],
+            "formula_names": field_coverage["formula_names"],
+            "active_search_fields": active_terminal_count,
+            "status_counts": field_coverage["status_counts"],
+            "base_status_counts": field_coverage["base_status_counts"],
+        },
+        "best_formula": best_formula,
+        "best_panda_formula": best_panda_formula,
+        "best_train_fitness": float(best_program.raw_fitness_),
+        "best_stats": best_stats,
+        "early_stats": early_stats,
+        "late_stats": late_stats,
+        "top_candidates": selected,
+        "cache_size": len(cache),
+        "cache": cache,
+        "cache_errors": cache_errors,
+        "generation_results": generation_results,
+        "run_details": estimator.run_details_,
+    }
+    write_json(run_output / "gp_run.json", result)
+    report_lines = [
+        "# AlphaPROBE aligned net-excess search",
+        "",
+        f"- Alignment: `{date_text(aligned_start)}..{date_text(aligned_end)}`",
+        f"- Signals: `{len(context.signal_dates)}`; minimum candidate coverage: `{args.aligned_min_periods}` periods; cycle: `{args.aligned_cycle}` trading days",
+        f"- Universe: `{len(stock_ids)}` local full-A instruments; qfq + daily_basic",
+        f"- Objective: annualized top `{100 / args.aligned_groups:.1f}%` excess minus turnover cost; round-trip cost `{args.aligned_round_trip_cost:.4f}` "
+        f"(one-way `{args.aligned_round_trip_cost / 2:.4f}`)",
+        f"- GP expressions scored: `{len(cache)}`; invalid: `{len(cache_errors)}`",
+        f"- GP search terminals: `{len(terminals)}` via `{args.search_field_mode}`",
+        f"- Candidate deduplication: positive signal-panel Rank correlation `< {args.aligned_candidate_rank_corr_threshold:.3f}`",
+        "",
+        "| rank | raw AlphaPROBE formula | PandaAI formula | net excess | gross excess | turnover | annual cost | coverage | max prior Rank corr |",
+        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for index, item in enumerate(selected, start=1):
+        rank_corr = item["max_rank_corr_to_selected"]
+        rank_corr_text = "n/a" if rank_corr is None else f"{float(rank_corr):.4f}"
+        report_lines.append(
+            f"| {index} | `{item['formula']}` | `{item['panda_formula']}` | "
+            f"{float(item['net_excess']) * 100:.2f}% | "
+            f"{float(item['gross_excess']) * 100:.2f}% | "
+            f"{float(item['turnover']) * 100:.2f}% | "
+            f"{float(item['annual_cost']) * 100:.2f}% | "
+            f"{float(item['coverage']) * 100:.1f}% | "
+            f"{rank_corr_text} |"
+        )
+    report_lines.extend(
+        [
+            "",
+            "## Best formula diagnostics",
+            "",
+            f"- Raw AlphaPROBE formula: `{best_formula}`",
+            f"- PandaAI formula: `{result['best_panda_formula']}`",
+            f"- Full aligned net excess: `{float(best_stats['net_excess']) * 100:.2f}%`",
+            f"- Early net excess through 2024-12-31: `{float(early_stats['net_excess']) * 100:.2f}%`",
+            f"- Late net excess from 2025-01-01: `{float(late_stats['net_excess']) * 100:.2f}%`",
+            "",
+            "The local score is a research proxy; no PandaAI factor was created or run by this search.",
+        ]
+    )
+    (run_output / "aligned_net_report.md").write_text(
+        "\n".join(report_lines) + "\n", encoding="utf-8"
+    )
+    print(f"best_formula={best_formula}", flush=True)
+    print(f"best_panda_formula={best_panda_formula}", flush=True)
+    print(f"best_net_excess={best_stats['net_excess']}", flush=True)
+    print(f"candidate_file={candidate_path}", flush=True)
+    print(f"result={run_output / 'gp_run.json'}", flush=True)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--objective",
+        choices=["ic", "aligned_net_excess"],
+        default="ic",
+        help="fitness objective; aligned_net_excess uses the local full-A alignment proxy",
+    )
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--batch-root", type=Path, default=None)
+    parser.add_argument(
+        "--financial-root",
+        type=Path,
+        default=DEFAULT_FINANCIAL_ROOT,
+        help="PIT Tushare financial cache used by PandaAI named fields",
+    )
+    parser.add_argument(
+        "--cap-root",
+        type=Path,
+        default=DEFAULT_CACHE_ROOT / "tushare_factor_recheck" / "daily_basic_full_a",
+        help="daily_basic cache used by the aligned full-A objective",
+    )
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--universe", default="all", help="all, comma-separated codes, or a file")
     parser.add_argument("--universe-limit", type=int, default=None)
@@ -486,6 +1584,44 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--n-jobs", type=int, default=1)
+    parser.add_argument(
+        "--search-field-mode",
+        choices=["all", "base", "price_volume"],
+        default="all",
+        help="terminal subset used by GP; coverage reporting still includes all fields",
+    )
+    parser.add_argument(
+        "--search-field-file",
+        type=Path,
+        default=None,
+        help="optional newline/comma-separated terminal list overriding search-field-mode",
+    )
+    parser.add_argument("--aligned-start", default=date_text(ALIGNED_START).replace("-", ""))
+    parser.add_argument("--aligned-end", default=date_text(ALIGNED_END).replace("-", ""))
+    parser.add_argument("--aligned-cycle", type=int, default=ALIGNED_CYCLE)
+    parser.add_argument("--aligned-label-offset", type=int, default=ALIGNED_LABEL_OFFSET)
+    parser.add_argument("--aligned-groups", type=int, default=ALIGNED_GROUPS)
+    parser.add_argument("--aligned-data-start", default=date_text(ALIGNED_DATA_START).replace("-", ""))
+    parser.add_argument("--aligned-lookback", type=int, default=756)
+    parser.add_argument(
+        "--aligned-min-periods",
+        type=int,
+        default=ALIGNED_MIN_PERIODS,
+        help="minimum valid aligned signal periods required for a candidate",
+    )
+    parser.add_argument("--output-candidates", type=int, default=3)
+    parser.add_argument(
+        "--aligned-candidate-rank-corr-threshold",
+        type=float,
+        default=ALIGNED_CANDIDATE_RANK_CORR_THRESHOLD,
+        help="skip later candidates whose positive signal-panel Rank correlation reaches this threshold",
+    )
+    parser.add_argument(
+        "--aligned-round-trip-cost",
+        type=float,
+        default=ALIGNED_ROUND_TRIP_COST,
+        help="round-trip cost used by the local net-excess objective",
+    )
     return parser
 
 
@@ -512,7 +1648,13 @@ def main() -> int:
         raise ValueError("--generations must be at least 1")
     if args.tournament_size < 1:
         raise ValueError("--tournament-size must be at least 1")
+    if args.output_candidates < 1:
+        raise ValueError("--output-candidates must be at least 1")
+    if not 0.0 <= args.aligned_candidate_rank_corr_threshold <= 1.0:
+        raise ValueError("--aligned-candidate-rank-corr-threshold must be between 0 and 1")
     pool_sizes = parse_pool_sizes(args.pool_sizes)
+    if args.objective == "aligned_net_excess":
+        return run_aligned_net_excess(args, cache_root, batch_root, run_output)
     calendar = load_trade_dates(cache_root)
     universe = resolve_universe(cache_root, args.universe, args.universe_limit)
     device = torch.device(args.device)
@@ -533,6 +1675,7 @@ def main() -> int:
         max_backtrack_days=args.max_backtrack_days,
         max_future_days=args.max_future_days,
         device=device,
+        financial_root=args.financial_root.expanduser().resolve(),
     )
     valid_data = TushareStockData(
         batch_root=batch_root,
@@ -543,6 +1686,7 @@ def main() -> int:
         max_backtrack_days=args.max_backtrack_days,
         max_future_days=args.max_future_days,
         device=device,
+        financial_root=args.financial_root.expanduser().resolve(),
     )
     test_data = TushareStockData(
         batch_root=batch_root,
@@ -553,10 +1697,21 @@ def main() -> int:
         max_backtrack_days=args.max_backtrack_days,
         max_future_days=args.max_future_days,
         device=device,
+        financial_root=args.financial_root.expanduser().resolve(),
     )
     print(f"train={train_data.summary()}")
     print(f"valid={valid_data.summary()}")
     print(f"test={test_data.summary()}")
+    field_coverage = write_field_coverage(train_data, run_output)
+    terminals = local_terminals(
+        train_data,
+        mode=args.search_field_mode,
+        field_file=args.search_field_file,
+    )
+    print(
+        f"pandaai_fields base={field_coverage['platform_base_fields']} "
+        f"formula_names={field_coverage['formula_names']} active={len(terminals)}",
+    )
 
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
@@ -587,13 +1742,10 @@ def main() -> int:
 
     metric = make_fitness(function=score_formula, greater_is_better=True)
     functions = [make_function(**operator._asdict()) for operator in generic_operators.funcs]
-    terminals = [
-        "open_",
-        "close",
-        "high",
-        "low",
-        "volume",
-        *[f"Constant({value})" for value in [-30.0, -10.0, -5.0, -2.0, -1.0, -0.5, -0.01, 0.01, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]],
+    active_terminal_count = len(terminals)
+    terminals = terminals + [
+        f"Constant({value})"
+        for value in [-30.0, -10.0, -5.0, -2.0, -1.0, -0.5, -0.01, 0.01, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]
     ]
     x_train = np.asarray([terminals], dtype=object)
     y_train = np.asarray([[1]], dtype=object)
@@ -714,6 +1866,14 @@ def main() -> int:
             "train": train_data.summary(),
             "valid": valid_data.summary(),
             "test": test_data.summary(),
+        },
+        "financial_root": args.financial_root.expanduser().resolve(),
+        "field_coverage": {
+            "platform_base_fields": field_coverage["platform_base_fields"],
+            "formula_names": field_coverage["formula_names"],
+            "active_search_fields": active_terminal_count,
+            "status_counts": field_coverage["status_counts"],
+            "base_status_counts": field_coverage["base_status_counts"],
         },
         "best_formula": best_formula,
         "best_train_fitness": float(best_program.raw_fitness_),

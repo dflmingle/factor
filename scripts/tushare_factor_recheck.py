@@ -21,6 +21,7 @@ from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -51,6 +52,7 @@ PLATFORM_REFERENCE: dict[str, dict[str, float]] = {
 }
 
 DAILY_COLUMNS = ["date", "instrument", "open", "close", "volume"]
+OPTIONAL_DAILY_COLUMNS = ["high", "low", "high_qfq", "low_qfq", "amount"]
 _thread_state = threading.local()
 _api_rate_lock = threading.Lock()
 _next_api_call = 0.0
@@ -141,13 +143,24 @@ def normalize_daily(raw: pd.DataFrame, trade_date: pd.Timestamp, price_mode: str
     result = result.rename(
         columns={"ts_code": "instrument", open_column: "open", close_column: "close", "vol": "volume"}
     )
+    if "amount" in raw.columns:
+        result["amount"] = raw["amount"]
+    if price_mode == "qfq":
+        for column in ["high_qfq", "low_qfq"]:
+            if column in raw.columns:
+                result[column] = raw[column]
+    else:
+        for column in ["high", "low"]:
+            if column in raw.columns:
+                result[column] = raw[column]
     result["date"] = pd.Timestamp(trade_date)
-    for column in ["open", "close", "volume"]:
-        result[column] = pd.to_numeric(result[column], errors="coerce")
+    for column in ["open", "close", "volume", *OPTIONAL_DAILY_COLUMNS]:
+        if column in result.columns:
+            result[column] = pd.to_numeric(result[column], errors="coerce")
     result["instrument"] = result["instrument"].astype(str)
     result = result.dropna(subset=["instrument", "open", "close", "volume"])
     result = result[(result["open"] > 0) & (result["close"] > 0) & (result["volume"] > 0)]
-    return result[DAILY_COLUMNS]
+    return result[DAILY_COLUMNS + [column for column in OPTIONAL_DAILY_COLUMNS if column in result.columns]]
 
 
 def fetch_one_day(
@@ -293,7 +306,18 @@ def load_daily_batches(
     paths = sorted(batch_root.glob("batch_*.parquet"))
     if not paths:
         raise FileNotFoundError(f"No downloaded Tushare batches found under {batch_root}")
-    frames = [pd.read_parquet(path, columns=DAILY_COLUMNS) for path in paths]
+    wanted_columns = DAILY_COLUMNS + OPTIONAL_DAILY_COLUMNS
+    frames = [
+        pd.read_parquet(
+            path,
+            columns=[
+                column
+                for column in wanted_columns
+                if column in pq.ParquetFile(path).schema_arrow.names
+            ],
+        )
+        for path in paths
+    ]
     frame = pd.concat(frames, ignore_index=True)
     frame["date"] = pd.to_datetime(frame["date"])
     for column in ["open", "close", "volume"]:

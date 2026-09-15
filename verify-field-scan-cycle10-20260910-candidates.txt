@@ -1,0 +1,5 @@
+# Same three field-scan verification formulas with a 10-day rebalance cycle.
+# Window: 2021-09-07 to 2026-09-07; 10 groups; 0.30% one-way cost.
+VERIFY10-E260910-04 ~ RANK(book_to_market_ratio_lf) - RANK(MARKET_CAP) ~ 1
+VERIFY10-F260910-12 ~ RANK(book_to_market_ratio_lf) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60) ~ 1
+VERIFY10-G260910-13 ~ RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60) ~ 1

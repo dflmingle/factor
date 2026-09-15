@@ -24,6 +24,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from financial_factor_local import FINANCIAL_HANDLERS, load_financial_cache  # noqa: E402
 from full_a_local_data import load_full_a_data  # noqa: E402
+from platform_alignment_rules import (  # noqa: E402
+    ALIGNMENT_LABEL_OFFSET,
+    ALIGNMENT_RULES_DOCUMENT,
+    ALIGNMENT_RULE_VERSION,
+)
 from platform_aligned_factor_compare import read_platform_run  # noqa: E402
 from positive_factor_local_compare import (  # noqa: E402
     DATA_START,
@@ -124,11 +129,15 @@ def local_factor_periods(
     cycle: int,
     direction: int,
     max_age_trade_days: int | None,
+    label_offset: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     positions = {date: index for index, date in enumerate(calendar)}
     if any(date not in positions for date in signal_dates):
         raise RuntimeError("A platform signal date is absent from the local trade calendar")
-    target_positions = [positions[date] + cycle for date in signal_dates]
+    current_positions = [positions[date] + label_offset for date in signal_dates]
+    target_positions = [position + cycle for position in current_positions]
+    if min(current_positions, default=0) < 0:
+        raise RuntimeError("A platform signal date has no local current label date")
     if max(target_positions, default=-1) >= len(calendar):
         raise RuntimeError("Local data does not cover the platform forward target")
 
@@ -136,7 +145,9 @@ def local_factor_periods(
     factor_frame["factor"] = pd.to_numeric(factor_values.to_numpy(), errors="coerce")
     factor_frame = factor_frame[factor_frame["date"].isin(signal_dates)]
 
-    current = close.loc[signal_dates].stack(dropna=False).rename("current_close").reset_index()
+    current = close.iloc[current_positions].copy()
+    current.index = signal_dates
+    current = current.stack(dropna=False).rename("current_close").reset_index()
     current = current.rename(columns={"level_0": "date", "level_1": "instrument"})
     future = close.iloc[target_positions].copy()
     future.index = signal_dates
@@ -148,7 +159,9 @@ def local_factor_periods(
     returns["forward_return"] = returns["future_close"].div(returns["current_close"]).sub(1.0)
 
     if max_age_trade_days is not None:
-        current_age = price_age.loc[signal_dates].stack(dropna=False).rename("current_age").reset_index()
+        current_age = price_age.iloc[current_positions].copy()
+        current_age.index = signal_dates
+        current_age = current_age.stack(dropna=False).rename("current_age").reset_index()
         current_age = current_age.rename(columns={"level_0": "date", "level_1": "instrument"})
         target_age = price_age.iloc[target_positions].copy()
         target_age.index = signal_dates
@@ -518,6 +531,7 @@ def run(args: argparse.Namespace) -> int:
                 cycle,
                 record["direction"],
                 args.max_age_trade_days,
+                args.label_offset,
             )
             periods = add_platform_columns(periods, platform, selected_group)
             stem = record["id"].replace(":", "__").replace("/", "_")
@@ -561,6 +575,8 @@ def run(args: argparse.Namespace) -> int:
         del values
 
     settings = {
+        "alignment_rule_version": ALIGNMENT_RULE_VERSION,
+        "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
         "start": day_text(DEFAULT_START),
         "end": day_text(END),
         "data_start": day_text(data_start),
@@ -572,6 +588,7 @@ def run(args: argparse.Namespace) -> int:
         ),
         "min_delta_pp": args.min_delta_pp,
         "max_age_trade_days": args.max_age_trade_days,
+        "label_offset": args.label_offset,
         "groups": GROUPS,
         "round_trip_cost": ROUND_TRIP_COST,
     }
@@ -596,7 +613,7 @@ def main() -> int:
         "--cap-root",
         default=str(CACHE_ROOT / "tushare_factor_recheck" / "daily_basic_full_a"),
     )
-    parser.add_argument("--financial-root", default=str(CACHE_ROOT / "financial"))
+    parser.add_argument("--financial-root", default=str(CACHE_ROOT / "financial_full_a"))
     parser.add_argument("--data-start", default=DATA_START.strftime("%Y%m%d"))
     parser.add_argument(
         "--compare-json",
@@ -608,6 +625,12 @@ def main() -> int:
         type=int,
         default=None,
         help="drop a price if it has been forward-filled for more than N trade days; omit for no cap",
+    )
+    parser.add_argument(
+        "--label-offset",
+        type=int,
+        default=ALIGNMENT_LABEL_OFFSET,
+        help="Trading-day offset applied to both current and future close in the forward label.",
     )
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     return run(parser.parse_args())

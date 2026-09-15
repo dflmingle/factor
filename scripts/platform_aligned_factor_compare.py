@@ -157,7 +157,9 @@ def read_platform_run(path: Path) -> dict[str, Any]:
     analysis = factor_analysis_payload(raw)
     factor_rows = analysis.get("query_factor_analysis_data") or analysis.get("factor_data_analysis") or []
     metrics = {
-        str(row.get("indicator")): as_float(row.get("factor1"))
+        str(row.get("indicator")): as_float(
+            row.get("factor1") if row.get("factor1") is not None else row.get("factor_value")
+        )
         for row in factor_rows
         if isinstance(row, dict)
     }

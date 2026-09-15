@@ -7,6 +7,7 @@
 - [`selected/huatai-multifactor-series13/`](./selected/huatai-multifactor-series13/)：华泰证券 2016--2019 年多因子系列 13 篇的完整副本，包含 PDF 和可检索 TXT。
 - [`short_reversal/`](./short_reversal/)：从上述资料中筛出的短期反转专题资料，并附有外部论文索引。
 - [`market_behavior/`](./market_behavior/)：洗盘、出货、主力资金、大单和高频订单行为研究。
+- [`platform_alignment/ALIGNMENT_RULES.md`](./platform_alignment/ALIGNMENT_RULES.md)：PandaAI 平台结果与本地 Tushare 重建的固定对齐口径和变更纪律。
 
 ## 主题导航
 

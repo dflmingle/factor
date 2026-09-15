@@ -1,0 +1,63 @@
+{
+  "platform": {
+    "workflow_id": "6aa371b551cdfe29b2e0bc34",
+    "run_id": "6aa371b5ecb163ea7228d004",
+    "correlation_task_id": "3e07308fd6664f1096e128d2bc6b70c3",
+    "method": "FactorCorrelationCalculationControl",
+    "value": 0.4151352929,
+    "window": "2021-09-07..2026-09-07"
+  },
+  "inputs": {
+    "t10_size": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP)))) / 4",
+    "h03": "RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))"
+  },
+  "settings": {
+    "alignment_rule_version": "full-a-qfq-label1-v1",
+    "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+    "universe": "沪深全A",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "data_start": "2018-01-01",
+    "comparison_start": "2021-09-07",
+    "comparison_end": "2026-09-07",
+    "calendar_dates_requested": 1211,
+    "frame_rows": 9401373,
+    "frame_instruments": 5456,
+    "frame_date_min": "2018-01-02",
+    "frame_date_max": "2026-09-07",
+    "valid_rows": 5368681,
+    "valid_dates": 1211,
+    "valid_stock_count_mean": 4433.262592898431,
+    "market_field_sources": {
+      "high_qfq": "cached",
+      "low_qfq": "cached",
+      "amount": "cached"
+    }
+  },
+  "local": {
+    "daily_cross_sectional_spearman": {
+      "mean": 0.41629297585382163,
+      "median": 0.41051829956167757,
+      "std": 0.11251714019832688,
+      "weighted_mean": 0.4188200088012455,
+      "days": 1211
+    },
+    "daily_cross_sectional_pearson": {
+      "mean": 0.42683786923523664,
+      "median": 0.4218114783101314,
+      "std": 0.10799454262331176,
+      "weighted_mean": 0.42924874864527196,
+      "days": 1211
+    },
+    "pooled_spearman": 0.4232668101036458,
+    "pooled_pearson": 0.43326181848484985,
+    "closest_to_platform": {
+      "method": "daily_cross_sectional_spearman_mean",
+      "value": 0.41629297585382163,
+      "delta": 0.001157682953821626
+    }
+  },
+  "artifacts": {
+    "daily_csv": "/data/games/factor_/corr-t10-size-vs-h03-local-reproduction-20260914.daily.csv"
+  }
+}

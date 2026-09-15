@@ -25,6 +25,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import financial_factor_local as financial_local  # noqa: E402
 from financial_factor_local import load_financial_cache  # noqa: E402
 from full_a_local_data import load_full_a_data  # noqa: E402
+from platform_alignment_rules import (  # noqa: E402
+    ALIGNMENT_BENCHMARK_DESCRIPTION,
+    ALIGNMENT_BENCHMARK_MODE,
+    ALIGNMENT_DATA_START,
+    ALIGNMENT_GROUPS,
+    ALIGNMENT_LABEL_OFFSET,
+    ALIGNMENT_ONE_WAY_COST,
+    ALIGNMENT_PRICE_MODE,
+    ALIGNMENT_RULES_DOCUMENT,
+    ALIGNMENT_RULE_VERSION,
+    ALIGNMENT_ROUND_TRIP_COST,
+)
 from platform_aligned_factor_compare import read_platform_run  # noqa: E402
 from positive_factor_local_compare import (  # noqa: E402
     END,
@@ -36,7 +48,7 @@ from positive_factor_local_compare import (  # noqa: E402
 from stfilter_local_recheck import ensure_calendar  # noqa: E402
 
 
-DATA_START = pd.Timestamp("2018-01-01")
+DATA_START = pd.Timestamp(ALIGNMENT_DATA_START)
 OUTPUT_DEFAULT = (
     PROJECT_ROOT
     / "quantlab/.quantlab/cache/research/cn_equity/reports/financial_field_proxy_diagnosis_full_a"
@@ -358,10 +370,11 @@ def shifted_forward_returns(
     calendar: list[pd.Timestamp],
     signal_dates: list[pd.Timestamp],
     cycle: int,
+    label_offset: int = ALIGNMENT_LABEL_OFFSET,
 ) -> pd.DataFrame:
     positions = [calendar.index(date) for date in signal_dates]
-    current = close.iloc[[position + 1 for position in positions]].copy()
-    target_positions = [position + cycle + 1 for position in positions]
+    current = close.iloc[[position + label_offset for position in positions]].copy()
+    target_positions = [position + cycle + label_offset for position in positions]
     if max(target_positions, default=-1) >= len(calendar):
         raise RuntimeError("Local data does not cover shifted forward targets")
     target = close.iloc[target_positions].copy()
@@ -387,12 +400,12 @@ def evaluate_variant(
     factor_frame = frame[["date", "instrument"]].copy()
     factor_frame["factor"] = values.to_numpy(dtype=float)
     factor_frame = factor_frame[factor_frame["date"].isin(signal_dates)]
-    returns = shifted_forward_returns(close, calendar, signal_dates, int(record["configured_cycle"]))
-    full_benchmark = (
-        returns.replace([np.inf, -np.inf], np.nan)
-        .dropna(subset=["forward_return"])
-        .groupby("date", sort=False)["forward_return"]
-        .mean()
+    returns = shifted_forward_returns(
+        close,
+        calendar,
+        signal_dates,
+        int(record["configured_cycle"]),
+        ALIGNMENT_LABEL_OFFSET,
     )
     data = factor_frame.merge(returns, on=["date", "instrument"], how="left")
     data = data.replace([np.inf, -np.inf], np.nan).dropna()
@@ -418,8 +431,8 @@ def evaluate_variant(
         )
         if pd.notna(rank_ic):
             rank_ics.append(float(rank_ic))
-        benchmark = full_benchmark.get(date)
-        if benchmark is None or not np.isfinite(benchmark):
+        benchmark = current["forward_return"].mean()
+        if not np.isfinite(benchmark):
             continue
         benchmark = float(benchmark)
         members = set(
@@ -494,13 +507,19 @@ def write_report(
     output.mkdir(parents=True, exist_ok=True)
     payload = {
         "settings": {
+            "alignment_rule_version": ALIGNMENT_RULE_VERSION,
+            "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
             "data_start": day_text(DATA_START),
             "end": day_text(END),
-            "groups": GROUPS,
-            "round_trip_cost": ROUND_TRIP_COST,
-            "price_mode": "qfq",
-            "benchmark": "full-A qfq panel, independent of factor-value availability",
-            "label": "close(t+1) -> close(t+cycle+1)",
+            "groups": ALIGNMENT_GROUPS,
+            "round_trip_cost": ALIGNMENT_ROUND_TRIP_COST,
+            "one_way_cost": ALIGNMENT_ONE_WAY_COST,
+            "price_mode": ALIGNMENT_PRICE_MODE,
+            "benchmark_mode": ALIGNMENT_BENCHMARK_MODE,
+            "benchmark_description": ALIGNMENT_BENCHMARK_DESCRIPTION,
+            "benchmark": "factor-valid qfq panel, matching the final local comparison",
+            "label_offset": ALIGNMENT_LABEL_OFFSET,
+            "label": f"close(t+{ALIGNMENT_LABEL_OFFSET}) -> close(t+cycle+{ALIGNMENT_LABEL_OFFSET})",
             "records": len(records),
             "proxies": list(PROXIES),
         },
@@ -518,8 +537,10 @@ def write_report(
         "",
         "Offline comparison over saved platform CFP workflows. No factor was created and no platform backtest was run.",
         "",
-        "- label: `close(t+1) -> close(t+cycle+1)`",
-        "- price: qfq; groups: `10`; one-way cost: `0.30%`",
+        f"- alignment rules: `{ALIGNMENT_RULE_VERSION}`; see `{ALIGNMENT_RULES_DOCUMENT}`",
+        f"- label: `close(t+{ALIGNMENT_LABEL_OFFSET}) -> close(t+cycle+{ALIGNMENT_LABEL_OFFSET})`",
+        f"- price: {ALIGNMENT_PRICE_MODE}; groups: `{ALIGNMENT_GROUPS}`; one-way cost: `{100 * ALIGNMENT_ONE_WAY_COST:.2f}%`",
+        f"- benchmark: `{ALIGNMENT_BENCHMARK_MODE}` ({ALIGNMENT_BENCHMARK_DESCRIPTION})",
         f"- saved CFP records: `{len(records)}`; proxy variants: `{len(PROXIES)}`",
         "",
         "| factor | proxy | periods | local net | platform net | delta pp | gross delta pp | turnover delta pp | local RankIC | platform RankIC | top20 |",

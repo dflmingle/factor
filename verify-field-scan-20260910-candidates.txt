@@ -1,0 +1,6 @@
+# Verification sample from the user's E/F/G field-scan results.
+# Window: 2021-09-07 to 2026-09-07; 5-day rebalance; 10 groups; 0.30% one-way cost.
+# Field names follow PandaAI's catalog; capitalization is immaterial to the formula definition.
+VERIFY-E260910-04 ~ RANK(book_to_market_ratio_lf) - RANK(MARKET_CAP) ~ 1
+VERIFY-F260910-12 ~ RANK(book_to_market_ratio_lf) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60) ~ 1
+VERIFY-G260910-13 ~ RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60) ~ 1
