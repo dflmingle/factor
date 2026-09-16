@@ -1,0 +1,108 @@
+{
+  "method": "AlphaPROBE GFlowNet",
+  "method_id": "alphaprobe-gfn",
+  "data_source": "Tushare cached full-A qfq Parquet",
+  "price_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches",
+  "daily_basic_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a",
+  "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1",
+  "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+  "alignment": {
+    "universe": "full_a",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "data_start": "20180101",
+    "start": "20210907",
+    "end": "20260907",
+    "groups": 10,
+    "label_offset": 1,
+    "round_trip_cost": 0.006,
+    "one_way_cost": 0.003,
+    "benchmark_mode": "factor_valid",
+    "correlation_method": "daily_cross_sectional_spearman_mean"
+  },
+  "target": "close(t+1) -> close(t+1+5)",
+  "ic_objective": "signed_positive",
+  "cycle": 5,
+  "data_start": "20180101",
+  "train": {
+    "start": "20210907",
+    "end": "20240906"
+  },
+  "valid": {
+    "start": "20240909",
+    "end": "20250905"
+  },
+  "test": {
+    "start": "20250908",
+    "end": "20260907"
+  },
+  "universe": "沪深全A (.SH/.SZ)",
+  "universe_size": 5456,
+  "universe_limit": null,
+  "features": [
+    "open",
+    "close",
+    "high",
+    "low",
+    "volume",
+    "vwap"
+  ],
+  "vwap_source": "cached",
+  "panels": {
+    "train": {
+      "start_date": "2021-09-07",
+      "end_date": "2024-09-06",
+      "trading_days": 728,
+      "stocks": 5456,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 64,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    },
+    "valid": {
+      "start_date": "2024-09-09",
+      "end_date": "2025-09-05",
+      "trading_days": 241,
+      "stocks": 5456,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 64,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    },
+    "test": {
+      "start_date": "2025-09-08",
+      "end_date": "2026-09-07",
+      "trading_days": 242,
+      "stocks": 5456,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 64,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    }
+  },
+  "device": "cuda:0"
+}

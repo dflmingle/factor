@@ -66,7 +66,81 @@ except ModuleNotFoundError as exc:  # pragma: no cover - depends on local enviro
 DEFAULT_CACHE_ROOT = PROJECT_ROOT / "quantlab" / ".quantlab" / "cache" / "research" / "cn_equity"
 DEFAULT_PRICE_ROOT = DEFAULT_CACHE_ROOT / "tushare_factor_recheck" / "qfq" / "daily_batches"
 DEFAULT_CAP_ROOT = DEFAULT_CACHE_ROOT / "tushare_factor_recheck" / "daily_basic_full_a"
-DEFAULT_OUTPUT = DEFAULT_CACHE_ROOT / "reports" / "alphaprobe_gfn_tushare_cycle5"
+DEFAULT_OUTPUT = DEFAULT_CACHE_ROOT / "reports" / "alphaprobe_gfn_tushare_cycle5_signed_positive"
+
+
+class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
+    """AlphaPool with an explicit signed-IC objective.
+
+    AlphaPROBE's bundled pool takes ``abs`` of both the return IC and mutual
+    IC.  For positive-IC mining, the return IC must retain its sign while
+    mutual correlation remains absolute so inverse duplicates are still
+    treated as redundant.  The original absolute behavior is kept as an
+    explicit compatibility mode.
+    """
+
+    VALID_OBJECTIVES = frozenset({"signed_positive", "absolute"})
+
+    def __init__(self, *args: Any, ic_objective: str = "signed_positive", **kwargs: Any):
+        if ic_objective not in self.VALID_OBJECTIVES:
+            choices = ", ".join(sorted(self.VALID_OBJECTIVES))
+            raise ValueError(f"ic-objective must be one of: {choices}")
+        super().__init__(*args, **kwargs)
+        self.ic_objective = ic_objective
+
+    def _score_single_ic(self, ic_ret: float) -> float:
+        return float(abs(ic_ret) if self.ic_objective == "absolute" else ic_ret)
+
+    def try_new_expr(self, expr: object, embedding: torch.Tensor | None = None) -> tuple[float, float]:
+        value = self._normalize_by_day(expr.evaluate(self.data))
+        ic_ret, ic_mut = self._calc_ics(value, ic_mut_threshold=0.99)
+        if ic_ret is None or ic_mut is None:
+            return 0.0, 1.0
+
+        raw_ic = float(ic_ret)
+        score_ic = self._score_single_ic(raw_ic)
+        mutual_ics = np.abs(ic_mut)
+
+        # A non-positive candidate is not useful for a signed positive-IC
+        # pool.  Return its signed score so the environment can assign the
+        # minimum reward, and keep it out of the pool entirely.
+        if self.ic_objective == "signed_positive" and raw_ic <= 0.0:
+            print(f"[Pool Reject non-positive IC={raw_ic:.6f}] {expr}")
+            return score_ic, 0.0
+
+        if self.size < self.capacity:
+            if mutual_ics.size == 0 or np.max(mutual_ics) <= self.ic_mut_threshold:
+                self._add_factor(expr, value, score_ic, mutual_ics, embedding)
+                print(f"[Pool Add] {expr}")
+            else:
+                print(f"[Pool Reject correlated] {expr}")
+        else:
+            min_ic_idx = np.argmin(self.single_ics[:self.size])
+            min_ic = self.single_ics[min_ic_idx]
+
+            if score_ic > min_ic and (mutual_ics.size == 0 or np.max(mutual_ics) <= self.ic_mut_threshold):
+                self._add_factor(expr, value, score_ic, mutual_ics, embedding)
+                print(f"[Pool Add] {expr}")
+                print(f"[Pool Pop] {self.exprs[np.argmin(self.single_ics[:self.size])]}")
+                self._pop()
+            else:
+                print(f"[Pool Reject] {expr}")
+
+        novelty = (1 - np.max(mutual_ics)) if mutual_ics.size > 0 else 1.0
+        return score_ic, float(novelty)
+
+    def try_new_expr_with_ssl(
+        self, expr: object, embedding: torch.Tensor | None = None
+    ) -> tuple[float, float, float]:
+        ic_reward, nov_reward = self.try_new_expr(expr, embedding)
+
+        # Do not let auxiliary SSL/novelty terms turn a non-positive IC into
+        # a high-reward trajectory in the signed-positive objective.
+        if self.ic_objective == "signed_positive" and ic_reward <= 0.0:
+            return ic_reward, 0.0, 0.0
+
+        ssl_reward = self.compute_ssl_reward(expr, embedding) if embedding is not None else 0.0
+        return ic_reward, nov_reward, ssl_reward
 
 
 def parse_date(value: str) -> pd.Timestamp:
@@ -288,6 +362,7 @@ def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[st
         "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
         "alignment": alignment_config_snapshot(),
         "target": f"close(t+{ALIGNMENT_LABEL_OFFSET}) -> close(t+{ALIGNMENT_LABEL_OFFSET}+{args.cycle})",
+        "ic_objective": args.ic_objective,
         "cycle": args.cycle,
         "data_start": args.data_start,
         "train": {"start": args.train_start, "end": args.train_end},
@@ -407,7 +482,12 @@ def build_gfn_components(args: argparse.Namespace, pool: AlphaPoolGFN, device: t
 
 def dry_run(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], target: object, metadata: dict[str, Any], device: torch.device) -> None:
     train_data = panels["train"]
-    pool = AlphaPoolGFN(capacity=args.pool_capacity, stock_data=train_data, target=target)
+    pool = ObjectiveAlphaPoolGFN(
+        capacity=args.pool_capacity,
+        stock_data=train_data,
+        target=target,
+        ic_objective=args.ic_objective,
+    )
     env, *_ = build_gfn_components(args, pool, device)
     target_values = target.evaluate(train_data)
     finite = int(torch.isfinite(target_values).sum().item())
@@ -440,11 +520,12 @@ def train(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], targ
     )
 
     train_data = panels["train"]
-    pool = AlphaPoolGFN(
+    pool = ObjectiveAlphaPoolGFN(
         capacity=args.pool_capacity,
         stock_data=train_data,
         target=target,
         ic_mut_threshold=args.ic_mut_threshold,
+        ic_objective=args.ic_objective,
     )
     env, backbone, _, _, loss_fn, sampler, optimizer = build_gfn_components(args, pool, device)
     logger = GFNLogger(backbone, pool, output / "checkpoints", panels["test"], target)
@@ -508,6 +589,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--test-start", default="20250908")
     parser.add_argument("--test-end", default=ALIGNMENT_END)
     parser.add_argument("--cycle", type=int, default=5)
+    parser.add_argument(
+        "--ic-objective",
+        choices=sorted(ObjectiveAlphaPoolGFN.VALID_OBJECTIVES),
+        default="signed_positive",
+        help="single-factor IC objective; signed_positive rejects non-positive IC candidates",
+    )
     parser.add_argument("--backtrack-days", type=int, default=64)
     parser.add_argument("--universe-limit", type=int)
     parser.add_argument("--pool-capacity", type=int, default=50)

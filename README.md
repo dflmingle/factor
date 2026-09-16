@@ -35,8 +35,8 @@
 
 ```bash
 python -m pip install -r requirements-alphaprobe-gfn.txt
-python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
-python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
+python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 ```
 
-训练结果包含 `final_pool.json`、`training_history.json`、检查点和 `factor_metrics.csv`。当前最近一次全量训练结果位于 `quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_run2/`。
+默认目标是 `signed_positive`：单因子 IC 保留符号，只接收正 IC 候选；因子间互相关仍取绝对值。旧的绝对 IC 行为可显式使用 `--ic-objective absolute`。训练结果包含 `final_pool.json`、`training_history.json`、检查点和 `factor_metrics.csv`；本轮正 IC 结果摘要见 [`research_reports/alphaprobe_gfn_tushare_cycle5_signed_positive_run1/`](./research_reports/alphaprobe_gfn_tushare_cycle5_signed_positive_run1/)。

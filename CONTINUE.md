@@ -314,8 +314,8 @@ python scripts/tushare_financial_cache.py --universe full_a --start-date 2018010
 
 ```bash
 python -m pip install -r requirements-alphaprobe-gfn.txt
-python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
-python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
+python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 ```
 
-评估脚本使用线性内存的逐日 Spearman，避免 AlphaPROBE 原始 `batch_spearmanr` 在全 A 股票数上创建二次方矩阵。最近一次全量 10,000 episode 结果在 `quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_run2/`，包含 50 条表达式、检查点、`final_pool.json`、`training_history.json` 和 `factor_metrics.csv/json`。该轮 ensemble 的 train/valid/test Rank IC 为 `-0.0877/-0.0900/-0.0572`，说明当前 GFlowNet pool 没有通过验证集泛化筛选；不要直接把 test 最优单因子当成已验证因子。
+评估脚本使用线性内存的逐日 Spearman，避免 AlphaPROBE 原始 `batch_spearmanr` 在全 A 股票数上创建二次方矩阵。默认 `signed_positive` 目标保留单因子 IC 符号并拒绝非正 IC 候选；旧绝对 IC 轮仍保留在 `alphaprobe_gfn_tushare_cycle5_run2/`。正 IC 轮的 10,000 episode 结果在 `alphaprobe_gfn_tushare_cycle5_signed_positive_run1/`，ensemble train/valid/test Rank IC 为 `0.0913/0.0794/0.0556`，Pearson IC 为 `0.0337/0.0181/0.0066`。这是本地历史样本结果，仍需对单因子做独立泛化和成本检验。

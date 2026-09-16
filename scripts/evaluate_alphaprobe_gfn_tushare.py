@@ -51,8 +51,22 @@ def evaluate(args: argparse.Namespace) -> dict:
     run_dir = args.run_dir.expanduser().resolve()
     report_output = (args.report_output or run_dir).expanduser().resolve()
     final_pool = json.loads((run_dir / "final_pool.json").read_text(encoding="utf-8"))
+    saved_metadata_path = run_dir / "run_metadata.json"
+    saved_metadata = (
+        json.loads(saved_metadata_path.read_text(encoding="utf-8"))
+        if saved_metadata_path.exists()
+        else {}
+    )
+    # Runs created before --ic-objective existed used the absolute-IC pool.
+    # The evaluator does not need the mode to calculate values, but preserving
+    # it in metadata prevents a historical run from being mislabeled.
+    saved_objective = saved_metadata.get("ic_objective", "absolute")
+    if saved_objective in {"absolute", "signed_positive"}:
+        args.ic_objective = saved_objective
     device = resolve_device(args.device)
     panels, target, metadata = load_panels(args, device)
+    metadata["evaluated_run_metadata"] = saved_metadata
+    metadata["ic_objective"] = saved_objective
     parser = ExpressionParser()
     target_values = {
         split: target.evaluate(panel) for split, panel in panels.items()
