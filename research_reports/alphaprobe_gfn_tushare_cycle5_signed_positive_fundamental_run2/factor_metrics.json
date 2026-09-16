@@ -1,0 +1,1175 @@
+{
+  "run_dir": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_run2",
+  "report_output": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_run2",
+  "factor_count": 50,
+  "ensemble": {
+    "train": {
+      "ic": 0.03679116070270538,
+      "rank_ic": 0.12126189470291138
+    },
+    "valid": {
+      "ic": 0.04046362265944481,
+      "rank_ic": 0.09383569657802582
+    },
+    "test": {
+      "ic": 0.014126650989055634,
+      "rank_ic": 0.06949787586927414
+    }
+  },
+  "metadata": {
+    "method": "AlphaPROBE GFlowNet",
+    "method_id": "alphaprobe-gfn",
+    "data_source": "Tushare cached full-A qfq Parquet",
+    "price_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches",
+    "daily_basic_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a",
+    "financial_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/financial_full_a",
+    "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1",
+    "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+    "alignment": {
+      "universe": "full_a",
+      "price_mode": "qfq",
+      "market_cap_field": "total_mv",
+      "data_start": "20180101",
+      "start": "20210907",
+      "end": "20260907",
+      "groups": 10,
+      "label_offset": 1,
+      "round_trip_cost": 0.006,
+      "one_way_cost": 0.003,
+      "benchmark_mode": "factor_valid",
+      "correlation_method": "daily_cross_sectional_spearman_mean"
+    },
+    "target": "close(t+1) -> close(t+1+5)",
+    "ic_objective": "signed_positive",
+    "cycle": 5,
+    "data_start": "20180101",
+    "train": {
+      "start": "20210907",
+      "end": "20240906"
+    },
+    "valid": {
+      "start": "20240909",
+      "end": "20250905"
+    },
+    "test": {
+      "start": "20250908",
+      "end": "20260907"
+    },
+    "universe": "沪深全A (.SH/.SZ)",
+    "universe_size": 5456,
+    "universe_limit": null,
+    "features": [
+      "open",
+      "close",
+      "high",
+      "low",
+      "volume",
+      "vwap"
+    ],
+    "feature_set": "custom",
+    "search_fields": [
+      "market_cap_3",
+      "pb_ratio_ttm",
+      "pb_ratio_lf",
+      "book_to_market_ratio_ttm",
+      "book_to_market_ratio_lf",
+      "ps_ratio_ttm",
+      "ev_ttm",
+      "revenue_ttm",
+      "operating_revenue_ttm",
+      "net_profit_ttm",
+      "net_profit_deduct_non_recurring_pnl_ttm",
+      "total_assets_ttm",
+      "total_liabilities_ttm",
+      "equity_parent_company_ttm",
+      "cash_flow_from_operating_activities_ttm",
+      "gross_profit_ttm",
+      "profit_from_operation_ttm"
+    ],
+    "search_field_count": 17,
+    "search_field_status": [
+      {
+        "field": "market_cap_3",
+        "base_field": "market_cap_3",
+        "period": "current",
+        "label": "总市值",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "daily_basic.total_mv",
+        "note": "aligned daily_basic total market value"
+      },
+      {
+        "field": "pb_ratio_ttm",
+        "base_field": "pb_ratio_ttm",
+        "period": "current",
+        "label": "市净率ttm,当前股票总市值",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "pb_ratio_lf",
+        "base_field": "pb_ratio_lf",
+        "period": "current",
+        "label": "市净率lf,当前股票总市值",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "book_to_market_ratio_ttm",
+        "base_field": "book_to_market_ratio_ttm",
+        "period": "current",
+        "label": "账面市值比 ttm,归属母公司股东权益合计ttm",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "book_to_market_ratio_lf",
+        "base_field": "book_to_market_ratio_lf",
+        "period": "current",
+        "label": "账面市值比lf,归属母公司股东权益合计mrq",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "ps_ratio_ttm",
+        "base_field": "ps_ratio_ttm",
+        "period": "current",
+        "label": "市销率ttm,总市值",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "ev_ttm",
+        "base_field": "ev_ttm",
+        "period": "current",
+        "label": "企业价值ttm,总市值 + 负债合计ttm",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "revenue_ttm",
+        "base_field": "revenue",
+        "period": "ttm",
+        "label": "营业总收入",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "income.total_revenue",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "operating_revenue_ttm",
+        "base_field": "operating_revenue",
+        "period": "ttm",
+        "label": "营业收入",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "income.revenue",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "net_profit_ttm",
+        "base_field": "net_profit",
+        "period": "ttm",
+        "label": "净利润",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "income.n_income",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "net_profit_deduct_non_recurring_pnl_ttm",
+        "base_field": "net_profit_deduct_non_recurring_pnl",
+        "period": "ttm",
+        "label": "扣除非经常性损益后的净利润",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_proxy",
+        "source": "fina_indicator.profit_dedt",
+        "note": "Tushare alias/proxy"
+      },
+      {
+        "field": "total_assets_ttm",
+        "base_field": "total_assets",
+        "period": "ttm",
+        "label": "总资产",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "balancesheet.total_assets",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "total_liabilities_ttm",
+        "base_field": "total_liabilities",
+        "period": "ttm",
+        "label": "负债合计",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "balancesheet.total_liab",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "equity_parent_company_ttm",
+        "base_field": "equity_parent_company",
+        "period": "ttm",
+        "label": "归属于母公司所有者权益合计",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "balancesheet.total_hldr_eqy_exc_min_int",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "cash_flow_from_operating_activities_ttm",
+        "base_field": "cash_flow_from_operating_activities",
+        "period": "ttm",
+        "label": "经营活动产生的现金流量净额",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "cashflow.n_cashflow_act",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "gross_profit_ttm",
+        "base_field": "gross_profit",
+        "period": "ttm",
+        "label": "主营业务利润",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_proxy",
+        "source": "income.revenue-income.oper_cost-income.biz_tax_surchg",
+        "note": "主营业利润 proxy: operating revenue - operating cost - sales tax"
+      },
+      {
+        "field": "profit_from_operation_ttm",
+        "base_field": "profit_from_operation",
+        "period": "ttm",
+        "label": "营业利润",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "income.operate_profit",
+        "note": "PIT Tushare statement field"
+      }
+    ],
+    "vwap_source": "cached",
+    "panels": {
+      "train": {
+        "start_date": "2021-09-07",
+        "end_date": "2024-09-06",
+        "trading_days": 728,
+        "stocks": 5456,
+        "features": [
+          "open",
+          "close",
+          "high",
+          "low",
+          "volume",
+          "vwap"
+        ],
+        "device": "cuda:0",
+        "max_backtrack_days": 512,
+        "max_future_days": 8,
+        "high_low_fallback": false
+      },
+      "valid": {
+        "start_date": "2024-09-09",
+        "end_date": "2025-09-05",
+        "trading_days": 241,
+        "stocks": 5456,
+        "features": [
+          "open",
+          "close",
+          "high",
+          "low",
+          "volume",
+          "vwap"
+        ],
+        "device": "cuda:0",
+        "max_backtrack_days": 512,
+        "max_future_days": 8,
+        "high_low_fallback": false
+      },
+      "test": {
+        "start_date": "2025-09-08",
+        "end_date": "2026-09-07",
+        "trading_days": 242,
+        "stocks": 5456,
+        "features": [
+          "open",
+          "close",
+          "high",
+          "low",
+          "volume",
+          "vwap"
+        ],
+        "device": "cuda:0",
+        "max_backtrack_days": 512,
+        "max_future_days": 8,
+        "high_low_fallback": false
+      }
+    },
+    "device": "cuda:0",
+    "evaluated_run_metadata": {
+      "method": "AlphaPROBE GFlowNet",
+      "method_id": "alphaprobe-gfn",
+      "data_source": "Tushare cached full-A qfq Parquet",
+      "price_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches",
+      "daily_basic_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a",
+      "financial_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/financial_full_a",
+      "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1",
+      "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+      "alignment": {
+        "universe": "full_a",
+        "price_mode": "qfq",
+        "market_cap_field": "total_mv",
+        "data_start": "20180101",
+        "start": "20210907",
+        "end": "20260907",
+        "groups": 10,
+        "label_offset": 1,
+        "round_trip_cost": 0.006,
+        "one_way_cost": 0.003,
+        "benchmark_mode": "factor_valid",
+        "correlation_method": "daily_cross_sectional_spearman_mean"
+      },
+      "target": "close(t+1) -> close(t+1+5)",
+      "ic_objective": "signed_positive",
+      "cycle": 5,
+      "data_start": "20180101",
+      "train": {
+        "start": "20210907",
+        "end": "20240906"
+      },
+      "valid": {
+        "start": "20240909",
+        "end": "20250905"
+      },
+      "test": {
+        "start": "20250908",
+        "end": "20260907"
+      },
+      "universe": "沪深全A (.SH/.SZ)",
+      "universe_size": 5456,
+      "universe_limit": null,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "feature_set": "fundamental_core",
+      "search_fields": [
+        "market_cap_3",
+        "pb_ratio_ttm",
+        "pb_ratio_lf",
+        "book_to_market_ratio_ttm",
+        "book_to_market_ratio_lf",
+        "ps_ratio_ttm",
+        "ev_ttm",
+        "revenue_ttm",
+        "operating_revenue_ttm",
+        "net_profit_ttm",
+        "net_profit_deduct_non_recurring_pnl_ttm",
+        "total_assets_ttm",
+        "total_liabilities_ttm",
+        "equity_parent_company_ttm",
+        "cash_flow_from_operating_activities_ttm",
+        "gross_profit_ttm",
+        "profit_from_operation_ttm"
+      ],
+      "search_field_count": 17,
+      "search_field_status": [
+        {
+          "field": "market_cap_3",
+          "base_field": "market_cap_3",
+          "period": "current",
+          "label": "总市值",
+          "status": "local_direct",
+          "source": "daily_basic.total_mv",
+          "note": "aligned daily_basic total market value"
+        },
+        {
+          "field": "pb_ratio_ttm",
+          "base_field": "pb_ratio_ttm",
+          "period": "current",
+          "label": "市净率ttm,当前股票总市值",
+          "status": "local_derived",
+          "source": "PIT Tushare valuation reconstruction",
+          "note": "valuation reconstructed from PIT statements"
+        },
+        {
+          "field": "pb_ratio_lf",
+          "base_field": "pb_ratio_lf",
+          "period": "current",
+          "label": "市净率lf,当前股票总市值",
+          "status": "local_derived",
+          "source": "PIT Tushare valuation reconstruction",
+          "note": "valuation reconstructed from PIT statements"
+        },
+        {
+          "field": "book_to_market_ratio_ttm",
+          "base_field": "book_to_market_ratio_ttm",
+          "period": "current",
+          "label": "账面市值比 ttm,归属母公司股东权益合计ttm",
+          "status": "local_derived",
+          "source": "PIT Tushare valuation reconstruction",
+          "note": "valuation reconstructed from PIT statements"
+        },
+        {
+          "field": "book_to_market_ratio_lf",
+          "base_field": "book_to_market_ratio_lf",
+          "period": "current",
+          "label": "账面市值比lf,归属母公司股东权益合计mrq",
+          "status": "local_derived",
+          "source": "PIT Tushare valuation reconstruction",
+          "note": "valuation reconstructed from PIT statements"
+        },
+        {
+          "field": "ps_ratio_ttm",
+          "base_field": "ps_ratio_ttm",
+          "period": "current",
+          "label": "市销率ttm,总市值",
+          "status": "local_derived",
+          "source": "PIT Tushare valuation reconstruction",
+          "note": "valuation reconstructed from PIT statements"
+        },
+        {
+          "field": "ev_ttm",
+          "base_field": "ev_ttm",
+          "period": "current",
+          "label": "企业价值ttm,总市值 + 负债合计ttm",
+          "status": "local_derived",
+          "source": "PIT Tushare valuation reconstruction",
+          "note": "valuation reconstructed from PIT statements"
+        },
+        {
+          "field": "revenue_ttm",
+          "base_field": "revenue",
+          "period": "ttm",
+          "label": "营业总收入",
+          "status": "local_direct",
+          "source": "income.total_revenue",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "operating_revenue_ttm",
+          "base_field": "operating_revenue",
+          "period": "ttm",
+          "label": "营业收入",
+          "status": "local_direct",
+          "source": "income.revenue",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "net_profit_ttm",
+          "base_field": "net_profit",
+          "period": "ttm",
+          "label": "净利润",
+          "status": "local_direct",
+          "source": "income.n_income",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "net_profit_deduct_non_recurring_pnl_ttm",
+          "base_field": "net_profit_deduct_non_recurring_pnl",
+          "period": "ttm",
+          "label": "扣除非经常性损益后的净利润",
+          "status": "local_proxy",
+          "source": "fina_indicator.profit_dedt",
+          "note": "Tushare alias/proxy"
+        },
+        {
+          "field": "total_assets_ttm",
+          "base_field": "total_assets",
+          "period": "ttm",
+          "label": "总资产",
+          "status": "local_direct",
+          "source": "balancesheet.total_assets",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "total_liabilities_ttm",
+          "base_field": "total_liabilities",
+          "period": "ttm",
+          "label": "负债合计",
+          "status": "local_direct",
+          "source": "balancesheet.total_liab",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "equity_parent_company_ttm",
+          "base_field": "equity_parent_company",
+          "period": "ttm",
+          "label": "归属于母公司所有者权益合计",
+          "status": "local_direct",
+          "source": "balancesheet.total_hldr_eqy_exc_min_int",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "cash_flow_from_operating_activities_ttm",
+          "base_field": "cash_flow_from_operating_activities",
+          "period": "ttm",
+          "label": "经营活动产生的现金流量净额",
+          "status": "local_direct",
+          "source": "cashflow.n_cashflow_act",
+          "note": "PIT Tushare statement field"
+        },
+        {
+          "field": "gross_profit_ttm",
+          "base_field": "gross_profit",
+          "period": "ttm",
+          "label": "主营业务利润",
+          "status": "local_proxy",
+          "source": "income.revenue-income.oper_cost-income.biz_tax_surchg",
+          "note": "主营业利润 proxy: operating revenue - operating cost - sales tax"
+        },
+        {
+          "field": "profit_from_operation_ttm",
+          "base_field": "profit_from_operation",
+          "period": "ttm",
+          "label": "营业利润",
+          "status": "local_direct",
+          "source": "income.operate_profit",
+          "note": "PIT Tushare statement field"
+        }
+      ],
+      "vwap_source": "cached",
+      "panels": {
+        "train": {
+          "start_date": "2021-09-07",
+          "end_date": "2024-09-06",
+          "trading_days": 728,
+          "stocks": 5456,
+          "features": [
+            "open",
+            "close",
+            "high",
+            "low",
+            "volume",
+            "vwap"
+          ],
+          "device": "cuda:0",
+          "max_backtrack_days": 512,
+          "max_future_days": 8,
+          "high_low_fallback": false
+        },
+        "valid": {
+          "start_date": "2024-09-09",
+          "end_date": "2025-09-05",
+          "trading_days": 241,
+          "stocks": 5456,
+          "features": [
+            "open",
+            "close",
+            "high",
+            "low",
+            "volume",
+            "vwap"
+          ],
+          "device": "cuda:0",
+          "max_backtrack_days": 512,
+          "max_future_days": 8,
+          "high_low_fallback": false
+        },
+        "test": {
+          "start_date": "2025-09-08",
+          "end_date": "2026-09-07",
+          "trading_days": 242,
+          "stocks": 5456,
+          "features": [
+            "open",
+            "close",
+            "high",
+            "low",
+            "volume",
+            "vwap"
+          ],
+          "device": "cuda:0",
+          "max_backtrack_days": 512,
+          "max_future_days": 8,
+          "high_low_fallback": false
+        }
+      },
+      "device": "cuda:0"
+    }
+  },
+  "factors": [
+    {
+      "rank": 1,
+      "formula": "$net_profit_ttm",
+      "weight": 0.0029610826168209314,
+      "train_ic": 0.0029612230136990547,
+      "train_rank_ic": -0.003001451026648283,
+      "valid_ic": -0.007125808857381344,
+      "valid_rank_ic": -0.007311847060918808,
+      "test_ic": 0.0011318193282932043,
+      "test_rank_ic": 0.010130698792636395
+    },
+    {
+      "rank": 2,
+      "formula": "TsDiv($net_profit_deduct_non_recurring_pnl_ttm,20)",
+      "weight": 0.00221158261410892,
+      "train_ic": 0.004329301882535219,
+      "train_rank_ic": 0.0010032211430370808,
+      "valid_ic": -0.003463524393737316,
+      "valid_rank_ic": -0.0002498878166079521,
+      "test_ic": 0.0007202862179838121,
+      "test_rank_ic": -0.002606644295156002
+    },
+    {
+      "rank": 3,
+      "formula": "TsIr($book_to_market_ratio_ttm,50)",
+      "weight": 0.015202086418867111,
+      "train_ic": 0.015202085487544537,
+      "train_rank_ic": 0.04974311962723732,
+      "valid_ic": -0.0032966495491564274,
+      "valid_rank_ic": 0.04703661426901817,
+      "test_ic": -0.015607504174113274,
+      "test_rank_ic": 0.017758753150701523
+    },
+    {
+      "rank": 4,
+      "formula": "Div($profit_from_operation_ttm,$net_profit_deduct_non_recurring_pnl_ttm)",
+      "weight": 0.0008469613967463374,
+      "train_ic": 0.0008469594176858664,
+      "train_rank_ic": -0.0026105863507837057,
+      "valid_ic": 0.0012735755881294608,
+      "valid_rank_ic": -0.0026514867786318064,
+      "test_ic": -0.0016047096578404307,
+      "test_rank_ic": -0.0010992174502462149
+    },
+    {
+      "rank": 5,
+      "formula": "Sub(TsMin($high,10),$low)",
+      "weight": 0.02325763925909996,
+      "train_ic": 0.02325763925909996,
+      "train_rank_ic": 0.043570421636104584,
+      "valid_ic": 0.019094977527856827,
+      "valid_rank_ic": 0.05111532658338547,
+      "test_ic": -0.011688421480357647,
+      "test_rank_ic": 0.03177961707115173
+    },
+    {
+      "rank": 6,
+      "formula": "TsDiv($book_to_market_ratio_lf,40)",
+      "weight": 0.025224046781659126,
+      "train_ic": 0.025224046781659126,
+      "train_rank_ic": 0.05683090165257454,
+      "valid_ic": 0.0255978312343359,
+      "valid_rank_ic": 0.08634587377309799,
+      "test_ic": 0.022432278841733932,
+      "test_rank_ic": 0.04874660447239876
+    },
+    {
+      "rank": 7,
+      "formula": "Less(TsDiv(TsMinDiff($book_to_market_ratio_ttm,20),20),$close)",
+      "weight": 0.0019266854505985975,
+      "train_ic": 0.0019266862655058503,
+      "train_rank_ic": 0.01665790192782879,
+      "valid_ic": 0.004222203511744738,
+      "valid_rank_ic": 0.03248493745923042,
+      "test_ic": 0.00041526678251102567,
+      "test_rank_ic": 0.014702992513775826
+    },
+    {
+      "rank": 8,
+      "formula": "Pow(Mul(0.5,$ps_ratio_ttm),Div($vwap,$ev_ttm))",
+      "weight": 0.009770183824002743,
+      "train_ic": 0.009798277169466019,
+      "train_rank_ic": -0.013102582655847073,
+      "valid_ic": -0.00885169766843319,
+      "valid_rank_ic": -0.0027140923775732517,
+      "test_ic": -0.00724582327529788,
+      "test_rank_ic": -0.004444299731403589
+    },
+    {
+      "rank": 9,
+      "formula": "Sub(1.0,TsDelta(Sub($high,TsWMA(Add(TsRank($revenue_ttm,10),Less($gross_profit_ttm,1.0)),10)),50))",
+      "weight": 0.0009848689660429955,
+      "train_ic": 0.00098486861679703,
+      "train_rank_ic": -0.03435932844877243,
+      "valid_ic": 0.004551110789179802,
+      "valid_rank_ic": -0.0362427644431591,
+      "test_ic": -0.0034452497493475676,
+      "test_rank_ic": 0.008931288495659828
+    },
+    {
+      "rank": 10,
+      "formula": "TsRank($net_profit_deduct_non_recurring_pnl_ttm,40)",
+      "weight": 0.007864805869758129,
+      "train_ic": 0.00879543274641037,
+      "train_rank_ic": 0.0008492922061122954,
+      "valid_ic": 0.0019407500512897968,
+      "valid_rank_ic": -0.004552755504846573,
+      "test_ic": 0.005581153091043234,
+      "test_rank_ic": 0.0017874877667054534
+    },
+    {
+      "rank": 11,
+      "formula": "Mul(Rank($book_to_market_ratio_lf),TsMinDiff(Pow(2.0,TsCov($ps_ratio_ttm,Abs(Abs($cash_flow_from_operating_activities_ttm)),50)),20))",
+      "weight": 0.002513566520065069,
+      "train_ic": 0.0025135669857263565,
+      "train_rank_ic": -0.00016496666648890823,
+      "valid_ic": -0.0017112226923927665,
+      "valid_rank_ic": -0.004583179950714111,
+      "test_ic": 0.002978820353746414,
+      "test_rank_ic": -0.007050315383821726
+    },
+    {
+      "rank": 12,
+      "formula": "Less($net_profit_deduct_non_recurring_pnl_ttm,1.0)",
+      "weight": 0.0027884042356163263,
+      "train_ic": 0.002797236666083336,
+      "train_rank_ic": 0.0049462406896054745,
+      "valid_ic": 0.006913990247994661,
+      "valid_rank_ic": -0.005767232272773981,
+      "test_ic": 0.006048405077308416,
+      "test_rank_ic": -0.000106832456367556
+    },
+    {
+      "rank": 13,
+      "formula": "Pow(0.5,$close)",
+      "weight": 0.002690639579668641,
+      "train_ic": 0.0026906386483460665,
+      "train_rank_ic": 0.007133400999009609,
+      "valid_ic": -0.01934821531176567,
+      "valid_rank_ic": 0.0001021035059238784,
+      "test_ic": -0.0039907582104206085,
+      "test_rank_ic": -0.016962628811597824
+    },
+    {
+      "rank": 14,
+      "formula": "Sub(30.0,$pb_ratio_ttm)",
+      "weight": 0.006285004783421755,
+      "train_ic": 0.006285004783421755,
+      "train_rank_ic": -0.030324114486575127,
+      "valid_ic": 0.0025434927083551884,
+      "valid_rank_ic": -0.020370308309793472,
+      "test_ic": 0.004448313266038895,
+      "test_rank_ic": -0.00729646161198616
+    },
+    {
+      "rank": 15,
+      "formula": "SLog1p(Less(Abs($low),Greater($ps_ratio_ttm,2.0)))",
+      "weight": 0.011103158816695213,
+      "train_ic": 0.011103158816695213,
+      "train_rank_ic": 0.0053440057672560215,
+      "valid_ic": 0.00543693732470274,
+      "valid_rank_ic": -0.0185153279453516,
+      "test_ic": 0.006601473316550255,
+      "test_rank_ic": 0.004972098860889673
+    },
+    {
+      "rank": 16,
+      "formula": "Pow($book_to_market_ratio_lf,Less(TsMad($ps_ratio_ttm,50),$cash_flow_from_operating_activities_ttm))",
+      "weight": 0.0023295809514820576,
+      "train_ic": 0.0023295811843127012,
+      "train_rank_ic": 0.020222680643200874,
+      "valid_ic": -0.006228863727301359,
+      "valid_rank_ic": 0.008008042350411415,
+      "test_ic": -0.0025470496620982885,
+      "test_rank_ic": 0.014971813187003136
+    },
+    {
+      "rank": 17,
+      "formula": "TsSkew(Pow($book_to_market_ratio_lf,2.0),30)",
+      "weight": 0.014648142270743847,
+      "train_ic": 0.014648142270743847,
+      "train_rank_ic": 0.019074689596891403,
+      "valid_ic": 0.018252385780215263,
+      "valid_rank_ic": 0.019534975290298462,
+      "test_ic": 0.009654133580625057,
+      "test_rank_ic": 0.010864483192563057
+    },
+    {
+      "rank": 18,
+      "formula": "TsMaxDiff($ps_ratio_ttm,40)",
+      "weight": 0.000907741894479841,
+      "train_ic": 0.0009077417780645192,
+      "train_rank_ic": 0.021339543163776398,
+      "valid_ic": 0.001420898362994194,
+      "valid_rank_ic": 0.031438056379556656,
+      "test_ic": 0.006961640901863575,
+      "test_rank_ic": 0.0254969522356987
+    },
+    {
+      "rank": 19,
+      "formula": "Div($book_to_market_ratio_ttm,Mul(Pow($low,2.0),SLog1p(TsRank($ev_ttm,20))))",
+      "weight": 0.005420040339231491,
+      "train_ic": 0.005420038942247629,
+      "train_rank_ic": 0.052442342042922974,
+      "valid_ic": -0.0018237474141642451,
+      "valid_rank_ic": 0.013308731839060783,
+      "test_ic": -0.002627770649269223,
+      "test_rank_ic": 0.020866921171545982
+    },
+    {
+      "rank": 20,
+      "formula": "TsMad(Inv(Div($total_liabilities_ttm,$cash_flow_from_operating_activities_ttm)),30)",
+      "weight": 0.0018903494346886873,
+      "train_ic": 0.0017157308757305145,
+      "train_rank_ic": 0.0002972519723698497,
+      "valid_ic": 0.004383775405585766,
+      "valid_rank_ic": -0.0020186854526400566,
+      "test_ic": -0.002094804774969816,
+      "test_rank_ic": -0.0034016158897429705
+    },
+    {
+      "rank": 21,
+      "formula": "Inv(Log($profit_from_operation_ttm))",
+      "weight": 0.010928303934633732,
+      "train_ic": 0.010940207168459892,
+      "train_rank_ic": -0.006085550412535667,
+      "valid_ic": 0.028042703866958618,
+      "valid_rank_ic": -0.000370997644495219,
+      "test_ic": 0.0044011687859892845,
+      "test_rank_ic": -0.010102899745106697
+    },
+    {
+      "rank": 22,
+      "formula": "Log(TsEMA(TsMad(SLog1p(TsStd($book_to_market_ratio_lf,40)),10),10))",
+      "weight": 0.0004109345027245581,
+      "train_ic": 0.0004109340952709317,
+      "train_rank_ic": 0.0031222417019307613,
+      "valid_ic": -0.005620800424367189,
+      "valid_rank_ic": -0.0009718913934193552,
+      "test_ic": 0.0041043441742658615,
+      "test_rank_ic": 0.006158493459224701
+    },
+    {
+      "rank": 23,
+      "formula": "TsWMA(TsMed(Sign($ps_ratio_ttm),50),50)",
+      "weight": 0.00289543136022985,
+      "train_ic": 0.0045420024544000626,
+      "train_rank_ic": 0.0032368283718824387,
+      "valid_ic": 0.025466501712799072,
+      "valid_rank_ic": -0.018367091193795204,
+      "test_ic": 0.0112873874604702,
+      "test_rank_ic": -0.00047943511162884533
+    },
+    {
+      "rank": 24,
+      "formula": "Less(TsMad($equity_parent_company_ttm,20),1.0)",
+      "weight": 0.0032070064917206764,
+      "train_ic": 0.004016070161014795,
+      "train_rank_ic": 0.0031605318654328585,
+      "valid_ic": 0.0009185110684484243,
+      "valid_rank_ic": -0.011695855297148228,
+      "test_ic": 0.0020571548957377672,
+      "test_rank_ic": -8.27601834316738e-05
+    },
+    {
+      "rank": 25,
+      "formula": "TsCorr($volume,Rank(Less(Less(-2.0,Pow(Abs($net_profit_deduct_non_recurring_pnl_ttm),Less(Sub(0.5,$volume),-5.0))),2.0)),50)",
+      "weight": 0.0016537206247448921,
+      "train_ic": 0.0016546436818316579,
+      "train_rank_ic": 0.03049580380320549,
+      "valid_ic": 0.001441408065147698,
+      "valid_rank_ic": 0.016210954636335373,
+      "test_ic": -0.0050053843297064304,
+      "test_rank_ic": 0.015511251986026764
+    },
+    {
+      "rank": 26,
+      "formula": "TsMed(Less($revenue_ttm,Less(0.5,$book_to_market_ratio_lf)),20)",
+      "weight": 0.005445403512567282,
+      "train_ic": 0.005445403046905994,
+      "train_rank_ic": 0.0012082284083589911,
+      "valid_ic": 0.002443835139274597,
+      "valid_rank_ic": -0.02039284259080887,
+      "test_ic": 0.002297357888892293,
+      "test_rank_ic": -0.003828580491244793
+    },
+    {
+      "rank": 27,
+      "formula": "Div($gross_profit_ttm,$revenue_ttm)",
+      "weight": 0.0005083412397652864,
+      "train_ic": -0.0002958696859423071,
+      "train_rank_ic": -0.010370698757469654,
+      "valid_ic": 0.0032354434952139854,
+      "valid_rank_ic": 0.0036004818975925446,
+      "test_ic": -0.007150972727686167,
+      "test_rank_ic": -0.004770929925143719
+    },
+    {
+      "rank": 28,
+      "formula": "Less(TsDiv($gross_profit_ttm,20),Pow(-0.5,$ev_ttm))",
+      "weight": 0.00018729058501776308,
+      "train_ic": 0.00018729071598500013,
+      "train_rank_ic": 0.00605043163523078,
+      "valid_ic": 0.0003047930367756635,
+      "valid_rank_ic": -0.019817516207695007,
+      "test_ic": -0.0005998568376526237,
+      "test_rank_ic": 0.0032569586765021086
+    },
+    {
+      "rank": 29,
+      "formula": "Div(Inv($ev_ttm),$close)",
+      "weight": 0.007097569759935141,
+      "train_ic": 0.007097570691257715,
+      "train_rank_ic": 0.023771069943904877,
+      "valid_ic": 0.012231459841132164,
+      "valid_rank_ic": 0.03144485503435135,
+      "test_ic": 0.0014864392578601837,
+      "test_rank_ic": 0.013185285031795502
+    },
+    {
+      "rank": 30,
+      "formula": "Sub(-1.0,Div($ps_ratio_ttm,Mul($ev_ttm,TsVar($pb_ratio_ttm,10))))",
+      "weight": 0.0005004151607863605,
+      "train_ic": 0.0005004157428629696,
+      "train_rank_ic": -0.03656107187271118,
+      "valid_ic": -0.0078002698719501495,
+      "valid_rank_ic": -0.039216864854097366,
+      "test_ic": -0.002039574319496751,
+      "test_rank_ic": -0.016812270507216454
+    },
+    {
+      "rank": 31,
+      "formula": "Mul($cash_flow_from_operating_activities_ttm,Add($pb_ratio_lf,$low))",
+      "weight": 0.0004194521752651781,
+      "train_ic": 0.0004194524371996522,
+      "train_rank_ic": -0.000750384118873626,
+      "valid_ic": -0.0041395495645701885,
+      "valid_rank_ic": -0.02333981543779373,
+      "test_ic": -0.00045913999201729894,
+      "test_rank_ic": 0.0023449333384633064
+    },
+    {
+      "rank": 32,
+      "formula": "TsStd(Mul(-10.0,TsMaxDiff($cash_flow_from_operating_activities_ttm,50)),20)",
+      "weight": 0.001579299452714622,
+      "train_ic": 0.0015792443882673979,
+      "train_rank_ic": 0.009620053693652153,
+      "valid_ic": -0.002403654856607318,
+      "valid_rank_ic": 0.00500315660610795,
+      "test_ic": -0.002974855713546276,
+      "test_rank_ic": -0.0011507434537634254
+    },
+    {
+      "rank": 33,
+      "formula": "Less(10.0,Sub(TsMax(TsMax($book_to_market_ratio_lf,50),50),$close))",
+      "weight": 0.00934302993118763,
+      "train_ic": 0.009343028999865055,
+      "train_rank_ic": 0.001289274892769754,
+      "valid_ic": 0.008770886808633804,
+      "valid_rank_ic": -0.01726687327027321,
+      "test_ic": -0.0013329077046364546,
+      "test_rank_ic": -0.0018439332488924265
+    },
+    {
+      "rank": 34,
+      "formula": "TsMaxDiff($revenue_ttm,20)",
+      "weight": 0.0012133915442973375,
+      "train_ic": 0.0024124763440340757,
+      "train_rank_ic": -0.0014471729518845677,
+      "valid_ic": 0.0009095941786654294,
+      "valid_rank_ic": -0.0049764784052968025,
+      "test_ic": 0.0033109637442976236,
+      "test_rank_ic": -0.002760818460956216
+    },
+    {
+      "rank": 35,
+      "formula": "TsMaxDiff($vwap,10)",
+      "weight": 0.010035260580480099,
+      "train_ic": 0.010035260580480099,
+      "train_rank_ic": 0.02055911161005497,
+      "valid_ic": -0.00018125996575690806,
+      "valid_rank_ic": 0.02141839824616909,
+      "test_ic": -0.003378855064511299,
+      "test_rank_ic": 0.02187400870025158
+    },
+    {
+      "rank": 36,
+      "formula": "Pow($total_assets_ttm,-2.0)",
+      "weight": 0.0013474860461428761,
+      "train_ic": -0.00023004597460385412,
+      "train_rank_ic": -0.004766890313476324,
+      "valid_ic": -0.00034935324219986796,
+      "valid_rank_ic": 0.018518593162298203,
+      "test_ic": -0.005238701123744249,
+      "test_rank_ic": -0.0022068999242037535
+    },
+    {
+      "rank": 37,
+      "formula": "Less($pb_ratio_ttm,$cash_flow_from_operating_activities_ttm)",
+      "weight": 0.0009627033723518252,
+      "train_ic": 0.0009627031977288425,
+      "train_rank_ic": -0.0040604546666145325,
+      "valid_ic": 0.0021771052852272987,
+      "valid_rank_ic": -0.0005953802028670907,
+      "test_ic": 0.002150511834770441,
+      "test_rank_ic": -0.00446317158639431
+    },
+    {
+      "rank": 38,
+      "formula": "TsCov(Pow($book_to_market_ratio_lf,-10.0),$cash_flow_from_operating_activities_ttm,10)",
+      "weight": 0.0005387598648667336,
+      "train_ic": 0.0005387596902437508,
+      "train_rank_ic": 0.020170779898762703,
+      "valid_ic": 0.002273899968713522,
+      "valid_rank_ic": 0.02758234739303589,
+      "test_ic": -0.0005840412341058254,
+      "test_rank_ic": 0.0019331047078594565
+    },
+    {
+      "rank": 39,
+      "formula": "Sub(2.0,$volume)",
+      "weight": 0.031665656715631485,
+      "train_ic": 0.031969327479600906,
+      "train_rank_ic": 0.0541679672896862,
+      "valid_ic": 0.029624085873365402,
+      "valid_rank_ic": 0.06893397122621536,
+      "test_ic": 0.017365656793117523,
+      "test_rank_ic": 0.05452322959899902
+    },
+    {
+      "rank": 40,
+      "formula": "Inv($gross_profit_ttm)",
+      "weight": 0.0019125425023958087,
+      "train_ic": 0.0019124854588881135,
+      "train_rank_ic": 0.0014445281121879816,
+      "valid_ic": 0.0030861813575029373,
+      "valid_rank_ic": 0.019617782905697823,
+      "test_ic": 0.0006660177023150027,
+      "test_rank_ic": 0.000816310232039541
+    },
+    {
+      "rank": 41,
+      "formula": "Less(Div($gross_profit_ttm,$ev_ttm),Div(Inv($profit_from_operation_ttm),Mul(-5.0,$total_liabilities_ttm)))",
+      "weight": 0.0014219384174793959,
+      "train_ic": 0.0014219394652172923,
+      "train_rank_ic": 0.0076928227208554745,
+      "valid_ic": 0.0018461084691807628,
+      "valid_rank_ic": -0.014128339476883411,
+      "test_ic": -0.0010321805020794272,
+      "test_rank_ic": 0.004601242486387491
+    },
+    {
+      "rank": 42,
+      "formula": "Abs(Inv($net_profit_ttm))",
+      "weight": 0.0008351681753993034,
+      "train_ic": 0.0008351771393790841,
+      "train_rank_ic": -0.0007437657914124429,
+      "valid_ic": 0.0010729198111221194,
+      "valid_rank_ic": 0.018757052719593048,
+      "test_ic": 0.00327499583363533,
+      "test_rank_ic": -0.0032867949921637774
+    },
+    {
+      "rank": 43,
+      "formula": "TsCov($net_profit_deduct_non_recurring_pnl_ttm,$ps_ratio_ttm,40)",
+      "weight": 0.0014131659409031272,
+      "train_ic": 0.001413166057318449,
+      "train_rank_ic": 0.003118481021374464,
+      "valid_ic": 0.0017707879887893796,
+      "valid_rank_ic": -0.0065975249744951725,
+      "test_ic": -0.004136769101023674,
+      "test_rank_ic": -0.012229938060045242
+    },
+    {
+      "rank": 44,
+      "formula": "Add(TsIr($ps_ratio_ttm,20),Less($pb_ratio_ttm,Pow($cash_flow_from_operating_activities_ttm,$high)))",
+      "weight": 0.0006184628000482917,
+      "train_ic": 0.0006184626836329699,
+      "train_rank_ic": 0.005097969900816679,
+      "valid_ic": 0.0,
+      "valid_rank_ic": -0.008483042009174824,
+      "test_ic": 0.0,
+      "test_rank_ic": -0.0004285216564312577
+    },
+    {
+      "rank": 45,
+      "formula": "Inv($ps_ratio_ttm)",
+      "weight": 0.005262906197458506,
+      "train_ic": 0.005262906197458506,
+      "train_rank_ic": 0.03909596428275108,
+      "valid_ic": -0.00545823760330677,
+      "valid_rank_ic": 0.018969271332025528,
+      "test_ic": -0.0025129872374236584,
+      "test_rank_ic": 0.0290584284812212
+    },
+    {
+      "rank": 46,
+      "formula": "Add($gross_profit_ttm,Div($net_profit_ttm,$ps_ratio_ttm))",
+      "weight": 0.002439499832689762,
+      "train_ic": 0.002439499832689762,
+      "train_rank_ic": 0.013409166596829891,
+      "valid_ic": -0.006228192243725061,
+      "valid_rank_ic": -0.009363450109958649,
+      "test_ic": 0.0006185483071021736,
+      "test_rank_ic": 0.015437349677085876
+    },
+    {
+      "rank": 47,
+      "formula": "Div($volume,$net_profit_ttm)",
+      "weight": 0.0018816037336364388,
+      "train_ic": 0.0018816037336364388,
+      "train_rank_ic": -0.011836126446723938,
+      "valid_ic": 0.0007902510114945471,
+      "valid_rank_ic": -0.006953487638384104,
+      "test_ic": 0.0012299198424443603,
+      "test_rank_ic": -0.009437382221221924
+    },
+    {
+      "rank": 48,
+      "formula": "Sub($close,TsDelta($market_cap_3,30))",
+      "weight": 0.009056233800947666,
+      "train_ic": 0.009056233800947666,
+      "train_rank_ic": 0.04800709709525108,
+      "valid_ic": 0.008587725460529327,
+      "valid_rank_ic": 0.07230739295482635,
+      "test_ic": 5.399244764703326e-05,
+      "test_rank_ic": 0.03532479330897331
+    },
+    {
+      "rank": 49,
+      "formula": "Div(-0.5,$net_profit_deduct_non_recurring_pnl_ttm)",
+      "weight": 0.00037763104774057865,
+      "train_ic": 0.0005640904419124126,
+      "train_rank_ic": -0.00238559627905488,
+      "valid_ic": 0.0009392611682415009,
+      "valid_rank_ic": -0.015055767260491848,
+      "test_ic": -0.0018000765703618526,
+      "test_rank_ic": -0.003009350737556815
+    },
+    {
+      "rank": 50,
+      "formula": "Div($low,Add($profit_from_operation_ttm,$book_to_market_ratio_lf))",
+      "weight": 0.0005642342148348689,
+      "train_ic": 0.0005642342730425298,
+      "train_rank_ic": -0.008485911414027214,
+      "valid_ic": -0.0007323699537664652,
+      "valid_rank_ic": 0.0015993000706657767,
+      "test_ic": -0.0036871335469186306,
+      "test_rank_ic": -0.0019815268460661173
+    }
+  ]
+}

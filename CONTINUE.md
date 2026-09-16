@@ -291,7 +291,7 @@ python scripts/register_factor_correlations.py
 
 ## 13. PandaAI 字段本地复现
 
-AlphaPROBE 本地搜索的字段目录以 `vendor/skill-pandaai-factor-online/references/fields.md` 的公式模式字段为准：348 个基础字段，扩展为 4,744 个可写入公式的名称（基础字段、`_lyr`、`_ttm`、`_mrq_1..12`）。字段解析、Tushare PIT 映射、TTM 还原和懒加载面板在 `scripts/pandaai_fields_local.py`；GP 入口是 `scripts/alphaprobe_gp_tushare.py`。
+AlphaPROBE 本地搜索的字段目录以 `vendor/skill-pandaai-factor-online/references/fields.md` 的公式模式字段为准：348 个基础字段，扩展为基础字段、`_lyr`、`_ttm`、`_mrq_1..12` 等公式名称。搜索时保留平台公式目录中尚未单独回测的字段，排除 Barra 字段，并排除已被 FactorBuild 明确拒绝的 `contract_liabilities`、`net_profit_parent_company` 字段族；仅本地 Tushare 有而不在平台公式目录的字段不会进入终端。字段解析、Tushare PIT 映射、TTM 还原和懒加载面板在 `scripts/pandaai_fields_local.py`；GP 入口是 `scripts/alphaprobe_gp_tushare.py`。
 
 本地字段搜索和净超额评分统一使用 `full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1`：沪深全 A、Tushare qfq、`daily_basic.total_mv`、公告日 PIT、`comp_type=1` 优先、TTM 季度还原、`close(t+1) -> close(t+cycle+1)`、10 组、单边 0.30% 成本；相关性使用每日有效截面 Spearman 平均秩后取每日均值。`max5_low21` 额外复现已验证的平台 Python `[date, symbol]` level-0 滚动语义。每次 GP 输出会同时写 `field_coverage.json` 和 `field_coverage.md`。
 
@@ -302,7 +302,7 @@ $env:TUSHARE_TOKEN = "本机 token"
 python scripts/tushare_financial_cache.py --universe full_a --start-date 20180101 --end-date 20260907 --output-root quantlab/.quantlab/cache/research/cn_equity/financial_full_a
 ```
 
-当前工作区没有 `TUSHARE_TOKEN`，现有财务缓存仍是旧窄列，因此目前实际激活 254 个公式名；代码已声明并校验完整 348/4,744 名称，财务缓存刷新后会自动扩展 GP 终端。两个分类字段 `classified_by_continuity_operation`、`classified_by_ownership` 没有可靠的 Tushare 数值等价物，始终标记为 unavailable，不作为搜索终端。
+当前工作区没有 `TUSHARE_TOKEN`，现有财务缓存仍是旧窄列，因此实际激活终端数会低于平台目录；财务缓存刷新后会自动扩展 GP 终端，但仍受 Barra 和已拒绝字段族的搜索规则约束。两个分类字段 `classified_by_continuity_operation`、`classified_by_ownership` 没有可靠的 Tushare 数值等价物，始终标记为 unavailable，不作为搜索终端。
 
 ## 14. AlphaPROBE GFlowNet + Tushare
 
@@ -314,6 +314,7 @@ python scripts/tushare_financial_cache.py --universe full_a --start-date 2018010
 
 ```bash
 python -m pip install -r requirements-alphaprobe-gfn.txt
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --feature-set fundamental_core --backtrack-days 512 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_run2
 python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 ```

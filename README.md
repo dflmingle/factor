@@ -29,12 +29,15 @@
 
 ## AlphaPROBE GFlowNet 本地挖掘
 
+默认使用 512 个交易日暖机，以覆盖嵌套时间窗口表达式。
+
 `scripts/alphaprobe_gfn_tushare.py` 使用 AlphaPROBE 的 GFlowNet 轨迹平衡搜索器，读取本地 Tushare qfq 与 `daily_basic` 全 A 缓存，不调用 PandaAI 回测接口。当前兼容依赖固定在 [`requirements-alphaprobe-gfn.txt`](./requirements-alphaprobe-gfn.txt)；AlphaPROBE 源码按 `torchgfn 1.2.1` API 运行。
 
 训练和逐因子评估使用统一 label-1、5 日周期和全 A 口径：
 
 ```bash
 python -m pip install -r requirements-alphaprobe-gfn.txt
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --feature-set fundamental_core --backtrack-days 512 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_run2
 python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 ```

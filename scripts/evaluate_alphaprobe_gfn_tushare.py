@@ -18,10 +18,10 @@ if str(ALPHAPROBE_SRC) not in sys.path:
     sys.path.insert(0, str(ALPHAPROBE_SRC))
 
 from alpha_gfn.alpha_pool import AlphaPoolGFN  # noqa: E402
-from alphagen.data.tree import ExpressionParser  # noqa: E402
 from alphagen.utils.correlation import batch_pearsonr  # noqa: E402
 from alphaprobe_gfn_tushare import (  # noqa: E402
     DEFAULT_OUTPUT,
+    GFNExpressionParser,
     build_parser as build_training_parser,
     load_panels,
     resolve_device,
@@ -63,11 +63,24 @@ def evaluate(args: argparse.Namespace) -> dict:
     saved_objective = saved_metadata.get("ic_objective", "absolute")
     if saved_objective in {"absolute", "signed_positive"}:
         args.ic_objective = saved_objective
+    saved_panels = saved_metadata.get("panels")
+    saved_train_panel = (
+        saved_panels.get("train", {}) if isinstance(saved_panels, dict) else {}
+    )
+    saved_backtrack_days = saved_train_panel.get("max_backtrack_days")
+    if isinstance(saved_backtrack_days, int) and saved_backtrack_days >= 0:
+        # Preserve the historical panel boundary when reevaluating an older
+        # run after the safe default warmup has changed.
+        args.backtrack_days = saved_backtrack_days
+    saved_fields = saved_metadata.get("search_fields")
+    if isinstance(saved_fields, list):
+        args.feature_set = "fundamental_core" if saved_fields else "price_volume"
+        args.extra_fields = ",".join(str(field) for field in saved_fields)
     device = resolve_device(args.device)
     panels, target, metadata = load_panels(args, device)
     metadata["evaluated_run_metadata"] = saved_metadata
     metadata["ic_objective"] = saved_objective
-    parser = ExpressionParser()
+    parser = GFNExpressionParser(saved_fields or [])
     target_values = {
         split: target.evaluate(panel) for split, panel in panels.items()
     }

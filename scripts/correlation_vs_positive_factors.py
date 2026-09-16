@@ -166,6 +166,7 @@ def json_default(value: Any) -> Any:
 def write_outputs(
     *,
     target: dict[str, str],
+    date_mode: str,
     output_prefix: Path,
     records: list[dict[str, Any]],
     rows: list[dict[str, Any]],
@@ -200,6 +201,7 @@ def write_outputs(
             "data_start": data_start,
             "comparison_start": start,
             "comparison_end": end,
+            "date_mode": date_mode,
             "correlation_method": ALIGNMENT_CORRELATION_METHOD,
             "correlation_description": ALIGNMENT_CORRELATION_DESCRIPTION,
             "frame_rows": len(frame),
@@ -239,6 +241,7 @@ def write_outputs(
         f"- Window: `{start:%Y-%m-%d}..{end:%Y-%m-%d}`; warm-up starts `{data_start:%Y-%m-%d}`.",
         f"- Universe: `{ALIGNMENT_UNIVERSE_LABEL}`; prices `{ALIGNMENT_PRICE_MODE}`; market cap `{ALIGNMENT_MARKET_CAP_FIELD}`.",
         f"- Correlation: `{ALIGNMENT_CORRELATION_METHOD}`; {ALIGNMENT_CORRELATION_DESCRIPTION}.",
+        f"- Date sampling mode: `{date_mode}`; `signal` uses the shared 5-day aligned signal dates as a screening sample, not the full daily series.",
         "- Pairwise valid stocks are intersected separately on every date. Platform direction, forward returns, rebalance cycle, grouping, turnover, and transaction cost do not enter this statistic.",
         "",
         "## Highest absolute correlations",
@@ -293,6 +296,12 @@ def main() -> int:
     parser.add_argument("--target-name", default=TARGET_NAME)
     parser.add_argument("--target-formula", default=TARGET_FORMULA)
     parser.add_argument("--target-handler", default=TARGET_HANDLER)
+    parser.add_argument(
+        "--date-mode",
+        choices=["all", "signal"],
+        default="all",
+        help="compare all trading days or the aligned 5-day signal dates",
+    )
     args = parser.parse_args()
 
     data_start = parse_date(args.data_start)
@@ -312,14 +321,22 @@ def main() -> int:
         for value in ensure_calendar(data_start, end, token=None)
     ]
     comparison_dates = [date for date in calendar if start <= date <= end]
+    if args.date_mode == "signal":
+        start_position = calendar.index(start)
+        comparison_dates = [
+            calendar[position]
+            for position in range(start_position, len(calendar), 5)
+            if calendar[position] <= end
+            and position + 1 + 5 < len(calendar)
+        ]
     if not comparison_dates:
         raise SystemExit("no comparison dates in the cached trade calendar")
     print(
         f"frame_rows={len(frame)} instruments={frame['instrument'].nunique()} "
-        f"comparison_dates={len(comparison_dates)}",
+        f"comparison_dates={len(comparison_dates)} mode={args.date_mode}",
         flush=True,
     )
-    comparison_frame = frame[frame["date"].between(start, end)].copy()
+    comparison_frame = frame[frame["date"].isin(comparison_dates)].copy()
 
     financial_handlers = {
         str(record["handler"])
@@ -387,6 +404,7 @@ def main() -> int:
     rows.sort(key=lambda row: float(row["abs_correlation"]), reverse=True)
     write_outputs(
         target=target,
+        date_mode=args.date_mode,
         output_prefix=Path(args.output_prefix),
         records=records,
         rows=rows,

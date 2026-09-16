@@ -99,6 +99,12 @@ ALIGNED_GROUPS = ALIGNMENT_GROUPS
 ALIGNED_ROUND_TRIP_COST = ALIGNMENT_ROUND_TRIP_COST
 ALIGNED_CANDIDATE_RANK_CORR_THRESHOLD = 0.999
 ALIGNED_MIN_PERIODS = 200
+ALIGNED_ABSOLUTE_DD_TARGET = 0.30
+ALIGNED_EXCESS_DD_TARGET = 0.15
+ALIGNED_ABSOLUTE_DD_WEIGHT = 0.50
+ALIGNED_EXCESS_DD_WEIGHT = 0.25
+ALIGNED_ABSOLUTE_DD_CEILING = 0.45
+ALIGNED_EXCESS_DD_CEILING = 0.25
 
 
 def parse_date(value: str) -> pd.Timestamp:
@@ -192,7 +198,16 @@ def load_daily_rows(
     end: pd.Timestamp,
     instruments: set[str] | None,
 ) -> pd.DataFrame:
-    wanted = ["date", "instrument", "open", "close", "volume", "high_qfq", "low_qfq"]
+    wanted = [
+        "date",
+        "instrument",
+        "open",
+        "close",
+        "volume",
+        "amount",
+        "high_qfq",
+        "low_qfq",
+    ]
     frames: list[pd.DataFrame] = []
     for path in batch_paths(batch_root, start, end):
         available = set(pq.ParquetFile(path).schema_arrow.names)
@@ -210,11 +225,20 @@ def load_daily_rows(
 
     if not frames:
         return pd.DataFrame(
-            columns=["date", "instrument", "open", "close", "volume", "high", "low"]
+            columns=[
+                "date",
+                "instrument",
+                "open",
+                "close",
+                "volume",
+                "amount",
+                "high",
+                "low",
+            ]
         )
 
     frame = pd.concat(frames, ignore_index=True)
-    for column in ["open", "close", "volume", "high_qfq", "low_qfq"]:
+    for column in ["open", "close", "volume", "amount", "high_qfq", "low_qfq"]:
         if column in frame:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame = frame[
@@ -231,8 +255,16 @@ def load_daily_rows(
     low = frame["low_qfq"] if "low_qfq" in frame else pd.Series(np.nan, index=frame.index)
     frame["high"] = high.fillna(frame[["open", "close"]].max(axis=1))
     frame["low"] = low.fillna(frame[["open", "close"]].min(axis=1))
+    if "amount" not in frame:
+        frame["amount"] = np.nan
+    frame["amount"] = frame["amount"].where(
+        frame["amount"].gt(0),
+        frame["volume"] * frame[["open", "close"]].mean(axis=1),
+    )
     frame = frame.drop_duplicates(subset=["date", "instrument"], keep="last")
-    return frame[["date", "instrument", "open", "close", "volume", "high", "low"]].sort_values(
+    return frame[
+        ["date", "instrument", "open", "close", "volume", "amount", "high", "low"]
+    ].sort_values(
         ["date", "instrument"], ignore_index=True
     )
 
@@ -557,6 +589,51 @@ class TushareStockData:
         }
 
 
+def _max_drawdown_from_returns(values: torch.Tensor) -> float | None:
+    """Return the max drawdown of a finite periodic return series."""
+    if values.ndim != 1 or values.numel() == 0:
+        return None
+    if not bool(torch.isfinite(values).all().item()):
+        return None
+    equity = torch.cumprod(1.0 + values, dim=0)
+    if not bool(torch.isfinite(equity).all().item()) or bool((equity <= 0).any().item()):
+        return None
+    peaks = torch.cummax(equity, dim=0).values
+    drawdown = torch.clamp_min(1.0 - equity / peaks, 0.0)
+    return float(drawdown.max().detach().item())
+
+
+def _relative_max_drawdown(
+    portfolio_returns: torch.Tensor,
+    benchmark_returns: torch.Tensor,
+) -> float | None:
+    """Return drawdown of portfolio equity relative to benchmark equity.
+
+    The platform only exposes an aggregate excess-drawdown field. This
+    relative-equity calculation is the local proxy used by the mining score.
+    """
+    if portfolio_returns.shape != benchmark_returns.shape:
+        raise ValueError("Portfolio and benchmark return series must have the same shape")
+    if portfolio_returns.ndim != 1 or portfolio_returns.numel() == 0:
+        return None
+    if not bool(torch.isfinite(portfolio_returns).all().item()) or not bool(
+        torch.isfinite(benchmark_returns).all().item()
+    ):
+        return None
+    portfolio_equity = torch.cumprod(1.0 + portfolio_returns, dim=0)
+    benchmark_equity = torch.cumprod(1.0 + benchmark_returns, dim=0)
+    if not bool(torch.isfinite(portfolio_equity).all().item()) or not bool(
+        torch.isfinite(benchmark_equity).all().item()
+    ):
+        return None
+    if bool((portfolio_equity <= 0).any().item()) or bool((benchmark_equity <= 0).any().item()):
+        return None
+    relative_equity = portfolio_equity / benchmark_equity
+    peaks = torch.cummax(relative_equity, dim=0).values
+    drawdown = torch.clamp_min(1.0 - relative_equity / peaks, 0.0)
+    return float(drawdown.max().detach().item())
+
+
 class AlignedNetExcessContext:
     """Score factors with the project's local platform-alignment proxy."""
 
@@ -665,6 +742,8 @@ class AlignedNetExcessContext:
                 "turnover": None,
                 "annual_cost": None,
                 "net_excess": None,
+                "absolute_max_drawdown": None,
+                "excess_max_drawdown": None,
             }
 
         data_positions = [self.signal_data_positions[index] for index in indices]
@@ -681,6 +760,8 @@ class AlignedNetExcessContext:
                 "turnover": None,
                 "annual_cost": None,
                 "net_excess": None,
+                "absolute_max_drawdown": None,
+                "excess_max_drawdown": None,
             }
 
         factor_rows = factor_rows[keep]
@@ -728,17 +809,23 @@ class AlignedNetExcessContext:
                 "turnover": None,
                 "annual_cost": None,
                 "net_excess": None,
+                "absolute_max_drawdown": None,
+                "excess_max_drawdown": None,
             }
         years = periods * self.cycle / 252.0
         gross_annualized = float(gross_excess.sum().detach().item()) / years
         turnover = float(turnovers.mean().detach().item()) if len(turnovers) else 0.0
         annual_cost = turnover * (252.0 / self.cycle) * self.round_trip_cost
+        absolute_max_drawdown = _max_drawdown_from_returns(gross)
+        excess_max_drawdown = _relative_max_drawdown(gross, benchmark)
         return {
             "periods": periods,
             "gross_excess": gross_annualized,
             "turnover": turnover,
             "annual_cost": annual_cost,
             "net_excess": gross_annualized - annual_cost,
+            "absolute_max_drawdown": absolute_max_drawdown,
+            "excess_max_drawdown": excess_max_drawdown,
         }
 
 
@@ -894,9 +981,16 @@ def write_field_coverage(
     lines = [
         "# PandaAI local field coverage",
         "",
-        f"- Platform base fields: `{coverage['platform_base_fields']}`",
+        f"- Platform formula-mode base fields: `{coverage['platform_formula_fields']}`",
+        f"- Platform backtest catalog fields: `{coverage['platform_catalog_fields']}`",
+        f"- Platform declared fields after de-duplication: `{coverage['platform_declared_fields']}`",
+        f"- Catalog statement fields with `_mrq_n` expansion: `{coverage['catalog_statement_fields']}`",
+        f"- Catalog daily technical fields: `{coverage['catalog_daily_technical_fields']}`",
         f"- Formula names including period variants: `{coverage['formula_names']}`",
         f"- Active search fields: `{len(coverage['active_search_fields'])}`",
+        "- Search policy: PandaAI-declared catalog; Barra, intraday, Alpha191, and known FactorBuild-rejected families excluded from local active search",
+        f"- Excluded Barra fields: `{', '.join(coverage['barra_fields_excluded'])}`",
+        f"- Excluded unsupported families: `{', '.join(coverage['unsupported_base_fields'])}`",
         f"- Alignment rules: `{coverage['alignment']['alignment_rule_version']}`",
         "",
         "| status | count |",
@@ -1109,6 +1203,7 @@ def run_aligned_net_excess(
     run_output: Path,
 ) -> int:
     """Run GP with the local full-A, cost-adjusted long-side objective."""
+    risk_control = args.objective == "aligned_net_excess_drawdown"
     if args.universe.lower() != "full_a":
         raise ValueError("--objective aligned_net_excess requires --universe full_a")
     if args.universe_limit is not None:
@@ -1121,6 +1216,17 @@ def run_aligned_net_excess(
         raise ValueError("--aligned-label-offset must be non-negative")
     if args.aligned_round_trip_cost < 0:
         raise ValueError("--aligned-round-trip-cost must be non-negative")
+    if risk_control:
+        if args.aligned_absolute_dd_target < 0 or args.aligned_excess_dd_target < 0:
+            raise ValueError("Drawdown targets must be non-negative")
+        if args.aligned_absolute_dd_weight < 0 or args.aligned_excess_dd_weight < 0:
+            raise ValueError("Drawdown weights must be non-negative")
+        if args.aligned_absolute_dd_ceiling <= 0 or args.aligned_excess_dd_ceiling <= 0:
+            raise ValueError("Drawdown ceilings must be positive")
+        if args.aligned_absolute_dd_target > args.aligned_absolute_dd_ceiling:
+            raise ValueError("Absolute drawdown target must not exceed its ceiling")
+        if args.aligned_excess_dd_target > args.aligned_excess_dd_ceiling:
+            raise ValueError("Excess drawdown target must not exceed its ceiling")
 
     aligned_start = parse_date(args.aligned_start)
     aligned_end = parse_date(args.aligned_end)
@@ -1159,7 +1265,7 @@ def run_aligned_net_excess(
         date for date in calendar if data_start <= date <= aligned_end
     ]
     cap_root = args.cap_root.expanduser().resolve()
-    print("objective=aligned_net_excess", flush=True)
+    print(f"objective={args.objective}", flush=True)
     print("data_source=local_tushare_qfq_daily_basic", flush=True)
     print(f"price_root={batch_root}", flush=True)
     print(f"cap_root={cap_root}", flush=True)
@@ -1169,6 +1275,17 @@ def run_aligned_net_excess(
         f"groups={args.aligned_groups} round_trip_cost={args.aligned_round_trip_cost}",
         flush=True,
     )
+    if risk_control:
+        print(
+            "drawdown_control="
+            f"absolute_target={args.aligned_absolute_dd_target} "
+            f"excess_target={args.aligned_excess_dd_target} "
+            f"absolute_weight={args.aligned_absolute_dd_weight} "
+            f"excess_weight={args.aligned_excess_dd_weight} "
+            f"absolute_ceiling={args.aligned_absolute_dd_ceiling} "
+            f"excess_ceiling={args.aligned_excess_dd_ceiling}",
+            flush=True,
+        )
 
     frame = load_full_a_data(batch_root, cap_root, data_start, aligned_end)
     frame = frame.sort_values(["instrument", "date"], ignore_index=True)
@@ -1247,6 +1364,43 @@ def run_aligned_net_excess(
     cache_stats: dict[str, dict[str, float | int | None]] = {}
     cache_errors: dict[str, str] = {}
 
+    def fitness_for_stats(stats: dict[str, float | int | None]) -> float:
+        """Convert aligned metrics into the GP's scalar search fitness."""
+        net_excess = stats.get("net_excess")
+        periods = int(stats.get("periods") or 0)
+        if net_excess is None or periods < args.aligned_min_periods:
+            return -1.0
+        if not risk_control:
+            return float(net_excess) if np.isfinite(float(net_excess)) else -1.0
+
+        absolute_dd = stats.get("absolute_max_drawdown")
+        excess_dd = stats.get("excess_max_drawdown")
+        if absolute_dd is None or excess_dd is None:
+            return -1.0
+        absolute_dd = float(absolute_dd)
+        excess_dd = float(excess_dd)
+        if not np.isfinite(absolute_dd) or not np.isfinite(excess_dd):
+            return -1.0
+        if (
+            absolute_dd > args.aligned_absolute_dd_ceiling
+            or excess_dd > args.aligned_excess_dd_ceiling
+        ):
+            return -1.0 - absolute_dd - excess_dd
+
+        score = (
+            float(net_excess)
+            - args.aligned_absolute_dd_weight * absolute_dd
+            - args.aligned_excess_dd_weight * excess_dd
+        )
+        stats["risk_adjusted_score"] = score
+        stats["absolute_dd_target_pass"] = int(
+            absolute_dd <= args.aligned_absolute_dd_target
+        )
+        stats["excess_dd_target_pass"] = int(
+            excess_dd <= args.aligned_excess_dd_target
+        )
+        return score
+
     def score_formula(_y: object, formula_values: object, _weights: object) -> float:
         formula = str(np.asarray(formula_values, dtype=object).reshape(-1)[0])
         if formula in cache:
@@ -1260,15 +1414,7 @@ def run_aligned_net_excess(
                     factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
                     stats = context.score(factor)
                 cache_stats[formula] = stats
-                score_value = stats.get("net_excess")
-                periods = int(stats.get("periods") or 0)
-                score = (
-                    float(score_value)
-                    if score_value is not None and periods >= args.aligned_min_periods
-                    else -1.0
-                )
-                if not np.isfinite(score):
-                    score = -1.0
+                score = fitness_for_stats(stats)
         except Exception as exc:  # Invalid generated expressions are terminal candidates.
             score = -1.0
             cache_errors[formula] = f"{type(exc).__name__}: {exc}"
@@ -1301,24 +1447,42 @@ def run_aligned_net_excess(
     y_train = np.asarray([[1]], dtype=object)
     generation_results: list[dict[str, Any]] = []
 
+    def cached_record(formula: str, score: float) -> dict[str, Any]:
+        stats = cache_stats.get(formula, {})
+        return {
+            "formula": formula,
+            "fitness": score,
+            "net_excess": stats.get("net_excess"),
+            "gross_excess": stats.get("gross_excess"),
+            "turnover": stats.get("turnover"),
+            "annual_cost": stats.get("annual_cost"),
+            "absolute_max_drawdown": stats.get("absolute_max_drawdown"),
+            "excess_max_drawdown": stats.get("excess_max_drawdown"),
+            "risk_adjusted_score": stats.get("risk_adjusted_score"),
+            "absolute_dd_target_pass": stats.get("absolute_dd_target_pass"),
+            "excess_dd_target_pass": stats.get("excess_dd_target_pass"),
+            "periods": stats.get("periods"),
+            "coverage": (
+                float(stats["periods"]) / len(context.signal_dates)
+                if stats.get("periods") is not None
+                else None
+            ),
+        }
+
+    def all_cached_records() -> list[dict[str, Any]]:
+        return [
+            cached_record(formula, score)
+            for formula, score in cache.items()
+            if formula in cache_stats
+        ]
+
     def top_records(limit: int = 20) -> list[dict[str, Any]]:
-        records = []
-        for formula, score in sorted(cache.items(), key=lambda item: item[1], reverse=True)[:limit]:
-            stats = cache_stats.get(formula, {})
-            records.append({
-                "formula": formula,
-                "net_excess": score,
-                "gross_excess": stats.get("gross_excess"),
-                "turnover": stats.get("turnover"),
-                "annual_cost": stats.get("annual_cost"),
-                "periods": stats.get("periods"),
-                "coverage": (
-                    float(stats["periods"]) / len(context.signal_dates)
-                    if stats.get("periods") is not None
-                    else None
-                ),
-            })
-        return records
+        records = sorted(
+            all_cached_records(),
+            key=lambda item: float(item.get("fitness") or -1.0),
+            reverse=True,
+        )
+        return records[:limit]
 
     def on_generation() -> None:
         generation = len(generation_results) + 1
@@ -1362,6 +1526,7 @@ def run_aligned_net_excess(
     with torch.no_grad():
         best_factor = finite_as_nan(best_expression.evaluate(data))  # type: ignore[attr-defined]
     best_stats = context.score(best_factor)
+    best_fitness = fitness_for_stats(best_stats)
     try:
         best_panda_formula = expression_to_panda_formula(best_formula)
     except ValueError:
@@ -1377,36 +1542,170 @@ def run_aligned_net_excess(
         end_date=pd.Timestamp("2024-12-31"),
     )
 
+    def risk_eligible(item: dict[str, Any]) -> bool:
+        net_excess = item.get("net_excess")
+        absolute_dd = item.get("absolute_max_drawdown")
+        excess_dd = item.get("excess_max_drawdown")
+        if int(item.get("periods") or 0) < args.aligned_min_periods:
+            return False
+        if net_excess is None or absolute_dd is None or excess_dd is None:
+            return False
+        try:
+            net_excess = float(net_excess)
+            absolute_dd = float(absolute_dd)
+            excess_dd = float(excess_dd)
+        except (TypeError, ValueError):
+            return False
+        return bool(
+            np.isfinite(net_excess)
+            and np.isfinite(absolute_dd)
+            and np.isfinite(excess_dd)
+            and net_excess > 0.0
+            and absolute_dd <= args.aligned_absolute_dd_ceiling
+            and excess_dd <= args.aligned_excess_dd_ceiling
+        )
+
+    def pareto_dominates(left: dict[str, Any], right: dict[str, Any]) -> bool:
+        """Return whether left is at least as good on all three risk objectives."""
+        left_values = (
+            float(left["net_excess"]),
+            float(left["absolute_max_drawdown"]),
+            float(left["excess_max_drawdown"]),
+        )
+        right_values = (
+            float(right["net_excess"]),
+            float(right["absolute_max_drawdown"]),
+            float(right["excess_max_drawdown"]),
+        )
+        no_worse = (
+            left_values[0] >= right_values[0]
+            and left_values[1] <= right_values[1]
+            and left_values[2] <= right_values[2]
+        )
+        strictly_better = (
+            left_values[0] > right_values[0]
+            or left_values[1] < right_values[1]
+            or left_values[2] < right_values[2]
+        )
+        return no_worse and strictly_better
+
+    all_records = all_cached_records()
+    if risk_control:
+        eligible_records = [item for item in all_records if risk_eligible(item)]
+        pareto_records = [
+            item
+            for item in eligible_records
+            if not any(
+                pareto_dominates(other, item)
+                for other in eligible_records
+                if other["formula"] != item["formula"]
+            )
+        ]
+        pareto_formulas = {str(item["formula"]) for item in pareto_records}
+        role_orders = [
+            (
+                "return_priority",
+                lambda item: (
+                    -float(item["net_excess"]),
+                    float(item["absolute_max_drawdown"]),
+                    float(item["excess_max_drawdown"]),
+                ),
+            ),
+            (
+                "risk_adjusted_balance",
+                lambda item: (
+                    -float(item["risk_adjusted_score"]),
+                    -float(item["net_excess"]),
+                    float(item["absolute_max_drawdown"]),
+                ),
+            ),
+            (
+                "drawdown_priority",
+                lambda item: (
+                    float(item["absolute_max_drawdown"]),
+                    float(item["excess_max_drawdown"]),
+                    -float(item["net_excess"]),
+                ),
+            ),
+        ]
+        candidate_sources = [
+            (
+                role,
+                sorted(pareto_records, key=sort_key),
+                True,
+            )
+            for role, sort_key in role_orders
+        ]
+        # If correlation filtering prevents a full Pareto set, fill from the
+        # remaining valid risk candidates and mark those records explicitly.
+        candidate_sources.append(
+            (
+                "risk_fallback",
+                sorted(
+                    [item for item in eligible_records if item["formula"] not in pareto_formulas],
+                    key=lambda item: (
+                        -float(item["risk_adjusted_score"]),
+                        -float(item["net_excess"]),
+                        float(item["absolute_max_drawdown"]),
+                    ),
+                ),
+                False,
+            )
+        )
+    else:
+        eligible_records = []
+        pareto_records = []
+        candidate_sources = [
+            (
+                "fitness_priority",
+                top_records(limit=max(50, args.output_candidates * 10)),
+                False,
+            )
+        ]
+
     selected: list[dict[str, Any]] = []
     selected_signal_factors: list[torch.Tensor] = []
     seen_formulas: set[str] = set()
-    for item in top_records(limit=max(50, args.output_candidates * 10)):
+    signal_factor_cache: dict[str, torch.Tensor] = {}
+
+    def try_select(
+        item: dict[str, Any],
+        selection_role: str,
+        is_pareto_frontier: bool,
+    ) -> bool:
         raw_formula = str(item["formula"])
-        if item.get("gross_excess") is None or item.get("turnover") is None:
-            continue
-        if int(item.get("periods") or 0) < args.aligned_min_periods:
-            continue
+        if risk_control and not risk_eligible(item):
+            return False
+        if not risk_control and (
+            item.get("gross_excess") is None
+            or item.get("turnover") is None
+            or int(item.get("periods") or 0) < args.aligned_min_periods
+        ):
+            return False
         try:
             panda_formula = expression_to_panda_formula(raw_formula)
         except ValueError:
             panda_formula = raw_formula
         if panda_formula in seen_formulas:
-            continue
+            return False
 
         try:
-            expression = evaluate_formula(raw_formula, namespace)
-            if not bool(getattr(expression, "is_featured", False)):
-                continue
-            with torch.no_grad():
-                factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
-                signal_factor = factor[context.signal_data_positions]
-                prior_rank_correlations = [
-                    batch_spearmanr_linear(signal_factor, prior).nanmean().item()
-                    for prior in selected_signal_factors
-                ]
+            signal_factor = signal_factor_cache.get(raw_formula)
+            if signal_factor is None:
+                expression = evaluate_formula(raw_formula, namespace)
+                if not bool(getattr(expression, "is_featured", False)):
+                    return False
+                with torch.no_grad():
+                    factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
+                    signal_factor = factor[context.signal_data_positions]
+                signal_factor_cache[raw_formula] = signal_factor
+            prior_rank_correlations = [
+                batch_spearmanr_linear(signal_factor, prior).nanmean().item()
+                for prior in selected_signal_factors
+            ]
         except Exception as exc:
             cache_errors.setdefault(raw_formula, f"candidate selection: {type(exc).__name__}: {exc}")
-            continue
+            return False
 
         finite_correlations = [value for value in prior_rank_correlations if np.isfinite(value)]
         max_rank_correlation = max(finite_correlations) if finite_correlations else None
@@ -1414,30 +1713,51 @@ def run_aligned_net_excess(
             max_rank_correlation is not None
             and max_rank_correlation >= args.aligned_candidate_rank_corr_threshold
         ):
-            continue
+            return False
         seen_formulas.add(panda_formula)
-        item = dict(item)
-        item["panda_formula"] = panda_formula
-        item["max_rank_corr_to_selected"] = max_rank_correlation
-        selected.append(item)
+        selected_item = dict(item)
+        selected_item["panda_formula"] = panda_formula
+        selected_item["max_rank_corr_to_selected"] = max_rank_correlation
+        selected_item["selection_role"] = selection_role
+        selected_item["pareto_frontier"] = bool(is_pareto_frontier)
+        selected.append(selected_item)
         selected_signal_factors.append(signal_factor)
+        return True
+
+    for selection_role, source, is_pareto_frontier in candidate_sources:
+        for item in source:
+            try_select(item, selection_role, is_pareto_frontier)
+            if len(selected) >= args.output_candidates:
+                break
         if len(selected) >= args.output_candidates:
             break
 
     candidate_path = PROJECT_ROOT / f"{run_output.name}-candidates.txt"
+    candidate_header = (
+        "# AlphaPROBE local drawdown-controlled aligned-net-excess candidates; direction=1"
+        if risk_control
+        else "# AlphaPROBE local aligned-net-excess candidates; direction=1"
+    )
     candidate_lines = [
-        "# AlphaPROBE local aligned-net-excess candidates; direction=1",
+        candidate_header,
         f"# alignment={date_text(aligned_start)}..{date_text(aligned_end)} cycle={args.aligned_cycle} "
         f"label_offset={args.aligned_label_offset} groups={args.aligned_groups} "
         f"round_trip_cost={args.aligned_round_trip_cost}",
     ]
+    if risk_control:
+        candidate_lines.append(
+            f"# drawdown_targets=absolute:{args.aligned_absolute_dd_target} "
+            f"excess_proxy:{args.aligned_excess_dd_target} "
+            f"ceilings=absolute:{args.aligned_absolute_dd_ceiling} "
+            f"excess_proxy:{args.aligned_excess_dd_ceiling}"
+        )
     for index, item in enumerate(selected, start=1):
         candidate_lines.append(f"F-NET{index:02d} ~ {item['panda_formula']} ~ 1")
     candidate_path.write_text("\n".join(candidate_lines) + "\n", encoding="utf-8")
 
     result = {
         "status": "completed",
-        "objective": "aligned_net_excess",
+        "objective": args.objective,
         "data_source": "local_tushare_qfq_daily_basic",
         "cache_root": cache_root,
         "batch_root": batch_root,
@@ -1468,22 +1788,57 @@ def run_aligned_net_excess(
             "search_field_file": args.search_field_file,
             "output_candidates": args.output_candidates,
             "candidate_rank_corr_threshold": args.aligned_candidate_rank_corr_threshold,
+            "aligned_absolute_dd_target": args.aligned_absolute_dd_target,
+            "aligned_excess_dd_target": args.aligned_excess_dd_target,
+            "aligned_absolute_dd_weight": args.aligned_absolute_dd_weight,
+            "aligned_excess_dd_weight": args.aligned_excess_dd_weight,
+            "aligned_absolute_dd_ceiling": args.aligned_absolute_dd_ceiling,
+            "aligned_excess_dd_ceiling": args.aligned_excess_dd_ceiling,
+        },
+        "drawdown_control": {
+            "enabled": risk_control,
+            "absolute_dd_target": args.aligned_absolute_dd_target,
+            "excess_dd_target": args.aligned_excess_dd_target,
+            "absolute_dd_weight": args.aligned_absolute_dd_weight,
+            "excess_dd_weight": args.aligned_excess_dd_weight,
+            "absolute_dd_ceiling": args.aligned_absolute_dd_ceiling,
+            "excess_dd_ceiling": args.aligned_excess_dd_ceiling,
+            "excess_dd_definition": "drawdown of portfolio equity relative to factor_valid benchmark equity; local proxy",
         },
         "dataset": data.summary(),
         "field_coverage": {
             "platform_base_fields": field_coverage["platform_base_fields"],
+            "platform_formula_fields": field_coverage["platform_formula_fields"],
+            "platform_catalog_fields": field_coverage["platform_catalog_fields"],
+            "platform_declared_fields": field_coverage["platform_declared_fields"],
+            "catalog_statement_fields": field_coverage["catalog_statement_fields"],
+            "catalog_daily_technical_fields": field_coverage["catalog_daily_technical_fields"],
             "formula_names": field_coverage["formula_names"],
             "active_search_fields": active_terminal_count,
             "status_counts": field_coverage["status_counts"],
+            "barra_fields_excluded": field_coverage["barra_fields_excluded"],
+            "unsupported_base_fields": field_coverage["unsupported_base_fields"],
             "base_status_counts": field_coverage["base_status_counts"],
         },
         "best_formula": best_formula,
         "best_panda_formula": best_panda_formula,
         "best_train_fitness": float(best_program.raw_fitness_),
+        "best_objective_fitness": best_fitness,
         "best_stats": best_stats,
         "early_stats": early_stats,
         "late_stats": late_stats,
         "top_candidates": selected,
+        "selection": {
+            "requested": args.output_candidates,
+            "selected": len(selected),
+            "eligible_risk_candidates": len(eligible_records) if risk_control else None,
+            "pareto_frontier_candidates": len(pareto_records) if risk_control else None,
+            "pareto_frontier_selected": sum(
+                1 for item in selected if item.get("pareto_frontier")
+            )
+            if risk_control
+            else None,
+        },
         "cache_size": len(cache),
         "cache": cache,
         "cache_errors": cache_errors,
@@ -1491,33 +1846,83 @@ def run_aligned_net_excess(
         "run_details": estimator.run_details_,
     }
     write_json(run_output / "gp_run.json", result)
+    report_title = (
+        "# AlphaPROBE drawdown-controlled aligned net-excess search"
+        if risk_control
+        else "# AlphaPROBE aligned net-excess search"
+    )
+    if risk_control:
+        objective_line = (
+            f"- Objective: maximize annualized top `{100 / args.aligned_groups:.1f}%` net excess "
+            f"minus `{args.aligned_absolute_dd_weight:.2f}` x absolute max drawdown "
+            f"minus `{args.aligned_excess_dd_weight:.2f}` x excess max drawdown"
+        )
+        drawdown_lines = [
+            f"- Drawdown targets: absolute `<= {args.aligned_absolute_dd_target:.2%}`, "
+            f"excess proxy `<= {args.aligned_excess_dd_target:.2%}`",
+            f"- Drawdown ceilings: absolute `<= {args.aligned_absolute_dd_ceiling:.2%}`, "
+            f"excess proxy `<= {args.aligned_excess_dd_ceiling:.2%}`",
+            "- Excess max drawdown is a local relative-equity proxy against the factor-valid benchmark; it is not a byte-level claim about PandaAI's internal field.",
+            f"- Eligible positive-net candidates: `{len(eligible_records)}`; Pareto frontier: `{len(pareto_records)}`; selected: `{len(selected)}`",
+        ]
+        table_header = (
+            "| rank | role | Pareto | raw AlphaPROBE formula | PandaAI formula | net excess | "
+            "risk-adjusted score | abs max DD | excess max DD | turnover | coverage | max prior Rank corr |"
+        )
+        table_divider = (
+            "| ---: | --- | :---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+        )
+    else:
+        objective_line = (
+            f"- Objective: annualized top `{100 / args.aligned_groups:.1f}%` excess minus turnover cost; round-trip cost `{args.aligned_round_trip_cost:.4f}` "
+            f"(one-way `{args.aligned_round_trip_cost / 2:.4f}`)"
+        )
+        drawdown_lines = []
+        table_header = (
+            "| rank | raw AlphaPROBE formula | PandaAI formula | net excess | gross excess | turnover | annual cost | coverage | max prior Rank corr |"
+        )
+        table_divider = "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
     report_lines = [
-        "# AlphaPROBE aligned net-excess search",
+        report_title,
         "",
         f"- Alignment: `{date_text(aligned_start)}..{date_text(aligned_end)}`",
         f"- Signals: `{len(context.signal_dates)}`; minimum candidate coverage: `{args.aligned_min_periods}` periods; cycle: `{args.aligned_cycle}` trading days",
         f"- Universe: `{len(stock_ids)}` local full-A instruments; qfq + daily_basic",
-        f"- Objective: annualized top `{100 / args.aligned_groups:.1f}%` excess minus turnover cost; round-trip cost `{args.aligned_round_trip_cost:.4f}` "
-        f"(one-way `{args.aligned_round_trip_cost / 2:.4f}`)",
+        objective_line,
+        *drawdown_lines,
         f"- GP expressions scored: `{len(cache)}`; invalid: `{len(cache_errors)}`",
         f"- GP search terminals: `{len(terminals)}` via `{args.search_field_mode}`",
         f"- Candidate deduplication: positive signal-panel Rank correlation `< {args.aligned_candidate_rank_corr_threshold:.3f}`",
         "",
-        "| rank | raw AlphaPROBE formula | PandaAI formula | net excess | gross excess | turnover | annual cost | coverage | max prior Rank corr |",
-        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        table_header,
+        table_divider,
     ]
     for index, item in enumerate(selected, start=1):
         rank_corr = item["max_rank_corr_to_selected"]
         rank_corr_text = "n/a" if rank_corr is None else f"{float(rank_corr):.4f}"
-        report_lines.append(
-            f"| {index} | `{item['formula']}` | `{item['panda_formula']}` | "
-            f"{float(item['net_excess']) * 100:.2f}% | "
-            f"{float(item['gross_excess']) * 100:.2f}% | "
-            f"{float(item['turnover']) * 100:.2f}% | "
-            f"{float(item['annual_cost']) * 100:.2f}% | "
-            f"{float(item['coverage']) * 100:.1f}% | "
-            f"{rank_corr_text} |"
-        )
+        if risk_control:
+            report_lines.append(
+                f"| {index} | {item['selection_role']} | "
+                f"{'yes' if item['pareto_frontier'] else 'no'} | "
+                f"`{item['formula']}` | `{item['panda_formula']}` | "
+                f"{float(item['net_excess']) * 100:.2f}% | "
+                f"{float(item['risk_adjusted_score']) * 100:.2f}% | "
+                f"{float(item['absolute_max_drawdown']) * 100:.2f}% | "
+                f"{float(item['excess_max_drawdown']) * 100:.2f}% | "
+                f"{float(item['turnover']) * 100:.2f}% | "
+                f"{float(item['coverage']) * 100:.1f}% | "
+                f"{rank_corr_text} |"
+            )
+        else:
+            report_lines.append(
+                f"| {index} | `{item['formula']}` | `{item['panda_formula']}` | "
+                f"{float(item['net_excess']) * 100:.2f}% | "
+                f"{float(item['gross_excess']) * 100:.2f}% | "
+                f"{float(item['turnover']) * 100:.2f}% | "
+                f"{float(item['annual_cost']) * 100:.2f}% | "
+                f"{float(item['coverage']) * 100:.1f}% | "
+                f"{rank_corr_text} |"
+            )
     report_lines.extend(
         [
             "",
@@ -1528,6 +1933,15 @@ def run_aligned_net_excess(
             f"- Full aligned net excess: `{float(best_stats['net_excess']) * 100:.2f}%`",
             f"- Early net excess through 2024-12-31: `{float(early_stats['net_excess']) * 100:.2f}%`",
             f"- Late net excess from 2025-01-01: `{float(late_stats['net_excess']) * 100:.2f}%`",
+            *(
+                [
+                    f"- Full absolute max drawdown: `{float(best_stats['absolute_max_drawdown']) * 100:.2f}%`",
+                    f"- Full excess max drawdown proxy: `{float(best_stats['excess_max_drawdown']) * 100:.2f}%`",
+                    f"- Full risk-adjusted score: `{float(best_stats['risk_adjusted_score']) * 100:.2f}%`",
+                ]
+                if risk_control
+                else []
+            ),
             "",
             "The local score is a research proxy; no PandaAI factor was created or run by this search.",
         ]
@@ -1547,9 +1961,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--objective",
-        choices=["ic", "aligned_net_excess"],
+        choices=["ic", "aligned_net_excess", "aligned_net_excess_drawdown"],
         default="ic",
-        help="fitness objective; aligned_net_excess uses the local full-A alignment proxy",
+        help=(
+            "fitness objective; aligned_net_excess uses the local full-A alignment proxy, "
+            "aligned_net_excess_drawdown adds absolute and excess drawdown control"
+        ),
     )
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--batch-root", type=Path, default=None)
@@ -1622,6 +2039,42 @@ def build_parser() -> argparse.ArgumentParser:
         default=ALIGNED_ROUND_TRIP_COST,
         help="round-trip cost used by the local net-excess objective",
     )
+    parser.add_argument(
+        "--aligned-absolute-dd-target",
+        type=float,
+        default=ALIGNED_ABSOLUTE_DD_TARGET,
+        help="absolute max drawdown target for the drawdown-controlled objective",
+    )
+    parser.add_argument(
+        "--aligned-excess-dd-target",
+        type=float,
+        default=ALIGNED_EXCESS_DD_TARGET,
+        help="relative-equity excess max drawdown target for the drawdown-controlled objective",
+    )
+    parser.add_argument(
+        "--aligned-absolute-dd-weight",
+        type=float,
+        default=ALIGNED_ABSOLUTE_DD_WEIGHT,
+        help="penalty weight for absolute max drawdown",
+    )
+    parser.add_argument(
+        "--aligned-excess-dd-weight",
+        type=float,
+        default=ALIGNED_EXCESS_DD_WEIGHT,
+        help="penalty weight for relative-equity excess max drawdown",
+    )
+    parser.add_argument(
+        "--aligned-absolute-dd-ceiling",
+        type=float,
+        default=ALIGNED_ABSOLUTE_DD_CEILING,
+        help="hard ceiling for absolute max drawdown",
+    )
+    parser.add_argument(
+        "--aligned-excess-dd-ceiling",
+        type=float,
+        default=ALIGNED_EXCESS_DD_CEILING,
+        help="hard ceiling for relative-equity excess max drawdown",
+    )
     return parser
 
 
@@ -1653,7 +2106,7 @@ def main() -> int:
     if not 0.0 <= args.aligned_candidate_rank_corr_threshold <= 1.0:
         raise ValueError("--aligned-candidate-rank-corr-threshold must be between 0 and 1")
     pool_sizes = parse_pool_sizes(args.pool_sizes)
-    if args.objective == "aligned_net_excess":
+    if args.objective in {"aligned_net_excess", "aligned_net_excess_drawdown"}:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)
     calendar = load_trade_dates(cache_root)
     universe = resolve_universe(cache_root, args.universe, args.universe_limit)
@@ -1870,9 +2323,16 @@ def main() -> int:
         "financial_root": args.financial_root.expanduser().resolve(),
         "field_coverage": {
             "platform_base_fields": field_coverage["platform_base_fields"],
+            "platform_formula_fields": field_coverage["platform_formula_fields"],
+            "platform_catalog_fields": field_coverage["platform_catalog_fields"],
+            "platform_declared_fields": field_coverage["platform_declared_fields"],
+            "catalog_statement_fields": field_coverage["catalog_statement_fields"],
+            "catalog_daily_technical_fields": field_coverage["catalog_daily_technical_fields"],
             "formula_names": field_coverage["formula_names"],
             "active_search_fields": active_terminal_count,
             "status_counts": field_coverage["status_counts"],
+            "barra_fields_excluded": field_coverage["barra_fields_excluded"],
+            "unsupported_base_fields": field_coverage["unsupported_base_fields"],
             "base_status_counts": field_coverage["base_status_counts"],
         },
         "best_formula": best_formula,

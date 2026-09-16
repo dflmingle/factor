@@ -1,0 +1,285 @@
+{
+  "method": "AlphaPROBE GFlowNet",
+  "method_id": "alphaprobe-gfn",
+  "data_source": "Tushare cached full-A qfq Parquet",
+  "price_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches",
+  "daily_basic_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a",
+  "financial_root": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/financial_full_a",
+  "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1",
+  "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+  "alignment": {
+    "universe": "full_a",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "data_start": "20180101",
+    "start": "20210907",
+    "end": "20260907",
+    "groups": 10,
+    "label_offset": 1,
+    "round_trip_cost": 0.006,
+    "one_way_cost": 0.003,
+    "benchmark_mode": "factor_valid",
+    "correlation_method": "daily_cross_sectional_spearman_mean"
+  },
+  "target": "close(t+1) -> close(t+1+5)",
+  "ic_objective": "signed_positive",
+  "cycle": 5,
+  "data_start": "20180101",
+  "train": {
+    "start": "20210907",
+    "end": "20240906"
+  },
+  "valid": {
+    "start": "20240909",
+    "end": "20250905"
+  },
+  "test": {
+    "start": "20250908",
+    "end": "20260907"
+  },
+  "universe": "沪深全A (.SH/.SZ)",
+  "universe_size": 5456,
+  "universe_limit": null,
+  "features": [
+    "open",
+    "close",
+    "high",
+    "low",
+    "volume",
+    "vwap"
+  ],
+  "feature_set": "fundamental_core",
+  "search_fields": [
+    "market_cap_3",
+    "pb_ratio_ttm",
+    "pb_ratio_lf",
+    "book_to_market_ratio_ttm",
+    "book_to_market_ratio_lf",
+    "ps_ratio_ttm",
+    "ev_ttm",
+    "revenue_ttm",
+    "operating_revenue_ttm",
+    "net_profit_ttm",
+    "net_profit_deduct_non_recurring_pnl_ttm",
+    "total_assets_ttm",
+    "total_liabilities_ttm",
+    "equity_parent_company_ttm",
+    "cash_flow_from_operating_activities_ttm",
+    "gross_profit_ttm",
+    "profit_from_operation_ttm"
+  ],
+  "search_field_count": 17,
+  "search_field_status": [
+    {
+      "field": "market_cap_3",
+      "base_field": "market_cap_3",
+      "period": "current",
+      "label": "总市值",
+      "status": "local_direct",
+      "source": "daily_basic.total_mv",
+      "note": "aligned daily_basic total market value"
+    },
+    {
+      "field": "pb_ratio_ttm",
+      "base_field": "pb_ratio_ttm",
+      "period": "current",
+      "label": "市净率ttm,当前股票总市值",
+      "status": "local_derived",
+      "source": "PIT Tushare valuation reconstruction",
+      "note": "valuation reconstructed from PIT statements"
+    },
+    {
+      "field": "pb_ratio_lf",
+      "base_field": "pb_ratio_lf",
+      "period": "current",
+      "label": "市净率lf,当前股票总市值",
+      "status": "local_derived",
+      "source": "PIT Tushare valuation reconstruction",
+      "note": "valuation reconstructed from PIT statements"
+    },
+    {
+      "field": "book_to_market_ratio_ttm",
+      "base_field": "book_to_market_ratio_ttm",
+      "period": "current",
+      "label": "账面市值比 ttm,归属母公司股东权益合计ttm",
+      "status": "local_derived",
+      "source": "PIT Tushare valuation reconstruction",
+      "note": "valuation reconstructed from PIT statements"
+    },
+    {
+      "field": "book_to_market_ratio_lf",
+      "base_field": "book_to_market_ratio_lf",
+      "period": "current",
+      "label": "账面市值比lf,归属母公司股东权益合计mrq",
+      "status": "local_derived",
+      "source": "PIT Tushare valuation reconstruction",
+      "note": "valuation reconstructed from PIT statements"
+    },
+    {
+      "field": "ps_ratio_ttm",
+      "base_field": "ps_ratio_ttm",
+      "period": "current",
+      "label": "市销率ttm,总市值",
+      "status": "local_derived",
+      "source": "PIT Tushare valuation reconstruction",
+      "note": "valuation reconstructed from PIT statements"
+    },
+    {
+      "field": "ev_ttm",
+      "base_field": "ev_ttm",
+      "period": "current",
+      "label": "企业价值ttm,总市值 + 负债合计ttm",
+      "status": "local_derived",
+      "source": "PIT Tushare valuation reconstruction",
+      "note": "valuation reconstructed from PIT statements"
+    },
+    {
+      "field": "revenue_ttm",
+      "base_field": "revenue",
+      "period": "ttm",
+      "label": "营业总收入",
+      "status": "local_direct",
+      "source": "income.total_revenue",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "operating_revenue_ttm",
+      "base_field": "operating_revenue",
+      "period": "ttm",
+      "label": "营业收入",
+      "status": "local_direct",
+      "source": "income.revenue",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "net_profit_ttm",
+      "base_field": "net_profit",
+      "period": "ttm",
+      "label": "净利润",
+      "status": "local_direct",
+      "source": "income.n_income",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "net_profit_deduct_non_recurring_pnl_ttm",
+      "base_field": "net_profit_deduct_non_recurring_pnl",
+      "period": "ttm",
+      "label": "扣除非经常性损益后的净利润",
+      "status": "local_proxy",
+      "source": "fina_indicator.profit_dedt",
+      "note": "Tushare alias/proxy"
+    },
+    {
+      "field": "total_assets_ttm",
+      "base_field": "total_assets",
+      "period": "ttm",
+      "label": "总资产",
+      "status": "local_direct",
+      "source": "balancesheet.total_assets",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "total_liabilities_ttm",
+      "base_field": "total_liabilities",
+      "period": "ttm",
+      "label": "负债合计",
+      "status": "local_direct",
+      "source": "balancesheet.total_liab",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "equity_parent_company_ttm",
+      "base_field": "equity_parent_company",
+      "period": "ttm",
+      "label": "归属于母公司所有者权益合计",
+      "status": "local_direct",
+      "source": "balancesheet.total_hldr_eqy_exc_min_int",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "cash_flow_from_operating_activities_ttm",
+      "base_field": "cash_flow_from_operating_activities",
+      "period": "ttm",
+      "label": "经营活动产生的现金流量净额",
+      "status": "local_direct",
+      "source": "cashflow.n_cashflow_act",
+      "note": "PIT Tushare statement field"
+    },
+    {
+      "field": "gross_profit_ttm",
+      "base_field": "gross_profit",
+      "period": "ttm",
+      "label": "主营业务利润",
+      "status": "local_proxy",
+      "source": "income.revenue-income.oper_cost-income.biz_tax_surchg",
+      "note": "主营业利润 proxy: operating revenue - operating cost - sales tax"
+    },
+    {
+      "field": "profit_from_operation_ttm",
+      "base_field": "profit_from_operation",
+      "period": "ttm",
+      "label": "营业利润",
+      "status": "local_direct",
+      "source": "income.operate_profit",
+      "note": "PIT Tushare statement field"
+    }
+  ],
+  "vwap_source": "cached",
+  "panels": {
+    "train": {
+      "start_date": "2021-09-07",
+      "end_date": "2024-09-06",
+      "trading_days": 728,
+      "stocks": 5456,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 512,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    },
+    "valid": {
+      "start_date": "2024-09-09",
+      "end_date": "2025-09-05",
+      "trading_days": 241,
+      "stocks": 5456,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 512,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    },
+    "test": {
+      "start_date": "2025-09-08",
+      "end_date": "2026-09-07",
+      "trading_days": 242,
+      "stocks": 5456,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 512,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    }
+  },
+  "device": "cuda:0"
+}

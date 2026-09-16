@@ -310,6 +310,10 @@ def _attach(
     keys = {"instrument", "ann_date", "f_ann_date", "end_date", "end_type", "report_type", "comp_type", "update_flag"}
     columns = keep_columns or [column for column in right.columns if column not in keys and column != "ts_code"]
     columns = [column for column in columns if column in right.columns]
+    # Income and cashflow TTM tables can expose the same field name.  The
+    # first PIT attachment is authoritative for that output column; avoid a
+    # pandas join collision when the later table contributes no new field.
+    columns = [column for column in columns if f"{column}{suffix}" not in signal.columns]
     if not columns:
         return signal
     joined = _asof(signal[["row_id", "instrument", "date"]], right[["instrument", "ann_date"] + columns])
