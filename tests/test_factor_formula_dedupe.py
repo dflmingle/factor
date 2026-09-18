@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from factor_formula_dedupe import normalize_formula
+from factor_formula_dedupe import normalize_formula, normalize_scale_invariant_formula
 
 
 def test_vwap_expansion_is_a_duplicate() -> None:
@@ -39,3 +39,24 @@ def test_same_window_rolling_extreme_is_idempotent() -> None:
     assert normalize_formula("TS_MAX(TS_MAX(CURRENT_LIABILITIES,40),40)") == normalize_formula(
         "TS_MAX(CURRENT_LIABILITIES,40)"
     )
+
+
+def test_scale_invariant_signature_removes_rank_preserving_constants() -> None:
+    assert normalize_scale_invariant_formula("-0.01*BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR") == normalize_scale_invariant_formula(
+        "BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR"
+    )
+    assert normalize_scale_invariant_formula("BOOK_TO_MARKET_RATIO_LF/(-2)/OPER_MAIN_PROFIT_TTM") == normalize_scale_invariant_formula(
+        "BOOK_TO_MARKET_RATIO_LF/OPER_MAIN_PROFIT_TTM"
+    )
+
+
+def test_scale_invariant_signature_flattens_division_chains() -> None:
+    assert normalize_scale_invariant_formula(
+        "RATIO_SP_TTM/CURRENT_LIABILITIES/OPER_ROE_LYR/CURRENT_LIABILITIES"
+    ) == normalize_scale_invariant_formula(
+        "RATIO_SP_TTM/OPER_ROE_LYR/CURRENT_LIABILITIES/CURRENT_LIABILITIES"
+    )
+
+
+def test_scale_invariant_signature_preserves_additive_constants() -> None:
+    assert normalize_scale_invariant_formula("CLOSE+1") != normalize_scale_invariant_formula("CLOSE")

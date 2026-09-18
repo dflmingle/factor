@@ -14,6 +14,7 @@ import argparse
 import ast
 import csv
 import json
+import math
 import re
 import sys
 from collections import defaultdict
@@ -240,6 +241,156 @@ def normalize_formula(formula: str) -> str | None:
         if not re.search(r"[A-Z]", compact):
             return None
         return compact
+
+
+def _constant_value(tree: tuple[Any, ...]) -> float | None:
+    """Evaluate the small constant subtrees emitted by GP expressions."""
+    op = tree[0]
+    if op == "CONST":
+        return float(tree[1])
+    if op in {"ADD", "MUL", "MAX", "MIN"}:
+        values = [_constant_value(item) for item in tree[1:]]
+        if any(value is None for value in values):
+            return None
+        numbers = [float(value) for value in values]
+        if op == "ADD":
+            return sum(numbers)
+        if op == "MUL":
+            result = 1.0
+            for number in numbers:
+                result *= number
+            return result
+        return (max if op == "MAX" else min)(numbers)
+    if op in {"SUB", "DIV"}:
+        left = _constant_value(tree[1])
+        right = _constant_value(tree[2])
+        if left is None or right is None:
+            return None
+        if op == "SUB":
+            return left - right
+        if right == 0.0:
+            return None
+        return left / right
+    if op != "CALL":
+        return None
+
+    name = str(tree[1])
+    args = tree[2:]
+    if name in {"ABS", "SIGN", "LOG"} and len(args) == 1:
+        value = _constant_value(args[0])
+        if value is None:
+            return None
+        if name == "ABS":
+            return abs(value)
+        if name == "SIGN":
+            return float(1 if value > 0.0 else -1 if value < 0.0 else 0)
+        if value <= 0.0:
+            return None
+        return float(math.log(value))
+    if name in {"MA", "MEDIAN", "WMA", "EMA", "MAX_TS", "MIN_TS"} and len(args) == 2:
+        value = _constant_value(args[0])
+        window = _constant_value(args[1])
+        if value is not None and window is not None:
+            return value * window if name == "SUM" else value
+    if name == "SUM" and len(args) == 2:
+        value = _constant_value(args[0])
+        window = _constant_value(args[1])
+        if value is not None and window is not None:
+            return value * window
+    if name in {"STD", "VAR", "SKEW", "KURT", "MAD"} and len(args) >= 1:
+        value = _constant_value(args[0])
+        if value is not None and all(_constant_value(arg) is not None for arg in args[1:]):
+            return 0.0
+    return None
+
+
+def _remove_scalar(tree: tuple[Any, ...]) -> tuple[Any, ...]:
+    """Remove non-zero scalar factors while preserving additive structure."""
+    op = tree[0]
+    if op == "MUL":
+        non_constant = []
+        for item in tree[1:]:
+            if _constant_value(item) is None:
+                non_constant.append(_remove_scalar(item))
+        if len(non_constant) == 1:
+            return non_constant[0]
+        if non_constant:
+            return _make("MUL", *non_constant)
+        return tree
+    if op == "DIV":
+        numerator, denominator = tree[1], tree[2]
+        denominator_value = _constant_value(denominator)
+        if denominator_value is not None and denominator_value != 0.0:
+            return _remove_scalar(numerator)
+        numerator = _remove_scalar(numerator)
+        if _constant_value(numerator) not in {None, 0.0}:
+            # 1/x and -1/x are the same rank signal after direction selection.
+            numerator = _constant(1)
+        return _make("DIV", numerator, _remove_scalar(denominator))
+    return tree
+
+
+def _monomial_parts(tree: tuple[Any, ...]) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
+    """Flatten multiplication/division chains for algebraic duplicate checks."""
+    op = tree[0]
+    if op == "MUL":
+        numerators: list[tuple[Any, ...]] = []
+        denominators: list[tuple[Any, ...]] = []
+        for item in tree[1:]:
+            numerator, denominator = _monomial_parts(item)
+            numerators.extend(numerator)
+            denominators.extend(denominator)
+        return numerators, denominators
+    if op == "DIV":
+        left_numerator, left_denominator = _monomial_parts(tree[1])
+        right_numerator, right_denominator = _monomial_parts(tree[2])
+        return left_numerator + right_denominator, left_denominator + right_numerator
+    return [tree], []
+
+
+def normalize_scale_invariant_formula(formula: str) -> str | None:
+    """Return a rank-signal signature invariant to non-zero scalar factors.
+
+    Formula direction is selected separately on PandaAI, so ``x`` and ``-2*x``
+    are the same factor for historical-duplicate purposes.  This deliberately
+    only removes scalar factors from multiplicative/divisive chains; additive
+    constants and additive combinations remain distinct.
+    """
+    text = str(formula).strip()
+    if not text or len(text) > 4000 or "class " in text or "def " in text:
+        return None
+    text = text.replace("$", "")
+    text = re.sub(r"\bNaN\b", "0", text, flags=re.IGNORECASE)
+    try:
+        tree = _ast_node(ast.parse(text, mode="eval").body)
+    except (SyntaxError, ValueError, TypeError):
+        return None
+    tree = _remove_scalar(tree)
+    numerators, denominators = _monomial_parts(tree)
+    numerators.sort(key=repr)
+    denominators.sort(key=repr)
+    if len(numerators) == 1:
+        numerator = numerators[0]
+    else:
+        numerator = _make("MUL", *numerators)
+    if not denominators:
+        return _render(numerator)
+    if len(denominators) == 1:
+        denominator = denominators[0]
+    else:
+        denominator = _make("MUL", *denominators)
+    return _render(_make("DIV", numerator, denominator))
+
+
+def load_scale_invariant_signatures(path: Path) -> set[str]:
+    """Load scale-invariant signatures from a formula registry."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    signatures = set()
+    for item in payload.get("formulas", []):
+        signature = normalize_scale_invariant_formula(item.get("representative_formula", ""))
+        if signature is not None:
+            signatures.add(signature)
+    return signatures
 
 
 def _formula_from_candidate_line(line: str) -> str | None:

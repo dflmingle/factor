@@ -30,7 +30,12 @@ from alphaprobe_gp_tushare import (  # noqa: E402
     load_trade_dates,
     parse_date,
 )
-from factor_formula_dedupe import load_signatures, normalize_formula  # noqa: E402
+from factor_formula_dedupe import (  # noqa: E402
+    load_scale_invariant_signatures,
+    load_signatures,
+    normalize_formula,
+    normalize_scale_invariant_formula,
+)
 from full_a_local_data import load_full_a_data  # noqa: E402
 from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_DATA_START,
@@ -109,6 +114,7 @@ def load_unique_candidates(
         if not str(item).startswith("Constant(")
     }
     existing = load_signatures(registry)
+    existing_scale_invariant = load_scale_invariant_signatures(registry)
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for raw_formula, fitness in sorted(
@@ -121,6 +127,7 @@ def load_unique_candidates(
         except ValueError:
             panda_formula = raw_formula
         signature = normalize_formula(panda_formula)
+        scale_signature = normalize_scale_invariant_formula(panda_formula)
         if signature is None or signature in seen:
             continue
         seen.add(signature)
@@ -130,16 +137,18 @@ def load_unique_candidates(
                 "raw_formula": raw_formula,
                 "formula": panda_formula,
                 "signature": signature,
+                "scale_signature": scale_signature,
                 "gp_fitness": fitness,
                 "used_fields": fields,
                 "distinct_fields": len(fields),
                 "historical_exact_match": signature in existing,
+                "historical_scale_match": scale_signature in existing_scale_invariant,
                 "formula_length": len(panda_formula),
             }
         )
         if len(rows) >= scan_count:
             break
-    return payload, rows, len(existing)
+    return payload, rows, len(existing), len(existing_scale_invariant)
 
 
 def market_cap_tensor(
@@ -165,6 +174,9 @@ def evaluate_rows(
     for index, row in enumerate(rows, start=1):
         if row["historical_exact_match"]:
             row["decision"] = "reject_exact_historical_formula"
+            continue
+        if row["historical_scale_match"]:
+            row["decision"] = "reject_scale_invariant_historical_formula"
             continue
         try:
             expression = evaluate_formula(row["raw_formula"], namespace)
@@ -209,6 +221,24 @@ def evaluate_rows(
             row["error"] = f"{type(exc).__name__}: {exc}"
         print(f"audited={index}/{len(rows)} decision={row['decision']} formula={row['formula'][:160]}", flush=True)
 
+    # GP often emits the same rank signal with different non-zero constants or
+    # a different ordering of a division chain. Keep the highest-fitness member
+    # of each scale-invariant signal in the final candidate set.
+    best_by_scale: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        scale_signature = row.get("scale_signature")
+        if not scale_signature or row.get("historical_scale_match"):
+            continue
+        current = best_by_scale.get(scale_signature)
+        if current is None or float(row.get("gp_fitness") or -1.0) > float(current.get("gp_fitness") or -1.0):
+            best_by_scale[scale_signature] = row
+    for row in rows:
+        scale_signature = row.get("scale_signature")
+        best = best_by_scale.get(scale_signature) if scale_signature else None
+        if best is not None and best is not row and row.get("decision") == "eligible_local_screen":
+            row["decision"] = "reject_scale_invariant_batch_duplicate"
+            row["duplicate_of"] = best.get("formula")
+
 
 def flatten_row(row: dict[str, Any]) -> dict[str, Any]:
     result = {key: value for key, value in row.items() if key != "split_stats" and key != "used_fields"}
@@ -231,9 +261,9 @@ def write_outputs(output: Path, payload: dict[str, Any], rows: list[dict[str, An
         "# GP candidate novelty audit",
         "",
         "- This is an offline local audit; it does not create or run PandaAI factors.",
-        f"- Scanned unique GP expressions: `{len(rows)}`; eligible after exact dedup, split, and size screens: `{len(eligible)}`.",
+        f"- Scanned unique GP expressions: `{len(rows)}`; eligible after historical scale dedup, split, and size screens: `{len(eligible)}`.",
         f"- Split windows: train `{SPLITS[0][1]}..{SPLITS[0][2]}`, valid `{SPLITS[1][1]}..{SPLITS[1][2]}`, test `{SPLITS[2][1]}..{SPLITS[2][2]}`.",
-        "- Local screen: full/valid/test net excess > 0; absolute daily size RankIC < 0.45; historical normalized formula signature absent.",
+        "- Local screen: full/valid/test net excess > 0; absolute daily size RankIC < 0.45; historical exact and scale-invariant signatures absent; batch scale duplicates removed.",
         "",
         "| rank | decision | formula | fields | full net | train net | valid net | test net | size RankIC | turnover |",
         "| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -253,7 +283,7 @@ def write_outputs(output: Path, payload: dict[str, Any], rows: list[dict[str, An
     lines.extend(
         [
             "",
-            "The JSON/CSV files retain rejected candidates and their reasons. A formula that differs only by a normalized algebraic or idempotent rolling rewrite is one signature, not a new factor.",
+        "The JSON/CSV files retain rejected candidates and their reasons. A formula that differs only by a normalized algebraic, scalar, or idempotent rolling rewrite is one signal, not a new factor.",
         ]
     )
     output.with_suffix(".md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -271,7 +301,7 @@ def main() -> int:
     parser.add_argument("--scan-count", type=int, default=200)
     args = parser.parse_args()
 
-    gp_payload, rows, existing_count = load_unique_candidates(
+    gp_payload, rows, existing_count, existing_scale_count = load_unique_candidates(
         args.gp_run.resolve(), args.registry.resolve(), args.scan_count
     )
     calendar = load_trade_dates(args.cache_root.resolve())
@@ -324,6 +354,7 @@ def main() -> int:
         },
         "gp_settings": gp_payload.get("settings", {}),
         "historical_registry_signature_count": existing_count,
+        "historical_scale_invariant_signature_count": existing_scale_count,
         "scanned_unique_expression_count": len(rows),
     }
     write_outputs(args.output.resolve(), audit_payload, rows)
