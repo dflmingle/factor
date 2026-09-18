@@ -1,0 +1,1596 @@
+{
+  "alignment": {
+    "universe": "沪深全A",
+    "start": "20210907",
+    "end": "20260907",
+    "data_start": "20180101",
+    "cycle": 5,
+    "label_offset": 1,
+    "groups": 10,
+    "round_trip_cost": 0.006
+  },
+  "thresholds": {
+    "historical_duplicate_abs_daily_rank_corr": 0.9,
+    "batch_duplicate_abs_daily_rank_corr": 0.9
+  },
+  "sources": {
+    "audit": "/data/games/factor_/research_reports/platform_alignment/gp-multifield-novelty-audit-final-20260918.json",
+    "historical": "/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/reports/all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate1/all_factor_local_compare.json"
+  },
+  "candidate_count_after_audit": 12,
+  "historical_formula_count": 133,
+  "historical_signal_count": 87,
+  "historical_signal_skipped_count": 46,
+  "final_candidate_count": 4,
+  "candidates": [
+    {
+      "raw_formula": "Div(Div(ratio_sp_ttm,oper_roe_lyr),current_liabilities)",
+      "formula": "((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(RATIO_SP_TTM,OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(RATIO_SP_TTM,MUL(CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.09363523001631266,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr",
+        "ratio_sp_ttm"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 49,
+      "full_net_excess": 0.09363523001631266,
+      "full_gross_excess": 0.10423997507055766,
+      "full_turnover": 0.03506860136985779,
+      "full_annual_cost": 0.010604745054244994,
+      "size_rank_corr": -0.2994498014450073,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.12231180275956245,
+          "turnover": 0.034670718014240265,
+          "annual_cost": 0.010484425127506256,
+          "net_excess": 0.11182737763205619,
+          "absolute_max_drawdown": 0.37242335081100464,
+          "excess_max_drawdown": 0.1126895546913147
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.1347739040851593,
+          "turnover": 0.035623904317617416,
+          "annual_cost": 0.010772668665647507,
+          "net_excess": 0.12400123541951179,
+          "absolute_max_drawdown": 0.13482588529586792,
+          "excess_max_drawdown": 0.030365049839019775
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.01691837006426872,
+          "turnover": 0.03636680915951729,
+          "annual_cost": 0.010997323089838027,
+          "net_excess": 0.005921046974430693,
+          "absolute_max_drawdown": 0.24204838275909424,
+          "excess_max_drawdown": 0.10261744260787964
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-WGTRET-1M",
+        "handler": "weighted_reversal",
+        "formula": "-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)",
+        "abs_rank_corr": 0.42531120777130127,
+        "signed_rank_corr": 0.09336099773645401,
+        "periods": 241,
+        "local_net_excess": -0.031410848044521905,
+        "platform_net_excess_pct": -1.0025199999999987
+      },
+      "batch_closest": {
+        "name": "((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9458109140396118,
+        "signed_rank_corr": 0.9458109140396118,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(ratio_sp_ttm,TsMax(TsMax(TsMax(TsMax(TsMax(TsWMA(TsMed(oper_main_profit_ttm,10),30),40),40),40),40),40))",
+      "formula": "(RATIO_SP_TTM/TS_MAX(TS_MAX(TS_MAX(TS_MAX(TS_MAX(WMA(TS_MEDIAN(OPER_MAIN_PROFIT_TTM,10),30),40),40),40),40),40))",
+      "signature": "DIV(RATIO_SP_TTM,MAX_TS(WMA(MEDIAN(OPER_MAIN_PROFIT_TTM,10),30),40))",
+      "scale_signature": "DIV(RATIO_SP_TTM,MAX_TS(WMA(MEDIAN(OPER_MAIN_PROFIT_TTM,10),30),40))",
+      "gp_fitness": 0.0843520903927162,
+      "used_fields": [
+        "oper_main_profit_ttm",
+        "ratio_sp_ttm"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 112,
+      "full_net_excess": 0.0843520903927162,
+      "full_gross_excess": 0.09823144669354704,
+      "full_turnover": 0.04589734226465225,
+      "full_annual_cost": 0.013879356300830842,
+      "size_rank_corr": -0.35372844338417053,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.11752454320045368,
+          "turnover": 0.045749809592962265,
+          "annual_cost": 0.013834742420911789,
+          "net_excess": 0.10368980077954189,
+          "absolute_max_drawdown": 0.3637465238571167,
+          "excess_max_drawdown": 0.10966837406158447
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.12112509682774544,
+          "turnover": 0.04587123543024063,
+          "annual_cost": 0.013871461594104767,
+          "net_excess": 0.10725363523364068,
+          "absolute_max_drawdown": 0.14132332801818848,
+          "excess_max_drawdown": 0.0372350811958313
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.01491898498002519,
+          "turnover": 0.04513067007064819,
+          "annual_cost": 0.013647514629364014,
+          "net_excess": 0.0012714703506611757,
+          "absolute_max_drawdown": 0.2441556453704834,
+          "excess_max_drawdown": 0.09226197004318237
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "F-GFN-N02-20260916",
+        "handler": "book_to_market_lf_div_oper_main_profit_ttm",
+        "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM",
+        "abs_rank_corr": 0.5072579979896545,
+        "signed_rank_corr": 0.5072579979896545,
+        "periods": 241,
+        "local_net_excess": 0.09154100364292599,
+        "platform_net_excess_pct": 12.274464
+      },
+      "batch_closest": {
+        "name": "((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.4419806897640228,
+        "signed_rank_corr": 0.4419806897640228,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(Div(TsSum(book_to_market_ratio_lyr,10),oper_roe_lyr),current_liabilities)",
+      "formula": "((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(SUM(BOOK_TO_MARKET_RATIO_LYR,10),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(SUM(BOOK_TO_MARKET_RATIO_LYR,10),MUL(CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.08144590770507007,
+      "used_fields": [
+        "book_to_market_ratio_lyr",
+        "current_liabilities",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 69,
+      "full_net_excess": 0.08144590770507007,
+      "full_gross_excess": 0.08921163319552093,
+      "full_turnover": 0.025680309161543846,
+      "full_annual_cost": 0.007765725490450859,
+      "size_rank_corr": -0.27113452553749084,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.10149601779571951,
+          "turnover": 0.02600381337106228,
+          "annual_cost": 0.007863553163409233,
+          "net_excess": 0.09363246463231029,
+          "absolute_max_drawdown": 0.3874571919441223,
+          "excess_max_drawdown": 0.11914604902267456
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.10793304964900018,
+          "turnover": 0.02568921074271202,
+          "annual_cost": 0.007768417328596115,
+          "net_excess": 0.10016463232040407,
+          "absolute_max_drawdown": 0.13543498516082764,
+          "excess_max_drawdown": 0.026124954223632812
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.031931909474920715,
+          "turnover": 0.025290949270129204,
+          "annual_cost": 0.0076479830592870715,
+          "net_excess": 0.024283926415633643,
+          "absolute_max_drawdown": 0.22421538829803467,
+          "excess_max_drawdown": 0.06398087739944458
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VOL-STD-1M",
+        "handler": "volatility21",
+        "formula": "STDDEV(RETURNS(CLOSE,1),21)",
+        "abs_rank_corr": 0.41701245307922363,
+        "signed_rank_corr": 0.16804979741573334,
+        "periods": 241,
+        "local_net_excess": -0.07352622928225548,
+        "platform_net_excess_pct": -8.233471999999999
+      },
+      "batch_closest": {
+        "name": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9969398975372314,
+        "signed_rank_corr": 0.9969398975372314,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(Div(book_to_market_ratio_lf,oper_roe_lyr),current_liabilities)",
+      "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(BOOK_TO_MARKET_RATIO_LF,OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(BOOK_TO_MARKET_RATIO_LF,MUL(CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.07935857645087717,
+      "used_fields": [
+        "book_to_market_ratio_lf",
+        "current_liabilities",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 60,
+      "full_net_excess": 0.07935857645087717,
+      "full_gross_excess": 0.08876835152321337,
+      "full_turnover": 0.03111698105931282,
+      "full_annual_cost": 0.009409775072336196,
+      "size_rank_corr": -0.27132201194763184,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.10018235265392147,
+          "turnover": 0.03155278041958809,
+          "annual_cost": 0.009541560798883438,
+          "net_excess": 0.09064079185503804,
+          "absolute_max_drawdown": 0.3892584443092346,
+          "excess_max_drawdown": 0.12188363075256348
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.11903748437762261,
+          "turnover": 0.03106418438255787,
+          "annual_cost": 0.0093938093572855,
+          "net_excess": 0.10964367502033712,
+          "absolute_max_drawdown": 0.13470804691314697,
+          "excess_max_drawdown": 0.024851500988006592
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.022398981673920407,
+          "turnover": 0.030460648238658905,
+          "annual_cost": 0.009211300027370454,
+          "net_excess": 0.013187681646549954,
+          "absolute_max_drawdown": 0.23016691207885742,
+          "excess_max_drawdown": 0.07237869501113892
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-WGTRET-1M",
+        "handler": "weighted_reversal",
+        "formula": "-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)",
+        "abs_rank_corr": 0.4045643210411072,
+        "signed_rank_corr": 0.031120331957936287,
+        "periods": 241,
+        "local_net_excess": -0.031410848044521905,
+        "platform_net_excess_pct": -1.0025199999999987
+      },
+      "batch_closest": {
+        "name": "((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9969398975372314,
+        "signed_rank_corr": 0.9969398975372314,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(Div(Div(ratio_ep_ttm,oper_roe_lyr),oper_roe_lyr),current_liabilities)",
+      "formula": "(((RATIO_EP_TTM/OPER_ROE_LYR)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(DIV(RATIO_EP_TTM,OPER_ROE_LYR),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(RATIO_EP_TTM,MUL(CURRENT_LIABILITIES,OPER_ROE_LYR,OPER_ROE_LYR))",
+      "gp_fitness": 0.07593184921931924,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr",
+        "ratio_ep_ttm"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 64,
+      "full_net_excess": 0.07593184921931924,
+      "full_gross_excess": 0.08728558542322816,
+      "full_turnover": 0.037545423954725266,
+      "full_annual_cost": 0.01135373620390892,
+      "size_rank_corr": -0.16967548429965973,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.09346250638569871,
+          "turnover": 0.03909391164779663,
+          "annual_cost": 0.011821998882293702,
+          "net_excess": 0.08164050750340501,
+          "absolute_max_drawdown": 0.34309065341949463,
+          "excess_max_drawdown": 0.07610273361206055
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.13194941729307175,
+          "turnover": 0.036720871925354004,
+          "annual_cost": 0.01110439167022705,
+          "net_excess": 0.1208450256228447,
+          "absolute_max_drawdown": 0.11757934093475342,
+          "excess_max_drawdown": 0.02594733238220215
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.022483617067337036,
+          "turnover": 0.03466014936566353,
+          "annual_cost": 0.010481229168176651,
+          "net_excess": 0.012002387899160385,
+          "absolute_max_drawdown": 0.225155770778656,
+          "excess_max_drawdown": 0.05487847328186035
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "F-GFN-N02-20260916",
+        "handler": "book_to_market_lf_div_oper_main_profit_ttm",
+        "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM",
+        "abs_rank_corr": 0.4873540699481964,
+        "signed_rank_corr": 0.4873540699481964,
+        "periods": 241,
+        "local_net_excess": 0.09154100364292599,
+        "platform_net_excess_pct": 12.274464
+      },
+      "batch_closest": {
+        "name": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.7851073741912842,
+        "signed_rank_corr": 0.7851073741912842,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(Div(Div(ratio_sp_ttm,current_liabilities),oper_roe_lyr),current_liabilities)",
+      "formula": "(((RATIO_SP_TTM/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(DIV(RATIO_SP_TTM,CURRENT_LIABILITIES),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(RATIO_SP_TTM,MUL(CURRENT_LIABILITIES,CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.07543411653587184,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr",
+        "ratio_sp_ttm"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 71,
+      "full_net_excess": 0.07543411653587184,
+      "full_gross_excess": 0.08357005059966408,
+      "full_turnover": 0.026904543861746788,
+      "full_annual_cost": 0.008135934063792228,
+      "size_rank_corr": -0.2966262996196747,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.08790653307143956,
+          "turnover": 0.027581585571169853,
+          "annual_cost": 0.008340671476721764,
+          "net_excess": 0.07956586159471779,
+          "absolute_max_drawdown": 0.3904012441635132,
+          "excess_max_drawdown": 0.12288236618041992
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.14123541712760926,
+          "turnover": 0.027270903810858727,
+          "annual_cost": 0.00824672131240368,
+          "net_excess": 0.1329886958152056,
+          "absolute_max_drawdown": 0.1255062222480774,
+          "excess_max_drawdown": 0.02333974838256836
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.011206922125309072,
+          "turnover": 0.02499999664723873,
+          "annual_cost": 0.0075599989861249925,
+          "net_excess": 0.003646923139184079,
+          "absolute_max_drawdown": 0.24635416269302368,
+          "excess_max_drawdown": 0.06547015905380249
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VOL-STD-1M",
+        "handler": "volatility21",
+        "formula": "STDDEV(RETURNS(CLOSE,1),21)",
+        "abs_rank_corr": 0.40041494369506836,
+        "signed_rank_corr": 0.10995850712060928,
+        "periods": 241,
+        "local_net_excess": -0.07352622928225548,
+        "platform_net_excess_pct": -8.233471999999999
+      },
+      "batch_closest": {
+        "name": "(SUM(((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES),10)/CURRENT_LIABILITIES)",
+        "formula": "(SUM(((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES),10)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9934075474739075,
+        "signed_rank_corr": 0.9934075474739075,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(TsSum(Div(Div(ratio_sp_ttm,oper_roe_lyr),current_liabilities),10),current_liabilities)",
+      "formula": "(SUM(((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES),10)/CURRENT_LIABILITIES)",
+      "signature": "DIV(SUM(DIV(DIV(RATIO_SP_TTM,OPER_ROE_LYR),CURRENT_LIABILITIES),10),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(SUM(DIV(DIV(RATIO_SP_TTM,OPER_ROE_LYR),CURRENT_LIABILITIES),10),CURRENT_LIABILITIES)",
+      "gp_fitness": 0.07260624336074745,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr",
+        "ratio_sp_ttm"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 79,
+      "full_net_excess": 0.07260624336074745,
+      "full_gross_excess": 0.07934158570538913,
+      "full_turnover": 0.022272957488894463,
+      "full_annual_cost": 0.006735342344641685,
+      "size_rank_corr": -0.3024555444717407,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.08305479394246454,
+          "turnover": 0.022840483114123344,
+          "annual_cost": 0.006906962093710899,
+          "net_excess": 0.07614783184875364,
+          "absolute_max_drawdown": 0.391313374042511,
+          "excess_max_drawdown": 0.1234440803527832
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.13009120970964433,
+          "turnover": 0.02189677022397518,
+          "annual_cost": 0.006621583315730095,
+          "net_excess": 0.12346962639391423,
+          "absolute_max_drawdown": 0.12707370519638062,
+          "excess_max_drawdown": 0.024496614933013916
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.01597751762638701,
+          "turnover": 0.02078697457909584,
+          "annual_cost": 0.006285981112718581,
+          "net_excess": 0.009691536513668428,
+          "absolute_max_drawdown": 0.24497461318969727,
+          "excess_max_drawdown": 0.06153154373168945
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VOL-STD-1M",
+        "handler": "volatility21",
+        "formula": "STDDEV(RETURNS(CLOSE,1),21)",
+        "abs_rank_corr": 0.408713698387146,
+        "signed_rank_corr": 0.060165975242853165,
+        "periods": 241,
+        "local_net_excess": -0.07352622928225548,
+        "platform_net_excess_pct": -8.233471999999999
+      },
+      "batch_closest": {
+        "name": "(((RATIO_SP_TTM/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "(((RATIO_SP_TTM/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9934075474739075,
+        "signed_rank_corr": 0.9934075474739075,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(Div(Constant(-1.0),oper_roe_lyr),current_liabilities)",
+      "formula": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(MUL(-1,1),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(1,MUL(CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.07177841710245461,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 41,
+      "full_net_excess": 0.07177841710245461,
+      "full_gross_excess": 0.07708639861142487,
+      "full_turnover": 0.017552848905324936,
+      "full_annual_cost": 0.005307981508970261,
+      "size_rank_corr": 0.23510415852069855,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.05491948470677415,
+          "turnover": 0.01811589114367962,
+          "annual_cost": 0.005478245481848717,
+          "net_excess": 0.04944123922492544,
+          "absolute_max_drawdown": 0.3794398307800293,
+          "excess_max_drawdown": 0.14195793867111206
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.16861966475844384,
+          "turnover": 0.01710308901965618,
+          "annual_cost": 0.005171974119544029,
+          "net_excess": 0.1634476906388998,
+          "absolute_max_drawdown": 0.16775262355804443,
+          "excess_max_drawdown": 0.05898958444595337
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.05246450824940458,
+          "turnover": 0.016871336847543716,
+          "annual_cost": 0.00510189226269722,
+          "net_excess": 0.04736261598670736,
+          "absolute_max_drawdown": 0.2585017681121826,
+          "excess_max_drawdown": 0.0705062747001648
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-WGTRET-1M",
+        "handler": "weighted_reversal",
+        "formula": "-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)",
+        "abs_rank_corr": 0.43983402848243713,
+        "signed_rank_corr": 0.06639004498720169,
+        "periods": 241,
+        "local_net_excess": -0.031410848044521905,
+        "platform_net_excess_pct": -1.0025199999999987
+      },
+      "batch_closest": {
+        "name": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9827582836151123,
+        "signed_rank_corr": -0.9827582836151123,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(Mul(Constant(-0.01),book_to_market_ratio_lf),oper_roe_lyr)",
+      "formula": "(((-0.01)*BOOK_TO_MARKET_RATIO_LF)/OPER_ROE_LYR)",
+      "signature": "DIV(MUL(-1,0.01,BOOK_TO_MARKET_RATIO_LF),OPER_ROE_LYR)",
+      "scale_signature": "DIV(BOOK_TO_MARKET_RATIO_LF,OPER_ROE_LYR)",
+      "gp_fitness": 0.06643741989519092,
+      "used_fields": [
+        "book_to_market_ratio_lf",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 48,
+      "full_net_excess": 0.06643741989519092,
+      "full_gross_excess": 0.07434332994009944,
+      "full_turnover": 0.026143882423639297,
+      "full_annual_cost": 0.007905910044908523,
+      "size_rank_corr": -0.01953750289976597,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.05071981998339092,
+          "turnover": 0.024526963010430336,
+          "annual_cost": 0.007416953614354133,
+          "net_excess": 0.04330286636903678,
+          "absolute_max_drawdown": 0.3459361791610718,
+          "excess_max_drawdown": 0.11382901668548584
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.14659534245729447,
+          "turnover": 0.026484329253435135,
+          "annual_cost": 0.008008861166238784,
+          "net_excess": 0.1385864812910557,
+          "absolute_max_drawdown": 0.1575825810432434,
+          "excess_max_drawdown": 0.04863542318344116
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.07393770978805866,
+          "turnover": 0.03156420588493347,
+          "annual_cost": 0.009545015859603882,
+          "net_excess": 0.06439269392845479,
+          "absolute_max_drawdown": 0.23187226057052612,
+          "excess_max_drawdown": 0.05658519268035889
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VALUE-BP",
+        "handler": "value_bm",
+        "formula": "ratio_bm_ttm",
+        "abs_rank_corr": 0.498436838388443,
+        "signed_rank_corr": -0.498436838388443,
+        "periods": 241,
+        "local_net_excess": 0.0051064911355103194,
+        "platform_net_excess_pct": 2.098992
+      },
+      "batch_closest": {
+        "name": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/MIN(TS_SKEW(OPER_ROE_LYR,40),MA((-0.5),20)))",
+        "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/MIN(TS_SKEW(OPER_ROE_LYR,40),MA((-0.5),20)))",
+        "abs_rank_corr": 0.9694073796272278,
+        "signed_rank_corr": 0.9694073796272278,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(Div(Div(TsSum(book_to_market_ratio_lyr,10),current_liabilities),oper_roe_lyr),current_liabilities)",
+      "formula": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(DIV(SUM(BOOK_TO_MARKET_RATIO_LYR,10),CURRENT_LIABILITIES),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(SUM(BOOK_TO_MARKET_RATIO_LYR,10),MUL(CURRENT_LIABILITIES,CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.06416440478616484,
+      "used_fields": [
+        "book_to_market_ratio_lyr",
+        "current_liabilities",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 91,
+      "full_net_excess": 0.06416440478616484,
+      "full_gross_excess": 0.07032124244325884,
+      "full_turnover": 0.020359912887215614,
+      "full_annual_cost": 0.006156837657094002,
+      "size_rank_corr": -0.2744370102882385,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.07098641493549086,
+          "turnover": 0.02118050493299961,
+          "annual_cost": 0.006404984691739082,
+          "net_excess": 0.06458143024375178,
+          "absolute_max_drawdown": 0.3951488137245178,
+          "excess_max_drawdown": 0.12555819749832153
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.10644238740205765,
+          "turnover": 0.020348478108644485,
+          "annual_cost": 0.006153379780054092,
+          "net_excess": 0.10028900762200356,
+          "absolute_max_drawdown": 0.12924349308013916,
+          "excess_max_drawdown": 0.030031025409698486
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.031365273987993283,
+          "turnover": 0.018410488963127136,
+          "annual_cost": 0.005567331862449646,
+          "net_excess": 0.02579794212554364,
+          "absolute_max_drawdown": 0.2315412163734436,
+          "excess_max_drawdown": 0.03652632236480713
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VOL-STD-1M",
+        "handler": "volatility21",
+        "formula": "STDDEV(RETURNS(CLOSE,1),21)",
+        "abs_rank_corr": 0.4273858964443207,
+        "signed_rank_corr": 0.10788381844758987,
+        "periods": 241,
+        "local_net_excess": -0.07352622928225548,
+        "platform_net_excess_pct": -8.233471999999999
+      },
+      "batch_closest": {
+        "name": "(((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)/CURRENT_LIABILITIES)",
+        "formula": "(((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9985634088516235,
+        "signed_rank_corr": 0.9985634088516235,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(Div(Div(book_to_market_ratio_lf,oper_roe_lyr),current_liabilities),current_liabilities)",
+      "formula": "(((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(DIV(BOOK_TO_MARKET_RATIO_LF,OPER_ROE_LYR),CURRENT_LIABILITIES),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(BOOK_TO_MARKET_RATIO_LF,MUL(CURRENT_LIABILITIES,CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.0641309604666416,
+      "used_fields": [
+        "book_to_market_ratio_lf",
+        "current_liabilities",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 82,
+      "full_net_excess": 0.0641309604666416,
+      "full_gross_excess": 0.07119668074168604,
+      "full_turnover": 0.023365477100014687,
+      "full_annual_cost": 0.007065720275044441,
+      "size_rank_corr": -0.27140548825263977,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.0713204227081717,
+          "turnover": 0.024362197145819664,
+          "annual_cost": 0.0073671284168958665,
+          "net_excess": 0.06395329429127583,
+          "absolute_max_drawdown": 0.39687639474868774,
+          "excess_max_drawdown": 0.12678074836730957
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.1140277996659279,
+          "turnover": 0.023445580154657364,
+          "annual_cost": 0.007089943438768387,
+          "net_excess": 0.10693785622715951,
+          "absolute_max_drawdown": 0.12700390815734863,
+          "excess_max_drawdown": 0.029017090797424316
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.027069829531172488,
+          "turnover": 0.020553622394800186,
+          "annual_cost": 0.006215415412187576,
+          "net_excess": 0.020854414118984914,
+          "absolute_max_drawdown": 0.2364526391029358,
+          "excess_max_drawdown": 0.041069865226745605
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-WGTRET-1M",
+        "handler": "weighted_reversal",
+        "formula": "-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)",
+        "abs_rank_corr": 0.41701245307922363,
+        "signed_rank_corr": 0.07261411100625992,
+        "periods": 241,
+        "local_net_excess": -0.031410848044521905,
+        "platform_net_excess_pct": -1.0025199999999987
+      },
+      "batch_closest": {
+        "name": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9985634088516235,
+        "signed_rank_corr": 0.9985634088516235,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)"
+    },
+    {
+      "raw_formula": "Div(Div(book_to_market_ratio_lf,oper_roe_lyr),Less(TsSkew(oper_roe_lyr,40),TsMean(Constant(-0.5),20)))",
+      "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/MIN(TS_SKEW(OPER_ROE_LYR,40),MA((-0.5),20)))",
+      "signature": "DIV(DIV(BOOK_TO_MARKET_RATIO_LF,OPER_ROE_LYR),MIN(MA(MUL(-1,0.5),20),SKEW(OPER_ROE_LYR,40)))",
+      "scale_signature": "DIV(BOOK_TO_MARKET_RATIO_LF,MUL(OPER_ROE_LYR,MIN(MA(MUL(-1,0.5),20),SKEW(OPER_ROE_LYR,40))))",
+      "gp_fitness": 0.06137377071731813,
+      "used_fields": [
+        "book_to_market_ratio_lf",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 84,
+      "full_net_excess": 0.06137377071731813,
+      "full_gross_excess": 0.07409285747164018,
+      "full_turnover": 0.04206047207117081,
+      "full_annual_cost": 0.012719086754322052,
+      "size_rank_corr": -0.022790824994444847,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.04603722977311644,
+          "turnover": 0.03794822096824646,
+          "annual_cost": 0.01147554202079773,
+          "net_excess": 0.03456168775231871,
+          "absolute_max_drawdown": 0.3395623564720154,
+          "excess_max_drawdown": 0.1189451813697815
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.16675884425640108,
+          "turnover": 0.04681725427508354,
+          "annual_cost": 0.014157537692785263,
+          "net_excess": 0.1526013065636158,
+          "absolute_max_drawdown": 0.15746599435806274,
+          "excess_max_drawdown": 0.047248661518096924
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.06660674632863796,
+          "turnover": 0.05147011578083038,
+          "annual_cost": 0.015564563012123108,
+          "net_excess": 0.05104218331651485,
+          "absolute_max_drawdown": 0.2228853702545166,
+          "excess_max_drawdown": 0.058312416076660156
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VALUE-BP",
+        "handler": "value_bm",
+        "formula": "ratio_bm_ttm",
+        "abs_rank_corr": 0.47469234466552734,
+        "signed_rank_corr": -0.47469234466552734,
+        "periods": 241,
+        "local_net_excess": 0.0051064911355103194,
+        "platform_net_excess_pct": 2.098992
+      },
+      "batch_closest": {
+        "name": "(((-0.01)*BOOK_TO_MARKET_RATIO_LF)/OPER_ROE_LYR)",
+        "formula": "(((-0.01)*BOOK_TO_MARKET_RATIO_LF)/OPER_ROE_LYR)",
+        "abs_rank_corr": 0.9694073796272278,
+        "signed_rank_corr": 0.9694073796272278,
+        "periods": 241
+      },
+      "final_decision": "reject_batch_signal_duplicate",
+      "duplicate_of": "(((-0.01)*BOOK_TO_MARKET_RATIO_LF)/OPER_ROE_LYR)"
+    }
+  ],
+  "final_candidates": [
+    {
+      "raw_formula": "Div(Mul(Constant(-0.01),book_to_market_ratio_lf),oper_roe_lyr)",
+      "formula": "(((-0.01)*BOOK_TO_MARKET_RATIO_LF)/OPER_ROE_LYR)",
+      "signature": "DIV(MUL(-1,0.01,BOOK_TO_MARKET_RATIO_LF),OPER_ROE_LYR)",
+      "scale_signature": "DIV(BOOK_TO_MARKET_RATIO_LF,OPER_ROE_LYR)",
+      "gp_fitness": 0.06643741989519092,
+      "used_fields": [
+        "book_to_market_ratio_lf",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 48,
+      "full_net_excess": 0.06643741989519092,
+      "full_gross_excess": 0.07434332994009944,
+      "full_turnover": 0.026143882423639297,
+      "full_annual_cost": 0.007905910044908523,
+      "size_rank_corr": -0.01953750289976597,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.05071981998339092,
+          "turnover": 0.024526963010430336,
+          "annual_cost": 0.007416953614354133,
+          "net_excess": 0.04330286636903678,
+          "absolute_max_drawdown": 0.3459361791610718,
+          "excess_max_drawdown": 0.11382901668548584
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.14659534245729447,
+          "turnover": 0.026484329253435135,
+          "annual_cost": 0.008008861166238784,
+          "net_excess": 0.1385864812910557,
+          "absolute_max_drawdown": 0.1575825810432434,
+          "excess_max_drawdown": 0.04863542318344116
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.07393770978805866,
+          "turnover": 0.03156420588493347,
+          "annual_cost": 0.009545015859603882,
+          "net_excess": 0.06439269392845479,
+          "absolute_max_drawdown": 0.23187226057052612,
+          "excess_max_drawdown": 0.05658519268035889
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-VALUE-BP",
+        "handler": "value_bm",
+        "formula": "ratio_bm_ttm",
+        "abs_rank_corr": 0.498436838388443,
+        "signed_rank_corr": -0.498436838388443,
+        "periods": 241,
+        "local_net_excess": 0.0051064911355103194,
+        "platform_net_excess_pct": 2.098992
+      },
+      "batch_closest": {
+        "name": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/MIN(TS_SKEW(OPER_ROE_LYR,40),MA((-0.5),20)))",
+        "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/MIN(TS_SKEW(OPER_ROE_LYR,40),MA((-0.5),20)))",
+        "abs_rank_corr": 0.9694073796272278,
+        "signed_rank_corr": 0.9694073796272278,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(Div(Constant(-1.0),oper_roe_lyr),current_liabilities)",
+      "formula": "(((-1)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(MUL(-1,1),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(1,MUL(CURRENT_LIABILITIES,OPER_ROE_LYR))",
+      "gp_fitness": 0.07177841710245461,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 41,
+      "full_net_excess": 0.07177841710245461,
+      "full_gross_excess": 0.07708639861142487,
+      "full_turnover": 0.017552848905324936,
+      "full_annual_cost": 0.005307981508970261,
+      "size_rank_corr": 0.23510415852069855,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.05491948470677415,
+          "turnover": 0.01811589114367962,
+          "annual_cost": 0.005478245481848717,
+          "net_excess": 0.04944123922492544,
+          "absolute_max_drawdown": 0.3794398307800293,
+          "excess_max_drawdown": 0.14195793867111206
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.16861966475844384,
+          "turnover": 0.01710308901965618,
+          "annual_cost": 0.005171974119544029,
+          "net_excess": 0.1634476906388998,
+          "absolute_max_drawdown": 0.16775262355804443,
+          "excess_max_drawdown": 0.05898958444595337
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.05246450824940458,
+          "turnover": 0.016871336847543716,
+          "annual_cost": 0.00510189226269722,
+          "net_excess": 0.04736261598670736,
+          "absolute_max_drawdown": 0.2585017681121826,
+          "excess_max_drawdown": 0.0705062747001648
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "HT13-WGTRET-1M",
+        "handler": "weighted_reversal",
+        "formula": "-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)",
+        "abs_rank_corr": 0.43983402848243713,
+        "signed_rank_corr": 0.06639004498720169,
+        "periods": 241,
+        "local_net_excess": -0.031410848044521905,
+        "platform_net_excess_pct": -1.0025199999999987
+      },
+      "batch_closest": {
+        "name": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "(((SUM(BOOK_TO_MARKET_RATIO_LYR,10)/CURRENT_LIABILITIES)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.9827582836151123,
+        "signed_rank_corr": -0.9827582836151123,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(Div(Div(ratio_ep_ttm,oper_roe_lyr),oper_roe_lyr),current_liabilities)",
+      "formula": "(((RATIO_EP_TTM/OPER_ROE_LYR)/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+      "signature": "DIV(DIV(DIV(RATIO_EP_TTM,OPER_ROE_LYR),OPER_ROE_LYR),CURRENT_LIABILITIES)",
+      "scale_signature": "DIV(RATIO_EP_TTM,MUL(CURRENT_LIABILITIES,OPER_ROE_LYR,OPER_ROE_LYR))",
+      "gp_fitness": 0.07593184921931924,
+      "used_fields": [
+        "current_liabilities",
+        "oper_roe_lyr",
+        "ratio_ep_ttm"
+      ],
+      "distinct_fields": 3,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 64,
+      "full_net_excess": 0.07593184921931924,
+      "full_gross_excess": 0.08728558542322816,
+      "full_turnover": 0.037545423954725266,
+      "full_annual_cost": 0.01135373620390892,
+      "size_rank_corr": -0.16967548429965973,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.09346250638569871,
+          "turnover": 0.03909391164779663,
+          "annual_cost": 0.011821998882293702,
+          "net_excess": 0.08164050750340501,
+          "absolute_max_drawdown": 0.34309065341949463,
+          "excess_max_drawdown": 0.07610273361206055
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.13194941729307175,
+          "turnover": 0.036720871925354004,
+          "annual_cost": 0.01110439167022705,
+          "net_excess": 0.1208450256228447,
+          "absolute_max_drawdown": 0.11757934093475342,
+          "excess_max_drawdown": 0.02594733238220215
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.022483617067337036,
+          "turnover": 0.03466014936566353,
+          "annual_cost": 0.010481229168176651,
+          "net_excess": 0.012002387899160385,
+          "absolute_max_drawdown": 0.225155770778656,
+          "excess_max_drawdown": 0.05487847328186035
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "F-GFN-N02-20260916",
+        "handler": "book_to_market_lf_div_oper_main_profit_ttm",
+        "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM",
+        "abs_rank_corr": 0.4873540699481964,
+        "signed_rank_corr": 0.4873540699481964,
+        "periods": 241,
+        "local_net_excess": 0.09154100364292599,
+        "platform_net_excess_pct": 12.274464
+      },
+      "batch_closest": {
+        "name": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((BOOK_TO_MARKET_RATIO_LF/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.7851073741912842,
+        "signed_rank_corr": 0.7851073741912842,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    },
+    {
+      "raw_formula": "Div(ratio_sp_ttm,TsMax(TsMax(TsMax(TsMax(TsMax(TsWMA(TsMed(oper_main_profit_ttm,10),30),40),40),40),40),40))",
+      "formula": "(RATIO_SP_TTM/TS_MAX(TS_MAX(TS_MAX(TS_MAX(TS_MAX(WMA(TS_MEDIAN(OPER_MAIN_PROFIT_TTM,10),30),40),40),40),40),40))",
+      "signature": "DIV(RATIO_SP_TTM,MAX_TS(WMA(MEDIAN(OPER_MAIN_PROFIT_TTM,10),30),40))",
+      "scale_signature": "DIV(RATIO_SP_TTM,MAX_TS(WMA(MEDIAN(OPER_MAIN_PROFIT_TTM,10),30),40))",
+      "gp_fitness": 0.0843520903927162,
+      "used_fields": [
+        "oper_main_profit_ttm",
+        "ratio_sp_ttm"
+      ],
+      "distinct_fields": 2,
+      "historical_exact_match": false,
+      "historical_scale_match": false,
+      "formula_length": 112,
+      "full_net_excess": 0.0843520903927162,
+      "full_gross_excess": 0.09823144669354704,
+      "full_turnover": 0.04589734226465225,
+      "full_annual_cost": 0.013879356300830842,
+      "size_rank_corr": -0.35372844338417053,
+      "split_stats": {
+        "train": {
+          "periods": 146,
+          "gross_excess": 0.11752454320045368,
+          "turnover": 0.045749809592962265,
+          "annual_cost": 0.013834742420911789,
+          "net_excess": 0.10368980077954189,
+          "absolute_max_drawdown": 0.3637465238571167,
+          "excess_max_drawdown": 0.10966837406158447
+        },
+        "valid": {
+          "periods": 48,
+          "gross_excess": 0.12112509682774544,
+          "turnover": 0.04587123543024063,
+          "annual_cost": 0.013871461594104767,
+          "net_excess": 0.10725363523364068,
+          "absolute_max_drawdown": 0.14132332801818848,
+          "excess_max_drawdown": 0.0372350811958313
+        },
+        "test": {
+          "periods": 47,
+          "gross_excess": 0.01491898498002519,
+          "turnover": 0.04513067007064819,
+          "annual_cost": 0.013647514629364014,
+          "net_excess": 0.0012714703506611757,
+          "absolute_max_drawdown": 0.2441556453704834,
+          "excess_max_drawdown": 0.09226197004318237
+        }
+      },
+      "decision": "eligible_local_screen",
+      "historical_closest": {
+        "name": "F-GFN-N02-20260916",
+        "handler": "book_to_market_lf_div_oper_main_profit_ttm",
+        "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM",
+        "abs_rank_corr": 0.5072579979896545,
+        "signed_rank_corr": 0.5072579979896545,
+        "periods": 241,
+        "local_net_excess": 0.09154100364292599,
+        "platform_net_excess_pct": 12.274464
+      },
+      "batch_closest": {
+        "name": "((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "formula": "((RATIO_SP_TTM/OPER_ROE_LYR)/CURRENT_LIABILITIES)",
+        "abs_rank_corr": 0.4419806897640228,
+        "signed_rank_corr": 0.4419806897640228,
+        "periods": 241
+      },
+      "final_decision": "final_novel_candidate"
+    }
+  ],
+  "skipped_historical": [
+    {
+      "id": "h03-t10-single-20260911-candidates.report:H03-T10-SINGLE",
+      "name": "H03-T10-SINGLE",
+      "handler": "impact60",
+      "formula": "RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))",
+      "signature": "RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1)))",
+      "local_net_excess": 0.15337952869478097,
+      "platform_net_excess_pct": 16.443255999999998,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "high-potential-5-20260910-candidates.report:NEW-HIST-ROE-6Q",
+      "name": "NEW-HIST-ROE-6Q",
+      "handler": "quality_roe_tsrank756",
+      "formula": "TS_RANK(oper_roe_ttm,756)",
+      "signature": "RANK_TS(OPER_ROE_TTM,756)",
+      "local_net_excess": 0.011668149090968985,
+      "platform_net_excess_pct": -2.711384,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 37.22 GiB. GPU 0 has a total capacity of 23.57 GiB of which 14.93 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 6.21 GiB memory in use. Of the allocated memory 5.75 GiB is allocated by PyTorch, and 178.53 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "high-potential-5-20260910-candidates.report:NEW-VALUE-EVEBITDA",
+      "name": "NEW-VALUE-EVEBITDA",
+      "handler": "ev_ebitda_proxy",
+      "formula": "RANK(-ratio_ev_ebitda_ttm)",
+      "signature": "RANK(MUL(-1,RATIO_EV_EBITDA_TTM))",
+      "local_net_excess": 0.014370781164442433,
+      "platform_net_excess_pct": 3.3196399999999997,
+      "error": "KeyError: 'PandaAI field ratio_ev_ebitda_ttm is unavailable in the local cache: catalog-field inputs are not all present in the local cache or have no local handler'"
+    },
+    {
+      "id": "huatai-series13-candidates.report:HT13-HIST-ROA-6Q",
+      "name": "HT13-HIST-ROA-6Q",
+      "handler": "quality_roa_tsrank756",
+      "formula": "TS_RANK(oper_roa_net_ttm,756)",
+      "signature": "RANK_TS(OPER_ROA_NET_TTM,756)",
+      "local_net_excess": -0.03838229124447675,
+      "platform_net_excess_pct": -4.744400000000001,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 37.22 GiB. GPU 0 has a total capacity of 23.57 GiB of which 14.85 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 6.29 GiB memory in use. Of the allocated memory 5.83 GiB is allocated by PyTorch, and 180.65 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "literature-rankic-optimization-20260909-formula.report:NONHT-FSCORELIKE-REV40-INTERACT",
+      "name": "NONHT-FSCORELIKE-REV40-INTERACT",
+      "handler": "fscore_interact",
+      "formula": "RANK(1 - RETURNS(CLOSE,40)) * RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)",
+      "signature": "RANK(1-RETURNS(CLOSE,40))*RANK((IF(OPER_ROA_NET_TTM>0,1,0)+IF(CFD_OCF_TO_DEBT_TTM>0,1,0)+IF(OPER_ROA_NET_TTM>OPER_ROA_NET_LYR,1,0)+IF(CFD_SURPLUS_CASH_MULTI_TTM>1,1,0)+IF(FIN_DEBT_TO_ASSET_TTM<FIN_DEBT_TO_ASSET_LYR,1,0)+IF(FIN_CURRENT_RATIO_TTM>FIN_CURRENT_RATIO_LYR,1,0)+IF(OPER_GROSS_MARGIN_TTM>OPER_GROSS_MARGIN_LYR,1,0)+IF(OPER_TOTAL_ASSET_TURNOVER_TTM>OPER_TOTAL_ASSET_TURNOVER_LYR,1,0))/8)",
+      "local_net_excess": 0.011001997004364508,
+      "platform_net_excess_pct": 1.8427599999999984,
+      "error": "NameError: name 'IF' is not defined"
+    },
+    {
+      "id": "literature-rankic-optimization-20260909-formula.report:NONHT-RESVOL-MAX-INTERACT-21D",
+      "name": "NONHT-RESVOL-MAX-INTERACT-21D",
+      "handler": "residual_volatility_max_interact",
+      "formula": "RANK(-residual_volatility) * RANK(-TS_MAX(RETURNS(CLOSE,1),21))",
+      "signature": "MUL(RANK(MUL(MAX_TS(PCT_CHANGE(CLOSE,1),21),-1)),RANK(MUL(-1,RESIDUAL_VOLATILITY)))",
+      "local_net_excess": -0.0246129101432959,
+      "platform_net_excess_pct": -5.712656000000001,
+      "error": "NameError: name 'residual_volatility' is not defined"
+    },
+    {
+      "id": "literature-rankic-optimization-20260909-python.report:NONHT-MAX5-LOW-21D",
+      "name": "NONHT-MAX5-LOW-21D",
+      "handler": "max5_low21",
+      "formula": "literature-rankic-optimization-20260909-max5.py",
+      "signature": "LITERATURE-RANKIC-OPTIMIZATION-20260909-MAX5.PY",
+      "local_net_excess": -0.12377143747648073,
+      "platform_net_excess_pct": -11.930792,
+      "error": "NameError: name 'literature' is not defined"
+    },
+    {
+      "id": "nonht-report-directions-20260909-formula.report:NONHT-LTMOM-EXHIGH-252-21",
+      "name": "NONHT-LTMOM-EXHIGH-252-21",
+      "handler": "ltmom_exhigh252_21",
+      "formula": "RANK(SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),252)-SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),21))",
+      "signature": "RANK(SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),252)-SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),21))",
+      "local_net_excess": 0.0013531551692115215,
+      "platform_net_excess_pct": -2.933592,
+      "error": "NameError: name 'IF' is not defined"
+    },
+    {
+      "id": "nonhuatai-factor-6-20260909.report:NONHT-CASH-CONVERSION",
+      "name": "NONHT-CASH-CONVERSION",
+      "handler": "cash_conversion",
+      "formula": "RANK(cfd_surplus_cash_multi_ttm)",
+      "signature": "RANK(CFD_SURPLUS_CASH_MULTI_TTM)",
+      "local_net_excess": -0.0017008080172012247,
+      "platform_net_excess_pct": -0.02025599999999983,
+      "error": "KeyError: 'PandaAI field cfd_surplus_cash_multi_ttm is unavailable in the local cache: catalog-field inputs are not all present in the local cache or have no local handler'"
+    },
+    {
+      "id": "nonhuatai-factor-6-20260909.report:NONHT-FSCORELIKE-REV40",
+      "name": "NONHT-FSCORELIKE-REV40",
+      "handler": "fscore_eq",
+      "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)) / 2",
+      "signature": "(RANK(1-RETURNS(CLOSE,40))+RANK((IF(OPER_ROA_NET_TTM>0,1,0)+IF(CFD_OCF_TO_DEBT_TTM>0,1,0)+IF(OPER_ROA_NET_TTM>OPER_ROA_NET_LYR,1,0)+IF(CFD_SURPLUS_CASH_MULTI_TTM>1,1,0)+IF(FIN_DEBT_TO_ASSET_TTM<FIN_DEBT_TO_ASSET_LYR,1,0)+IF(FIN_CURRENT_RATIO_TTM>FIN_CURRENT_RATIO_LYR,1,0)+IF(OPER_GROSS_MARGIN_TTM>OPER_GROSS_MARGIN_LYR,1,0)+IF(OPER_TOTAL_ASSET_TURNOVER_TTM>OPER_TOTAL_ASSET_TURNOVER_LYR,1,0))/8))/2",
+      "local_net_excess": 0.006028938111637974,
+      "platform_net_excess_pct": 1.8243760000000009,
+      "error": "NameError: name 'IF' is not defined"
+    },
+    {
+      "id": "nonhuatai-factor-6-20260909.report:NONHT-LOW-BETA",
+      "name": "NONHT-LOW-BETA",
+      "handler": "beta_low",
+      "formula": "RANK(-beta)",
+      "signature": "RANK(MUL(-1,BETA))",
+      "local_net_excess": -0.10832273009951343,
+      "platform_net_excess_pct": -15.45632,
+      "error": "NameError: name 'beta' is not defined"
+    },
+    {
+      "id": "nonhuatai-factor-6-20260909.report:NONHT-RESVOL-LOW",
+      "name": "NONHT-RESVOL-LOW",
+      "handler": "residual_volatility",
+      "formula": "RANK(-residual_volatility)",
+      "signature": "RANK(MUL(-1,RESIDUAL_VOLATILITY))",
+      "local_net_excess": -0.0018572728725726063,
+      "platform_net_excess_pct": 0.37087199999999987,
+      "error": "NameError: name 'residual_volatility' is not defined"
+    },
+    {
+      "id": "nonhuatai-factor-6-20260909.report:NONHT-SKEW-LOW-60D",
+      "name": "NONHT-SKEW-LOW-60D",
+      "handler": "skew60_low",
+      "formula": "RANK(-TS_SKEW(RETURNS(CLOSE,1),60))",
+      "signature": "RANK(MUL(SKEW(PCT_CHANGE(CLOSE,1),60),-1))",
+      "local_net_excess": -0.008845144258247069,
+      "platform_net_excess_pct": -0.4400720000000007,
+      "error": "ValueError: no finite signal"
+    },
+    {
+      "id": "osr3-ret40-value-candidates.report:OSR3-RET40-BP-TSRANK756",
+      "name": "OSR3-RET40-BP-TSRANK756",
+      "handler": "reversal_bm_tsrank756",
+      "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK(TS_RANK(ratio_bm_ttm,756))) / 2",
+      "signature": "DIV(ADD(RANK(RANK_TS(RATIO_BM_TTM,756)),RANK(SUB(1,PCT_CHANGE(CLOSE,40)))),2)",
+      "local_net_excess": -0.027713924299712395,
+      "platform_net_excess_pct": 1.6427359999999993,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 37.22 GiB. GPU 0 has a total capacity of 23.57 GiB of which 14.71 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 6.43 GiB memory in use. Of the allocated memory 5.93 GiB is allocated by PyTorch, and 211.18 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "osr4-ret40-value-refine-candidates.report:OSR4-RET40-BP-CFP-TSRANK756",
+      "name": "OSR4-RET40-BP-CFP-TSRANK756",
+      "handler": "reversal_bm_cfp_tsrank756",
+      "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK(TS_RANK(ratio_bm_ttm,756)) + RANK(TS_RANK(ratio_cfp_ttm,756))) / 3",
+      "signature": "DIV(ADD(RANK(RANK_TS(RATIO_BM_TTM,756)),RANK(RANK_TS(RATIO_CFP_TTM,756)),RANK(SUB(1,PCT_CHANGE(CLOSE,40)))),3)",
+      "local_net_excess": 0.0094386635964461,
+      "platform_net_excess_pct": 2.461280000000002,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 37.22 GiB. GPU 0 has a total capacity of 23.57 GiB of which 14.71 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 6.43 GiB memory in use. Of the allocated memory 5.93 GiB is allocated by PyTorch, and 211.18 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "oversold-rebound-candidates.report:OSR-MFI14-20D",
+      "name": "OSR-MFI14-20D",
+      "handler": "mfi14",
+      "formula": "RANK(1 - MFI(CLOSE,HIGH,LOW,VOLUME,14) / 100)",
+      "signature": "RANK(SUB(1,DIV(MFI(CLOSE,HIGH,LOW,VOLUME,14),100)))",
+      "local_net_excess": -0.2387687315500867,
+      "platform_net_excess_pct": -21.91344,
+      "error": "TypeError: 'PandaAIField' object is not callable"
+    },
+    {
+      "id": "oversold-rebound-candidates.report:OSR-RET5-RSI14-20D",
+      "name": "OSR-RET5-RSI14-20D",
+      "handler": "reversal5_rsi14",
+      "formula": "(RANK(1 - RETURNS(CLOSE,5)) + RANK(1 - RSI(CLOSE,14) / 100)) / 2",
+      "signature": "DIV(ADD(RANK(SUB(1,PCT_CHANGE(CLOSE,5))),RANK(SUB(1,DIV(RSI(CLOSE,14),100)))),2)",
+      "local_net_excess": -0.2527902430943202,
+      "platform_net_excess_pct": -21.545583999999998,
+      "error": "NameError: name 'RSI' is not defined"
+    },
+    {
+      "id": "oversold-rebound-candidates.report:OSR-RSI14-20D",
+      "name": "OSR-RSI14-20D",
+      "handler": "rsi14",
+      "formula": "RANK(1 - RSI(CLOSE,14) / 100)",
+      "signature": "RANK(SUB(1,DIV(RSI(CLOSE,14),100)))",
+      "local_net_excess": -0.1296745156928662,
+      "platform_net_excess_pct": -10.000271999999999,
+      "error": "NameError: name 'RSI' is not defined"
+    },
+    {
+      "id": "oversold-rebound-candidates.report:OSR-Z20-20D",
+      "name": "OSR-Z20-20D",
+      "handler": "zscore20_low",
+      "formula": "RANK(1 - TS_ZSCORE(CLOSE,20))",
+      "signature": "RANK(SUB(1,TS_ZSCORE(CLOSE,20)))",
+      "local_net_excess": -0.22111138967710645,
+      "platform_net_excess_pct": -19.489344000000003,
+      "error": "NameError: name 'TS_ZSCORE' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-MODERATE-BIAS5",
+      "name": "OSR2-MODERATE-BIAS5",
+      "handler": "moderate_bias5",
+      "formula": "RANK(-ABS(MIN(BIAS(CLOSE,20),0)+5))",
+      "signature": "RANK(MUL(ABS(ADD(5,MIN(BIAS(CLOSE,20),0))),-1))",
+      "local_net_excess": -0.2218453621198007,
+      "platform_net_excess_pct": -22.130256,
+      "error": "NameError: name 'BIAS' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-MODERATE-RSI35",
+      "name": "OSR2-MODERATE-RSI35",
+      "handler": "rsi35",
+      "formula": "RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999))",
+      "signature": "RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999))",
+      "local_net_excess": -0.18892603162209667,
+      "platform_net_excess_pct": -18.051167999999997,
+      "error": "NameError: name 'IF' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-PRICE-CROSS-MA5",
+      "name": "OSR2-PRICE-CROSS-MA5",
+      "handler": "ma20_cross5",
+      "formula": "RANK(1 - CLOSE / MA(CLOSE,20)) * AS_FLOAT(CROSS(CLOSE,MA(CLOSE,5)))",
+      "signature": "MUL(AS_FLOAT(CROSS(CLOSE,MA(CLOSE,5))),RANK(SUB(1,DIV(CLOSE,MA(CLOSE,20)))))",
+      "local_net_excess": -0.2982611531418776,
+      "platform_net_excess_pct": -30.042975999999996,
+      "error": "NameError: name 'AS_FLOAT' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-RSI-CROSS30",
+      "name": "OSR2-RSI-CROSS30",
+      "handler": "rsi_cross30",
+      "formula": "RANK(1 - RSI(CLOSE,14) / 100) * AS_FLOAT(CROSS(RSI(CLOSE,14),30))",
+      "signature": "MUL(AS_FLOAT(CROSS(RSI(CLOSE,14),30)),RANK(SUB(1,DIV(RSI(CLOSE,14),100))))",
+      "local_net_excess": -0.2689924026844289,
+      "platform_net_excess_pct": -25.603664,
+      "error": "NameError: name 'RSI' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-RSI35-REC3",
+      "name": "OSR2-RSI35-REC3",
+      "handler": "rsi35_recovery3",
+      "formula": "(RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999)) + RANK(RETURNS(CLOSE,3))) / 2",
+      "signature": "(RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999))+RANK(RETURNS(CLOSE,3)))/2",
+      "local_net_excess": -0.3036749784170043,
+      "platform_net_excess_pct": -31.219072,
+      "error": "NameError: name 'IF' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-RSI35-REC5",
+      "name": "OSR2-RSI35-REC5",
+      "handler": "rsi35_recovery5",
+      "formula": "(RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999)) + RANK(RETURNS(CLOSE,5))) / 2",
+      "signature": "(RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999))+RANK(RETURNS(CLOSE,5)))/2",
+      "local_net_excess": -0.2989858921322569,
+      "platform_net_excess_pct": -31.517824,
+      "error": "NameError: name 'IF' is not defined"
+    },
+    {
+      "id": "oversold-rebound-recovery-candidates.report:OSR2-SMOOTH-RSI28",
+      "name": "OSR2-SMOOTH-RSI28",
+      "handler": "smooth_rsi28",
+      "formula": "RANK(MA(1 - RSI(CLOSE,28) / 100,10))",
+      "signature": "RANK(MA(SUB(1,DIV(RSI(CLOSE,28),100)),10))",
+      "local_net_excess": -0.04118982108010008,
+      "platform_net_excess_pct": -1.856224,
+      "error": "NameError: name 'RSI' is not defined"
+    },
+    {
+      "id": "paper-derived-full.report:paper-derived-profitability",
+      "name": "paper-derived-profitability",
+      "handler": "profitability",
+      "formula": "RANK(profitability)",
+      "signature": "RANK(PROFITABILITY)",
+      "local_net_excess": -0.06665241174073902,
+      "platform_net_excess_pct": -4.4671520000000005,
+      "error": "NameError: name 'profitability' is not defined"
+    },
+    {
+      "id": "report-backed-20260910-candidates.report:REPORT-HIST-ASSETTURN-6Q-10D-20260910",
+      "name": "REPORT-HIST-ASSETTURN-6Q-10D-20260910",
+      "handler": "quality_asset_turnover_tsrank378",
+      "formula": "TS_RANK(oper_total_asset_turnover_ttm,378)",
+      "signature": "RANK_TS(OPER_TOTAL_ASSET_TURNOVER_TTM,378)",
+      "local_net_excess": -0.00406285456862944,
+      "platform_net_excess_pct": -1.27048,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 18.61 GiB. GPU 0 has a total capacity of 23.57 GiB of which 17.06 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 4.08 GiB memory in use. Of the allocated memory 3.58 GiB is allocated by PyTorch, and 212.77 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "report-backed-20260910-candidates.report:REPORT-HIST-NETMARGIN-6Q-10D-20260910",
+      "name": "REPORT-HIST-NETMARGIN-6Q-10D-20260910",
+      "handler": "quality_net_margin_tsrank378",
+      "formula": "TS_RANK(oper_net_margin_ttm,378)",
+      "signature": "RANK_TS(OPER_NET_MARGIN_TTM,378)",
+      "local_net_excess": -0.014483997269221643,
+      "platform_net_excess_pct": -4.215712,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 18.61 GiB. GPU 0 has a total capacity of 23.57 GiB of which 17.06 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 4.08 GiB memory in use. Of the allocated memory 3.58 GiB is allocated by PyTorch, and 212.77 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "report-backed-untested-candidates.report:HT13-NEW-HIST-GPM-6Q",
+      "name": "HT13-NEW-HIST-GPM-6Q",
+      "handler": "quality_gross_margin_tsrank756",
+      "formula": "TS_RANK(oper_gross_margin_ttm,756)",
+      "signature": "RANK_TS(OPER_GROSS_MARGIN_TTM,756)",
+      "local_net_excess": -0.022473675414025875,
+      "platform_net_excess_pct": -6.8099039999999995,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 37.22 GiB. GPU 0 has a total capacity of 23.57 GiB of which 14.73 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 6.41 GiB memory in use. Of the allocated memory 5.91 GiB is allocated by PyTorch, and 222.77 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "report-backed-untested-candidates.report:HT13-NEW-HIST-OPPROFIT-6Q",
+      "name": "HT13-NEW-HIST-OPPROFIT-6Q",
+      "handler": "quality_oper_profit_tsrank756",
+      "formula": "TS_RANK(oper_oper_profit_to_tp_ttm,756)",
+      "signature": "RANK_TS(OPER_OPER_PROFIT_TO_TP_TTM,756)",
+      "local_net_excess": null,
+      "platform_net_excess_pct": -3.7639839999999998,
+      "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 37.22 GiB. GPU 0 has a total capacity of 23.57 GiB of which 14.72 GiB is free. Process 1604282 has 2.37 GiB memory in use. Including non-PyTorch memory, this process has 6.42 GiB memory in use. Of the allocated memory 5.91 GiB is allocated by PyTorch, and 232.77 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+    },
+    {
+      "id": "t10-additions-20260911-candidates.report:T10-ADD-BM-20260911",
+      "name": "T10-ADD-BM-20260911",
+      "handler": "t10_size_plus_impact_bm",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(book_to_market_ratio_lf)) / 6",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(BOOK_TO_MARKET_RATIO_LF),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),6)",
+      "local_net_excess": 0.13876266880434995,
+      "platform_net_excess_pct": 18.092280000000002,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-additions-20260911-candidates.report:T10-ADD-DD120-20260911",
+      "name": "T10-ADD-DD120-20260911",
+      "handler": "t10_size_plus_impact_dd120",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(1-CLOSE/TS_MAX(CLOSE,120))) / 6",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(1,DIV(CLOSE,MAX_TS(CLOSE,120)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),6)",
+      "local_net_excess": 0.12495545700665785,
+      "platform_net_excess_pct": 16.834384,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-additions-20260911-candidates.report:T10-ADD-G13-20260911",
+      "name": "T10-ADD-G13-20260911",
+      "handler": "t10_size_plus_impact_g13",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)) / 6",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(ABS(SUB(DIV(CLOSE,REF(CLOSE,1)),1)),ADD(1,AMOUNT)),60),60)),RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),6)",
+      "local_net_excess": 0.13617550976658166,
+      "platform_net_excess_pct": 19.622616,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-more-additions-20260911-candidates.report:T10-ADD-AGG-IMPACT-20260911",
+      "name": "T10-ADD-AGG-IMPACT-20260911",
+      "handler": "t10_size_plus_impact_aggregate",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1),60) / (SUM(AMOUNT,60) + 1))) / 6",
+      "signature": "DIV(ADD(RANK(DIV(SUM(ABS(SUB(DIV(CLOSE,REF(CLOSE,1)),1)),60),ADD(SUM(AMOUNT,60),1))),RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),6)",
+      "local_net_excess": 0.14227426606404908,
+      "platform_net_excess_pct": 19.759592,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-more-additions-20260911-candidates.report:T10-ADD-DOWNSIDE-IMPACT-20260911",
+      "name": "T10-ADD-DOWNSIDE-IMPACT-20260911",
+      "handler": "t10_size_plus_impact_downside",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM((ABS(CLOSE / DELAY(CLOSE,1) - 1) - (CLOSE / DELAY(CLOSE,1) - 1)) / 2,60) / (SUM(AMOUNT,60) + 1))) / 6",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(SUB(ABS(SUB(DIV(CLOSE,REF(CLOSE,1)),1)),SUB(DIV(CLOSE,REF(CLOSE,1)),1)),2),60),ADD(SUM(AMOUNT,60),1))),RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),6)",
+      "local_net_excess": 0.14147981461209175,
+      "platform_net_excess_pct": 19.39004,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-more-additions-20260911-candidates.report:T10-ADD-FSCORE-20260911",
+      "name": "T10-ADD-FSCORE-20260911",
+      "handler": "t10_size_plus_impact_fscore",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)) / 6",
+      "signature": "(RANK(1-RETURNS(CLOSE,40))+RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1)+RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504))+RANK(-ZSCORE(RANK(MARKET_CAP)))+RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))+RANK((IF(OPER_ROA_NET_TTM>0,1,0)+IF(CFD_OCF_TO_DEBT_TTM>0,1,0)+IF(OPER_ROA_NET_TTM>OPER_ROA_NET_LYR,1,0)+IF(CFD_SURPLUS_CASH_MULTI_TTM>1,1,0)+IF(FIN_DEBT_TO_ASSET_TTM<FIN_DEBT_TO_ASSET_LYR,1,0)+IF(FIN_CURRENT_RATIO_TTM>FIN_CURRENT_RATIO_LYR,1,0)+IF(OPER_GROSS_MARGIN_TTM>OPER_GROSS_MARGIN_LYR,1,0)+IF(OPER_TOTAL_ASSET_TURNOVER_TTM>OPER_TOTAL_ASSET_TURNOVER_LYR,1,0))/8))/6",
+      "local_net_excess": 0.1336371640984068,
+      "platform_net_excess_pct": 17.476064,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-newdirections-20260911-candidates.report:T10-SIZE-PLUS-IMPACT",
+      "name": "T10-SIZE-PLUS-IMPACT",
+      "handler": "t10_size_plus_impact",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 5",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),5)",
+      "local_net_excess": 0.13146870768467578,
+      "platform_net_excess_pct": 18.157232,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-newdirections-20260911-candidates.report:T10-SIZE-PLUS-IMPACT-WC",
+      "name": "T10-SIZE-PLUS-IMPACT-WC",
+      "handler": "t10_size_plus_impact_wc",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK((CURRENT_ASSETS-INVENTORY-CURRENT_LIABILITIES)/(ABS(MARKET_CAP)+1))) / 6",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(DIV(SUB(SUB(CURRENT_ASSETS,INVENTORY),CURRENT_LIABILITIES),ADD(ABS(MARKET_CAP),1))),RANK(MUL(ZSCORE(RANK(MARKET_CAP)),-1)),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),6)",
+      "local_net_excess": 0.14344148526806094,
+      "platform_net_excess_pct": 17.443168,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "t10-nomcap-plus-impact-20260911-candidates.report:T10-NOMCAP-PLUS-IMPACT",
+      "name": "T10-NOMCAP-PLUS-IMPACT",
+      "handler": "t10_nomcap_plus_impact",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 4",
+      "signature": "DIV(ADD(RANK(DIV(SUM(DIV(SUB(HIGH,LOW),ADD(REF(CLOSE,1),1e-06)),60),ADD(SUM(AMOUNT,60),1))),RANK(SUB(1,PCT_CHANGE(CLOSE,40))),RANK(SUB(1,DIV(MA(TURNOVER,21),MA(TURNOVER,504)))),RANK(SUB(DIV(DIV(SUM(DIV(MUL(ADD(CLOSE,OPEN),VOLUME),2),250),SUM(VOLUME,250)),CLOSE),1))),4)",
+      "local_net_excess": 0.10910325711014758,
+      "platform_net_excess_pct": 14.225216,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "verify-field-scan-20260910-candidates.report:VERIFY-F260910-12",
+      "name": "VERIFY-F260910-12",
+      "handler": "book_to_market_lf_plus_impact",
+      "formula": "RANK(book_to_market_ratio_lf) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)",
+      "signature": "ADD(RANK(DIV(SUM(DIV(ABS(SUB(DIV(CLOSE,REF(CLOSE,1)),1)),ADD(1,AMOUNT)),60),60)),RANK(BOOK_TO_MARKET_RATIO_LF))",
+      "local_net_excess": 0.1286167083855636,
+      "platform_net_excess_pct": 15.588864000000001,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "verify-field-scan-20260910-candidates.report:VERIFY-G260910-13",
+      "name": "VERIFY-G260910-13",
+      "handler": "impact_abs_return60",
+      "formula": "RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)",
+      "signature": "RANK(DIV(SUM(DIV(ABS(SUB(DIV(CLOSE,REF(CLOSE,1)),1)),ADD(1,AMOUNT)),60),60))",
+      "local_net_excess": 0.09731994260745458,
+      "platform_net_excess_pct": 14.700511999999998,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "vwap-volume-trend-raw.report:VWAP10-VOL20-MOM20-RAW",
+      "name": "VWAP10-VOL20-MOM20-RAW",
+      "handler": "vwap10_volume20_momentum20",
+      "formula": "((MA(AMOUNT / VOLUME, 10) / CLOSE) - 1) * (VOLUME / MA(VOLUME, 20)) * (BIAS(CLOSE, 20) / 100)",
+      "signature": "MUL(DIV(BIAS(CLOSE,20),100),DIV(VOLUME,MA(VOLUME,20)),SUB(DIV(MA(DIV(AMOUNT,VOLUME),10),CLOSE),1))",
+      "local_net_excess": -0.06787279935334731,
+      "platform_net_excess_pct": -10.06148,
+      "error": "NameError: name 'BIAS' is not defined"
+    },
+    {
+      "id": "workflow-6aa40282-python-candidates-d0.report:WF6AA4-D0-PYTHON-OBV-20260912",
+      "name": "WF6AA4-D0-PYTHON-OBV-20260912",
+      "handler": "python_obv",
+      "formula": "workflow-6aa40282-python.py",
+      "signature": "WORKFLOW-6AA40282-PYTHON.PY",
+      "local_net_excess": -0.13375294867357337,
+      "platform_net_excess_pct": -13.104599999999998,
+      "error": "SyntaxError: invalid decimal literal (<string>, line 1)"
+    },
+    {
+      "id": "workflow-6aa40282-singles-d0.report:WF6AA4-D0-CLOSE20-MOM-20260912",
+      "name": "WF6AA4-D0-CLOSE20-MOM-20260912",
+      "handler": "momentum20",
+      "formula": "RANK((CLOSE / DELAY(CLOSE, 20)) - 1)",
+      "signature": "RANK(SUB(DIV(CLOSE,REF(CLOSE,20)),1))",
+      "local_net_excess": -0.0402089579425256,
+      "platform_net_excess_pct": -0.10252000000000017,
+      "error": "NameError: name 'DELAY' is not defined"
+    },
+    {
+      "id": "workflow-6aa40282-singles-d0.report:WF6AA4-D0-OPEN20-MOM-20260912",
+      "name": "WF6AA4-D0-OPEN20-MOM-20260912",
+      "handler": "momentum20_open",
+      "formula": "RANK((OPEN / DELAY(CLOSE, 20)) - 1)",
+      "signature": "RANK(SUB(DIV(OPEN,REF(CLOSE,20)),1))",
+      "local_net_excess": -0.04249313622157409,
+      "platform_net_excess_pct": -0.23581600000000158,
+      "error": "NameError: name 'DELAY' is not defined"
+    }
+  ]
+}
