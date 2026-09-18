@@ -1,0 +1,757 @@
+[
+  {
+    "iteration": 1,
+    "parents": [
+      {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "retriever_score": 0.1119857953563987,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank($book_to_market_ratio_lf) + TsPctChange($book_to_market_ratio_lf, 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($book_to_market_ratio_lf, 20) * Inv(Rank($book_to_market_ratio_lf))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Log(Rank($book_to_market_ratio_lf)) + TsDelta($book_to_market_ratio_lf, 10)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Abs(Rank($book_to_market_ratio_lf)) - TsMean($book_to_market_ratio_lf, 50)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsCorr($book_to_market_ratio_lf, $market_cap, 60) * Rank($book_to_market_ratio_lf)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "accepted",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsRank($book_to_market_ratio_lyr,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($turnover,20)",
+            "status": "accepted",
+            "ic": 0.011692062951624393,
+            "icir": 0.18182444840992182,
+            "net_excess": -0.27619692941234536
+          },
+          {
+            "expression": "TsRank($market_cap,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Rank($ratio_ep_ttm)",
+        "retriever_score": 0.051071141111857836,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Mul($ratio_ep_ttm, $book_to_market_ratio_lf))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($ratio_ep_ttm, $book_to_market_ratio_lyr))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Rank($ratio_ep_ttm), 2)",
+            "status": "accepted",
+            "ic": 0.006082065869122744,
+            "icir": 0.14735438283910354,
+            "net_excess": -0.34880770914521936
+          },
+          {
+            "expression": "TsMean(Rank($ratio_ep_ttm), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.00537536945194006,
+            "icir": 0.04871075932235972,
+            "net_excess": 0.031133297731533442
+          },
+          {
+            "expression": "TsDelta(Rank($ratio_ep_ttm), 2)",
+            "status": "accepted",
+            "ic": 0.013141212984919548,
+            "icir": 0.18926064255350555,
+            "net_excess": -0.2862965633780989
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Mul($volume,1.0),0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank($volume,20)",
+      "TsRank($turnover,20)",
+      "TsPctChange(Rank($ratio_ep_ttm), 2)",
+      "TsDelta(Rank($ratio_ep_ttm), 2)"
+    ]
+  },
+  {
+    "iteration": 2,
+    "parents": [
+      {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "retriever_score": 0.1119857953563987,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Mul($book_to_market_ratio_lf, $market_cap))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange($book_to_market_ratio_lf, 2)",
+            "status": "accepted",
+            "ic": 0.008988666348159313,
+            "icir": 0.08996477625680646,
+            "net_excess": -0.42702589543878217
+          },
+          {
+            "expression": "TsRank($book_to_market_ratio_lf, 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta($book_to_market_ratio_lf, 2)",
+            "status": "accepted",
+            "ic": 0.01035684160888195,
+            "icir": 0.11521973548517087,
+            "net_excess": -0.3065462224921135
+          },
+          {
+            "expression": "TsStd($book_to_market_ratio_lf, 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsDelta(Rank($ratio_ep_ttm), 2)",
+        "retriever_score": -0.1358838708587958,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsDelta(Rank($ratio_pcf_ocf_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+            "status": "accepted",
+            "ic": 0.01796899549663067,
+            "icir": 0.18935774101247616,
+            "net_excess": -0.29703933458785486
+          },
+          {
+            "expression": "TsDelta(Rank($oper_roe_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.000965044426266104,
+            "icir": 0.03845352970674912,
+            "net_excess": -0.2437474904978112
+          },
+          {
+            "expression": "TsDelta(Rank($ratio_bm_ttm), 2)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsDelta(Rank($market_cap), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($volume, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($volume, $amount), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($volume, $market_cap), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($volume, TsMean($volume, 20)), 20)",
+            "status": "accepted",
+            "ic": 0.005876245908439159,
+            "icir": 0.09056807878813831,
+            "net_excess": -0.25852855232349814
+          },
+          {
+            "expression": "TsRank(Pow($volume, 0.000001), 20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($turnover,20)",
+        "retriever_score": -0.13711566386369217,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($turnover, $volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($turnover, $book_to_market_ratio_lyr), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(Div($turnover, $market_cap), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Pow($turnover, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($turnover, TsMean($turnover, 20)), 20)",
+            "status": "accepted",
+            "ic": 0.006624870467931032,
+            "icir": 0.10824243101071918,
+            "net_excess": -0.2503342346377569
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsRank($book_to_market_ratio_lyr,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($turnover,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.011692062951624393,
+            "icir": 0.18182444840992182,
+            "net_excess": -0.27619692941234536
+          },
+          {
+            "expression": "TsRank($market_cap,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Rank($ratio_ep_ttm)",
+        "retriever_score": 0.051071141111857836,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Mul($ratio_ep_ttm, $book_to_market_ratio_lf))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($ratio_ep_ttm, $book_to_market_ratio_lyr))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Rank($ratio_ep_ttm))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsMean(Rank($ratio_ep_ttm))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($ratio_ep_ttm), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013141212984919548,
+            "icir": 0.18926064255350555,
+            "net_excess": -0.2862965633780989
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsPctChange($book_to_market_ratio_lf, 2)",
+      "TsDelta($book_to_market_ratio_lf, 2)",
+      "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+      "TsRank(Sub($volume, TsMean($volume, 20)), 20)",
+      "TsRank(Sub($turnover, TsMean($turnover, 20)), 20)"
+    ]
+  },
+  {
+    "iteration": 3,
+    "parents": [
+      {
+        "expression": "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+        "retriever_score": -0.13124408610640495,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsDelta(Rank($book_to_market_ratio_lyr), 2)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsDelta(Rank($ratio_pcf_ocf_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($oper_roe_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.000965044426266104,
+            "icir": 0.03845352970674912,
+            "net_excess": -0.2437474904978112
+          },
+          {
+            "expression": "TsDelta(Rank($ratio_sp_ttm), 2)",
+            "status": "accepted",
+            "ic": 0.01697911135852337,
+            "icir": 0.1768907659019965,
+            "net_excess": -0.3319092903006567
+          },
+          {
+            "expression": "TsDelta(Rank($turnover), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsPctChange(Rank($ratio_ep_ttm), 2)",
+        "retriever_score": -0.1436380291704044,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsPctChange(Rank($ratio_pcf_ocf_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Rank($book_to_market_ratio_lf), 2)",
+            "status": "accepted",
+            "ic": 0.01007139217108488,
+            "icir": 0.12128292705231732,
+            "net_excess": -0.38972884781197326
+          },
+          {
+            "expression": "TsPctChange(Rank($oper_roe_lyr), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Rank($market_cap), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Rank($ratio_bm_ttm), 2)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsDelta($book_to_market_ratio_lf, 2)",
+        "retriever_score": -0.13899220301382129,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsDelta(Rank($book_to_market_ratio_lyr), 2)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsDelta(Mul($book_to_market_ratio_lf, $market_cap), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Add($book_to_market_ratio_lf, $oper_main_profit_ttm), 2)",
+            "status": "accepted",
+            "ic": 0.007806382607668638,
+            "icir": 0.12360998093703489,
+            "net_excess": -0.30723627481395255
+          },
+          {
+            "expression": "TsDelta(Div($book_to_market_ratio_lf, $gr_total_asset_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.000636967015452683,
+            "icir": 0.037784983925298735,
+            "net_excess": -0.1752214607859311
+          },
+          {
+            "expression": "TsDelta(Sub($book_to_market_ratio_lf, $ratio_bm_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "retriever_score": 0.1119857953563987,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Mul($book_to_market_ratio_lf, $market_cap))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange($book_to_market_ratio_lf, 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.008988666348159313,
+            "icir": 0.08996477625680646,
+            "net_excess": -0.42702589543878217
+          },
+          {
+            "expression": "Rank(Add($book_to_market_ratio_lf, $oper_main_profit_ttm))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($book_to_market_ratio_lf, 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Rank(Div($book_to_market_ratio_lf, $market_cap))",
+            "status": "accepted",
+            "ic": 0.04441283270716667,
+            "icir": 0.3157261248316671,
+            "net_excess": 0.18084775676906925
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsRank(Mul($close, 2.0),20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($close, $open),20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($close, $open),20)",
+            "status": "accepted",
+            "ic": 0.00813992228358984,
+            "icir": 0.09327245870007807,
+            "net_excess": -0.32310800899087566
+          },
+          {
+            "expression": "TsRank(Add($close, TsMean($close,20)),20)",
+            "status": "accepted",
+            "ic": 0.02055356837809086,
+            "icir": 0.20261164694736777,
+            "net_excess": -0.22441676279420722
+          }
+        ]
+      },
+      {
+        "expression": "TsDelta(Rank($ratio_ep_ttm), 2)",
+        "retriever_score": -0.1358838708587958,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsDelta(Rank($ratio_pcf_ocf_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01796899549663067,
+            "icir": 0.18935774101247616,
+            "net_excess": -0.29703933458785486
+          },
+          {
+            "expression": "TsDelta(Rank($oper_roe_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.000965044426266104,
+            "icir": 0.03845352970674912,
+            "net_excess": -0.2437474904978112
+          },
+          {
+            "expression": "TsDelta(Rank($gr_total_asset_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.00108633644413203,
+            "icir": 0.04934359919358356,
+            "net_excess": -0.23134506825053527
+          },
+          {
+            "expression": "TsDelta(Rank($market_cap), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsDelta(Rank($ratio_sp_ttm), 2)",
+      "TsPctChange(Rank($book_to_market_ratio_lf), 2)",
+      "TsDelta(Add($book_to_market_ratio_lf, $oper_main_profit_ttm), 2)",
+      "Rank(Div($book_to_market_ratio_lf, $market_cap))",
+      "TsRank(Div($close, $open),20)",
+      "TsRank(Add($close, TsMean($close,20)),20)"
+    ]
+  },
+  {
+    "iteration": 4,
+    "parents": [
+      {
+        "expression": "Rank(Div($book_to_market_ratio_lf, $market_cap))",
+        "retriever_score": 0.186564371402751,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Add($book_to_market_ratio_lf, $market_cap))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Rank(Div($book_to_market_ratio_lyr, $market_cap))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Rank(Mul($book_to_market_ratio_lf, $oper_main_profit_ttm))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Rank(Add($book_to_market_ratio_lf, $current_assets))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Rank(Div($book_to_market_ratio_lf, TsMean($market_cap, 20)))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank(Add($close, TsMean($close,20)),20)",
+        "retriever_score": -0.12611210558198385,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Add($close, TsMean($close,20)),20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.02055356837809086,
+            "icir": 0.20261164694736777,
+            "net_excess": -0.22441676279420722
+          },
+          {
+            "expression": "TsRank(Add($close, TsStd($close,20)),20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($close, TsWMA($close,20)),20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($close, TsEMA($close,20)),20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($close, TsCov($close,$volume,20)),20)",
+            "status": "accepted",
+            "ic": 0.013755230233073235,
+            "icir": 0.25545562646828623,
+            "net_excess": -0.1707641506188536
+          }
+        ]
+      },
+      {
+        "expression": "TsDelta(Rank($ratio_sp_ttm), 2)",
+        "retriever_score": -0.1326285821487284,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsDelta(Rank($ratio_pcf_ocf_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($book_to_market_ratio_lyr), 2)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsDelta(Rank($oper_roe_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.000965044426266104,
+            "icir": 0.03845352970674912,
+            "net_excess": -0.2437474904978112
+          },
+          {
+            "expression": "TsDelta(Rank($market_cap), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($turnover), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "retriever_score": 0.1119857953563987,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank($book_to_market_ratio_lf) + 0.000001",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange($book_to_market_ratio_lf, 2) * 1.0",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Rank($book_to_market_ratio_lyr) - 0.0",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($book_to_market_ratio_lf, 2) * 2.0",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsStd($book_to_market_ratio_lf, 2) * 1.0",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsDelta(Rank($ratio_ep_ttm), 2)",
+        "retriever_score": -0.1358838708587958,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsDelta(Rank($ratio_pcf_ocf_ttm), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01796899549663067,
+            "icir": 0.18935774101247616,
+            "net_excess": -0.29703933458785486
+          },
+          {
+            "expression": "TsDelta(Rank($oper_roe_lyr), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.000965044426266104,
+            "icir": 0.03845352970674912,
+            "net_excess": -0.2437474904978112
+          },
+          {
+            "expression": "TsDelta(Rank($market_cap), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta(Rank($turnover), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($close, $volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsPctChange($close, 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(Add($open, $high), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Inv($book_to_market_ratio_lyr), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($market_cap, $book_to_market_ratio_lyr), 20)",
+            "status": "pool_rejected"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(Add($close, TsCov($close,$volume,20)),20)"
+    ]
+  }
+]

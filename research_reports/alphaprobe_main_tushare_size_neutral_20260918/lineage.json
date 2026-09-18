@@ -1,0 +1,58 @@
+[
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($volume,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 1
+  },
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($turnover,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of turnover within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 1
+  },
+  {
+    "parent": "TsRank($volume,20)",
+    "child": "TsRank(TsPctChange($volume, 20), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of percentage change in volume over a 20-day window within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window)",
+    "iteration": 2
+  },
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($open,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of open price within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 2
+  },
+  {
+    "parent": "TsRank(TsPctChange($volume, 20), 20)",
+    "child": "TsRank(TsPctChange($close, 20), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of percentage change in close price over a 20-day window within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window) -> TsRank(TsPctChange($volume, 20), 20) (time-series position of percentage change in volume over a 20-day window within a 20-day window)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsRank(TsPctChange($volume, 20), 20)",
+    "child": "TsRank(TsPctChange($open, 20), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of percentage change in open price over a 20-day window within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window) -> TsRank(TsPctChange($volume, 20), 20) (time-series position of percentage change in volume over a 20-day window within a 20-day window)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsRank($turnover,20)",
+    "child": "TsRank(Sub($turnover, $close), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of turnover subtracted by close within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($turnover,20) (time-series position of turnover within a 20-day window)",
+    "iteration": 4
+  }
+]

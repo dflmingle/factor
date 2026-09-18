@@ -22,6 +22,7 @@ from alphagen.utils.correlation import batch_pearsonr  # noqa: E402
 from alphaprobe_gfn_tushare import (  # noqa: E402
     DEFAULT_OUTPUT,
     GFNExpressionParser,
+    build_net_excess_context,
     build_parser as build_training_parser,
     load_panels,
     resolve_device,
@@ -76,11 +77,19 @@ def evaluate(args: argparse.Namespace) -> dict:
     if isinstance(saved_fields, list):
         args.feature_set = "fundamental_core" if saved_fields else "price_volume"
         args.extra_fields = ",".join(str(field) for field in saved_fields)
+        args.max_extra_fields = 0
+        # Historical runs may have used the old broad action space. Preserve
+        # their ability to be re-evaluated while keeping new mining gated.
+        args.allow_unverified_fields = True
     device = resolve_device(args.device)
     panels, target, metadata = load_panels(args, device)
     metadata["evaluated_run_metadata"] = saved_metadata
     metadata["ic_objective"] = saved_objective
     parser = GFNExpressionParser(saved_fields or [])
+    net_excess_contexts = {
+        split: build_net_excess_context(panel, args.cycle)
+        for split, panel in panels.items()
+    }
     target_values = {
         split: target.evaluate(panel) for split, panel in panels.items()
     }
@@ -100,7 +109,8 @@ def evaluate(args: argparse.Namespace) -> dict:
                 "weight": float(weight),
             }
             for split, panel in panels.items():
-                value = AlphaPoolGFN._normalize_by_day(expression.evaluate(panel))
+                raw_value = expression.evaluate(panel)
+                value = AlphaPoolGFN._normalize_by_day(raw_value)
                 target_value = target_values[split]
                 row[f"{split}_ic"] = float(
                     batch_pearsonr(value, target_value).mean().item()
@@ -108,16 +118,31 @@ def evaluate(args: argparse.Namespace) -> dict:
                 row[f"{split}_rank_ic"] = float(
                     safe_batch_spearmanr(value, target_value).mean().item()
                 )
+                net_stats = net_excess_contexts[split].score(raw_value)
+                for metric in (
+                    "gross_excess",
+                    "turnover",
+                    "annual_cost",
+                    "net_excess",
+                    "periods",
+                ):
+                    row[f"{split}_{metric}"] = net_stats.get(metric)
                 ensemble_values[split] = ensemble_values[split] + value * float(weight)
                 del value
             rows.append(row)
 
-    ensemble: dict[str, dict[str, float]] = {}
+    ensemble: dict[str, dict[str, float | int | None]] = {}
     for split, value in ensemble_values.items():
         target_value = target_values[split]
+        net_stats = net_excess_contexts[split].score(value)
         ensemble[split] = {
             "ic": float(batch_pearsonr(value, target_value).mean().item()),
             "rank_ic": float(safe_batch_spearmanr(value, target_value).mean().item()),
+            "gross_excess": net_stats.get("gross_excess"),
+            "turnover": net_stats.get("turnover"),
+            "annual_cost": net_stats.get("annual_cost"),
+            "net_excess": net_stats.get("net_excess"),
+            "periods": net_stats.get("periods"),
         }
 
     report_output.mkdir(parents=True, exist_ok=True)
@@ -130,6 +155,21 @@ def evaluate(args: argparse.Namespace) -> dict:
         "valid_rank_ic",
         "test_ic",
         "test_rank_ic",
+        "train_gross_excess",
+        "train_turnover",
+        "train_annual_cost",
+        "train_net_excess",
+        "train_periods",
+        "valid_gross_excess",
+        "valid_turnover",
+        "valid_annual_cost",
+        "valid_net_excess",
+        "valid_periods",
+        "test_gross_excess",
+        "test_turnover",
+        "test_annual_cost",
+        "test_net_excess",
+        "test_periods",
         "formula",
     ]
     with (report_output / "factor_metrics.csv").open(
@@ -181,6 +221,7 @@ def main() -> int:
                         "train_rank_ic",
                         "valid_rank_ic",
                         "test_rank_ic",
+                        "test_net_excess",
                         "formula",
                     ]
                 },

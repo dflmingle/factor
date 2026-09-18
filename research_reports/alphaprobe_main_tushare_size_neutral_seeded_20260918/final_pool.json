@@ -1,0 +1,680 @@
+{
+  "capacity": 20,
+  "size": 20,
+  "factors": [
+    {
+      "expression": "TsRank($close,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close within a 20-day window",
+      "ic": 0.01805824413895607,
+      "icir": 0.18249913053237707,
+      "rank": -0.13061436193051587,
+      "net_excess": -0.27080652206172684,
+      "size_corr": 0.15258266031742096,
+      "node": {
+        "expression": "TsRank($close,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close within a 20-day window",
+        "depth": 0,
+        "ic": 0.01805824413895607,
+        "icir": 0.18249913053237707,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank($volume,20)",
+          "TsRank($open,20)"
+        ]
+      }
+    },
+    {
+      "expression": "Div(TsMean($volume,20),Add($volume,1e-06))",
+      "topic": "volume movements",
+      "description": "recent average volume relative to current volume",
+      "ic": 0.0011082026176154613,
+      "icir": 0.03309731599518463,
+      "rank": -0.14690718811409081,
+      "net_excess": -0.25058615396643336,
+      "size_corr": 0.09472063183784485,
+      "node": {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "length": 7,
+        "tokens": [
+          "OP:Div",
+          "OP:TsMean",
+          "DT:20",
+          "FEATURE:VOLUME",
+          "OP:Add",
+          "FEATURE:VOLUME",
+          "CONST:1e-06"
+        ],
+        "topic": "volume movements",
+        "description": "recent average volume relative to current volume",
+        "depth": 0,
+        "ic": 0.0011082026176154613,
+        "icir": 0.03309731599518463,
+        "times": 3,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))"
+        ]
+      }
+    },
+    {
+      "expression": "Div(Div($amount,$volume),$high)",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high",
+      "ic": 0.009873087517917156,
+      "icir": 0.17981135498507772,
+      "rank": 0.08890873641999052,
+      "net_excess": 0.05858500048820287,
+      "size_corr": 0.20077556371688843,
+      "node": {
+        "expression": "Div(Div($amount,$volume),$high)",
+        "length": 5,
+        "tokens": [
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high",
+        "depth": 0,
+        "ic": 0.009873087517917156,
+        "icir": 0.17981135498507772,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Div(Rank(Div($amount,$volume)), Rank($high))",
+          "Div(Div($amount, TsSum($volume, 2)), $high)",
+          "TsPctChange(Div(Div($amount,$volume), $high), 2)",
+          "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank($volume,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of volume within a 20-day window",
+      "ic": 0.013272221200168133,
+      "icir": 0.19049832185622614,
+      "rank": -0.13552154805552719,
+      "net_excess": -0.27561265951052105,
+      "size_corr": 0.08643481880426407,
+      "node": {
+        "expression": "TsRank($volume,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of volume within a 20-day window",
+        "depth": 1,
+        "ic": 0.013272221200168133,
+        "icir": 0.19049832185622614,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank($amount,20)"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank($open,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of open price within a 20-day window",
+      "ic": 0.015614508651196957,
+      "icir": 0.1629738271014303,
+      "rank": -0.13170628557367972,
+      "net_excess": -0.23546456365487348,
+      "size_corr": 0.15150785446166992,
+      "node": {
+        "expression": "TsRank($open,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:OPEN"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of open price within a 20-day window",
+        "depth": 1,
+        "ic": 0.015614508651196957,
+        "icir": 0.1629738271014303,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(Greater($amount,TsMean($volume,10)),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of amount greater than 10-day mean of volume within a 20-day window",
+      "ic": 0.015205370262265205,
+      "icir": 0.23136893714194254,
+      "rank": -0.1257116476034159,
+      "net_excess": -0.1733317748474748,
+      "size_corr": 0.08257409185171127,
+      "node": {
+        "expression": "TsRank(Greater($amount, TsMean($volume, 10)), 20)",
+        "length": 7,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Greater",
+          "FIELD:amount",
+          "OP:TsMean",
+          "DT:10",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of amount greater than 10-day mean of volume within a 20-day window",
+        "depth": 3,
+        "ic": 0.015205370262265205,
+        "icir": 0.23136893714194254,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Sub(Div(Div($amount,$volume),$high),TsMean($high,2))",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high minus the 2-period mean of the daily high",
+      "ic": 0.024308985099196434,
+      "icir": 0.3021660908686681,
+      "rank": 0.0732225662260084,
+      "net_excess": 0.03384473406525508,
+      "size_corr": 0.22936594486236572,
+      "node": {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+        "length": 9,
+        "tokens": [
+          "OP:Sub",
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH",
+          "OP:TsMean",
+          "DT:2",
+          "FEATURE:HIGH"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high minus the 2-period mean of the daily high",
+        "depth": 1,
+        "ic": 0.024308985099196434,
+        "icir": 0.3021660908686681,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))"
+        ]
+      }
+    },
+    {
+      "expression": "Div(Rank(Div($amount,$volume)),Rank($high))",
+      "topic": "intraday price-volume",
+      "description": "rank of volume-weighted average price relative to the rank of the daily high",
+      "ic": 0.010752932168543339,
+      "icir": 0.14796884369602098,
+      "rank": 0.142350917352071,
+      "net_excess": 0.13640101549274303,
+      "size_corr": 0.23332422971725464,
+      "node": {
+        "expression": "Div(Rank(Div($amount,$volume)), Rank($high))",
+        "length": 7,
+        "tokens": [
+          "OP:Div",
+          "OP:Rank",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "OP:Rank",
+          "FEATURE:HIGH"
+        ],
+        "topic": "intraday price-volume",
+        "description": "rank of volume-weighted average price relative to the rank of the daily high",
+        "depth": 1,
+        "ic": 0.010752932168543339,
+        "icir": 0.14796884369602098,
+        "times": 2,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Sub(Div(Div($amount,$volume),$high),TsPctChange($high,2))",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high",
+      "ic": 0.018232230097055435,
+      "icir": 0.22428109839395288,
+      "rank": -0.11377340602749397,
+      "net_excess": -0.1375934233080851,
+      "size_corr": 0.10294374078512192,
+      "node": {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+        "length": 9,
+        "tokens": [
+          "OP:Sub",
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH",
+          "OP:TsPctChange",
+          "DT:2",
+          "FEATURE:HIGH"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high",
+        "depth": 2,
+        "ic": 0.018232230097055435,
+        "icir": 0.22428109839395288,
+        "times": 3,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))",
+          "Sub(Div(Div($amount,$volume), $high), TsPctChange($low, 2))",
+          "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))"
+        ]
+      }
+    },
+    {
+      "expression": "Div(Div($amount,TsSum($volume,2)),$high)",
+      "topic": "intraday price-volume",
+      "description": "rolling 2-period volume-sum normalized volume-weighted average price relative to daily high",
+      "ic": 0.0033600626047700644,
+      "icir": 0.06152075918015895,
+      "rank": -0.1010737245187162,
+      "net_excess": -0.08599370687367164,
+      "size_corr": 0.07748162001371384,
+      "node": {
+        "expression": "Div(Div($amount, TsSum($volume, 2)), $high)",
+        "length": 7,
+        "tokens": [
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "OP:TsSum",
+          "DT:2",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH"
+        ],
+        "topic": "intraday price-volume",
+        "description": "rolling 2-period volume-sum normalized volume-weighted average price relative to daily high",
+        "depth": 1,
+        "ic": 0.0033600626047700644,
+        "icir": 0.06152075918015895,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Sub(Div(Div($amount,$volume),$high),TsPctChange($close,2))",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily close",
+      "ic": 0.01660372130572796,
+      "icir": 0.18727149167491555,
+      "rank": -0.10600437854536988,
+      "net_excess": -0.11488939387267583,
+      "size_corr": 0.12405911087989807,
+      "node": {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+        "length": 9,
+        "tokens": [
+          "OP:Sub",
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH",
+          "OP:TsPctChange",
+          "DT:2",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily close",
+        "depth": 3,
+        "ic": 0.01660372130572796,
+        "icir": 0.18727149167491555,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))"
+        ]
+      }
+    },
+    {
+      "expression": "Div(TsMean($volume,20),Add(Add($volume,1e-06),TsMean($volume,20)))",
+      "topic": "volume movements",
+      "description": "recent average volume relative to current volume with a small increment and recent average volume",
+      "ic": 0.009737800806760788,
+      "icir": 0.18699573407276773,
+      "rank": -0.1382775899249455,
+      "net_excess": -0.25058615396643336,
+      "size_corr": 0.09472064673900604,
+      "node": {
+        "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+        "length": 11,
+        "tokens": [
+          "OP:Div",
+          "OP:TsMean",
+          "DT:20",
+          "FEATURE:VOLUME",
+          "OP:Add",
+          "OP:Add",
+          "FEATURE:VOLUME",
+          "CONST:1e-06",
+          "OP:TsMean",
+          "DT:20",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "volume movements",
+        "description": "recent average volume relative to current volume with a small increment and recent average volume",
+        "depth": 1,
+        "ic": 0.009737800806760788,
+        "icir": 0.18699573407276773,
+        "times": 2,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsMean($volume,20)))"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank($amount,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of amount within a 20-day window",
+      "ic": 0.013795683160424232,
+      "icir": 0.19944993741952005,
+      "rank": -0.1347323671200519,
+      "net_excess": -0.26561380187077066,
+      "size_corr": 0.09036365151405334,
+      "node": {
+        "expression": "TsRank($amount,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FIELD:amount"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of amount within a 20-day window",
+        "depth": 2,
+        "ic": 0.013795683160424232,
+        "icir": 0.19944993741952005,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank(Greater($amount, TsMean($volume, 10)), 20)",
+          "TsRank(SLog1p(TsSum($amount, 15)), 20)",
+          "TsRank(Mul($amount, TsPctChange($close, 5)), 20)",
+          "TsRank(Add($amount, TsDelta($volume, 10)), 20)"
+        ]
+      }
+    },
+    {
+      "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,1e-06),TsPctChange($volume,20)),TsMean($volume,20)))",
+      "topic": "volume movements",
+      "description": "recent average volume relative to current volume with a small increment, percentage change of volume, and recent average volume",
+      "ic": 0.018605085089802742,
+      "icir": 0.26403869125279716,
+      "rank": -0.1293583170303695,
+      "net_excess": -0.24928449787832288,
+      "size_corr": 0.09387572109699249,
+      "node": {
+        "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsMean($volume,20)))",
+        "length": 15,
+        "tokens": [
+          "OP:Div",
+          "OP:TsMean",
+          "DT:20",
+          "FEATURE:VOLUME",
+          "OP:Add",
+          "OP:Add",
+          "OP:Add",
+          "FEATURE:VOLUME",
+          "CONST:1e-06",
+          "OP:TsPctChange",
+          "DT:20",
+          "FEATURE:VOLUME",
+          "OP:TsMean",
+          "DT:20",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "volume movements",
+        "description": "recent average volume relative to current volume with a small increment, percentage change of volume, and recent average volume",
+        "depth": 2,
+        "ic": 0.018605085089802742,
+        "icir": 0.26403869125279716,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Sub(Div(Div($amount,$volume),$high),TsPctChange($open,2))",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily open",
+      "ic": 0.014910027384757996,
+      "icir": 0.17177566756105375,
+      "rank": -0.11341266102770195,
+      "net_excess": -0.127625751280458,
+      "size_corr": 0.1208578497171402,
+      "node": {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))",
+        "length": 9,
+        "tokens": [
+          "OP:Sub",
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH",
+          "OP:TsPctChange",
+          "DT:2",
+          "FEATURE:OPEN"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily open",
+        "depth": 4,
+        "ic": 0.014910027384757996,
+        "icir": 0.17177566756105375,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Sub(Div(Div($amount,$volume),$high),TsPctChange($low,2))",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily low",
+      "ic": 0.015805399045348167,
+      "icir": 0.18314250363478812,
+      "rank": -0.08699212747708888,
+      "net_excess": -0.08390712912474593,
+      "size_corr": 0.12205073982477188,
+      "node": {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($low, 2))",
+        "length": 9,
+        "tokens": [
+          "OP:Sub",
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH",
+          "OP:TsPctChange",
+          "DT:2",
+          "FEATURE:LOW"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily low",
+        "depth": 3,
+        "ic": 0.015805399045348167,
+        "icir": 0.18314250363478812,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Sub(Div(Div($amount,$volume),$high),TsPctChange(TsMean($high,2),2))",
+      "topic": "intraday price-volume",
+      "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the 2-period mean of the daily high",
+      "ic": 0.0200226828455925,
+      "icir": 0.2522042253550914,
+      "rank": -0.079665460794983,
+      "net_excess": -0.0800985975750505,
+      "size_corr": 0.11178231984376907,
+      "node": {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))",
+        "length": 11,
+        "tokens": [
+          "OP:Sub",
+          "OP:Div",
+          "OP:Div",
+          "FIELD:amount",
+          "FEATURE:VOLUME",
+          "FEATURE:HIGH",
+          "OP:TsPctChange",
+          "DT:2",
+          "OP:TsMean",
+          "DT:2",
+          "FEATURE:HIGH"
+        ],
+        "topic": "intraday price-volume",
+        "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the 2-period mean of the daily high",
+        "depth": 3,
+        "ic": 0.0200226828455925,
+        "icir": 0.2522042253550914,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(Mul($amount,TsPctChange($close,5)),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of amount multiplied by 5-day percentage change in close within a 20-day window",
+      "ic": 0.012895911000669003,
+      "icir": 0.14178855673927915,
+      "rank": -0.13663433062076943,
+      "net_excess": -0.3228876095392933,
+      "size_corr": 0.13276048004627228,
+      "node": {
+        "expression": "TsRank(Mul($amount, TsPctChange($close, 5)), 20)",
+        "length": 7,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Mul",
+          "FIELD:amount",
+          "OP:TsPctChange",
+          "DT:5",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of amount multiplied by 5-day percentage change in close within a 20-day window",
+        "depth": 3,
+        "ic": 0.012895911000669003,
+        "icir": 0.14178855673927915,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(Add($amount,TsDelta($volume,10)),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of amount plus 10-day change in volume within a 20-day window",
+      "ic": 0.009586053900420666,
+      "icir": 0.15411029898072245,
+      "rank": -0.13934776118746006,
+      "net_excess": -0.28180677102199975,
+      "size_corr": 0.08284519612789154,
+      "node": {
+        "expression": "TsRank(Add($amount, TsDelta($volume, 10)), 20)",
+        "length": 7,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Add",
+          "FIELD:amount",
+          "OP:TsDelta",
+          "DT:10",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of amount plus 10-day change in volume within a 20-day window",
+        "depth": 3,
+        "ic": 0.009586053900420666,
+        "icir": 0.15411029898072245,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(SLog1p(TsSum($amount,15)),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of log1p of sum of amount within a 15-day window",
+      "ic": 0.017610721290111542,
+      "icir": 0.22404391788873532,
+      "rank": -0.11271035012714328,
+      "net_excess": -0.1328193590827184,
+      "size_corr": 0.0875118225812912,
+      "node": {
+        "expression": "TsRank(SLog1p(TsSum($amount, 15)), 20)",
+        "length": 6,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:SLog1p",
+          "OP:TsSum",
+          "DT:15",
+          "FIELD:amount"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of log1p of sum of amount within a 15-day window",
+        "depth": 3,
+        "ic": 0.017610721290111542,
+        "icir": 0.22404391788873532,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    }
+  ]
+}

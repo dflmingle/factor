@@ -1,0 +1,130 @@
+[
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($volume,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 1
+  },
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($turnover,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of turnover within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 1
+  },
+  {
+    "parent": "Rank($ratio_ep_ttm)",
+    "child": "TsPctChange(Rank($ratio_ep_ttm), 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling percentage change of the cross-sectional rank of the latest earnings-to-price ratio",
+    "trace": "Rank($ratio_ep_ttm) (cross-sectional rank of the latest announced earnings-to-price proxy)",
+    "iteration": 1
+  },
+  {
+    "parent": "Rank($ratio_ep_ttm)",
+    "child": "TsDelta(Rank($ratio_ep_ttm), 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling difference of the cross-sectional rank of the latest earnings-to-price ratio",
+    "trace": "Rank($ratio_ep_ttm) (cross-sectional rank of the latest announced earnings-to-price proxy)",
+    "iteration": 1
+  },
+  {
+    "parent": "Rank($book_to_market_ratio_lf)",
+    "child": "TsPctChange($book_to_market_ratio_lf, 2)",
+    "topic": "fundamental value",
+    "description": "2-period percentage change in the latest book-to-market ratio",
+    "trace": "Rank($book_to_market_ratio_lf) (cross-sectional rank of the latest announced book-to-market proxy)",
+    "iteration": 2
+  },
+  {
+    "parent": "Rank($book_to_market_ratio_lf)",
+    "child": "TsDelta($book_to_market_ratio_lf, 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling difference in the latest book-to-market ratio",
+    "trace": "Rank($book_to_market_ratio_lf) (cross-sectional rank of the latest announced book-to-market proxy)",
+    "iteration": 2
+  },
+  {
+    "parent": "TsDelta(Rank($ratio_ep_ttm), 2)",
+    "child": "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling difference of the cross-sectional rank of the latest book-to-market ratio (LF)",
+    "trace": "Rank($ratio_ep_ttm) (cross-sectional rank of the latest announced earnings-to-price proxy) -> TsDelta(Rank($ratio_ep_ttm), 2) (2-period rolling difference of the cross-sectional rank of the latest earnings-to-price ratio)",
+    "iteration": 2
+  },
+  {
+    "parent": "TsRank($volume,20)",
+    "child": "TsRank(Sub($volume, TsMean($volume, 20)), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of volume minus the rolling mean of volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window)",
+    "iteration": 2
+  },
+  {
+    "parent": "TsRank($turnover,20)",
+    "child": "TsRank(Sub($turnover, TsMean($turnover, 20)), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of turnover minus the rolling mean of turnover over 20 days within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($turnover,20) (time-series position of turnover within a 20-day window)",
+    "iteration": 2
+  },
+  {
+    "parent": "TsDelta(Rank($book_to_market_ratio_lf), 2)",
+    "child": "TsDelta(Rank($ratio_sp_ttm), 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling difference of the cross-sectional rank of the latest price-to-sales ratio (TTM)",
+    "trace": "Rank($ratio_ep_ttm) (cross-sectional rank of the latest announced earnings-to-price proxy) -> TsDelta(Rank($ratio_ep_ttm), 2) (2-period rolling difference of the cross-sectional rank of the latest earnings-to-price ratio) -> TsDelta(Rank($book_to_market_ratio_lf), 2) (2-period rolling difference of the cross-sectional rank of the latest book-to-market ratio (LF))",
+    "iteration": 3
+  },
+  {
+    "parent": "TsPctChange(Rank($ratio_ep_ttm), 2)",
+    "child": "TsPctChange(Rank($book_to_market_ratio_lf), 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling percentage change of the cross-sectional rank of the latest book-to-market ratio (from fundamentals)",
+    "trace": "Rank($ratio_ep_ttm) (cross-sectional rank of the latest announced earnings-to-price proxy) -> TsPctChange(Rank($ratio_ep_ttm), 2) (2-period rolling percentage change of the cross-sectional rank of the latest earnings-to-price ratio)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsDelta($book_to_market_ratio_lf, 2)",
+    "child": "TsDelta(Add($book_to_market_ratio_lf, $oper_main_profit_ttm), 2)",
+    "topic": "fundamental value",
+    "description": "2-period rolling difference in the sum of the latest book-to-market ratio and operating main profit (TTM)",
+    "trace": "Rank($book_to_market_ratio_lf) (cross-sectional rank of the latest announced book-to-market proxy) -> TsDelta($book_to_market_ratio_lf, 2) (2-period rolling difference in the latest book-to-market ratio)",
+    "iteration": 3
+  },
+  {
+    "parent": "Rank($book_to_market_ratio_lf)",
+    "child": "Rank(Div($book_to_market_ratio_lf, $market_cap))",
+    "topic": "fundamental value",
+    "description": "cross-sectional rank of the ratio of the latest book-to-market ratio to market capitalization",
+    "trace": "Rank($book_to_market_ratio_lf) (cross-sectional rank of the latest announced book-to-market proxy)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank(Div($close, $open),20)",
+    "topic": "interday price movements",
+    "description": "time-series position of the ratio of close to open within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank(Add($close, TsMean($close,20)),20)",
+    "topic": "interday price movements",
+    "description": "time-series position of the close plus the 20-day mean of close within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsRank(Add($close, TsMean($close,20)),20)",
+    "child": "TsRank(Add($close, TsCov($close,$volume,20)),20)",
+    "topic": "interday price movements",
+    "description": "time-series position of the close plus the 20-day covariance between close and volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank(Add($close, TsMean($close,20)),20) (time-series position of the close plus the 20-day mean of close within a 20-day window)",
+    "iteration": 4
+  }
+]

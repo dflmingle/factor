@@ -1,0 +1,835 @@
+[
+  {
+    "iteration": 1,
+    "parents": [
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "accepted",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsDelta($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($turnover,20)",
+            "status": "accepted",
+            "ic": 0.011692062951624393,
+            "icir": 0.18182444840992182,
+            "net_excess": -0.27619692941234536
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsPctChange($volume,20),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsWMA($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.001252073678188026,
+            "icir": 0.03914230402353433,
+            "net_excess": -0.2859616390130291
+          },
+          {
+            "expression": "Div(TsStd($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0009210807620547712,
+            "icir": 0.025390355504871478,
+            "net_excess": -0.19416251991513656
+          },
+          {
+            "expression": "Div(TsRank($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0004306163755245507,
+            "icir": 0.009944700085939395,
+            "net_excess": -0.1370843081386122
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank($volume,20)",
+      "TsRank($turnover,20)"
+    ]
+  },
+  {
+    "iteration": 2,
+    "parents": [
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($volume, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($volume, 1.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Inv($volume), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(SLog1p($volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPctChange($volume, 20), 20)",
+            "status": "accepted",
+            "ic": 0.005025500897318125,
+            "icir": 0.0861764707086953,
+            "net_excess": -0.24689541013534752
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($turnover,20)",
+        "retriever_score": -0.13711566386369217,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($turnover, $volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Pow($turnover, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($turnover, $volume), 20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsDelta($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "accepted",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsPctChange($volume,20),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsStd($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0009210807620547712,
+            "icir": 0.025390355504871478,
+            "net_excess": -0.19416251991513656
+          },
+          {
+            "expression": "Div(TsRank($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0004306163755245507,
+            "icir": 0.009944700085939395,
+            "net_excess": -0.1370843081386122
+          },
+          {
+            "expression": "Div(TsWMA($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.001252073678188026,
+            "icir": 0.03914230402353433,
+            "net_excess": -0.2859616390130291
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(TsPctChange($volume, 20), 20)",
+      "TsRank($open,20)"
+    ]
+  },
+  {
+    "iteration": 3,
+    "parents": [
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($turnover,20)",
+        "retriever_score": -0.13711566386369217,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($turnover, $volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Pow($turnover, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Inv($turnover), 20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsDelta($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "TsRank(TsPctChange($volume, 20), 20)",
+        "retriever_score": -0.14283893619015137,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(TsPctChange($close, 20), 20)",
+            "status": "accepted",
+            "ic": 0.007341237273067236,
+            "icir": 0.07929689373002906,
+            "net_excess": -0.2574480873016462
+          },
+          {
+            "expression": "TsRank(TsPctChange($high, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPctChange($low, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPct50($volume, 20), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(TsPctChange($open, 20), 20)",
+            "status": "accepted",
+            "ic": 0.005998377222567797,
+            "icir": 0.06706864115278055,
+            "net_excess": -0.2553467389730558
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($volume, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($volume, 1.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($volume, 0.000001), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Inv($volume), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(SLog1p($volume), 20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsPctChange($volume,20),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsWMA($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.001252073678188026,
+            "icir": 0.03914230402353433,
+            "net_excess": -0.2859616390130291
+          },
+          {
+            "expression": "Div(TsStd($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0009210807620547712,
+            "icir": 0.025390355504871478,
+            "net_excess": -0.19416251991513656
+          },
+          {
+            "expression": "Div(TsRank($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0004306163755245507,
+            "icir": 0.009944700085939395,
+            "net_excess": -0.1370843081386122
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(TsPctChange($close, 20), 20)",
+      "TsRank(TsPctChange($open, 20), 20)"
+    ]
+  },
+  {
+    "iteration": 4,
+    "parents": [
+      {
+        "expression": "TsRank($turnover,20)",
+        "retriever_score": -0.13711566386369217,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($turnover, $volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($turnover, $volume), 20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.001084049348719418,
+            "icir": 0.04474329205886197,
+            "net_excess": -0.2526330630815192
+          },
+          {
+            "expression": "TsRank(Pow($turnover, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($turnover, $close), 20)",
+            "status": "accepted",
+            "ic": 0.003073151921853423,
+            "icir": 0.0503009096189962,
+            "net_excess": -0.28753941654701753
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsDelta($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsDelta($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank($low,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank(TsPctChange($close, 20), 20)",
+        "retriever_score": -0.14092718653714353,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(TsPctChange($open, 20), 20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.005998377222567797,
+            "icir": 0.06706864115278055,
+            "net_excess": -0.2553467389730558
+          },
+          {
+            "expression": "TsRank(TsPctChange($high, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPctChange($low, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPct50(TsPctChange($close, 20)), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(TsPctChange($volume, 20), 20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.005025500897318125,
+            "icir": 0.0861764707086953,
+            "net_excess": -0.24689541013534752
+          }
+        ]
+      },
+      {
+        "expression": "TsRank(TsPctChange($volume, 20), 20)",
+        "retriever_score": -0.14283893619015137,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(TsPctChange($close, 20), 20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.007341237273067236,
+            "icir": 0.07929689373002906,
+            "net_excess": -0.2574480873016462
+          },
+          {
+            "expression": "TsRank(TsPctChange($high, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPctChange($low, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPct50($volume, 20), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(TsPctChange($oper_roe_lyr, 20), 20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(Sub($turnover, $close), 20)"
+    ]
+  },
+  {
+    "iteration": 5,
+    "parents": [
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($open,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsDelta($high,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($low,20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank(TsPctChange($close, 20), 20)",
+        "retriever_score": -0.14092718653714353,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(TsPctChange($open, 20), 20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.005998377222567797,
+            "icir": 0.06706864115278055,
+            "net_excess": -0.2553467389730558
+          },
+          {
+            "expression": "TsRank(TsPctChange($high, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPctChange($low, 20), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(TsPct, 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(TsPctChange($volume, 20), 20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.005025500897318125,
+            "icir": 0.0861764707086953,
+            "net_excess": -0.24689541013534752
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsDelta($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsPctChange($volume,20),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsRank($volume),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsStd($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0009210807620547712,
+            "icir": 0.025390355504871478,
+            "net_excess": -0.19416251991513656
+          },
+          {
+            "expression": "Div(TsWMA($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.001252073678188026,
+            "icir": 0.03914230402353433,
+            "net_excess": -0.2859616390130291
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($volume, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($volume, 1.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($volume, 0.000001), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Inv($volume), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(SLog1p($volume), 20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($turnover,20)",
+        "retriever_score": -0.13711566386369217,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($turnover, $volume), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($turnover, $close), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Pow($turnover, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($turnover, $volume), 20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": []
+  }
+]

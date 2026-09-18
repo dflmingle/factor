@@ -1,0 +1,1201 @@
+[
+  {
+    "iteration": 1,
+    "parents": [
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "accepted",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "accepted",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "Div(Div($amount,$volume),$high)",
+        "retriever_score": 0.08890873641999052,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(Mul(Div($amount,$volume), $high), Add($open, $close))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Div(Div($amount,$volume), $high), 2)",
+            "status": "accepted",
+            "ic": 0.0028281507547944784,
+            "icir": 0.040740592137528155,
+            "net_excess": -0.38080400103346945
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+            "status": "accepted",
+            "ic": 0.024308985099196434,
+            "icir": 0.3021660908686681,
+            "net_excess": 0.03384473406525508
+          },
+          {
+            "expression": "TsWMA(Div(Div($amount,$volume), $high), 2)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(Rank(Div($amount,$volume)), Rank($high))",
+            "status": "accepted",
+            "ic": 0.010752932168543339,
+            "icir": 0.14796884369602098,
+            "net_excess": 0.13640101549274303
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsPctChange($volume,20),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsWMA($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.001252073678188026,
+            "icir": 0.03914230402353433,
+            "net_excess": -0.2859616390130291
+          },
+          {
+            "expression": "Div(TsStd($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0009210807620547712,
+            "icir": 0.025390355504871478,
+            "net_excess": -0.19416251991513656
+          },
+          {
+            "expression": "Div(TsRank($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0004306163755245507,
+            "icir": 0.009944700085939395,
+            "net_excess": -0.1370843081386122
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank($volume,20)",
+      "TsRank($open,20)",
+      "TsPctChange(Div(Div($amount,$volume), $high), 2)",
+      "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+      "Div(Rank(Div($amount,$volume)), Rank($high))"
+    ]
+  },
+  {
+    "iteration": 2,
+    "parents": [
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+        "retriever_score": 0.0732225662260084,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.024308985099196434,
+            "icir": 0.3021660908686681,
+            "net_excess": 0.03384473406525508
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+            "status": "accepted",
+            "ic": 0.018232230097055435,
+            "icir": 0.22428109839395288,
+            "net_excess": -0.1375934233080851
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $low), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsWMA($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsEMA($high, 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank($low,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Div(Rank(Div($amount,$volume)), Rank($high))",
+        "retriever_score": 0.142350917352071,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(Rank(Div($amount,$volume)), Rank($close))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(Rank(Mul($amount, $high)), Rank($volume))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Rank(Add($amount, $volume)), Rank($low))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Rank(Inv(Div($volume, $amount))), Rank($open))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(Rank(SLog1p(Div($amount, $volume))), Rank($high))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Div(Div($amount,$volume),$high)",
+        "retriever_score": 0.08890873641999052,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(Mul(Div($amount,$volume), $high), TsPctChange($close, 1))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Div($amount, TsSum($volume, 2)), $high)",
+            "status": "accepted",
+            "ic": 0.0033600626047700644,
+            "icir": 0.06152075918015895,
+            "net_excess": -0.08599370687367164
+          },
+          {
+            "expression": "Div(Mul(Div($amount, $volume), TsRank($high, 1)), $high)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(Div($amount, TsMean($volume, 1)), TsPctChange($high, 1))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Mul(Div($amount, $volume), TsWMA($high, 2)), $high)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsPctChange($volume,20),Add($volume,0.000001))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsWMA($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.001252073678188026,
+            "icir": 0.03914230402353433,
+            "net_excess": -0.2859616390130291
+          },
+          {
+            "expression": "Div(TsStd($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0009210807620547712,
+            "icir": 0.025390355504871478,
+            "net_excess": -0.19416251991513656
+          },
+          {
+            "expression": "Div(TsRank($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0004306163755245507,
+            "icir": 0.009944700085939395,
+            "net_excess": -0.1370843081386122
+          }
+        ]
+      },
+      {
+        "expression": "TsPctChange(Div(Div($amount,$volume), $high), 2)",
+        "retriever_score": -0.1470241814113332,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsPctChange(Div(Div($amount, $volume), $high), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.0028281507547944784,
+            "icir": 0.040740592137528155,
+            "net_excess": -0.38080400103346945
+          },
+          {
+            "expression": "TsPctChange(Div(Div($amount, $volume), $close), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 6.829051017120946e-06,
+            "icir": 7.594580098731191e-05,
+            "net_excess": -0.40501444149539895
+          },
+          {
+            "expression": "TsPctChange(Div(Div($amount, $volume), Add($high, $low)), 2)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsPctChange(Div(Div($amount, $volume), Mul($high, 0.000001)), 2)",
+            "status": "rejected_parent_rule",
+            "ic": 0.002828150289133191,
+            "icir": 0.040740585429499404,
+            "net_excess": -0.38080400103346945
+          },
+          {
+            "expression": "TsPctChange(Div(Div($amount, $volume), Add($high, $open)), 2)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+      "Div(Div($amount, TsSum($volume, 2)), $high)"
+    ]
+  },
+  {
+    "iteration": 3,
+    "parents": [
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($volume, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($volume, 1.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($volume, 0.000001), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Pow($volume, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Sub($volume, 1.0), 20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+        "retriever_score": -0.11377340602749397,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+            "status": "accepted",
+            "ic": 0.01660372130572796,
+            "icir": 0.18727149167491555,
+            "net_excess": -0.11488939387267583
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $low), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $open), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), TsMean($high, 2)), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), TsWMA($high, 2)), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Div(Rank(Div($amount,$volume)), Rank($high))",
+        "retriever_score": 0.142350917352071,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(Rank(Div($amount,$volume)), Rank($low))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(Rank(Mul($volume, $close)), Rank($high))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Rank(Add($amount, $volume)), Rank($open))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Rank(Inv(Div($amount,$volume))), Rank($high))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0013785968767479062,
+            "icir": 0.014195496615249246,
+            "net_excess": 0.02964789929283809
+          },
+          {
+            "expression": "Div(Rank(SLog1p(Div($amount,$volume))), Rank($low))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+        "retriever_score": 0.0732225662260084,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $low), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsWMA($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsEMA($high, 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "Div(Div($amount,$volume),$high)",
+        "retriever_score": 0.08890873641999052,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(Mul(Div($amount,$volume), $high), TsPctChange($close, 1))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Div($amount, TsSum($volume, 2)), $high)",
+            "status": "rejected_parent_rule",
+            "ic": 0.0033600626047700644,
+            "icir": 0.06152075918015895,
+            "net_excess": -0.08599370687367164
+          },
+          {
+            "expression": "Div(Mul(Div($amount, $volume), TsRank($high, 1)), $high)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(Div($amount, TsStd($volume, 1)), TsMax($high, 1))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Mul(Div($amount, $volume), TsPctChange($high, 1)), $high)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "retriever_score": -0.14690718811409081,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Mul($volume,1.0),0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),0.000001))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),Mul($volume,1.0)))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0011082026176154613,
+            "icir": 0.03309731599518463,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+            "status": "accepted",
+            "ic": 0.009737800806760788,
+            "icir": 0.18699573407276773,
+            "net_excess": -0.25058615396643336
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+      "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))"
+    ]
+  },
+  {
+    "iteration": 4,
+    "parents": [
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank($low,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank($amount,20)",
+            "status": "accepted",
+            "ic": 0.013795683160424232,
+            "icir": 0.19944993741952005,
+            "net_excess": -0.26561380187077066
+          },
+          {
+            "expression": "TsRank($turnover,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+        "retriever_score": -0.1382775899249455,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+            "status": "rejected_parent_rule",
+            "ic": 0.009737800806760788,
+            "icir": 0.18699573407276773,
+            "net_excess": -0.25058615396643336
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Mul($volume,1.0),0.000001),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsStd($volume,20)),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsWMA($volume,20)),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsMean($volume,20)))",
+            "status": "accepted",
+            "ic": 0.018605085089802742,
+            "icir": 0.26403869125279716,
+            "net_excess": -0.24928449787832288
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+        "retriever_score": -0.10600437854536988,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))",
+            "status": "accepted",
+            "ic": 0.014910027384757996,
+            "icir": 0.17177566756105375,
+            "net_excess": -0.127625751280458
+          },
+          {
+            "expression": "Sub(Mul(Div($amount,$volume), 2.0), TsPctChange($close, 2))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $low), TsPctChange($close, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsWMA($close, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsEMA($close, 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+        "retriever_score": 0.0732225662260084,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $low), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsWMA($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsEMA($high, 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+        "retriever_score": -0.11377340602749397,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($low, 2))",
+            "status": "accepted",
+            "ic": 0.015805399045348167,
+            "icir": 0.18314250363478812,
+            "net_excess": -0.08390712912474593
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.014910027384757996,
+            "icir": 0.17177566756105375,
+            "net_excess": -0.127625751280458
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.01660372130572796,
+            "icir": 0.18727149167491555,
+            "net_excess": -0.11488939387267583
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))",
+            "status": "accepted",
+            "ic": 0.0200226828455925,
+            "icir": 0.2522042253550914,
+            "net_excess": -0.0800985975750505
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsWMA($high, 2), 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.13061436193051587,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($open,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.015614508651196957,
+            "icir": 0.1629738271014303,
+            "net_excess": -0.23546456365487348
+          }
+        ]
+      },
+      {
+        "expression": "Div(Div($amount,$volume),$high)",
+        "retriever_score": 0.08890873641999052,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(Mul(Div($amount,$volume), $high), TsPctChange($high, 1))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Div($amount, TsSum($volume, 2)), $high)",
+            "status": "rejected_parent_rule",
+            "ic": 0.0033600626047700644,
+            "icir": 0.06152075918015895,
+            "net_excess": -0.08599370687367164
+          },
+          {
+            "expression": "Div(Mul(Div($amount, $volume), TsRank($high)), $high)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Div($amount, TsStd($volume, 1)), TsPctChange($high, 1))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(Mul(Div($amount, $volume), TsDelta($high, 1)), $high)",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank($amount,20)",
+      "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsMean($volume,20)))",
+      "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))",
+      "Sub(Div(Div($amount,$volume), $high), TsPctChange($low, 2))",
+      "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))"
+    ]
+  },
+  {
+    "iteration": 5,
+    "parents": [
+      {
+        "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsMean($volume,20)))",
+        "retriever_score": -0.1293583170303695,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsPctChange($volume,20)))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsWMA($volume,20)),TsMean($volume,20)))",
+            "status": "rejected_parent_rule",
+            "ic": 0.00911660771816969,
+            "icir": 0.1830122696385575,
+            "net_excess": -0.21899015733836447
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsWMA($volume,20)),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsWMA($volume,20)),TsStd($volume,20)),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsWMA($volume,20)),TsStd($volume,20)),TsRank($volume)))",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))",
+        "retriever_score": -0.079665460794983,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.0200226828455925,
+            "icir": 0.2522042253550914,
+            "net_excess": -0.0800985975750505
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 1), 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $low), TsPctChange(TsMean($high, 2), 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($low, 2), 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($close, 2), 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($amount,20)",
+        "retriever_score": -0.1347323671200519,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($amount, TsPctChange($close, 5)), 20)",
+            "status": "accepted",
+            "ic": 0.012895911000669003,
+            "icir": 0.14178855673927915,
+            "net_excess": -0.3228876095392933
+          },
+          {
+            "expression": "TsRank(Add($amount, TsDelta($volume, 10)), 20)",
+            "status": "accepted",
+            "ic": 0.009586053900420666,
+            "icir": 0.15411029898072245,
+            "net_excess": -0.28180677102199975
+          },
+          {
+            "expression": "TsRank(Inv(TsStd($amount, 20)), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(SLog1p(TsSum($amount, 15)), 20)",
+            "status": "accepted",
+            "ic": 0.017610721290111542,
+            "icir": 0.22404391788873532,
+            "net_excess": -0.1328193590827184
+          },
+          {
+            "expression": "TsRank(Greater($amount, TsMean($volume, 10)), 20)",
+            "status": "accepted",
+            "ic": 0.015205370262265205,
+            "icir": 0.23136893714194254,
+            "net_excess": -0.1733317748474748
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($open,20)",
+        "retriever_score": -0.13170628557367972,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank($close,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.01805824413895607,
+            "icir": 0.18249913053237707,
+            "net_excess": -0.27080652206172684
+          },
+          {
+            "expression": "TsPctChange($close,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($volume,20)",
+            "status": "rejected_parent_rule",
+            "ic": 0.013272221200168133,
+            "icir": 0.19049832185622614,
+            "net_excess": -0.27561265951052105
+          },
+          {
+            "expression": "TsPctChange($volume,20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank($high,20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+        "retriever_score": 0.0732225662260084,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsPctChange($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $low), TsMean($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsWMA($high, 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount, $volume), $high), TsEMA($high, 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+        "retriever_score": -0.1382775899249455,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Div(TsMean($volume,20),Add(Mul($volume,1.0),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add($volume,0.0),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(Mul($volume,2.0),0.000001),TsMean($volume,20)))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(TsMean($volume,20),0.000001),TsMean($volume,20)))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "Div(TsMean($volume,20),Add(Add(TsMean($volume,20),TsMean($volume,20)),0.000001))",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "TsRank($volume,20)",
+        "retriever_score": -0.13552154805552719,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($volume, 2.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Add($volume, 1.0), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Div($volume, 0.000001), 20)",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "TsRank(Inv($volume), 20)",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(SLog1p($volume), 20)",
+            "status": "pool_rejected"
+          }
+        ]
+      },
+      {
+        "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+        "retriever_score": -0.11377340602749397,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($low, 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.015805399045348167,
+            "icir": 0.18314250363478812,
+            "net_excess": -0.08390712912474593
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.01660372130572796,
+            "icir": 0.18727149167491555,
+            "net_excess": -0.11488939387267583
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))",
+            "status": "rejected_parent_rule",
+            "ic": 0.014910027384757996,
+            "icir": 0.17177566756105375,
+            "net_excess": -0.127625751280458
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsWMA($high, 2), 2))",
+            "status": "pool_rejected"
+          },
+          {
+            "expression": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsEMA($high, 2), 2))",
+            "status": "pool_rejected"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(Mul($amount, TsPctChange($close, 5)), 20)",
+      "TsRank(Add($amount, TsDelta($volume, 10)), 20)",
+      "TsRank(SLog1p(TsSum($amount, 15)), 20)",
+      "TsRank(Greater($amount, TsMean($volume, 10)), 20)"
+    ]
+  }
+]

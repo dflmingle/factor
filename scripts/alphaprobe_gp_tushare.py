@@ -42,12 +42,18 @@ from alphagen.utils.pytorch_utils import normalize_by_day  # noqa: E402
 from alphagen_generic import features as generic_features  # noqa: E402
 from alphagen_generic import operators as generic_operators  # noqa: E402
 from full_a_local_data import load_full_a_data  # noqa: E402
+from factor_formula_dedupe import (  # noqa: E402
+    DEFAULT_OUTPUT as DEFAULT_FORMULA_REGISTRY,
+    load_signatures as load_formula_signatures,
+    normalize_formula,
+)
 from pandaai_fields_local import (  # noqa: E402
     PandaAIFieldStore,
     PRICE_VOLUME_FIELDS,
     build_pandaai_namespace,
     formula_field_name_set,
 )
+from search_field_policy import resolve_terminal_fields  # noqa: E402
 from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_DATA_START,
     ALIGNMENT_CORRELATION_METHOD,
@@ -98,6 +104,7 @@ ALIGNED_LABEL_OFFSET = ALIGNMENT_LABEL_OFFSET
 ALIGNED_GROUPS = ALIGNMENT_GROUPS
 ALIGNED_ROUND_TRIP_COST = ALIGNMENT_ROUND_TRIP_COST
 ALIGNED_CANDIDATE_RANK_CORR_THRESHOLD = 0.999
+ALIGNED_DRAWDOWN_CANDIDATE_RANK_CORR_THRESHOLD = 0.90
 ALIGNED_MIN_PERIODS = 200
 ALIGNED_ABSOLUTE_DD_TARGET = 0.30
 ALIGNED_EXCESS_DD_TARGET = 0.15
@@ -595,7 +602,12 @@ def _max_drawdown_from_returns(values: torch.Tensor) -> float | None:
         return None
     if not bool(torch.isfinite(values).all().item()):
         return None
-    equity = torch.cumprod(1.0 + values, dim=0)
+    equity = torch.cat(
+        [
+            torch.ones(1, dtype=values.dtype, device=values.device),
+            torch.cumprod(1.0 + values, dim=0),
+        ]
+    )
     if not bool(torch.isfinite(equity).all().item()) or bool((equity <= 0).any().item()):
         return None
     peaks = torch.cummax(equity, dim=0).values
@@ -620,8 +632,18 @@ def _relative_max_drawdown(
         torch.isfinite(benchmark_returns).all().item()
     ):
         return None
-    portfolio_equity = torch.cumprod(1.0 + portfolio_returns, dim=0)
-    benchmark_equity = torch.cumprod(1.0 + benchmark_returns, dim=0)
+    portfolio_equity = torch.cat(
+        [
+            torch.ones(1, dtype=portfolio_returns.dtype, device=portfolio_returns.device),
+            torch.cumprod(1.0 + portfolio_returns, dim=0),
+        ]
+    )
+    benchmark_equity = torch.cat(
+        [
+            torch.ones(1, dtype=benchmark_returns.dtype, device=benchmark_returns.device),
+            torch.cumprod(1.0 + benchmark_returns, dim=0),
+        ]
+    )
     if not bool(torch.isfinite(portfolio_equity).all().item()) or not bool(
         torch.isfinite(benchmark_equity).all().item()
     ):
@@ -780,7 +802,7 @@ class AlignedNetExcessContext:
             k=max_selected,
             dim=1,
             largest=True,
-            sorted=False,
+            sorted=True,
         ).indices
         rank_positions = torch.arange(max_selected, device=factor.device).unsqueeze(0)
         selected_rank_mask = rank_positions < selected_counts.unsqueeze(1)
@@ -920,6 +942,10 @@ def expression_namespace() -> dict[str, object]:
         "TS_DIV": "TsDiv",
         "WMA": "TsWMA",
         "EMA": "TsEMA",
+        "COV": "TsCov",
+        "CORR": "TsCorr",
+        "COVARIANCE": "TsCov",
+        "CORRELATION": "TsCorr",
         "TS_COV": "TsCov",
         "TS_CORR": "TsCorr",
         "POWER": "Pow",
@@ -938,30 +964,29 @@ def expression_namespace() -> dict[str, object]:
 def local_terminals(
     data: TushareStockData,
     *,
-    mode: str = "all",
+    mode: str = "verified",
     field_file: Path | None = None,
+    allow_unverified_fields: bool = False,
+    allow_blocked_fields: bool = False,
 ) -> list[str]:
-    """Return the requested locally resolvable PandaAI search terminals."""
-    active = set(data.pandaai_field_store.active_search_fields(include_period_variants=True))
-    if field_file is not None:
-        requested: set[str] = set()
-        for raw_line in field_file.read_text(encoding="utf-8").splitlines():
-            line = raw_line.split("#", 1)[0].strip().lower()
-            if not line:
-                continue
-            requested.update(item for item in line.replace(",", " ").split() if item)
-    elif mode == "price_volume":
-        requested = set(PRICE_VOLUME_FIELDS)
-    elif mode == "base":
-        requested = set(formula_field_name_set(include_period_variants=False))
-    elif mode == "all":
-        requested = active
-    else:
-        raise ValueError(f"Unsupported search field mode: {mode}")
-    terminals = sorted(active.intersection(requested))
-    if terminals:
-        return terminals
-    return ["open_", "close", "high", "low", "volume"]
+    """Return locally resolvable terminals within the selected search boundary.
+
+    The default boundary is the field set that passed the current alignment
+    quality gate.  Broader field ranges are diagnostic-only and must be
+    explicitly enabled so a local proxy cannot be mistaken for a platform
+    result.
+    """
+    return resolve_terminal_fields(
+        active_fields=data.pandaai_field_store.active_search_fields(
+            include_period_variants=True
+        ),
+        mode=mode,
+        field_file=field_file,
+        price_volume_fields=PRICE_VOLUME_FIELDS,
+        formula_fields=formula_field_name_set(include_period_variants=False),
+        allow_unverified_fields=allow_unverified_fields,
+        allow_blocked_fields=allow_blocked_fields,
+    )
 
 
 def write_field_coverage(
@@ -1098,8 +1123,10 @@ def expression_to_panda_formula(formula: str) -> str:
         "TsEMA": "EMA",
     }
     pair_rolling = {
-        "TsCov": "TS_COV",
-        "TsCorr": "TS_CORR",
+        # PandaAI's documented formula-mode spellings are COV/CORR.
+        # AlphaPROBE keeps the Ts* names internally.
+        "TsCov": "COV",
+        "TsCorr": "CORR",
     }
 
     def render(node: ast.AST) -> str:
@@ -1352,10 +1379,30 @@ def run_aligned_net_excess(
         data,
         mode=args.search_field_mode,
         field_file=args.search_field_file,
+        allow_unverified_fields=args.allow_unverified_fields,
+        allow_blocked_fields=args.allow_blocked_fields,
     )
     print(
         f"pandaai_fields base={field_coverage['platform_base_fields']} "
         f"formula_names={field_coverage['formula_names']} active={len(terminals)}",
+        flush=True,
+    )
+    search_leaf_names = {str(field).strip().lower() for field in terminals}
+
+    novelty_registry = args.novelty_registry.expanduser().resolve()
+    if novelty_registry.exists():
+        existing_formula_signatures = load_formula_signatures(novelty_registry)
+    elif args.allow_existing_formulas:
+        existing_formula_signatures = set()
+    else:
+        raise FileNotFoundError(
+            "The historical formula registry is required for a final novel-factor search: "
+            f"{novelty_registry}. Build it with scripts/factor_formula_dedupe.py first, "
+            "or use --allow-existing-formulas only for a diagnostic run."
+        )
+    print(
+        f"novelty_registry={novelty_registry} existing_signatures={len(existing_formula_signatures)} "
+        f"allow_existing={args.allow_existing_formulas}",
         flush=True,
     )
 
@@ -1408,6 +1455,14 @@ def run_aligned_net_excess(
         try:
             expression = evaluate_formula(formula, namespace)
             if not bool(getattr(expression, "is_featured", False)):
+                score = -1.0
+            elif len(
+                {
+                    token.lower()
+                    for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", formula)
+                    if token.lower() in search_leaf_names
+                }
+            ) < args.minimum_distinct_fields:
                 score = -1.0
             else:
                 with torch.no_grad():
@@ -1666,13 +1721,21 @@ def run_aligned_net_excess(
     selected: list[dict[str, Any]] = []
     selected_signal_factors: list[torch.Tensor] = []
     seen_formulas: set[str] = set()
+    seen_signatures: set[str] = set()
+    novelty_excluded = 0
     signal_factor_cache: dict[str, torch.Tensor] = {}
+    selection_rank_corr_threshold = (
+        args.aligned_drawdown_candidate_rank_corr_threshold
+        if risk_control
+        else args.aligned_candidate_rank_corr_threshold
+    )
 
     def try_select(
         item: dict[str, Any],
         selection_role: str,
         is_pareto_frontier: bool,
     ) -> bool:
+        nonlocal novelty_excluded
         raw_formula = str(item["formula"])
         if risk_control and not risk_eligible(item):
             return False
@@ -1688,6 +1751,13 @@ def run_aligned_net_excess(
             panda_formula = raw_formula
         if panda_formula in seen_formulas:
             return False
+        formula_signature = normalize_formula(panda_formula)
+        if formula_signature is not None:
+            if formula_signature in existing_formula_signatures and not args.allow_existing_formulas:
+                novelty_excluded += 1
+                return False
+            if formula_signature in seen_signatures:
+                return False
 
         try:
             signal_factor = signal_factor_cache.get(raw_formula)
@@ -1711,12 +1781,15 @@ def run_aligned_net_excess(
         max_rank_correlation = max(finite_correlations) if finite_correlations else None
         if (
             max_rank_correlation is not None
-            and max_rank_correlation >= args.aligned_candidate_rank_corr_threshold
+            and max_rank_correlation >= selection_rank_corr_threshold
         ):
             return False
         seen_formulas.add(panda_formula)
+        if formula_signature is not None:
+            seen_signatures.add(formula_signature)
         selected_item = dict(item)
         selected_item["panda_formula"] = panda_formula
+        selected_item["formula_signature"] = formula_signature
         selected_item["max_rank_corr_to_selected"] = max_rank_correlation
         selected_item["selection_role"] = selection_role
         selected_item["pareto_frontier"] = bool(is_pareto_frontier)
@@ -1724,12 +1797,23 @@ def run_aligned_net_excess(
         selected_signal_factors.append(signal_factor)
         return True
 
-    for selection_role, source, is_pareto_frontier in candidate_sources:
-        for item in source:
-            try_select(item, selection_role, is_pareto_frontier)
+    # Interleave the role-specific sources so one return-heavy branch cannot
+    # consume all slots before balance and drawdown-priority candidates run.
+    source_positions = [0 for _ in candidate_sources]
+    while len(selected) < args.output_candidates:
+        selected_this_round = False
+        for source_index, (selection_role, source, is_pareto_frontier) in enumerate(
+            candidate_sources
+        ):
+            while source_positions[source_index] < len(source):
+                item = source[source_positions[source_index]]
+                source_positions[source_index] += 1
+                if try_select(item, selection_role, is_pareto_frontier):
+                    selected_this_round = True
+                    break
             if len(selected) >= args.output_candidates:
                 break
-        if len(selected) >= args.output_candidates:
+        if not selected_this_round:
             break
 
     candidate_path = PROJECT_ROOT / f"{run_output.name}-candidates.txt"
@@ -1786,8 +1870,18 @@ def run_aligned_net_excess(
             "aligned_min_periods": args.aligned_min_periods,
             "search_field_mode": args.search_field_mode,
             "search_field_file": args.search_field_file,
+            "allow_unverified_fields": args.allow_unverified_fields,
+            "allow_blocked_fields": args.allow_blocked_fields,
+            "search_fields": terminals,
+            "search_field_count": active_terminal_count,
+            "minimum_distinct_fields": args.minimum_distinct_fields,
+            "novelty_registry": novelty_registry,
+            "existing_formula_signatures": len(existing_formula_signatures),
+            "novelty_excluded_candidates": novelty_excluded,
+            "alignment_rule_version": ALIGNMENT_RULE_VERSION,
             "output_candidates": args.output_candidates,
             "candidate_rank_corr_threshold": args.aligned_candidate_rank_corr_threshold,
+            "drawdown_candidate_rank_corr_threshold": args.aligned_drawdown_candidate_rank_corr_threshold,
             "aligned_absolute_dd_target": args.aligned_absolute_dd_target,
             "aligned_excess_dd_target": args.aligned_excess_dd_target,
             "aligned_absolute_dd_weight": args.aligned_absolute_dd_weight,
@@ -1804,6 +1898,7 @@ def run_aligned_net_excess(
             "absolute_dd_ceiling": args.aligned_absolute_dd_ceiling,
             "excess_dd_ceiling": args.aligned_excess_dd_ceiling,
             "excess_dd_definition": "drawdown of portfolio equity relative to factor_valid benchmark equity; local proxy",
+            "candidate_rank_corr_threshold": selection_rank_corr_threshold,
         },
         "dataset": data.summary(),
         "field_coverage": {
@@ -1819,6 +1914,15 @@ def run_aligned_net_excess(
             "barra_fields_excluded": field_coverage["barra_fields_excluded"],
             "unsupported_base_fields": field_coverage["unsupported_base_fields"],
             "base_status_counts": field_coverage["base_status_counts"],
+        },
+        "search": {
+            "mode": args.search_field_mode,
+            "field_file": args.search_field_file,
+            "allow_unverified_fields": args.allow_unverified_fields,
+            "allow_blocked_fields": args.allow_blocked_fields,
+            "fields": terminals,
+            "field_count": active_terminal_count,
+            "alignment_rule_version": ALIGNMENT_RULE_VERSION,
         },
         "best_formula": best_formula,
         "best_panda_formula": best_panda_formula,
@@ -1892,7 +1996,9 @@ def run_aligned_net_excess(
         *drawdown_lines,
         f"- GP expressions scored: `{len(cache)}`; invalid: `{len(cache_errors)}`",
         f"- GP search terminals: `{len(terminals)}` via `{args.search_field_mode}`",
-        f"- Candidate deduplication: positive signal-panel Rank correlation `< {args.aligned_candidate_rank_corr_threshold:.3f}`",
+        f"- Minimum distinct search fields per expression: `{args.minimum_distinct_fields}`",
+        f"- Candidate deduplication: positive signal-panel Rank correlation `< {selection_rank_corr_threshold:.3f}`",
+        f"- Historical formula exclusion: `{novelty_excluded}` candidates matched `{novelty_registry.name}`; selected formulas are required to have a new normalized signature.",
         "",
         table_header,
         table_divider,
@@ -2003,15 +2109,36 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--n-jobs", type=int, default=1)
     parser.add_argument(
         "--search-field-mode",
-        choices=["all", "base", "price_volume"],
-        default="all",
-        help="terminal subset used by GP; coverage reporting still includes all fields",
+        choices=["verified", "all", "base", "price_volume"],
+        default="verified",
+        help="terminal subset used by GP; verified is the aligned default",
     )
     parser.add_argument(
         "--search-field-file",
         type=Path,
         default=None,
         help="optional newline/comma-separated terminal list overriding search-field-mode",
+    )
+    parser.add_argument(
+        "--allow-unverified-fields",
+        action="store_true",
+        help="allow all/base/custom fields outside the aligned verified set (diagnostic only)",
+    )
+    parser.add_argument(
+        "--allow-blocked-fields",
+        action="store_true",
+        help="allow fields blocked by the alignment failure registry (diagnostic only)",
+    )
+    parser.add_argument(
+        "--novelty-registry",
+        type=Path,
+        default=DEFAULT_FORMULA_REGISTRY,
+        help="historical normalized formula registry used to exclude existing factors",
+    )
+    parser.add_argument(
+        "--allow-existing-formulas",
+        action="store_true",
+        help="diagnostic mode: do not exclude formulas found in the historical registry",
     )
     parser.add_argument("--aligned-start", default=date_text(ALIGNED_START).replace("-", ""))
     parser.add_argument("--aligned-end", default=date_text(ALIGNED_END).replace("-", ""))
@@ -2028,10 +2155,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-candidates", type=int, default=3)
     parser.add_argument(
+        "--minimum-distinct-fields",
+        type=int,
+        default=1,
+        help="minimum number of distinct named search fields used by each expression",
+    )
+    parser.add_argument(
         "--aligned-candidate-rank-corr-threshold",
         type=float,
         default=ALIGNED_CANDIDATE_RANK_CORR_THRESHOLD,
         help="skip later candidates whose positive signal-panel Rank correlation reaches this threshold",
+    )
+    parser.add_argument(
+        "--aligned-drawdown-candidate-rank-corr-threshold",
+        type=float,
+        default=ALIGNED_DRAWDOWN_CANDIDATE_RANK_CORR_THRESHOLD,
+        help="risk-mode candidate Rank correlation threshold used to keep selected roles distinct",
     )
     parser.add_argument(
         "--aligned-round-trip-cost",
@@ -2103,8 +2242,14 @@ def main() -> int:
         raise ValueError("--tournament-size must be at least 1")
     if args.output_candidates < 1:
         raise ValueError("--output-candidates must be at least 1")
+    if args.minimum_distinct_fields < 1:
+        raise ValueError("--minimum-distinct-fields must be at least 1")
     if not 0.0 <= args.aligned_candidate_rank_corr_threshold <= 1.0:
         raise ValueError("--aligned-candidate-rank-corr-threshold must be between 0 and 1")
+    if not 0.0 <= args.aligned_drawdown_candidate_rank_corr_threshold <= 1.0:
+        raise ValueError(
+            "--aligned-drawdown-candidate-rank-corr-threshold must be between 0 and 1"
+        )
     pool_sizes = parse_pool_sizes(args.pool_sizes)
     if args.objective in {"aligned_net_excess", "aligned_net_excess_drawdown"}:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)
@@ -2160,6 +2305,8 @@ def main() -> int:
         train_data,
         mode=args.search_field_mode,
         field_file=args.search_field_file,
+        allow_unverified_fields=args.allow_unverified_fields,
+        allow_blocked_fields=args.allow_blocked_fields,
     )
     print(
         f"pandaai_fields base={field_coverage['platform_base_fields']} "
@@ -2314,6 +2461,13 @@ def main() -> int:
             "pool_sizes": pool_sizes,
             "max_backtrack_days": args.max_backtrack_days,
             "max_future_days": args.max_future_days,
+            "search_field_mode": args.search_field_mode,
+            "search_field_file": args.search_field_file,
+            "allow_unverified_fields": args.allow_unverified_fields,
+            "allow_blocked_fields": args.allow_blocked_fields,
+            "search_fields": terminals,
+            "search_field_count": active_terminal_count,
+            "alignment_rule_version": ALIGNMENT_RULE_VERSION,
         },
         "datasets": {
             "train": train_data.summary(),
@@ -2334,6 +2488,15 @@ def main() -> int:
             "barra_fields_excluded": field_coverage["barra_fields_excluded"],
             "unsupported_base_fields": field_coverage["unsupported_base_fields"],
             "base_status_counts": field_coverage["base_status_counts"],
+        },
+        "search": {
+            "mode": args.search_field_mode,
+            "field_file": args.search_field_file,
+            "allow_unverified_fields": args.allow_unverified_fields,
+            "allow_blocked_fields": args.allow_blocked_fields,
+            "fields": terminals,
+            "field_count": active_terminal_count,
+            "alignment_rule_version": ALIGNMENT_RULE_VERSION,
         },
         "best_formula": best_formula,
         "best_train_fitness": float(best_program.raw_fitness_),

@@ -1,19 +1,383 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-11T10:48:46.149014+00:00",
+  "generated_at": "2026-09-18T05:19:27.668955+00:00",
   "source_registry": "pandaai-workflow-registry.json",
   "summary": {
-    "platform_workflows": 171,
+    "platform_workflows": 204,
     "pool_counts": {
-      "沪深全A": 167,
+      "沪深全A": 200,
       "自定义": 1,
       "<empty>": 3
     },
-    "positive_saved_results": 45,
-    "positive_results_with_config": 43,
-    "positive_results_without_current_config": 2
+    "positive_saved_results": 69,
+    "positive_results_with_config": 68,
+    "positive_results_without_current_config": 1
   },
   "positive_results": [
+    {
+      "report": "size-only-20260911-candidates.report.csv",
+      "name": "SIZE-ONLY-20260911",
+      "factor_id_from_report": "6aa3b8573e7967143f8faf29",
+      "run_id": "6aa3b8576df2a192a47e7cfe",
+      "raw_result": "size-only-20260911-candidates.results/6aa3b8576df2a192a47e7cfe.json",
+      "direction_from_report": "0",
+      "platform_rank_ic": "-0.0558",
+      "platform_gross_excess_pct": "22.72",
+      "platform_net_excess_pct": 21.433287999999997,
+      "platform_turnover_pct": "8.51",
+      "formula": "RANK(MARKET_CAP)",
+      "manifest": "size-only-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3b8573e7967143f8faf29",
+        "workflow_name": "size-only-20260911-SIZE-ONLY-20260911",
+        "run_id": "6aa3b8576df2a192a47e7cfe",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "0"
+      }
+    },
+    {
+      "report": "size-impact-platform-20260918-candidates.report.csv",
+      "name": "F-I10-01",
+      "factor_id_from_report": "6aac9f3951cdfe29b2e0d0b0",
+      "run_id": "6aac9f3a8b01f62dc51475b6",
+      "raw_result": "size-impact-platform-20260918-candidates.results/6aac9f3a8b01f62dc51475b6.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0656",
+      "platform_gross_excess_pct": "22.62",
+      "platform_net_excess_pct": 21.424008,
+      "platform_turnover_pct": "7.91",
+      "formula": "(RANK(-MARKET_CAP) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 2",
+      "manifest": "size-impact-platform-20260918-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aac9f3951cdfe29b2e0d0b0",
+        "workflow_name": "size-impact-20260918-F-I10-01",
+        "run_id": "6aac9f3a8b01f62dc51475b6",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-more-additions-20260911-candidates.report.csv",
+      "name": "T10-ADD-AGG-IMPACT-20260911",
+      "factor_id_from_report": "6aa3ca136df2a192a47e7d33",
+      "run_id": "6aa3ca1451cdfe29b2e0bce4",
+      "raw_result": "t10-more-additions-20260911-candidates.results/6aa3ca1451cdfe29b2e0bce4.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1057",
+      "platform_gross_excess_pct": "23.78",
+      "platform_net_excess_pct": 19.759592,
+      "platform_turnover_pct": "26.59",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1),60) / (SUM(AMOUNT,60) + 1))) / 6",
+      "manifest": "t10-more-additions-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3ca136df2a192a47e7d33",
+        "workflow_name": "t10-more-additions-20260911-T10-ADD-AGG-IMPACT-20260911",
+        "run_id": "6aa3ca1451cdfe29b2e0bce4",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-additions-20260911-candidates.report.csv",
+      "name": "T10-ADD-G13-20260911",
+      "factor_id_from_report": "6aa3c613ecb163ea7228d06e",
+      "run_id": "6aa3c61451cdfe29b2e0bcdd",
+      "raw_result": "t10-additions-20260911-candidates.results/6aa3c61451cdfe29b2e0bcdd.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1043",
+      "platform_gross_excess_pct": "23.64",
+      "platform_net_excess_pct": 19.622616,
+      "platform_turnover_pct": "26.57",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)) / 6",
+      "manifest": "t10-additions-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3c613ecb163ea7228d06e",
+        "workflow_name": "t10-additions-20260911-T10-ADD-G13-20260911",
+        "run_id": "6aa3c61451cdfe29b2e0bcdd",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-more-additions-20260911-candidates.report.csv",
+      "name": "T10-ADD-DOWNSIDE-IMPACT-20260911",
+      "factor_id_from_report": "6aa3c920ecb163ea7228d078",
+      "run_id": "6aa3c9208b01f62dc5146090",
+      "raw_result": "t10-more-additions-20260911-candidates.results/6aa3c9208b01f62dc5146090.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1067",
+      "platform_gross_excess_pct": "23.48",
+      "platform_net_excess_pct": 19.39004,
+      "platform_turnover_pct": "27.05",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM((ABS(CLOSE / DELAY(CLOSE,1) - 1) - (CLOSE / DELAY(CLOSE,1) - 1)) / 2,60) / (SUM(AMOUNT,60) + 1))) / 6",
+      "manifest": "t10-more-additions-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3c920ecb163ea7228d078",
+        "workflow_name": "t10-more-additions-20260911-T10-ADD-DOWNSIDE-IMPACT-20260911",
+        "run_id": "6aa3c9208b01f62dc5146090",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-newdirections-20260911-candidates.report.csv",
+      "name": "T10-SIZE-PLUS-IMPACT",
+      "factor_id_from_report": "6aa368586df2a192a47e7c5d",
+      "run_id": "6aa368586df2a192a47e7c5e",
+      "raw_result": "t10-newdirections-20260911-candidates.results/6aa368586df2a192a47e7c5e.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1113",
+      "platform_gross_excess_pct": "22.79",
+      "platform_net_excess_pct": 18.157232,
+      "platform_turnover_pct": "30.64",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 5",
+      "manifest": "t10-newdirections-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa368586df2a192a47e7c5d",
+        "workflow_name": "t10-new-20260911-T10-SIZE-PLUS-IMPACT",
+        "run_id": "6aa368586df2a192a47e7c5e",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-additions-20260911-candidates.report.csv",
+      "name": "T10-ADD-BM-20260911",
+      "factor_id_from_report": "6aa3c6d1a7f535324660ba70",
+      "run_id": "6aa3c6d25d52c44d2f55c45b",
+      "raw_result": "t10-additions-20260911-candidates.results/6aa3c6d25d52c44d2f55c45b.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1192",
+      "platform_gross_excess_pct": "22.53",
+      "platform_net_excess_pct": 18.092280000000002,
+      "platform_turnover_pct": "29.35",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(book_to_market_ratio_lf)) / 6",
+      "manifest": "t10-additions-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3c6d1a7f535324660ba70",
+        "workflow_name": "t10-additions-20260911-T10-ADD-BM-20260911",
+        "run_id": "6aa3c6d25d52c44d2f55c45b",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "verify-field-scan-20260910-candidates.report.csv",
+      "name": "VERIFY-E260910-04",
+      "factor_id_from_report": "6aa28cf2a7f535324660b832",
+      "run_id": "6aa28cf3cffa1665a210157a",
+      "raw_result": "verify-field-scan-20260910-candidates.results/6aa28cf3cffa1665a210157a.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0681",
+      "platform_gross_excess_pct": "19.89",
+      "platform_net_excess_pct": 17.75808,
+      "platform_turnover_pct": "7.05",
+      "formula": "RANK(book_to_market_ratio_lf) - RANK(MARKET_CAP)",
+      "manifest": "verify-field-scan-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa28cf2a7f535324660b832",
+        "workflow_name": "VERIFY-E260910-04",
+        "run_id": "6aa28cf3cffa1665a210157a",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-more-additions-20260911-candidates.report.csv",
+      "name": "T10-ADD-FSCORE-20260911",
+      "factor_id_from_report": "6aa3c986a7f535324660ba76",
+      "run_id": "6aa3c986a7f535324660ba77",
+      "raw_result": "t10-more-additions-20260911-candidates.results/6aa3c986a7f535324660ba77.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1118",
+      "platform_gross_excess_pct": "22.13",
+      "platform_net_excess_pct": 17.476064,
+      "platform_turnover_pct": "30.78",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)) / 6",
+      "manifest": "t10-more-additions-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3c986a7f535324660ba76",
+        "workflow_name": "t10-more-additions-20260911-T10-ADD-FSCORE-20260911",
+        "run_id": "6aa3c986a7f535324660ba77",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-newdirections-20260911-candidates.report.csv",
+      "name": "T10-SIZE-PLUS-IMPACT-WC",
+      "factor_id_from_report": "6aa3690aecb163ea7228cffa",
+      "run_id": "6aa3690a6df2a192a47e7c60",
+      "raw_result": "t10-newdirections-20260911-candidates.results/6aa3690a6df2a192a47e7c60.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1052",
+      "platform_gross_excess_pct": "21.58",
+      "platform_net_excess_pct": 17.443168,
+      "platform_turnover_pct": "27.36",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK((CURRENT_ASSETS-INVENTORY-CURRENT_LIABILITIES)/(ABS(MARKET_CAP)+1))) / 6",
+      "manifest": "t10-newdirections-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3690aecb163ea7228cffa",
+        "workflow_name": "t10-new-20260911-T10-SIZE-PLUS-IMPACT-WC",
+        "run_id": "6aa3690a6df2a192a47e7c60",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-additions-20260911-candidates.report.csv",
+      "name": "T10-ADD-DD120-20260911",
+      "factor_id_from_report": "6aa3c66cecb163ea7228d075",
+      "run_id": "6aa3c66d6df2a192a47e7d28",
+      "raw_result": "t10-additions-20260911-candidates.results/6aa3c66d6df2a192a47e7d28.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1052",
+      "platform_gross_excess_pct": "21.7",
+      "platform_net_excess_pct": 16.834384,
+      "platform_turnover_pct": "32.18",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(1-CLOSE/TS_MAX(CLOSE,120))) / 6",
+      "manifest": "t10-additions-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3c66cecb163ea7228d075",
+        "workflow_name": "t10-additions-20260911-T10-ADD-DD120-20260911",
+        "run_id": "6aa3c66d6df2a192a47e7d28",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "verify-field-scan-cycle10-20260910-candidates.report.csv",
+      "name": "VERIFY10-E260910-04",
+      "factor_id_from_report": "6aa28e090f6165ec8f7f378b",
+      "run_id": "6aa28e0a5d52c44d2f55c2da",
+      "raw_result": "verify-field-scan-cycle10-20260910-candidates.results/6aa28e0a5d52c44d2f55c2da.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0823",
+      "platform_gross_excess_pct": "18.23",
+      "platform_net_excess_pct": 16.74068,
+      "platform_turnover_pct": "9.85",
+      "formula": "RANK(book_to_market_ratio_lf) - RANK(MARKET_CAP)",
+      "manifest": "verify-field-scan-cycle10-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa28e090f6165ec8f7f378b",
+        "workflow_name": "VERIFY10-E260910-04",
+        "run_id": "6aa28e0a5d52c44d2f55c2da",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "h03-t10-single-20260911-candidates.report.csv",
+      "name": "H03-T10-SINGLE",
+      "factor_id_from_report": "6aa36bd3cffa1665a2101716",
+      "run_id": "6aa36bd3ecb163ea7228cffe",
+      "raw_result": "h03-t10-single-20260911-candidates.results/6aa36bd3ecb163ea7228cffe.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0665",
+      "platform_gross_excess_pct": "17.86",
+      "platform_net_excess_pct": 16.443255999999998,
+      "platform_turnover_pct": "9.37",
+      "formula": "RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))",
+      "manifest": "h03-t10-single-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa36bd3cffa1665a2101716",
+        "workflow_name": "h03-t10-20260911-H03-T10-SINGLE",
+        "run_id": "6aa36bd3ecb163ea7228cffe",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
     {
       "report": "combo-direct-4factor-size-20260909-candidates.report.csv",
       "name": "COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ",
@@ -43,6 +407,202 @@
       }
     },
     {
+      "report": "verify-field-scan-20260910-candidates.report.csv",
+      "name": "VERIFY-F260910-12",
+      "factor_id_from_report": "6aa28d3851cdfe29b2e0ba93",
+      "run_id": "6aa28d3951cdfe29b2e0ba94",
+      "raw_result": "verify-field-scan-20260910-candidates.results/6aa28d3951cdfe29b2e0ba94.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0656",
+      "platform_gross_excess_pct": "17.37",
+      "platform_net_excess_pct": 15.588864000000001,
+      "platform_turnover_pct": "5.89",
+      "formula": "RANK(book_to_market_ratio_lf) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)",
+      "manifest": "verify-field-scan-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa28d3851cdfe29b2e0ba93",
+        "workflow_name": "VERIFY-F260910-12",
+        "run_id": "6aa28d3951cdfe29b2e0ba94",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "verify-field-scan-cycle10-20260910-candidates.report.csv",
+      "name": "VERIFY10-F260910-12",
+      "factor_id_from_report": "6aa28e555d52c44d2f55c2dc",
+      "run_id": "6aa28e56a7f535324660b838",
+      "raw_result": "verify-field-scan-cycle10-20260910-candidates.results/6aa28e56a7f535324660b838.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0804",
+      "platform_gross_excess_pct": "16.41",
+      "platform_net_excess_pct": 15.046176,
+      "platform_turnover_pct": "9.02",
+      "formula": "RANK(book_to_market_ratio_lf) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)",
+      "manifest": "verify-field-scan-cycle10-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa28e555d52c44d2f55c2dc",
+        "workflow_name": "VERIFY10-F260910-12",
+        "run_id": "6aa28e56a7f535324660b838",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "verify-field-scan-20260910-candidates.report.csv",
+      "name": "VERIFY-G260910-13",
+      "factor_id_from_report": "6aa28d80cffa1665a210157c",
+      "run_id": "6aa28d80cffa1665a210157d",
+      "raw_result": "verify-field-scan-20260910-candidates.results/6aa28d80cffa1665a210157d.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0450",
+      "platform_gross_excess_pct": "16.4",
+      "platform_net_excess_pct": 14.700511999999998,
+      "platform_turnover_pct": "5.62",
+      "formula": "RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)",
+      "manifest": "verify-field-scan-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa28d80cffa1665a210157c",
+        "workflow_name": "VERIFY-G260910-13",
+        "run_id": "6aa28d80cffa1665a210157d",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-newdirections-20260911-candidates.report.csv",
+      "name": "T10-SIZE-PLUS-WC-MCAP",
+      "factor_id_from_report": "6aa368b9ecb163ea7228cff9",
+      "run_id": "6aa368baa7f535324660b9a5",
+      "raw_result": "t10-newdirections-20260911-candidates.results/6aa368baa7f535324660b9a5.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1032",
+      "platform_gross_excess_pct": "19.43",
+      "platform_net_excess_pct": 14.581016,
+      "platform_turnover_pct": "32.07",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK((CURRENT_ASSETS-INVENTORY-CURRENT_LIABILITIES)/(ABS(MARKET_CAP)+1))) / 5",
+      "manifest": "t10-newdirections-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa368b9ecb163ea7228cff9",
+        "workflow_name": "t10-new-20260911-T10-SIZE-PLUS-WC-MCAP",
+        "run_id": "6aa368baa7f535324660b9a5",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "t10-nomcap-plus-impact-20260911-candidates.report.csv",
+      "name": "T10-NOMCAP-PLUS-IMPACT",
+      "factor_id_from_report": "6aa3c06bd5536b11c13ee096",
+      "run_id": "6aa3c06cd5536b11c13ee097",
+      "raw_result": "t10-nomcap-plus-impact-20260911-candidates.results/6aa3c06cd5536b11c13ee097.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.1132",
+      "platform_gross_excess_pct": "19.49",
+      "platform_net_excess_pct": 14.225216,
+      "platform_turnover_pct": "34.82",
+      "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 4",
+      "manifest": "t10-nomcap-plus-impact-20260911-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa3c06bd5536b11c13ee096",
+        "workflow_name": "t10-nomcap-plus-impact-20260911-T10-NOMCAP-PLUS-IMPACT",
+        "run_id": "6aa3c06cd5536b11c13ee097",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "verify-field-scan-cycle10-20260910-candidates.report.csv",
+      "name": "VERIFY10-G260910-13",
+      "factor_id_from_report": "6aa28ea3a7f535324660b83a",
+      "run_id": "6aa28ea43e7967143f8fae33",
+      "raw_result": "verify-field-scan-cycle10-20260910-candidates.results/6aa28ea43e7967143f8fae33.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0559",
+      "platform_gross_excess_pct": "15.37",
+      "platform_net_excess_pct": 13.944184,
+      "platform_turnover_pct": "9.43",
+      "formula": "RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)",
+      "manifest": "verify-field-scan-cycle10-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa28ea3a7f535324660b83a",
+        "workflow_name": "VERIFY10-G260910-13",
+        "run_id": "6aa28ea43e7967143f8fae33",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "alphaprobe-net1-platform-20260914-candidates.report.csv",
+      "name": "F-NET01-PLAT-20260914",
+      "factor_id_from_report": "6aa7cd278b01f62dc5146aed",
+      "run_id": "6aa7cd283e7967143f8fb524",
+      "raw_result": "alphaprobe-net1-platform-20260914-candidates.results/6aa7cd283e7967143f8fb524.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0577",
+      "platform_gross_excess_pct": "16.06",
+      "platform_net_excess_pct": 13.628703999999999,
+      "platform_turnover_pct": "8.04",
+      "formula": "WMA((((1/LOW)/LOW)/VOLUME),40)",
+      "manifest": "alphaprobe-net1-platform-20260914-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa7cd278b01f62dc5146aed",
+        "workflow_name": "net1-platform-20260914-F-NET01-PLAT-20260914",
+        "run_id": "6aa7cd283e7967143f8fb524",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
       "report": "combo-direct-4factor-paper-20260909-candidates.report.csv",
       "name": "COMBO-DIRECT-OSR2-CHIP-TURN-PAPER-EQ",
       "factor_id_from_report": "6aa15326a7f535324660b5d5",
@@ -66,6 +626,34 @@
         "start_date": "20210907",
         "end_date": "20260907",
         "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "alphaprobe-gfn-new-20260916-candidates.report.csv",
+      "name": "F-GFN-N02-20260916",
+      "factor_id_from_report": "6aaa71cd6df2a192a47e8ddc",
+      "run_id": "6aaa722951cdfe29b2e0ccff",
+      "raw_result": "alphaprobe-gfn-new-20260916-candidates.results/6aaa722951cdfe29b2e0ccff.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0363",
+      "platform_gross_excess_pct": "13.98",
+      "platform_net_excess_pct": 12.274464,
+      "platform_turnover_pct": "5.64",
+      "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM",
+      "manifest": "alphaprobe-gfn-new-20260916-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aaa71cd6df2a192a47e8ddc",
+        "workflow_name": "gfn-new-20260916-F-GFN-N02-20260916",
+        "run_id": "6aaa722951cdfe29b2e0ccff",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
         "group_number": "10",
         "factor_direction": "1"
       }
@@ -379,6 +967,34 @@
       }
     },
     {
+      "report": "pandaai-net15-20260915-candidates.report.csv",
+      "name": "F-NET01-PLAT-20260915",
+      "factor_id_from_report": "6aa91ca351cdfe29b2e0c947",
+      "run_id": "6aa91ca451cdfe29b2e0c948",
+      "raw_result": "pandaai-net15-20260915-candidates.results/6aa91ca451cdfe29b2e0c948.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0404",
+      "platform_gross_excess_pct": "5.47",
+      "platform_net_excess_pct": 5.049664,
+      "platform_turnover_pct": "1.39",
+      "formula": "TS_MIN(INTEREST_EXPENSE_MRQ_10,50)",
+      "manifest": "pandaai-net15-20260915-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa91ca351cdfe29b2e0c947",
+        "workflow_name": "pandaai-net15-20260915-F-NET01-PLAT-20260915",
+        "run_id": "6aa91ca451cdfe29b2e0c948",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
       "report": "positive-cycle10-candidates.report.csv",
       "name": "OSR2-RET40",
       "factor_id_from_report": "6a9fcd2d6df2a192a47e765b",
@@ -603,6 +1219,34 @@
       }
     },
     {
+      "report": "high-potential-5-20260910-candidates.report.csv",
+      "name": "NEW-VALUE-EVEBITDA",
+      "factor_id_from_report": "6aa233bf6df2a192a47e79f1",
+      "run_id": "6aa233c051cdfe29b2e0b958",
+      "raw_result": "high-potential-5-20260910-candidates.results/6aa233c051cdfe29b2e0b958.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0202",
+      "platform_gross_excess_pct": "4.31",
+      "platform_net_excess_pct": 3.3196399999999997,
+      "platform_turnover_pct": "6.55",
+      "formula": "RANK(-ratio_ev_ebitda_ttm)",
+      "manifest": "high-potential-5-20260910-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa233bf6df2a192a47e79f1",
+        "workflow_name": "hp5-20260910-NEW-VALUE-EVEBITDA",
+        "run_id": "6aa233c051cdfe29b2e0b958",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
       "report": "osr4-ret40-value-refine-candidates.report.csv",
       "name": "OSR4-RET40-BP-CFP-VAL3",
       "factor_id_from_report": "6a9f78153e7967143f8faa6a",
@@ -704,6 +1348,34 @@
         "factor_id": "6a9f7922cffa1665a2100e1a",
         "workflow_name": "osr4-OSR4-RET40-BP-CFP-SP",
         "run_id": "6a9f7922cffa1665a2100e1b",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "5",
+        "group_number": "10",
+        "factor_direction": "1"
+      }
+    },
+    {
+      "report": "pandaai-orthogonal-net-20260916-candidates.report.csv",
+      "name": "F-NET03-PLAT-20260916",
+      "factor_id_from_report": "6aa9fe1351cdfe29b2e0cc1d",
+      "run_id": "6aa9fe713e7967143f8fb8ea",
+      "raw_result": "pandaai-orthogonal-net-20260916-candidates.results/6aa9fe713e7967143f8fb8ea.json",
+      "direction_from_report": "1",
+      "platform_rank_ic": "0.0305",
+      "platform_gross_excess_pct": "16.0",
+      "platform_net_excess_pct": 2.794191999999999,
+      "platform_turnover_pct": "43.67",
+      "formula": "(1/(REF(EV_NO_CASH_TTM,10)))",
+      "manifest": "pandaai-orthogonal-net-20260916-candidates.txt",
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa9fe1351cdfe29b2e0cc1d",
+        "workflow_name": "PANDA-260916-F-NET03-PLAT-20260916",
+        "run_id": "6aa9fe713e7967143f8fb8ea",
         "mode": "formula",
         "market": "股票",
         "stock_pool": "沪深全A",
@@ -951,8 +1623,20 @@
       "platform_turnover_pct": "35.97",
       "formula": "RETURNS(CLOSE,120)",
       "manifest": "ht13-momentum-120d-d0.txt",
-      "config_binding": "historical_not_in_registry",
-      "config": null
+      "config_binding": "run_id",
+      "config": {
+        "factor_id": "6aa4e3bd6df2a192a47e7ea3",
+        "workflow_name": "direction-audit-HT13-MOMENTUM-120D-D0",
+        "run_id": "6aa4e3bfa7f535324660bc2d",
+        "mode": "formula",
+        "market": "股票",
+        "stock_pool": "沪深全A",
+        "start_date": "20210907",
+        "end_date": "20260907",
+        "adjustment_cycle": "10",
+        "group_number": "10",
+        "factor_direction": "0"
+      }
     },
     {
       "report": "huatai-series13-candidates.report.csv",
@@ -1252,6 +1936,738 @@
     }
   ],
   "workflows": [
+    {
+      "factor_id": "6aacc75e3e7967143f8fbbdb",
+      "workflow_name": "RSQR60-ALPHA158-20260918",
+      "run_id": "6aacc75f3e7967143f8fbbdc",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "rsqr60-platform-20260918-candidates.txt.state.json",
+          "candidate_name": "RSQR60-ALPHA158-20260918",
+          "factor_id": "6aacc75e3e7967143f8fbbdb",
+          "run_id": "6aacc75f3e7967143f8fbbdc",
+          "raw_result": null,
+          "formula": "Rsquare(CLOSE,60)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aacb13651cdfe29b2e0d0b5",
+      "workflow_name": "KMID2-KMID2-ALPHA158-20260918",
+      "run_id": "6aacb13651cdfe29b2e0d0b6",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "0",
+      "local_runs": [
+        {
+          "state_file": "kmid2-platform-20260918-candidates.txt.state.json",
+          "candidate_name": "KMID2-ALPHA158-20260918",
+          "factor_id": "6aacb13651cdfe29b2e0d0b5",
+          "run_id": "6aacb13651cdfe29b2e0d0b6",
+          "raw_result": "kmid2-platform-20260918-candidates.results/6aacb13651cdfe29b2e0d0b6.json",
+          "formula": "(CLOSE-OPEN)/(HIGH-LOW+0.000000000001)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaca073ecb163ea7228db6e",
+      "workflow_name": "field-isolation-20260918-F-ALIGN-VWAP-20260918",
+      "run_id": "6aaca074ecb163ea7228db6f",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "field-isolation-20260918-candidates.txt.state.json",
+          "candidate_name": "F-ALIGN-VWAP-20260918",
+          "factor_id": "6aaca073ecb163ea7228db6e",
+          "run_id": "6aaca074ecb163ea7228db6f",
+          "raw_result": "field-isolation-20260918-candidates.results/6aaca074ecb163ea7228db6f.json",
+          "formula": "AMOUNT / VOLUME"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaca0256df2a192a47e9171",
+      "workflow_name": "field-isolation-20260918-F-ALIGN-HIGH-20260918",
+      "run_id": "6aaca0256df2a192a47e9172",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "field-isolation-20260918-candidates.txt.state.json",
+          "candidate_name": "F-ALIGN-HIGH-20260918",
+          "factor_id": "6aaca0256df2a192a47e9171",
+          "run_id": "6aaca0256df2a192a47e9172",
+          "raw_result": "field-isolation-20260918-candidates.results/6aaca0256df2a192a47e9172.json",
+          "formula": "HIGH"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aac9f3951cdfe29b2e0d0b0",
+      "workflow_name": "size-impact-20260918-F-I10-01",
+      "run_id": "6aac9f3a8b01f62dc51475b6",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "size-impact-platform-20260918-candidates.txt.state.json",
+          "candidate_name": "F-I10-01",
+          "factor_id": "6aac9f3951cdfe29b2e0d0b0",
+          "run_id": "6aac9f3a8b01f62dc51475b6",
+          "raw_result": "size-impact-platform-20260918-candidates.results/6aac9f3a8b01f62dc51475b6.json",
+          "formula": "(RANK(-MARKET_CAP) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 2"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa769b6df2a192a47e8e0c",
+      "workflow_name": "gfn-unt-20260916-GP-UNT-20260916-CONTRACT-RET30",
+      "run_id": "6aaa769c6df2a192a47e8e0d",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-untested-20260916-candidates.txt.state.json",
+          "candidate_name": "GP-UNT-20260916-CONTRACT-RET30",
+          "factor_id": "6aaa769b6df2a192a47e8e0c",
+          "run_id": null,
+          "raw_result": null,
+          "formula": "RETURNS(CONTRACT_LIABILITIES_LYR,30)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa769251cdfe29b2e0cd39",
+      "workflow_name": "gfn-unt-20260916-GFN-UNT-20260916-BMQUALITY",
+      "run_id": "6aaa769251cdfe29b2e0cd3a",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-untested-20260916-candidates.txt.state.json",
+          "candidate_name": "GFN-UNT-20260916-BMQUALITY",
+          "factor_id": "6aaa769251cdfe29b2e0cd39",
+          "run_id": null,
+          "raw_result": null,
+          "formula": "POWER(BOOK_TO_MARKET_RATIO_LF, IF(TS_MAD(PS_RATIO_TTM,50) < CASH_FLOW_FROM_OPERATING_ACTIVITIES_TTM, 1, 0))"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa764c6df2a192a47e8e07",
+      "workflow_name": "gfn-unt-20260916-GFN-UNT-20260916-EVPRICE",
+      "run_id": "6aaa764cecb163ea7228d989",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-untested-20260916-candidates.txt.state.json",
+          "candidate_name": "GFN-UNT-20260916-EVPRICE",
+          "factor_id": "6aaa764c6df2a192a47e8e07",
+          "run_id": "6aaa764cecb163ea7228d989",
+          "raw_result": "alphaprobe-untested-20260916-candidates.results/6aaa764cecb163ea7228d989.json",
+          "formula": "1 / EV_TTM / CLOSE"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa71cd6df2a192a47e8ddc",
+      "workflow_name": "gfn-new-20260916-F-GFN-N02-20260916",
+      "run_id": "6aaa722951cdfe29b2e0ccff",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-gfn-new-20260916-candidates.txt.state.json",
+          "candidate_name": "F-GFN-N02-20260916",
+          "factor_id": "6aaa71cd6df2a192a47e8ddc",
+          "run_id": "6aaa722951cdfe29b2e0ccff",
+          "raw_result": "alphaprobe-gfn-new-20260916-candidates.results/6aaa722951cdfe29b2e0ccff.json",
+          "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa71cc6df2a192a47e8ddb",
+      "workflow_name": "gfn-new-20260916-F-GFN-N01-20260916",
+      "run_id": "6aaa71e56df2a192a47e8de1",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-gfn-new-20260916-candidates.txt.state.json",
+          "candidate_name": "F-GFN-N01-20260916",
+          "factor_id": "6aaa71cc6df2a192a47e8ddb",
+          "run_id": "6aaa71e56df2a192a47e8de1",
+          "raw_result": "alphaprobe-gfn-new-20260916-candidates.results/6aaa71e56df2a192a47e8de1.json",
+          "formula": "AMOUNT / VOLUME / HIGH"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa692a51cdfe29b2e0ccdd",
+      "workflow_name": "PANDA-260916-NET-DD-F-NET-D03",
+      "run_id": "6aaa692ba7f535324660cbf6",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "net-dd-multiobjective-20260916-diversified-candidates.txt.state.json",
+          "candidate_name": "F-NET-D03",
+          "factor_id": "6aaa692a51cdfe29b2e0ccdd",
+          "run_id": "6aaa692ba7f535324660cbf6",
+          "raw_result": "net-dd-multiobjective-20260916-diversified-candidates.results/6aaa692ba7f535324660cbf6.json",
+          "formula": "COV(MIN(TOTAL_ASSETS_MRQ_1,CASH_RECEIVED_FROM_ISSUING_SECURITY_MRQ_10),INTEREST_PAYABLE_MRQ_4,30)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa68ecd5536b11c13eeafc",
+      "workflow_name": "PANDA-260916-NET-DD-F-NET-D02",
+      "run_id": "6aaa68ed5d52c44d2f55ce8f",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "net-dd-multiobjective-20260916-diversified-candidates.txt.state.json",
+          "candidate_name": "F-NET-D02",
+          "factor_id": "6aaa68ecd5536b11c13eeafc",
+          "run_id": "6aaa68ed5d52c44d2f55ce8f",
+          "raw_result": "net-dd-multiobjective-20260916-diversified-candidates.results/6aaa68ed5d52c44d2f55ce8f.json",
+          "formula": "(BOOK_TO_MARKET_RATIO_LYR*MA(INSURANCE_COMMISSION_EXPENSE_MRQ_9,10))"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa68e25d52c44d2f55ce8e",
+      "workflow_name": "PANDA-260916-NET-DD-F-NET-D01",
+      "run_id": "6aaa68e3a7f535324660cbf4",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "net-dd-multiobjective-20260916-diversified-candidates.txt.state.json",
+          "candidate_name": "F-NET-D01",
+          "factor_id": "6aaa68e25d52c44d2f55ce8e",
+          "run_id": "6aaa68e3a7f535324660cbf4",
+          "raw_result": "net-dd-multiobjective-20260916-diversified-candidates.results/6aaa68e3a7f535324660cbf4.factor_result.json",
+          "formula": "(TS_RANK(NET_COMMISSION_INCOME_LYR,40)*(TS_RANK(NET_COMMISSION_INCOME_LYR,40)*((TS_RANK(NET_COMMISSION_INCOME_LYR,40)*(NON_OPERATING_EXPENSE_MRQ_11*(TS_RANK(NET_COMMISSION_INCOME_LYR,40)*(TS_RANK(EMA(BORROWINGS_CAPITAL_MRQ_12,10),40)*(NON_OPERATING_EXPENSE_MRQ_11*CASH_RECEIVED_FROM_ISSUING_SECURITY_MRQ_8)))))-INTEREST_PAYABLE_MRQ_4)))"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa44026df2a192a47e8d45",
+      "workflow_name": "GFN-20260916-F-A20",
+      "run_id": "6aaa44033e7967143f8fb92d",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-gfn-platform-20260916-candidates.txt.state.json",
+          "candidate_name": "F-A20",
+          "factor_id": "6aaa44026df2a192a47e8d45",
+          "run_id": "6aaa44033e7967143f8fb92d",
+          "raw_result": "alphaprobe-gfn-platform-20260916-candidates.results/6aaa44033e7967143f8fb92d.json",
+          "formula": "TS_SKEW(book_to_market_ratio_lf * book_to_market_ratio_lf,30)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa43bf3e7967143f8fb92c",
+      "workflow_name": "GFN-20260916-F-A19",
+      "run_id": "6aaa43bfd5536b11c13eeacd",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-gfn-platform-20260916-candidates.txt.state.json",
+          "candidate_name": "F-A19",
+          "factor_id": "6aaa43bf3e7967143f8fb92c",
+          "run_id": "6aaa43bfd5536b11c13eeacd",
+          "raw_result": "alphaprobe-gfn-platform-20260916-candidates.results/6aaa43bfd5536b11c13eeacd.json",
+          "formula": "ps_ratio_ttm - TS_MAX(ps_ratio_ttm,40)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aaa43735d52c44d2f55ce57",
+      "workflow_name": "GFN-20260916-F-A18",
+      "run_id": "6aaa43736df2a192a47e8d43",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-gfn-platform-20260916-candidates.txt.state.json",
+          "candidate_name": "F-A18",
+          "factor_id": "6aaa43735d52c44d2f55ce57",
+          "run_id": "6aaa43736df2a192a47e8d43",
+          "raw_result": "alphaprobe-gfn-platform-20260916-candidates.results/6aaa43736df2a192a47e8d43.json",
+          "formula": "0 - CLOSE / MA(CLOSE,40)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa9fe1351cdfe29b2e0cc1d",
+      "workflow_name": "PANDA-260916-F-NET03-PLAT-20260916",
+      "run_id": "6aa9fe713e7967143f8fb8ea",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "pandaai-orthogonal-net-20260916-candidates.txt.state.json",
+          "candidate_name": "F-NET03-PLAT-20260916",
+          "factor_id": "6aa9fe1351cdfe29b2e0cc1d",
+          "run_id": "6aa9fe713e7967143f8fb8ea",
+          "raw_result": "pandaai-orthogonal-net-20260916-candidates.results/6aa9fe713e7967143f8fb8ea.json",
+          "formula": "(1/(REF(EV_NO_CASH_TTM,10)))"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa9fe1351cdfe29b2e0cc1c",
+      "workflow_name": "PANDA-260916-F-NET02-PLAT-20260916",
+      "run_id": "6aa9fe6e8b01f62dc5147113",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "pandaai-orthogonal-net-20260916-candidates.txt.state.json",
+          "candidate_name": "F-NET02-PLAT-20260916",
+          "factor_id": "6aa9fe1351cdfe29b2e0cc1c",
+          "run_id": "6aa9fe6e8b01f62dc5147113",
+          "raw_result": null,
+          "formula": "(1/(NET_PROFIT_PARENT_COMPANY_TTM))"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa9fe126df2a192a47e8cd1",
+      "workflow_name": "PANDA-260916-F-NET01-PLAT-20260916",
+      "run_id": "6aa9fe6b51cdfe29b2e0cc21",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "pandaai-orthogonal-net-20260916-candidates.txt.state.json",
+          "candidate_name": "F-NET01-PLAT-20260916",
+          "factor_id": "6aa9fe126df2a192a47e8cd1",
+          "run_id": "6aa9fe6b51cdfe29b2e0cc21",
+          "raw_result": null,
+          "formula": "(1/(CONTRACT_LIABILITIES_LYR))"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa91ca351cdfe29b2e0c947",
+      "workflow_name": "pandaai-net15-20260915-F-NET01-PLAT-20260915",
+      "run_id": "6aa91ca451cdfe29b2e0c948",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "pandaai-net15-20260915-candidates.txt.state.json",
+          "candidate_name": "F-NET01-PLAT-20260915",
+          "factor_id": "6aa91ca351cdfe29b2e0c947",
+          "run_id": "6aa91ca451cdfe29b2e0c948",
+          "raw_result": "pandaai-net15-20260915-candidates.results/6aa91ca451cdfe29b2e0c948.json",
+          "formula": "TS_MIN(INTEREST_EXPENSE_MRQ_10,50)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa7cd278b01f62dc5146aed",
+      "workflow_name": "net1-platform-20260914-F-NET01-PLAT-20260914",
+      "run_id": "6aa7cd283e7967143f8fb524",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-net1-platform-20260914-candidates.txt.state.json",
+          "candidate_name": "F-NET01-PLAT-20260914",
+          "factor_id": "6aa7cd278b01f62dc5146aed",
+          "run_id": "6aa7cd283e7967143f8fb524",
+          "raw_result": "alphaprobe-net1-platform-20260914-candidates.results/6aa7cd283e7967143f8fb524.json",
+          "formula": "WMA((((1/LOW)/LOW)/VOLUME),40)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa7ac1c51cdfe29b2e0c5d6",
+      "workflow_name": "panda-final-20260914-F-A18",
+      "run_id": "6aa7ac1c5d52c44d2f55cad8",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "5",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "alphaprobe-final-20260914-candidates.txt.state.json",
+          "candidate_name": "F-A18",
+          "factor_id": "6aa7ac1c51cdfe29b2e0c5d6",
+          "run_id": "6aa7ac1c5d52c44d2f55cad8",
+          "raw_result": "alphaprobe-final-20260914-candidates.results/6aa7ac1c5d52c44d2f55cad8.json",
+          "formula": "0 - CLOSE / MA(CLOSE,40)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa518903e7967143f8fb083",
+      "workflow_name": "vwap-volume-trend-VWAP10-VOL20-MOM20-RAW",
+      "run_id": "6aa518928b01f62dc51462aa",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "vwap-volume-trend-raw.txt.state.json",
+          "candidate_name": "VWAP10-VOL20-MOM20-RAW",
+          "factor_id": "6aa518903e7967143f8fb083",
+          "run_id": "6aa518928b01f62dc51462aa",
+          "raw_result": "vwap-volume-trend-raw.results\\6aa518928b01f62dc51462aa.json",
+          "formula": "((MA(AMOUNT / VOLUME, 10) / CLOSE) - 1) * (VOLUME / MA(VOLUME, 20)) * (BIAS(CLOSE, 20) / 100)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa4e3bd6df2a192a47e7ea3",
+      "workflow_name": "direction-audit-HT13-MOMENTUM-120D-D0",
+      "run_id": "6aa4e3bfa7f535324660bc2d",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "0",
+      "local_runs": [
+        {
+          "state_file": "ht13-momentum-120d-d0.txt.state.json",
+          "candidate_name": "HT13-MOMENTUM-120D-D0",
+          "factor_id": "6aa4e3bd6df2a192a47e7ea3",
+          "run_id": "6aa4e3bfa7f535324660bc2d",
+          "raw_result": "ht13-momentum-120d-d0.results\\6aa4e3bfa7f535324660bc2d.json",
+          "formula": "RETURNS(CLOSE,120)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa4df0cd5536b11c13ee152",
+      "workflow_name": "WF6AA4-D0-PYTHON-OBV-20260912",
+      "run_id": "6aa4df0ed5536b11c13ee153",
+      "mode": "code",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "0",
+      "local_runs": [
+        {
+          "state_file": "workflow-6aa40282-python-candidates-d0.txt.state.json",
+          "candidate_name": "WF6AA4-D0-PYTHON-OBV-20260912",
+          "factor_id": "6aa4df0cd5536b11c13ee152",
+          "run_id": "6aa4df0ed5536b11c13ee153",
+          "raw_result": "workflow-6aa40282-python-candidates-d0.results\\6aa4df0ed5536b11c13ee153.json",
+          "formula": "workflow-6aa40282-python.py"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa4de836df2a192a47e7e97",
+      "workflow_name": "WF6AA4-D0-OPEN20-MOM-20260912",
+      "run_id": "6aa4de84a7f535324660bc17",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "0",
+      "local_runs": [
+        {
+          "state_file": "workflow-6aa40282-singles-d0.txt.state.json",
+          "candidate_name": "WF6AA4-D0-OPEN20-MOM-20260912",
+          "factor_id": "6aa4de836df2a192a47e7e97",
+          "run_id": "6aa4de84a7f535324660bc17",
+          "raw_result": "workflow-6aa40282-singles-d0.results\\6aa4de84a7f535324660bc17.json",
+          "formula": "RANK((OPEN / DELAY(CLOSE, 20)) - 1)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa4de3351cdfe29b2e0be51",
+      "workflow_name": "WF6AA4-D0-CLOSE20-MOM-20260912",
+      "run_id": "6aa4de353e7967143f8fb035",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "0",
+      "local_runs": [
+        {
+          "state_file": "workflow-6aa40282-singles-d0.txt.state.json",
+          "candidate_name": "WF6AA4-D0-CLOSE20-MOM-20260912",
+          "factor_id": "6aa4de3351cdfe29b2e0be51",
+          "run_id": "6aa4de353e7967143f8fb035",
+          "raw_result": "workflow-6aa40282-singles-d0.results\\6aa4de353e7967143f8fb035.json",
+          "formula": "RANK((CLOSE / DELAY(CLOSE, 20)) - 1)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa4dc98a7f535324660bc07",
+      "workflow_name": "20日量价突破复合因子-克隆-5Y-T10-G10-D0-20260912",
+      "run_id": "6aa4dc9aa7f535324660bc08",
+      "mode": "code",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "0",
+      "local_runs": []
+    },
+    {
+      "factor_id": "6aa4270d3e7967143f8fafde",
+      "workflow_name": "20日量价突破复合因子-克隆-5Y-T10-G10-20260912",
+      "run_id": "6aa4273051cdfe29b2e0bdb0",
+      "mode": "code",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": []
+    },
+    {
+      "factor_id": "6aa422b9a7f535324660bb4b",
+      "workflow_name": "WF6AA4-PYTHON-OBV-20260911",
+      "run_id": "6aa422bcecb163ea7228d107",
+      "mode": "code",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "workflow-6aa40282-python-candidates.txt.state.json",
+          "candidate_name": "WF6AA4-PYTHON-OBV-20260911",
+          "factor_id": "6aa422b9a7f535324660bb4b",
+          "run_id": "6aa422bcecb163ea7228d107",
+          "raw_result": "workflow-6aa40282-python-candidates.results\\6aa422bcecb163ea7228d107.json",
+          "formula": "workflow-6aa40282-python.py"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa422566df2a192a47e7e05",
+      "workflow_name": "WF6AA4-OPEN20-MOM-20260911",
+      "run_id": "6aa422598b01f62dc514615d",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "workflow-6aa40282-singles.txt.state.json",
+          "candidate_name": "WF6AA4-OPEN20-MOM-20260911",
+          "factor_id": "6aa422566df2a192a47e7e05",
+          "run_id": "6aa422598b01f62dc514615d",
+          "raw_result": "workflow-6aa40282-singles.results\\6aa422598b01f62dc514615d.json",
+          "formula": "RANK((OPEN / DELAY(CLOSE, 20)) - 1)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa421e15d52c44d2f55c4f0",
+      "workflow_name": "WF6AA4-CLOSE20-MOM-20260911",
+      "run_id": "6aa421e35d52c44d2f55c4f1",
+      "mode": "formula",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20210907",
+      "end_date": "20260907",
+      "adjustment_cycle": "10",
+      "group_number": "10",
+      "factor_direction": "1",
+      "local_runs": [
+        {
+          "state_file": "workflow-6aa40282-singles.txt.state.json",
+          "candidate_name": "WF6AA4-CLOSE20-MOM-20260911",
+          "factor_id": "6aa421e15d52c44d2f55c4f0",
+          "run_id": "6aa421e35d52c44d2f55c4f1",
+          "raw_result": "workflow-6aa40282-singles.results\\6aa421e35d52c44d2f55c4f1.json",
+          "formula": "RANK((CLOSE / DELAY(CLOSE, 20)) - 1)"
+        }
+      ]
+    },
+    {
+      "factor_id": "6aa40282ecb163ea7228d0d8",
+      "workflow_name": "20日量价突破复合因子-克隆",
+      "run_id": null,
+      "mode": "code",
+      "market": "股票",
+      "stock_pool": "沪深全A",
+      "start_date": "20250101",
+      "end_date": "20251231",
+      "adjustment_cycle": "1",
+      "group_number": "5",
+      "factor_direction": "0",
+      "local_runs": []
+    },
     {
       "factor_id": "6aa3d4df3e7967143f8faf55",
       "workflow_name": "T10-NONLINEAR-XGB-20260911",

@@ -1,0 +1,170 @@
+{
+  "capacity": 6,
+  "size": 6,
+  "factors": [
+    {
+      "expression": "TsRank($close,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close within a 20-day window",
+      "ic": 0.0020718835294246674,
+      "icir": 0.011681479100657349,
+      "rank": 0.0020718835294246674,
+      "net_excess": null,
+      "node": {
+        "expression": "TsRank($close,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close within a 20-day window",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Rank($book_to_market_ratio_lf)",
+      "topic": "fundamental value",
+      "description": "cross-sectional rank of the latest announced book-to-market proxy",
+      "ic": 0.0011176015250384808,
+      "icir": 0.006751247728349875,
+      "rank": 0.0011176015250384808,
+      "net_excess": null,
+      "node": {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "length": 2,
+        "tokens": [
+          "OP:Rank",
+          "FIELD:book_to_market_ratio_lf"
+        ],
+        "topic": "fundamental value",
+        "description": "cross-sectional rank of the latest announced book-to-market proxy",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Rank($ratio_ep_ttm)",
+      "topic": "fundamental value",
+      "description": "cross-sectional rank of the latest announced earnings-to-price proxy",
+      "ic": 0.01538130734115839,
+      "icir": 0.09943156564722257,
+      "rank": 0.01538130734115839,
+      "net_excess": null,
+      "node": {
+        "expression": "Rank($ratio_ep_ttm)",
+        "length": 2,
+        "tokens": [
+          "OP:Rank",
+          "FIELD:ratio_ep_ttm"
+        ],
+        "topic": "fundamental value",
+        "description": "cross-sectional rank of the latest announced earnings-to-price proxy",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank($close, 60)",
+          "Div(TsMean($close, 5), $close)"
+        ]
+      }
+    },
+    {
+      "expression": "Rank($oper_roe_lyr)",
+      "topic": "fundamental quality",
+      "description": "cross-sectional rank of latest announced operating ROE proxy",
+      "ic": 0.004380728118121624,
+      "icir": 0.03091381200002216,
+      "rank": 0.004380728118121624,
+      "net_excess": null,
+      "node": {
+        "expression": "Rank($oper_roe_lyr)",
+        "length": 2,
+        "tokens": [
+          "OP:Rank",
+          "FIELD:oper_roe_lyr"
+        ],
+        "topic": "fundamental quality",
+        "description": "cross-sectional rank of latest announced operating ROE proxy",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank($close,60)",
+      "topic": "fundamental value",
+      "description": "time-series position of close over a recent window",
+      "ic": 0.012309347279369831,
+      "icir": 0.06565213688125608,
+      "rank": 0.012309347279369831,
+      "net_excess": null,
+      "node": {
+        "expression": "TsRank($close, 60)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:60",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "fundamental value",
+        "description": "time-series position of close over a recent window",
+        "depth": 1,
+        "ic": 0.012309347279369831,
+        "icir": 0.06565213688125608,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Div(TsMean($close,5),$close)",
+      "topic": "fundamental value",
+      "description": "distance of current close from its rolling mean",
+      "ic": 0.0020432251039892435,
+      "icir": 0.009142580706032114,
+      "rank": 0.0020432251039892435,
+      "net_excess": null,
+      "node": {
+        "expression": "Div(TsMean($close, 5), $close)",
+        "length": 5,
+        "tokens": [
+          "OP:Div",
+          "OP:TsMean",
+          "DT:5",
+          "FEATURE:CLOSE",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "fundamental value",
+        "description": "distance of current close from its rolling mean",
+        "depth": 1,
+        "ic": 0.0020432251039892435,
+        "icir": 0.009142580706032114,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    }
+  ]
+}

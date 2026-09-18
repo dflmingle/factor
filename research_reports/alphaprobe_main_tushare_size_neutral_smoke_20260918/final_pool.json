@@ -1,0 +1,68 @@
+{
+  "capacity": 8,
+  "size": 2,
+  "factors": [
+    {
+      "expression": "TsRank($close,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close within a 20-day window",
+      "ic": 0.0020718835294246674,
+      "icir": 0.011681479100657349,
+      "rank": 0.0020718835294246674,
+      "net_excess": null,
+      "size_corr": 0.17385859787464142,
+      "node": {
+        "expression": "TsRank($close,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close within a 20-day window",
+        "depth": 0,
+        "ic": 0.0020718835294246674,
+        "icir": 0.011681479100657349,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank(Mul($close, TsPctChange($close, 20)), 20)"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank(Mul($close,TsPctChange($close,20)),20)",
+      "topic": "interday price movements",
+      "description": "Time-series rank of the close price adjusted by the percentage change over a 20-day window",
+      "ic": 0.0029002088122069836,
+      "icir": 0.01855430784409972,
+      "rank": 0.0029002088122069836,
+      "net_excess": null,
+      "size_corr": 0.16237390041351318,
+      "node": {
+        "expression": "TsRank(Mul($close, TsPctChange($close, 20)), 20)",
+        "length": 7,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Mul",
+          "FEATURE:CLOSE",
+          "OP:TsPctChange",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "Time-series rank of the close price adjusted by the percentage change over a 20-day window",
+        "depth": 1,
+        "ic": 0.0029002088122069836,
+        "icir": 0.01855430784409972,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    }
+  ]
+}

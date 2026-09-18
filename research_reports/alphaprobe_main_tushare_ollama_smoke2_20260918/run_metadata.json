@@ -1,0 +1,352 @@
+{
+  "method": "AlphaPROBE Bayesian factor retriever + DAG-aware factor generator",
+  "method_id": "alphaprobe-mainline-tushare",
+  "paper_mainline": {
+    "retriever": "ICIR posterior + depth prior + repeat penalty + mutual-correlation redundancy",
+    "generator": "DAG lineage-conditioned Ollama Qwen3",
+    "semantic_embedding": "disabled_no_local_embedding_model",
+    "source_code": [
+      "quantlab/third_party/AlphaPROBE/src/alpha_knowledge/alpha_pool.py",
+      "quantlab/third_party/AlphaPROBE/src/alphagen/data/expression_knowledge_graph.py"
+    ]
+  },
+  "data_source": "Tushare cached full-A qfq Parquet",
+  "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1",
+  "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+  "alignment": {
+    "universe": "full_a",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "data_start": "20180101",
+    "start": "20210907",
+    "end": "20260907",
+    "groups": 10,
+    "label_offset": 1,
+    "round_trip_cost": 0.006,
+    "one_way_cost": 0.003,
+    "benchmark_mode": "factor_valid",
+    "correlation_method": "daily_cross_sectional_spearman_mean",
+    "platform_turnover_high_threshold": 0.85,
+    "local_turnover_low_threshold": 0.5,
+    "turnover_gap_alert_threshold": 0.25,
+    "platform_turnover_over_100_threshold": 1.0,
+    "turnover_sensitivity_method": "local gross excess minus annualized cost using saved platform turnover; diagnostic only",
+    "large_net_delta_pp": 5.0,
+    "large_gross_delta_pp": 5.0,
+    "large_rank_ic_delta": 0.02,
+    "min_top20_overlap": 15,
+    "min_period_coverage": 0.95,
+    "turnover_dominant_max_sensitivity_delta_pp": 2.0,
+    "verified_search_fields": [
+      "amount",
+      "book_to_market_ratio_lf",
+      "book_to_market_ratio_lyr",
+      "close",
+      "current_assets",
+      "current_liabilities",
+      "gr_total_asset_lyr",
+      "high",
+      "inventory",
+      "low",
+      "market_cap",
+      "open",
+      "oper_main_profit_ttm",
+      "oper_roe_lyr",
+      "ratio_bm_ttm",
+      "ratio_ep_ttm",
+      "ratio_pcf_ocf_ttm",
+      "ratio_sp_ttm",
+      "turnover",
+      "volume"
+    ]
+  },
+  "target": "close(t+1) -> close(t+1+5)",
+  "cycle": 5,
+  "data_start": "20180101",
+  "train": {
+    "start": "20210907",
+    "end": "20240906"
+  },
+  "valid": {
+    "start": "20240909",
+    "end": "20250905"
+  },
+  "test": {
+    "start": "20250908",
+    "end": "20260907"
+  },
+  "universe": "smoke subset of 沪深全A",
+  "universe_size": 300,
+  "universe_limit": 300,
+  "feature_search": {
+    "feature_set": "verified",
+    "search_fields": [
+      "amount",
+      "book_to_market_ratio_lf",
+      "book_to_market_ratio_lyr",
+      "current_assets",
+      "current_liabilities",
+      "gr_total_asset_lyr",
+      "inventory",
+      "market_cap",
+      "oper_main_profit_ttm",
+      "oper_roe_lyr",
+      "ratio_bm_ttm",
+      "ratio_ep_ttm",
+      "ratio_pcf_ocf_ttm",
+      "ratio_sp_ttm",
+      "turnover"
+    ],
+    "search_field_count": 15,
+    "search_field_status": [
+      {
+        "field": "amount",
+        "base_field": "amount",
+        "period": "current",
+        "label": "成交额",
+        "category": "price_volume",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "amount",
+        "note": "aligned qfq/daily_basic field"
+      },
+      {
+        "field": "book_to_market_ratio_lf",
+        "base_field": "book_to_market_ratio_lf",
+        "period": "current",
+        "label": "账面市值比lf,归属母公司股东权益合计mrq",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "book_to_market_ratio_lyr",
+        "base_field": "book_to_market_ratio_lyr",
+        "period": "current",
+        "label": "账面市值比lyr,归属母公司股东权益合计lyr",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_derived",
+        "source": "PIT Tushare valuation reconstruction",
+        "note": "valuation reconstructed from PIT statements"
+      },
+      {
+        "field": "current_assets",
+        "base_field": "current_assets",
+        "period": "current",
+        "label": "流动资产合计",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "balancesheet.total_cur_assets",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "current_liabilities",
+        "base_field": "current_liabilities",
+        "period": "current",
+        "label": "流动负债合计",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "balancesheet.total_cur_liab",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "gr_total_asset_lyr",
+        "base_field": "gr_total_asset_lyr",
+        "period": "current",
+        "label": "double | 总资产同比增长率lyr",
+        "category": "growth-derived",
+        "source_file": "fields-growth-derived.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "inventory",
+        "base_field": "inventory",
+        "period": "current",
+        "label": "存货",
+        "category": "fundamental",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "balancesheet.inventories",
+        "note": "PIT Tushare statement field"
+      },
+      {
+        "field": "market_cap",
+        "base_field": "market_cap",
+        "period": "current",
+        "label": "市值",
+        "category": "price_volume",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "total_mv",
+        "note": "aligned qfq/daily_basic field"
+      },
+      {
+        "field": "oper_main_profit_ttm",
+        "base_field": "oper_main_profit_ttm",
+        "period": "current",
+        "label": "double | 主营业务利润ttm",
+        "category": "operating-derived",
+        "source_file": "fields-operating-derived.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "oper_roe_lyr",
+        "base_field": "oper_roe_lyr",
+        "period": "current",
+        "label": "double | 净资产收益率lyr",
+        "category": "operating-derived",
+        "source_file": "fields-operating-derived.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "ratio_bm_ttm",
+        "base_field": "ratio_bm_ttm",
+        "period": "current",
+        "label": "double | 账面市值比ttm",
+        "category": "valuation",
+        "source_file": "fields-valuation.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "ratio_ep_ttm",
+        "base_field": "ratio_ep_ttm",
+        "period": "current",
+        "label": "double | 盈市率ttm",
+        "category": "valuation",
+        "source_file": "fields-valuation.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "ratio_pcf_ocf_ttm",
+        "base_field": "ratio_pcf_ocf_ttm",
+        "period": "current",
+        "label": "double | 市现率_经营ttm",
+        "category": "valuation",
+        "source_file": "fields-valuation.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "ratio_sp_ttm",
+        "base_field": "ratio_sp_ttm",
+        "period": "current",
+        "label": "double | 销售收益率ttm",
+        "category": "valuation",
+        "source_file": "fields-valuation.md",
+        "status": "local_proxy",
+        "source": "PIT Tushare/catalog-field reconstruction",
+        "note": "platform catalog field mapped to an aligned Tushare source or derived indicator"
+      },
+      {
+        "field": "turnover",
+        "base_field": "turnover",
+        "period": "current",
+        "label": "换手率",
+        "category": "price_volume",
+        "source_file": "fields.md",
+        "status": "local_direct",
+        "source": "turnover",
+        "note": "aligned qfq/daily_basic field"
+      }
+    ],
+    "unverified_fields": [],
+    "allow_unverified_fields": false,
+    "blocked_fields": [],
+    "allow_blocked_fields": false,
+    "failure_registry": "/data/games/factor_/research_reports/platform_alignment/factor_alignment_failure_registry.json"
+  },
+  "net_excess_reward": {
+    "train_only": true,
+    "weight": 0.1,
+    "scale": 0.1,
+    "groups": 10,
+    "round_trip_cost": 0.006,
+    "benchmark_mode": "factor_valid"
+  },
+  "generator": {
+    "provider": "ollama",
+    "model": "goekdenizguelmez/JOSIEFIED-Qwen3:latest",
+    "temperature": 0.3,
+    "generate_num": 2
+  },
+  "panels": {
+    "train": {
+      "start_date": "2021-09-07",
+      "end_date": "2024-09-06",
+      "trading_days": 728,
+      "stocks": 300,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 512,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    },
+    "valid": {
+      "start_date": "2024-09-09",
+      "end_date": "2025-09-05",
+      "trading_days": 241,
+      "stocks": 300,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 512,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    },
+    "test": {
+      "start_date": "2025-09-08",
+      "end_date": "2026-09-07",
+      "trading_days": 242,
+      "stocks": 300,
+      "features": [
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "vwap"
+      ],
+      "device": "cuda:0",
+      "max_backtrack_days": 512,
+      "max_future_days": 8,
+      "high_low_fallback": false
+    }
+  },
+  "device": "cuda:0",
+  "generation_statuses": [
+    "ollama",
+    "ollama",
+    "ollama"
+  ],
+  "seed_count": 7,
+  "accepted_count": 6
+}

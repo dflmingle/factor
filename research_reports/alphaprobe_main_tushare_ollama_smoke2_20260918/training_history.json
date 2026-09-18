@@ -1,0 +1,66 @@
+[
+  {
+    "iteration": 1,
+    "parents": [
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": -0.08554344806119453,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($close, TsPctChange($close, 10)), 20)",
+            "status": "accepted",
+            "ic": 0.010761887766420841,
+            "icir": 0.08823156908138151,
+            "net_excess": -0.353355895352037
+          },
+          {
+            "expression": "TsRank(Add($close, TsDelta($close, 5)), 20)",
+            "status": "accepted",
+            "ic": 0.01772184856235981,
+            "icir": 0.13465941606189832,
+            "net_excess": -0.43313901075467676
+          }
+        ]
+      },
+      {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "retriever_score": -0.04468468236479465,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Add($book_to_market_ratio_lf, $oper_main_profit_ttm))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsRank(Mul($book_to_market_ratio_lf, $market_cap))",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      },
+      {
+        "expression": "Rank($ratio_ep_ttm)",
+        "retriever_score": -0.0020164930326146777,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "Rank(Mul($ratio_ep_ttm, $book_to_market_ratio_lf))",
+            "status": "accepted",
+            "ic": 0.006001847330480814,
+            "icir": 0.047656922520673224,
+            "net_excess": -0.031120411009821172
+          },
+          {
+            "expression": "TsRank(Add($ratio_ep_ttm, $book_to_market_ratio_lyr))",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(Mul($close, TsPctChange($close, 10)), 20)",
+      "TsRank(Add($close, TsDelta($close, 5)), 20)",
+      "Rank(Mul($ratio_ep_ttm, $book_to_market_ratio_lf))"
+    ]
+  }
+]

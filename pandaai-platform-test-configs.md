@@ -1,17 +1,17 @@
 # PandaAI Platform Test Configurations
 
-Registry snapshot: `2026-09-11T10:48:46.149014+00:00`. This file is built from the local registry and saved report files; it does not call PandaAI.
+Registry snapshot: `2026-09-18T05:19:27.668955+00:00`. This file is built from the local registry and saved report files; it does not call PandaAI.
 
 ## Snapshot
 
-- current platform workflows: `171`
-- saved positive results: `45`
-- positive results bound to a current config: `43`
-- positive results without a current config: `2`
+- current platform workflows: `204`
+- saved positive results: `69`
+- positive results bound to a current config: `68`
+- positive results without a current config: `1`
 
 | stock pool value from factor_info | workflow count |
 |---|---:|
-| 沪深全A | 167 |
+| 沪深全A | 200 |
 | <empty> | 3 |
 | 自定义 | 1 |
 
@@ -21,8 +21,29 @@ The configuration columns below are copied from `factor_info`; the result column
 
 | result | factor_id | run_id | pool | dates | cycle | groups | direction | net excess | binding |
 |---|---|---|---|---|---:|---:|---:|---:|---|
+| SIZE-ONLY-20260911 | 6aa3b8573e7967143f8faf29 | 6aa3b8576df2a192a47e7cfe | 沪深全A | 20210907..20260907 | 10 | 10 | 0 | 21.43% | run_id |
+| F-I10-01 | 6aac9f3951cdfe29b2e0d0b0 | 6aac9f3a8b01f62dc51475b6 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 21.42% | run_id |
+| T10-ADD-AGG-IMPACT-20260911 | 6aa3ca136df2a192a47e7d33 | 6aa3ca1451cdfe29b2e0bce4 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 19.76% | run_id |
+| T10-ADD-G13-20260911 | 6aa3c613ecb163ea7228d06e | 6aa3c61451cdfe29b2e0bcdd | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 19.62% | run_id |
+| T10-ADD-DOWNSIDE-IMPACT-20260911 | 6aa3c920ecb163ea7228d078 | 6aa3c9208b01f62dc5146090 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 19.39% | run_id |
+| T10-SIZE-PLUS-IMPACT | 6aa368586df2a192a47e7c5d | 6aa368586df2a192a47e7c5e | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 18.16% | run_id |
+| T10-ADD-BM-20260911 | 6aa3c6d1a7f535324660ba70 | 6aa3c6d25d52c44d2f55c45b | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 18.09% | run_id |
+| VERIFY-E260910-04 | 6aa28cf2a7f535324660b832 | 6aa28cf3cffa1665a210157a | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 17.76% | run_id |
+| T10-ADD-FSCORE-20260911 | 6aa3c986a7f535324660ba76 | 6aa3c986a7f535324660ba77 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 17.48% | run_id |
+| T10-SIZE-PLUS-IMPACT-WC | 6aa3690aecb163ea7228cffa | 6aa3690a6df2a192a47e7c60 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 17.44% | run_id |
+| T10-ADD-DD120-20260911 | 6aa3c66cecb163ea7228d075 | 6aa3c66d6df2a192a47e7d28 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 16.83% | run_id |
+| VERIFY10-E260910-04 | 6aa28e090f6165ec8f7f378b | 6aa28e0a5d52c44d2f55c2da | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 16.74% | run_id |
+| H03-T10-SINGLE | 6aa36bd3cffa1665a2101716 | 6aa36bd3ecb163ea7228cffe | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 16.44% | run_id |
 | COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ | 6aa150cb3e7967143f8face0 | 6aa150cbcffa1665a21012bd | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 16.38% | run_id |
+| VERIFY-F260910-12 | 6aa28d3851cdfe29b2e0ba93 | 6aa28d3951cdfe29b2e0ba94 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 15.59% | run_id |
+| VERIFY10-F260910-12 | 6aa28e555d52c44d2f55c2dc | 6aa28e56a7f535324660b838 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 15.05% | run_id |
+| VERIFY-G260910-13 | 6aa28d80cffa1665a210157c | 6aa28d80cffa1665a210157d | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 14.70% | run_id |
+| T10-SIZE-PLUS-WC-MCAP | 6aa368b9ecb163ea7228cff9 | 6aa368baa7f535324660b9a5 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 14.58% | run_id |
+| T10-NOMCAP-PLUS-IMPACT | 6aa3c06bd5536b11c13ee096 | 6aa3c06cd5536b11c13ee097 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 14.23% | run_id |
+| VERIFY10-G260910-13 | 6aa28ea3a7f535324660b83a | 6aa28ea43e7967143f8fae33 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 13.94% | run_id |
+| F-NET01-PLAT-20260914 | 6aa7cd278b01f62dc5146aed | 6aa7cd283e7967143f8fb524 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 13.63% | run_id |
 | COMBO-DIRECT-OSR2-CHIP-TURN-PAPER-EQ | 6aa15326a7f535324660b5d5 | 6aa15327cffa1665a21012d2 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 12.77% | run_id |
+| F-GFN-N02-20260916 | 6aaa71cd6df2a192a47e8ddc | 6aaa722951cdfe29b2e0ccff | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 12.27% | run_id |
 | OSR2-RET40-TURN-BIAS-PAPER-EQ | 6a9fe1363e7967143f8fab47 | 6a9fe1366df2a192a47e76a5 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 11.64% | run_id |
 | paper-derived-composite | 6a9e306152393bc2bd995c4b | 6a9e30629a167ed86a7f1ae4 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 11.41% | run_id |
 | paper-derived-composite | 6a9fd5536df2a192a47e766d | 6a9fd554cffa1665a2100f4b | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 11.20% | run_id |
@@ -34,6 +55,7 @@ The configuration columns below are copied from `factor_info`; the result column
 | HT13-TURN-BIAS-1M | 6a9e8b253e7967143f8fa933 | 6a9e8b263e7967143f8fa934 | 沪深全A | 20210907..20260907 | 5 | 10 | 0 | 6.43% | run_id |
 | HT13-TURN-BIAS-1M-POS | 6a9e9449a7f535324660b07d | 6a9e944aa7f535324660b07e | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 6.40% | run_id |
 | OSR2-RET40-TURN-BIAS-PAPER-NOMCAP-EQ | 6aa0c0435d52c44d2f55c0b9 | 6aa0c0433e7967143f8fabf6 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 5.22% | run_id |
+| F-NET01-PLAT-20260915 | 6aa91ca351cdfe29b2e0c947 | 6aa91ca451cdfe29b2e0c948 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 5.05% | run_id |
 | OSR2-RET40 | 6a9fcd2d6df2a192a47e765b | 6a9fcd2e6df2a192a47e765c | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 5.03% | run_id |
 | HT13-TURN-BIAS-1M | 6a9fcdb251cdfe29b2e0b56b | 6a9fcdb23e7967143f8faaee | 沪深全A | 20210907..20260907 | 10 | 10 | 0 | 4.96% | run_id |
 | OSR2-DD120 | 6a9e77906df2a192a47e7347 | 6a9e7b46ecb163ea7228ca6d | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 4.79% | run_id |
@@ -42,10 +64,12 @@ The configuration columns below are copied from `factor_info`; the result column
 | OSR2-DD120 | 6a9fcd73ecb163ea7228cbed | 6a9fcd73ecb163ea7228cbee | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 4.25% | run_id |
 | OSR3-RET40-BP-CFP | 6a9f735ccffa1665a2100e03 | 6a9f735ccffa1665a2100e04 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 3.56% | run_id |
 | OSR4-RET40-BP-CFP-VAL2 | 6a9f77be0f6165ec8f7f34a1 | 6a9f77bf0f6165ec8f7f34a2 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 3.56% | run_id |
+| NEW-VALUE-EVEBITDA | 6aa233bf6df2a192a47e79f1 | 6aa233c051cdfe29b2e0b958 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 3.32% | run_id |
 | OSR4-RET40-BP-CFP-VAL3 | 6a9f78153e7967143f8faa6a | 6a9f78165d52c44d2f55bf65 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 3.31% | run_id |
 | OSR3-RET40-BP-VAL2 | 6a9f725e5d52c44d2f55bf62 | 6a9f725e5d52c44d2f55bf63 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 3.17% | run_id |
 | OSR3-RET40-BP-EQ | 6a9f71b551cdfe29b2e0b49c | 6a9f71b56df2a192a47e7551 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 3.16% | run_id |
 | OSR4-RET40-BP-CFP-SP | 6a9f7922cffa1665a2100e1a | 6a9f7922cffa1665a2100e1b | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.88% | run_id |
+| F-NET03-PLAT-20260916 | 6aa9fe1351cdfe29b2e0cc1d | 6aa9fe713e7967143f8fb8ea | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.79% | run_id |
 | OSR3-RET40-BP-INTERACT | 6a9f75703e7967143f8faa67 | 6a9f7571a7f535324660b21f | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.73% | run_id |
 | HT-WREV-LOWTURN-21D | 6a9fb7b4ecb163ea7228cbd2 | 6a9fb7b46df2a192a47e762c | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 2.71% | run_id |
 | OSR4-RET40-BP-CFP-PCF | 6a9f797aa7f535324660b238 | 6a9f797ba7f535324660b239 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.67% | run_id |
@@ -54,7 +78,7 @@ The configuration columns below are copied from `factor_info`; the result column
 | OSR4-RET40-BP-CFP-TSRANK756 | 6a9f78c7a7f535324660b22c | 6a9f78c7ecb163ea7228cb78 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.46% | run_id |
 | OSR3-RET40-BP-MA63 | 6a9f74c7cffa1665a2100e07 | 6a9f74c7cffa1665a2100e08 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.41% | run_id |
 | OSR4-RET40-BP-CFP-REV2 | 6a9f771bcffa1665a2100e10 | 6a9f771ca7f535324660b221 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.37% | run_id |
-| HT13-MOMENTUM-120D-D0 | 6aa4e3bd6df2a192a47e7ea3 | 6aa4e3bfa7f535324660bc2d | <not in registry> |  |  |  | 0 | 2.29% | historical_not_in_registry |
+| HT13-MOMENTUM-120D-D0 | 6aa4e3bd6df2a192a47e7ea3 | 6aa4e3bfa7f535324660bc2d | 沪深全A | 20210907..20260907 | 10 | 10 | 0 | 2.29% | run_id |
 | HT13-VALUE-BP | 6a9e891a0f6165ec8f7f33d9 | 6a9e891acffa1665a2100bcd | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 2.10% | run_id |
 | OSR2-DD60 | 6a9e7790cffa1665a2100b83 | 6a9e7afc6df2a192a47e7356 | 沪深全A | 20210907..20260907 | 5 | 10 | 1 | 1.95% | run_id |
 | NONHT-FSCORELIKE-REV40-INTERACT | 6aa1051decb163ea7228cd46 | 6aa1051eecb163ea7228cd47 | 沪深全A | 20210907..20260907 | 10 | 10 | 1 | 1.84% | run_id |
@@ -71,6 +95,39 @@ The configuration columns below are copied from `factor_info`; the result column
 
 | workflow | factor_id | last run_id | pool | market | dates | cycle | groups | direction | local runs |
 |---|---|---|---|---|---|---:|---:|---:|---:|
+| RSQR60-ALPHA158-20260918 | 6aacc75e3e7967143f8fbbdb | 6aacc75f3e7967143f8fbbdc | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| KMID2-KMID2-ALPHA158-20260918 | 6aacb13651cdfe29b2e0d0b5 | 6aacb13651cdfe29b2e0d0b6 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 0 | 1 |
+| field-isolation-20260918-F-ALIGN-VWAP-20260918 | 6aaca073ecb163ea7228db6e | 6aaca074ecb163ea7228db6f | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| field-isolation-20260918-F-ALIGN-HIGH-20260918 | 6aaca0256df2a192a47e9171 | 6aaca0256df2a192a47e9172 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| size-impact-20260918-F-I10-01 | 6aac9f3951cdfe29b2e0d0b0 | 6aac9f3a8b01f62dc51475b6 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |
+| gfn-unt-20260916-GP-UNT-20260916-CONTRACT-RET30 | 6aaa769b6df2a192a47e8e0c | 6aaa769c6df2a192a47e8e0d | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| gfn-unt-20260916-GFN-UNT-20260916-BMQUALITY | 6aaa769251cdfe29b2e0cd39 | 6aaa769251cdfe29b2e0cd3a | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| gfn-unt-20260916-GFN-UNT-20260916-EVPRICE | 6aaa764c6df2a192a47e8e07 | 6aaa764cecb163ea7228d989 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| gfn-new-20260916-F-GFN-N02-20260916 | 6aaa71cd6df2a192a47e8ddc | 6aaa722951cdfe29b2e0ccff | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| gfn-new-20260916-F-GFN-N01-20260916 | 6aaa71cc6df2a192a47e8ddb | 6aaa71e56df2a192a47e8de1 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| PANDA-260916-NET-DD-F-NET-D03 | 6aaa692a51cdfe29b2e0ccdd | 6aaa692ba7f535324660cbf6 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| PANDA-260916-NET-DD-F-NET-D02 | 6aaa68ecd5536b11c13eeafc | 6aaa68ed5d52c44d2f55ce8f | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| PANDA-260916-NET-DD-F-NET-D01 | 6aaa68e25d52c44d2f55ce8e | 6aaa68e3a7f535324660cbf4 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| GFN-20260916-F-A20 | 6aaa44026df2a192a47e8d45 | 6aaa44033e7967143f8fb92d | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| GFN-20260916-F-A19 | 6aaa43bf3e7967143f8fb92c | 6aaa43bfd5536b11c13eeacd | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| GFN-20260916-F-A18 | 6aaa43735d52c44d2f55ce57 | 6aaa43736df2a192a47e8d43 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| PANDA-260916-F-NET03-PLAT-20260916 | 6aa9fe1351cdfe29b2e0cc1d | 6aa9fe713e7967143f8fb8ea | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| PANDA-260916-F-NET02-PLAT-20260916 | 6aa9fe1351cdfe29b2e0cc1c | 6aa9fe6e8b01f62dc5147113 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| PANDA-260916-F-NET01-PLAT-20260916 | 6aa9fe126df2a192a47e8cd1 | 6aa9fe6b51cdfe29b2e0cc21 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| pandaai-net15-20260915-F-NET01-PLAT-20260915 | 6aa91ca351cdfe29b2e0c947 | 6aa91ca451cdfe29b2e0c948 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| net1-platform-20260914-F-NET01-PLAT-20260914 | 6aa7cd278b01f62dc5146aed | 6aa7cd283e7967143f8fb524 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| panda-final-20260914-F-A18 | 6aa7ac1c51cdfe29b2e0c5d6 | 6aa7ac1c5d52c44d2f55cad8 | 沪深全A | 股票 | 20210907..20260907 | 5 | 10 | 1 | 1 |
+| vwap-volume-trend-VWAP10-VOL20-MOM20-RAW | 6aa518903e7967143f8fb083 | 6aa518928b01f62dc51462aa | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |
+| direction-audit-HT13-MOMENTUM-120D-D0 | 6aa4e3bd6df2a192a47e7ea3 | 6aa4e3bfa7f535324660bc2d | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 0 | 1 |
+| WF6AA4-D0-PYTHON-OBV-20260912 | 6aa4df0cd5536b11c13ee152 | 6aa4df0ed5536b11c13ee153 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 0 | 1 |
+| WF6AA4-D0-OPEN20-MOM-20260912 | 6aa4de836df2a192a47e7e97 | 6aa4de84a7f535324660bc17 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 0 | 1 |
+| WF6AA4-D0-CLOSE20-MOM-20260912 | 6aa4de3351cdfe29b2e0be51 | 6aa4de353e7967143f8fb035 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 0 | 1 |
+| 20日量价突破复合因子-克隆-5Y-T10-G10-D0-20260912 | 6aa4dc98a7f535324660bc07 | 6aa4dc9aa7f535324660bc08 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 0 | 0 |
+| 20日量价突破复合因子-克隆-5Y-T10-G10-20260912 | 6aa4270d3e7967143f8fafde | 6aa4273051cdfe29b2e0bdb0 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 0 |
+| WF6AA4-PYTHON-OBV-20260911 | 6aa422b9a7f535324660bb4b | 6aa422bcecb163ea7228d107 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |
+| WF6AA4-OPEN20-MOM-20260911 | 6aa422566df2a192a47e7e05 | 6aa422598b01f62dc514615d | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |
+| WF6AA4-CLOSE20-MOM-20260911 | 6aa421e15d52c44d2f55c4f0 | 6aa421e35d52c44d2f55c4f1 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |
+| 20日量价突破复合因子-克隆 | 6aa40282ecb163ea7228d0d8 |  | 沪深全A | 股票 | 20250101..20251231 | 1 | 5 | 0 | 0 |
 | T10-NONLINEAR-XGB-20260911 | 6aa3d4df3e7967143f8faf55 | 6aa3d504a7f535324660ba88 | 沪深全A |  | .. | 10 | 10 | 1 | 0 |
 | t10-more-additions-20260911-T10-ADD-AGG-IMPACT-20260911 | 6aa3ca136df2a192a47e7d33 | 6aa3ca1451cdfe29b2e0bce4 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |
 | t10-more-additions-20260911-T10-ADD-FSCORE-20260911 | 6aa3c986a7f535324660ba76 | 6aa3c986a7f535324660ba77 | 沪深全A | 股票 | 20210907..20260907 | 10 | 10 | 1 | 1 |

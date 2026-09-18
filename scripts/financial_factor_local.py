@@ -14,6 +14,7 @@ from platform_alignment_rules import CFP_PROXY_BY_HANDLER
 
 MARKET_HANDLERS = {
     "size_only",
+    "amount_volume_high",
     "impact60",
     "impact_abs_return60",
     "impact_downside60",
@@ -49,6 +50,10 @@ FINANCIAL_HANDLERS = {
     "asset_growth",
     "paper_composite",
     "paper_composite_nomcap",
+    "paper_bm_component",
+    "paper_roe_component",
+    "paper_asset_growth_component",
+    "paper_size_component",
     "reversal_turn_paper",
     "reversal_turn_paper_nomcap",
     "reversal_chip_turn_paper",
@@ -61,6 +66,7 @@ FINANCIAL_HANDLERS = {
     "t10_size_plus_impact_wc",
     "t10_size_plus_impact_fscore",
     "book_to_market_lf_plus_impact",
+    "book_to_market_lf_div_oper_main_profit_ttm",
     "ev_ebitda_proxy",
     "reversal20_growth_net",
     "growth_operating_cashflow_reversal20",
@@ -896,6 +902,14 @@ def _ev_to_ebitda_proxy(selected: pd.DataFrame) -> pd.Series:
     return enterprise_value.div(ebitda.where(ebitda.abs().gt(1e-12)))
 
 
+def _gross_profit_ttm_proxy(selected: pd.DataFrame) -> pd.Series:
+    """Rebuild the platform gross/main-profit field from PIT TTM income data."""
+    revenue = _coalesce_numeric(selected, ["ttm_revenue", "ttm_total_revenue"])
+    operating_cost = _numeric_series(selected, "ttm_oper_cost")
+    sales_tax = _numeric_series(selected, "ttm_biz_tax_surchg")
+    return revenue.sub(operating_cost).sub(sales_tax)
+
+
 def build_market_factor(
     frame: pd.DataFrame,
     handler: str,
@@ -918,6 +932,15 @@ def build_market_factor(
 
     if handler == "size_only":
         factor = selected["cap_rank"]
+    elif handler == "amount_volume_high":
+        # AMOUNT/VOLUME is the cached daily VWAP proxy, and HIGH is the qfq
+        # high exposed by full_a_local_data.
+        amount = _numeric_series(selected, "amount")
+        volume = _numeric_series(selected, "volume")
+        high = _numeric_series(selected, "high_qfq")
+        factor = amount.div(volume.replace(0.0, np.nan)).div(
+            high.replace(0.0, np.nan)
+        )
     elif handler == "impact60":
         factor = impact_rank("h03")
     elif handler == "impact_abs_return60":
@@ -1109,7 +1132,15 @@ def build_financial_factor(
     profitability_denominator = _coalesce_numeric(selected, ["ttm_total_revenue", "ttm_revenue"])
     profitability = profitability_numerator.div(profitability_denominator.replace(0.0, np.nan))
 
-    if handler == "value_bm":
+    if handler == "paper_bm_component":
+        factor = _zscore(selected["bm_lyr_rank"], dates_series)
+    elif handler == "paper_roe_component":
+        factor = _zscore(selected["oper_roe_lyr_rank"], dates_series)
+    elif handler == "paper_asset_growth_component":
+        factor = -_zscore(selected["growth_rank"], dates_series)
+    elif handler == "paper_size_component":
+        factor = -_zscore(selected["cap_rank"], dates_series)
+    elif handler == "value_bm":
         factor = selected["ratio_bm_ttm"]
     elif handler == "value_sp":
         factor = selected["ratio_sp_ttm"]
@@ -1193,6 +1224,11 @@ def build_financial_factor(
         ) / 4.0
     elif handler == "book_to_market_lf_minus_size":
         factor = selected["bm_lf_rank"] - selected["cap_rank"]
+    elif handler == "book_to_market_lf_div_oper_main_profit_ttm":
+        gross_profit_ttm = _gross_profit_ttm_proxy(selected)
+        factor = selected["book_to_market_ratio_lf"].div(
+            gross_profit_ttm.where(gross_profit_ttm.abs().gt(1e-12))
+        )
     elif handler == "t10_size_plus_wc_mcap":
         factor = (
             selected["rev_rank"]

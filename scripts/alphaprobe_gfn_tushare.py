@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 import re
 import sys
@@ -63,19 +64,28 @@ from alpha_gfn.env.core import GFNEnvCore  # noqa: E402
 from alpha_gfn.gflownet import EntropyTBGFlowNet  # noqa: E402
 from alpha_gfn.modules import SequenceEncoder  # noqa: E402
 from alpha_gfn.preprocessors import IntegerPreprocessor  # noqa: E402
-from alphaprobe_gp_tushare import TushareStockData, load_trade_dates  # noqa: E402
+from alphaprobe_gp_tushare import (  # noqa: E402
+    AlignedNetExcessContext,
+    TushareStockData,
+    load_trade_dates,
+)
 from full_a_local_data import load_full_a_data  # noqa: E402
 from gfn.actions import Actions  # noqa: E402
 from gfn.env import DiscreteEnv  # noqa: E402
 from gfn.states import DiscreteStates  # noqa: E402
 from pandaai_fields_local import (  # noqa: E402
-    PRICE_VOLUME_FIELDS,
     PandaAIField,
+)
+from search_field_policy import (  # noqa: E402
+    parse_field_list as _parse_field_list,
+    resolve_named_search_fields,
 )
 from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_DATA_START,
     ALIGNMENT_END,
+    ALIGNMENT_GROUPS,
     ALIGNMENT_LABEL_OFFSET,
+    ALIGNMENT_ROUND_TRIP_COST,
     ALIGNMENT_RULES_DOCUMENT,
     ALIGNMENT_RULE_VERSION,
     alignment_config_snapshot,
@@ -121,8 +131,29 @@ FUNDAMENTAL_CORE_FIELDS = (
     "gross_profit_ttm",
     "profit_from_operation_ttm",
 )
-BASE_FEATURE_NAMES = frozenset(feature.name.lower() for feature in FEATURES) | PRICE_VOLUME_FIELDS
+# These are AlphaPROBE's built-in leaves. ``amount``, ``turnover`` and
+# ``market_cap`` are PandaAI named fields, not GFlowNet features, so they must
+# remain available to the named-field action space.
+BASE_FEATURE_NAMES = frozenset(feature.name.lower() for feature in FEATURES)
 FIELD_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def scaled_net_excess_reward(
+    net_excess: float | None,
+    *,
+    weight: float,
+    scale: float,
+) -> float:
+    """Map annualized net excess to a bounded, sign-preserving reward."""
+    if weight < 0.0:
+        raise ValueError("net-excess-weight must be non-negative")
+    if scale <= 0.0:
+        raise ValueError("net-excess-scale must be positive")
+    if weight == 0.0:
+        return 0.0
+    if net_excess is None or not np.isfinite(float(net_excess)):
+        return -weight
+    return weight * math.tanh(float(net_excess) / scale)
 
 
 class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
@@ -137,18 +168,38 @@ class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
 
     VALID_OBJECTIVES = frozenset({"signed_positive", "absolute"})
 
-    def __init__(self, *args: Any, ic_objective: str = "signed_positive", **kwargs: Any):
+    def __init__(
+        self,
+        *args: Any,
+        ic_objective: str = "signed_positive",
+        net_excess_context: AlignedNetExcessContext | None = None,
+        net_excess_weight: float = 0.10,
+        net_excess_scale: float = 0.10,
+        **kwargs: Any,
+    ):
         if ic_objective not in self.VALID_OBJECTIVES:
             choices = ", ".join(sorted(self.VALID_OBJECTIVES))
             raise ValueError(f"ic-objective must be one of: {choices}")
+        if net_excess_weight < 0.0:
+            raise ValueError("net-excess-weight must be non-negative")
+        if net_excess_scale <= 0.0:
+            raise ValueError("net-excess-scale must be positive")
         super().__init__(*args, **kwargs)
         self.ic_objective = ic_objective
+        self.net_excess_context = net_excess_context
+        self.net_excess_weight = float(net_excess_weight)
+        self.net_excess_scale = float(net_excess_scale)
+        self.last_net_excess_stats: dict[str, float | int | None] | None = None
 
     def _score_single_ic(self, ic_ret: float) -> float:
         return float(abs(ic_ret) if self.ic_objective == "absolute" else ic_ret)
 
-    def try_new_expr(self, expr: object, embedding: torch.Tensor | None = None) -> tuple[float, float]:
-        value = self._normalize_by_day(expr.evaluate(self.data))
+    def _try_new_expr_value(
+        self,
+        expr: object,
+        value: torch.Tensor,
+        embedding: torch.Tensor | None = None,
+    ) -> tuple[float, float]:
         ic_ret, ic_mut = self._calc_ics(value, ic_mut_threshold=0.99)
         if ic_ret is None or ic_mut is None:
             return 0.0, 1.0
@@ -185,18 +236,42 @@ class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
         novelty = (1 - np.max(mutual_ics)) if mutual_ics.size > 0 else 1.0
         return score_ic, float(novelty)
 
+    def try_new_expr(
+        self, expr: object, embedding: torch.Tensor | None = None
+    ) -> tuple[float, float]:
+        raw_value = expr.evaluate(self.data)
+        value = self._normalize_by_day(raw_value)
+        return self._try_new_expr_value(expr, value, embedding)
+
+    def _net_excess_reward(self, raw_value: torch.Tensor) -> float:
+        if self.net_excess_context is None or self.net_excess_weight == 0.0:
+            self.last_net_excess_stats = None
+            return 0.0
+        with torch.no_grad():
+            stats = self.net_excess_context.score(raw_value)
+        self.last_net_excess_stats = stats
+        return scaled_net_excess_reward(
+            stats.get("net_excess"),
+            weight=self.net_excess_weight,
+            scale=self.net_excess_scale,
+        )
+
     def try_new_expr_with_ssl(
         self, expr: object, embedding: torch.Tensor | None = None
-    ) -> tuple[float, float, float]:
-        ic_reward, nov_reward = self.try_new_expr(expr, embedding)
+    ) -> tuple[float, float, float, float]:
+        raw_value = expr.evaluate(self.data)
+        value = self._normalize_by_day(raw_value)
+        ic_reward, nov_reward = self._try_new_expr_value(expr, value, embedding)
 
         # Do not let auxiliary SSL/novelty terms turn a non-positive IC into
         # a high-reward trajectory in the signed-positive objective.
         if self.ic_objective == "signed_positive" and ic_reward <= 0.0:
-            return ic_reward, 0.0, 0.0
+            self.last_net_excess_stats = None
+            return ic_reward, 0.0, 0.0, 0.0
 
+        net_excess_reward = self._net_excess_reward(raw_value)
         ssl_reward = self.compute_ssl_reward(expr, embedding) if embedding is not None else 0.0
-        return ic_reward, nov_reward, ssl_reward
+        return ic_reward, nov_reward, ssl_reward, net_excess_reward
 
 
 class GFNNamedField(PandaAIField):
@@ -533,6 +608,26 @@ def build_panel(
     )
 
 
+def build_net_excess_context(
+    panel: TushareGFNStockData,
+    cycle: int,
+) -> AlignedNetExcessContext:
+    """Build the train/evaluation proxy using the shared alignment contract."""
+    if panel.df_bak is None:
+        raise ValueError("The Tushare panel has no aligned source frame for net-excess scoring")
+    return AlignedNetExcessContext(
+        frame=panel.df_bak,
+        calendar=panel._calendar,
+        data=panel,
+        start_date=panel._start_time,
+        end_date=panel._end_time,
+        cycle=cycle,
+        label_offset=ALIGNMENT_LABEL_OFFSET,
+        groups=ALIGNMENT_GROUPS,
+        round_trip_cost=ALIGNMENT_ROUND_TRIP_COST,
+    )
+
+
 def safe_batch_spearmanr(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """Compute daily Spearman correlation without a stock-by-stock tensor."""
     valid = torch.isfinite(x) & torch.isfinite(y)
@@ -567,27 +662,7 @@ def safe_batch_spearmanr(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 
 
 def parse_field_list(value: str | Path | None) -> list[str]:
-    if value is None:
-        return []
-    raw_value = str(value)
-    candidate = Path(raw_value).expanduser()
-    try:
-        is_file = candidate.is_file()
-    except OSError:
-        # A saved evaluator run may pass a long comma-separated field list;
-        # do not let Path.stat reject it before the list parser sees it.
-        is_file = False
-    if is_file:
-        raw_values = candidate.read_text(encoding="utf-8").splitlines()
-    else:
-        raw_values = [raw_value]
-    fields: list[str] = []
-    for raw_line in raw_values:
-        line = raw_line.split("#", 1)[0].strip().lower()
-        if not line:
-            continue
-        fields.extend(item for item in line.replace(",", " ").split() if item)
-    return list(dict.fromkeys(fields))
+    return _parse_field_list(value)
 
 
 def resolve_search_fields(
@@ -596,62 +671,20 @@ def resolve_search_fields(
     feature_set: str,
     extra_fields: str | Path | None,
     max_extra_fields: int,
+    allow_unverified_fields: bool,
+    allow_blocked_fields: bool = False,
 ) -> dict[str, Any]:
     """Resolve and validate the named-field action space for one run."""
-    requested_override = parse_field_list(extra_fields)
-    if requested_override:
-        requested = requested_override
-        resolved_feature_set = "custom"
-    elif feature_set == "price_volume":
-        return {
-            "feature_set": feature_set,
-            "search_fields": [],
-            "search_field_count": 0,
-            "search_field_status": [],
-        }
-    elif feature_set == "fundamental_core":
-        requested = list(FUNDAMENTAL_CORE_FIELDS)
-        resolved_feature_set = feature_set
-    elif feature_set == "all_active":
-        active = set(panel.pandaai_field_store.active_search_fields(include_period_variants=True))
-        requested = sorted(active - BASE_FEATURE_NAMES)
-        resolved_feature_set = feature_set
-    else:
-        raise ValueError(f"Unsupported feature-set: {feature_set}")
-
-    requested = [field for field in requested if field not in BASE_FEATURE_NAMES]
-    if feature_set == "all_active" and not requested_override:
-        unavailable = []
-        statuses = [panel.pandaai_field_store.status(field) for field in requested]
-    else:
-        statuses = [panel.pandaai_field_store.status(field) for field in requested]
-        unavailable = [
-            str(item["field"])
-            for item in statuses
-            if item["status"] == "unavailable"
-        ]
-    if unavailable:
-        details = [item for item in statuses if item["field"] in unavailable]
-        detail_text = "; ".join(
-            f"{item['field']}: {item['note'] or item['status']}" for item in details
-        )
-        raise ValueError(
-            "Requested named fields are unavailable in the local financial cache: "
-            f"{detail_text}"
-        )
-    if max_extra_fields < 0:
-        raise ValueError("--max-extra-fields must be non-negative; use 0 for no limit")
-    if max_extra_fields and len(requested) > max_extra_fields:
-        raise ValueError(
-            f"Feature set {resolved_feature_set} resolves to {len(requested)} named fields, "
-            f"above --max-extra-fields={max_extra_fields}; use a field file or --max-extra-fields 0"
-        )
-    return {
-        "feature_set": resolved_feature_set,
-        "search_fields": requested,
-        "search_field_count": len(requested),
-        "search_field_status": statuses,
-    }
+    return resolve_named_search_fields(
+        panel,
+        feature_set=feature_set,
+        extra_fields=extra_fields,
+        max_extra_fields=max_extra_fields,
+        allow_unverified_fields=allow_unverified_fields,
+        allow_blocked_fields=allow_blocked_fields,
+        base_feature_names=BASE_FEATURE_NAMES,
+        fundamental_core_fields=FUNDAMENTAL_CORE_FIELDS,
+    )
 
 
 def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[str, TushareGFNStockData], object, dict[str, Any]]:
@@ -715,7 +748,19 @@ def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[st
         feature_set=args.feature_set,
         extra_fields=args.extra_fields,
         max_extra_fields=args.max_extra_fields,
+        allow_unverified_fields=args.allow_unverified_fields,
+        allow_blocked_fields=args.allow_blocked_fields,
     )
+    blocked_base_features = [
+        field.strip().lower()
+        for field in str(args.blocked_features or "").split(",")
+        if field.strip()
+    ]
+    unknown_base_features = sorted(set(blocked_base_features) - BASE_FEATURE_NAMES)
+    if unknown_base_features:
+        raise ValueError(
+            "Unknown --blocked-features: " + ", ".join(unknown_base_features)
+        )
     metadata = {
         "method": "AlphaPROBE GFlowNet",
         "method_id": "alphaprobe-gfn",
@@ -728,6 +773,14 @@ def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[st
         "alignment": alignment_config_snapshot(),
         "target": f"close(t+{ALIGNMENT_LABEL_OFFSET}) -> close(t+{ALIGNMENT_LABEL_OFFSET}+{args.cycle})",
         "ic_objective": args.ic_objective,
+        "net_excess_reward": {
+            "train_only": True,
+            "weight": args.net_excess_weight,
+            "scale": args.net_excess_scale,
+            "groups": ALIGNMENT_GROUPS,
+            "round_trip_cost": ALIGNMENT_ROUND_TRIP_COST,
+            "benchmark_mode": alignment_config_snapshot()["benchmark_mode"],
+        },
         "cycle": args.cycle,
         "data_start": args.data_start,
         "train": {"start": args.train_start, "end": args.train_end},
@@ -737,10 +790,12 @@ def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[st
         "universe_size": len(instruments),
         "universe_limit": args.universe_limit,
         "features": [feature.name.lower() for feature in FeatureType],
+        "blocked_base_features": blocked_base_features,
         **search_config,
         "vwap_source": panels["train"].vwap_source,
         "panels": {name: panel.summary() for name, panel in panels.items()},
         "device": str(device),
+        "search_alignment_rule_version": ALIGNMENT_RULE_VERSION,
     }
     return panels, target, metadata
 
@@ -753,6 +808,7 @@ class NamedFieldGFNEnvCore(DiscreteEnv):
         pool: AlphaPoolGFN,
         *,
         named_fields: Iterable[str] = (),
+        blocked_features: Iterable[str] = (),
         encoder: torch.nn.Module | None = None,
         device: torch.device = torch.device("cuda:0"),
         mask_dropout_prob: float = 0.1,
@@ -766,10 +822,15 @@ class NamedFieldGFNEnvCore(DiscreteEnv):
         self.nov_weight = nov_weight
         self.builder = GFNExpressionBuilder()
         self.named_fields = list(dict.fromkeys(str(field).lower() for field in named_fields))
+        blocked = {str(field).strip().lower() for field in blocked_features}
 
         self.beg_token = [BEG_TOKEN]
         self.operators = [OperatorToken(operator) for operator in OPERATORS]
-        self.features = [FeatureToken(feature) for feature in FEATURES]
+        self.features = [
+            FeatureToken(feature)
+            for feature in FEATURES
+            if feature.name.lower() not in blocked
+        ]
         self.features.extend(NamedFieldToken(field) for field in self.named_fields)
         self.delta_times = [DeltaTimeToken(delta_time) for delta_time in DELTA_TIMES]
         self.constants = [ConstantToken(constant) for constant in CONSTANTS]
@@ -886,10 +947,15 @@ class NamedFieldGFNEnvCore(DiscreteEnv):
                     if self.encoder is not None:
                         with torch.no_grad():
                             embedding = self.encoder(state_tensor.unsqueeze(0)).squeeze(0)
-                    ic_reward, nov_reward, ssl_reward = self.pool.try_new_expr_with_ssl(
+                    ic_reward, nov_reward, ssl_reward, net_excess_reward = self.pool.try_new_expr_with_ssl(
                         expression, embedding
                     )
-                    reward = ic_reward + self.ssl_weight * ssl_reward + self.nov_weight * nov_reward
+                    reward = (
+                        ic_reward
+                        + net_excess_reward
+                        + self.ssl_weight * ssl_reward
+                        + self.nov_weight * nov_reward
+                    )
                 except OutOfDataRangeError:
                     reward = 0.0
             rewards.append(np.maximum(reward, np.exp(-10)))
@@ -957,13 +1023,19 @@ def build_gfn_components(
     pool: AlphaPoolGFN,
     device: torch.device,
     named_fields: Iterable[str] = (),
+    blocked_features: Iterable[str] = (),
 ) -> tuple[NamedFieldGFNEnvCore, torch.nn.Module, Any, Any, Any, Any, Any]:
     named_fields = list(named_fields)
-    n_tokens = len(FEATURES) + len(named_fields) + len(OPERATORS) + len(DELTA_TIMES) + len(CONSTANTS)
+    blocked_features = list(blocked_features)
+    allowed_feature_count = len(
+        [feature for feature in FEATURES if feature.name.lower() not in set(blocked_features)]
+    )
+    n_tokens = allowed_feature_count + len(named_fields) + len(OPERATORS) + len(DELTA_TIMES) + len(CONSTANTS)
     backbone = NamedFieldSequenceEncoder(n_tokens, args.encoder_type).to(device)
     env = NamedFieldGFNEnvCore(
         pool=pool,
         named_fields=named_fields,
+        blocked_features=blocked_features,
         encoder=backbone,
         device=device,
         mask_dropout_prob=args.mask_dropout_prob,
@@ -1007,13 +1079,23 @@ def build_gfn_components(
 
 def dry_run(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], target: object, metadata: dict[str, Any], device: torch.device) -> None:
     train_data = panels["train"]
+    net_context = build_net_excess_context(train_data, args.cycle)
     pool = ObjectiveAlphaPoolGFN(
         capacity=args.pool_capacity,
         stock_data=train_data,
         target=target,
         ic_objective=args.ic_objective,
+        net_excess_context=net_context,
+        net_excess_weight=args.net_excess_weight,
+        net_excess_scale=args.net_excess_scale,
     )
-    env, *_ = build_gfn_components(args, pool, device, metadata.get("search_fields", []))
+    env, *_ = build_gfn_components(
+        args,
+        pool,
+        device,
+        metadata.get("search_fields", []),
+        metadata.get("blocked_base_features", []),
+    )
     target_values = target.evaluate(train_data)
     finite = int(torch.isfinite(target_values).sum().item())
     print(json.dumps({
@@ -1024,6 +1106,9 @@ def dry_run(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], ta
         "gfn_actions": env.n_actions,
         "pool_capacity": args.pool_capacity,
         "encoder_type": args.encoder_type,
+        "net_excess_signal_periods": len(net_context.signal_dates),
+        "net_excess_weight": args.net_excess_weight,
+        "net_excess_scale": args.net_excess_scale,
     }, ensure_ascii=False, indent=2, default=json_default))
 
 
@@ -1045,15 +1130,23 @@ def train(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], targ
     )
 
     train_data = panels["train"]
+    net_context = build_net_excess_context(train_data, args.cycle)
     pool = ObjectiveAlphaPoolGFN(
         capacity=args.pool_capacity,
         stock_data=train_data,
         target=target,
         ic_mut_threshold=args.ic_mut_threshold,
         ic_objective=args.ic_objective,
+        net_excess_context=net_context,
+        net_excess_weight=args.net_excess_weight,
+        net_excess_scale=args.net_excess_scale,
     )
     env, backbone, _, _, loss_fn, sampler, optimizer = build_gfn_components(
-        args, pool, device, metadata.get("search_fields", [])
+        args,
+        pool,
+        device,
+        metadata.get("search_fields", []),
+        metadata.get("blocked_base_features", []),
     )
     logger = GFNLogger(backbone, pool, output / "checkpoints", panels["test"], target)
     losses: list[float] = []
@@ -1130,9 +1223,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--feature-set",
-        choices=["price_volume", "fundamental_core", "all_active"],
-        default="price_volume",
-        help="named-field action space; fundamental_core is the controlled finance set",
+        choices=["price_volume", "verified", "fundamental_core", "all_active"],
+        default="verified",
+        help="named-field action space; verified is the aligned default",
     )
     parser.add_argument(
         "--extra-fields",
@@ -1145,6 +1238,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=64,
         help="guard for named fields; 0 disables the guard",
+    )
+    parser.add_argument(
+        "--allow-unverified-fields",
+        action="store_true",
+        help="allow fundamental_core/all_active/custom fields outside the aligned set (diagnostic only)",
+    )
+    parser.add_argument(
+        "--allow-blocked-fields",
+        action="store_true",
+        help="allow fields blocked by the alignment failure registry (diagnostic only)",
+    )
+    parser.add_argument(
+        "--blocked-features",
+        default="",
+        help="comma-separated built-in price/volume leaves to exclude from the GFlowNet action space",
     )
     parser.add_argument(
         "--backtrack-days",
@@ -1167,6 +1275,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mask-dropout-prob", type=float, default=1.0)
     parser.add_argument("--ssl-weight", type=float, default=1.0)
     parser.add_argument("--nov-weight", type=float, default=0.3)
+    parser.add_argument(
+        "--net-excess-weight",
+        type=float,
+        default=0.10,
+        help="weight of the train-only cost-adjusted long-side net-excess reward",
+    )
+    parser.add_argument(
+        "--net-excess-scale",
+        type=float,
+        default=0.10,
+        help="annualized net-excess scale used by tanh before applying the reward weight",
+    )
     parser.add_argument("--final-weight-ratio", type=float, default=0.0)
     parser.add_argument("--ic-mut-threshold", type=float, default=0.3)
     return parser
@@ -1178,6 +1298,10 @@ def main() -> int:
         raise ValueError("cycle, pool-capacity and n-episodes must be positive")
     if not 0 <= args.final_weight_ratio <= 1:
         raise ValueError("final-weight-ratio must be between 0 and 1")
+    if args.net_excess_weight < 0:
+        raise ValueError("net-excess-weight must be non-negative")
+    if args.net_excess_scale <= 0:
+        raise ValueError("net-excess-scale must be positive")
 
     validate_alignment_config(alignment_config_snapshot())
     random.seed(args.seed)

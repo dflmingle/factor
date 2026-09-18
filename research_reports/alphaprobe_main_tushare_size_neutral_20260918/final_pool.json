@@ -1,0 +1,281 @@
+{
+  "capacity": 16,
+  "size": 9,
+  "factors": [
+    {
+      "expression": "TsRank($close,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close within a 20-day window",
+      "ic": 0.01805824413895607,
+      "icir": 0.18249913053237707,
+      "rank": -0.13061436193051587,
+      "net_excess": -0.27080652206172684,
+      "size_corr": 0.15258266031742096,
+      "node": {
+        "expression": "TsRank($close,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close within a 20-day window",
+        "depth": 0,
+        "ic": 0.01805824413895607,
+        "icir": 0.18249913053237707,
+        "times": 5,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank($volume,20)",
+          "TsRank($open,20)",
+          "TsRank($turnover,20)"
+        ]
+      }
+    },
+    {
+      "expression": "Div(TsMean($volume,20),Add($volume,1e-06))",
+      "topic": "volume movements",
+      "description": "recent average volume relative to current volume",
+      "ic": 0.0011082026176154613,
+      "icir": 0.03309731599518463,
+      "rank": -0.14690718811409081,
+      "net_excess": -0.25058615396643336,
+      "size_corr": 0.09472063183784485,
+      "node": {
+        "expression": "Div(TsMean($volume,20),Add($volume,0.000001))",
+        "length": 7,
+        "tokens": [
+          "OP:Div",
+          "OP:TsMean",
+          "DT:20",
+          "FEATURE:VOLUME",
+          "OP:Add",
+          "FEATURE:VOLUME",
+          "CONST:1e-06"
+        ],
+        "topic": "volume movements",
+        "description": "recent average volume relative to current volume",
+        "depth": 0,
+        "ic": 0.0011082026176154613,
+        "icir": 0.03309731599518463,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank($volume,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of volume within a 20-day window",
+      "ic": 0.013272221200168133,
+      "icir": 0.19049832185622614,
+      "rank": -0.13552154805552719,
+      "net_excess": -0.27561265951052105,
+      "size_corr": 0.08643481880426407,
+      "node": {
+        "expression": "TsRank($volume,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of volume within a 20-day window",
+        "depth": 1,
+        "ic": 0.013272221200168133,
+        "icir": 0.19049832185622614,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank(TsPctChange($volume, 20), 20)"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank($turnover,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of turnover within a 20-day window",
+      "ic": 0.011692062951624393,
+      "icir": 0.18182444840992182,
+      "rank": -0.13711566386369217,
+      "net_excess": -0.27619692941234536,
+      "size_corr": 0.08646327257156372,
+      "node": {
+        "expression": "TsRank($turnover,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FIELD:turnover"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of turnover within a 20-day window",
+        "depth": 1,
+        "ic": 0.011692062951624393,
+        "icir": 0.18182444840992182,
+        "times": 4,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank(Sub($turnover, $close), 20)"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank(TsPctChange($volume,20),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of percentage change in volume over a 20-day window within a 20-day window",
+      "ic": 0.005025500897318125,
+      "icir": 0.0861764707086953,
+      "rank": -0.14283893619015137,
+      "net_excess": -0.24689541013534752,
+      "size_corr": 0.07837427407503128,
+      "node": {
+        "expression": "TsRank(TsPctChange($volume, 20), 20)",
+        "length": 5,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:TsPctChange",
+          "DT:20",
+          "FEATURE:VOLUME"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of percentage change in volume over a 20-day window within a 20-day window",
+        "depth": 2,
+        "ic": 0.005025500897318125,
+        "icir": 0.0861764707086953,
+        "times": 2,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank(TsPctChange($open, 20), 20)",
+          "TsRank(TsPctChange($close, 20), 20)"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank($open,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of open price within a 20-day window",
+      "ic": 0.015614508651196957,
+      "icir": 0.1629738271014303,
+      "rank": -0.13170628557367972,
+      "net_excess": -0.23546456365487348,
+      "size_corr": 0.15150785446166992,
+      "node": {
+        "expression": "TsRank($open,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:OPEN"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of open price within a 20-day window",
+        "depth": 1,
+        "ic": 0.015614508651196957,
+        "icir": 0.1629738271014303,
+        "times": 3,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(TsPctChange($close,20),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of percentage change in close price over a 20-day window within a 20-day window",
+      "ic": 0.007341237273067236,
+      "icir": 0.07929689373002906,
+      "rank": -0.14092718653714353,
+      "net_excess": -0.2574480873016462,
+      "size_corr": 0.1551508754491806,
+      "node": {
+        "expression": "TsRank(TsPctChange($close, 20), 20)",
+        "length": 5,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:TsPctChange",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of percentage change in close price over a 20-day window within a 20-day window",
+        "depth": 3,
+        "ic": 0.007341237273067236,
+        "icir": 0.07929689373002906,
+        "times": 2,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(TsPctChange($open,20),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of percentage change in open price over a 20-day window within a 20-day window",
+      "ic": 0.005998377222567797,
+      "icir": 0.06706864115278055,
+      "rank": -0.14219617012470098,
+      "net_excess": -0.2553467389730558,
+      "size_corr": 0.1538238823413849,
+      "node": {
+        "expression": "TsRank(TsPctChange($open, 20), 20)",
+        "length": 5,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:TsPctChange",
+          "DT:20",
+          "FEATURE:OPEN"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of percentage change in open price over a 20-day window within a 20-day window",
+        "depth": 3,
+        "ic": 0.005998377222567797,
+        "icir": 0.06706864115278055,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(Sub($turnover,$close),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of turnover subtracted by close within a 20-day window",
+      "ic": 0.003073151921853423,
+      "icir": 0.0503009096189962,
+      "rank": -0.14597579088916163,
+      "net_excess": -0.28753941654701753,
+      "size_corr": 0.09349386394023895,
+      "node": {
+        "expression": "TsRank(Sub($turnover, $close), 20)",
+        "length": 5,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Sub",
+          "FIELD:turnover",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of turnover subtracted by close within a 20-day window",
+        "depth": 2,
+        "ic": 0.003073151921853423,
+        "icir": 0.0503009096189962,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    }
+  ]
+}

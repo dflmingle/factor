@@ -1,6 +1,6 @@
 # 平台/本地对齐规则
 
-规则版本：`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1`<br>
+规则版本：`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1`<br>
 适用范围：保存的 PandaAI 因子结果与本地 Tushare 重建结果的离线对比。<br>
 性质：研究复现规则，不是 PandaAI 内部实现的声明，也不会创建因子或发起平台回测。
 
@@ -83,6 +83,58 @@
 的显式 handler。该规则不是对平台 Python API 的普遍推断，配置见
 `ALIGNMENT_PYTHON_INDEX_HANDLERS`，并在结果 `fidelity` 中标记。
 
+## 换手可比性诊断（turnoverdiag1）
+
+平台保存结果只有分组汇总换手，没有逐期持仓或逐股票换手明细；本地则根据相邻信号期的实际分组成员交集计算换手。因此，平台和本地换手即使使用相同的年化成本公式，也不必然是同一语义。规则保留两套数值：
+
+- `local_turnover` 和由它计算的 `local_net_excess` 是正式本地复现值；不能用平台摘要换手替换它。
+- `platform_turnover` 只作为平台审计字段。`turnover_alignment` 按固定阈值标记 `comparable`、`large_turnover_gap`、`platform_high_local_low` 或 `platform_turnover_over_100`，并保留有符号差值 `turnover_gap_pp = platform_turnover - local_turnover`。
+- `platform_turnover_cost_sensitivity` 固定为“本地毛超额减去平台摘要换手年化成本”，只回答“如果本地收益路径不变、仅采用平台换手计成本，净超额会落在哪里”；它是诊断值，不是平台持仓复现值。
+
+当前阈值为：平台换手 `>=85%`、本地换手 `<=50%` 时触发 `platform_high_local_low`；绝对差 `>=25` 个百分点时触发 `large_turnover_gap`；平台换手超过 `100%` 时触发 `platform_turnover_over_100`。平台没有逐期持仓文件时，不得为了抹平净超额差异反向修改因子值、标签、复权或股票池。
+
+## 大差异质量门槛（qualitygate1）
+
+本地因子挖掘只使用已经证明与平台结果足够接近的记录。质量门槛同时检查净超额、毛超额、RankIC、最新 Top20 和有效信号期覆盖；不能只因为把平台换手代入成本后净超额接近，就把字段或收益路径不一致的因子当成已对齐。
+
+| 字段 | 阈值 |
+|---|---:|
+| 净超额绝对差告警 | `5pp` |
+| 毛超额绝对差告警 | `5pp` |
+| RankIC 绝对差告警 | `0.02` |
+| Top20 最低重合 | `15/20` |
+| 有效期覆盖率最低 | `95%` |
+| 换手主导的敏感性残差 | `2pp` |
+
+每条本地结果写入 `alignment_quality`：
+
+- `aligned`：上述路径指标在阈值内；只有换手也 `comparable` 时才写入 `local_mining_eligible=true`。
+- `turnover_dominant`：净超额差较大，但毛超额、RankIC、Top20、有效期都对得上，且差异可由平台汇总换手敏感性解释；只能做收益路径诊断，不进入净超额挖掘。
+- `field_or_path_mismatch`：字段语义、复权/停牌/标签路径或排序结果仍有明显差异；禁止进入本地挖掘候选池。
+- `unsupported`：本地没有有效计算结果；禁止进入本地挖掘候选池。
+
+`AMOUNT/VOLUME/HIGH` 的当前 qfq 高价代理已被保存结果证明排名不一致，因此暂时回到 `unsupported`，直到拿到可验证的字段语义映射。旧版本结果目录保留作诊断，不能和新质量门槛版本混合。
+
+## 本地挖掘字段边界
+
+`local_mining_eligible=true` 的 76 条记录是当前本地净超额挖掘的验证样本。GP/GFN 默认只从 `scripts/platform_alignment_rules.py` 中的 `ALIGNMENT_VERIFIED_SEARCH_FIELDS` 取命名字段；未验证的 PandaAI 声明字段仍可在字段覆盖报告中查看，但不能悄悄进入对齐搜索。需要研究未验证字段时必须显式开启诊断模式，并把结果标记为未验证代理。
+
+AlphaPROBE GFlowNet 的 `VWAP` 是本地 `AMOUNT/VOLUME` 计算得到的特征，不属于已验证的 PandaAI 命名字段。它只能作为本地搜索特征，提交平台前必须改写为平台可接受的公式（例如 `AMOUNT/VOLUME`），且改写后的公式仍需单独在线验证。
+
+## 不可接受差异的字段归因
+
+净超额绝对差 `>5pp` 才记为硬失败；`<=5pp` 记录可以继续作为净超额口径的可接受样本，但 Top20、RankIC、毛超额和换手差异仍保留为诊断信息。
+
+每次正式复现后运行：
+
+```bash
+python scripts/build_alignment_failure_registry.py
+```
+
+脚本生成 [`factor_alignment_failure_registry.json`](./factor_alignment_failure_registry.json) 和对应 Markdown 报告。每条硬失败记录至少保存：公式字段、算子、净/毛超额差、换手敏感性、Top20、RankIC、有效期覆盖、原因代码和字段归因置信度。字段只因出现在失败公式中不会自动拉黑；至少两条 `>5pp` 失败且没有任何 `<=5pp` 通过证据时，才进入 `blocked_fields`。
+
+GP/GFN 默认不使用登记表中的 `blocked_fields`。需要复查被拉黑字段时，必须显式使用 `--allow-blocked-fields`，并将该轮标记为诊断模式。当前登记表没有足够证据全局拉黑已验证的 `CLOSE`、`HIGH`、`AMOUNT`、`VOLUME`、`TURNOVER` 或 `MARKET_CAP`；已有单字段隔离结果显示不能把组合失败错误归因给这些单个字段。
+
 CFP 组合使用经过同一评估器诊断的公式级代理：
 
 | handler | 代理 |
@@ -146,7 +198,7 @@ python scripts/positive_factor_local_compare.py \
   --price-root quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches \
   --cap-root quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a \
   --financial-root quantlab/.quantlab/cache/research/cn_equity/financial_full_a \
-  --output quantlab/.quantlab/cache/research/cn_equity/reports/all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1 \
+  --output quantlab/.quantlab/cache/research/cn_equity/reports/all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate1 \
   --platform-net-filter all \
   --label-offset 1
 ```
@@ -161,21 +213,25 @@ python scripts/diagnose_financial_field_proxies.py
 
 ## 当前基线
 
-`full-a-qfq-label1-v1` 的旧基线和新规则输出必须分目录保存。`pythonindex1` 全量结果目录为
-`all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1/`；旧基线详细结果仍见
+`full-a-qfq-label1-v1` 的旧基线和新规则输出必须分目录保存。`qualitygate1` 全量结果目录为
+`all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate1/`；
+`turnoverdiag1` 旧版结果目录仍保留，不再作为当前 handler 结论；
+`pythonindex1` 旧版本结果仍保留在 `all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1/`；
+旧基线详细结果仍见
 [`positive_factor_alignment_20260914.md`](./positive_factor_alignment_20260914.md)。
 
-本次全量结果：保存平台记录 `163` 条，本地有 handler `158` 条，当前缓存仍不支持 `5` 条；
-其中 `157` 条能产出有效净超额。与旧 `parserfix1` 结果相比，`MAX5` 的绝对净超额差从
-`6.16pp` 降到 `0.45pp`；全量有效记录的平均绝对差从 `2.36pp` 降到 `2.32pp`，绝对差
-达到 `5pp` 及以上的记录从 `10` 条降到 `9` 条。
+`pythonindex1` 历史全量结果仍是保存平台记录 `163` 条、本地有 handler `158` 条、当前缓存不支持 `5` 条；
+`qualitygate1` 全量结果以当前 handler 逻辑重新生成；报告同时写出质量状态和 `local_mining_eligible`。完整换手/质量诊断见
+[`turnover_alignment_diagnosis_20260917_qualitygate1.md`](./turnover_alignment_diagnosis_20260917_qualitygate1.md)。平台换手成本敏感性不能与正式本地净超额混在一起统计。
 
 剩余最大差异中，`HT13-EXPWRET-6M` 的 RankIC 为 `0.0991/0.1004`、Top20 为 `19/20`，
-但平台/本地换手为 `216.73%/45.50%`，属于平台换手字段异常，不能反向修改因子；T10
+但平台/本地换手为 `216.73%/45.50%`，属于平台换手字段异常，不能反向修改因子；按平台换手计成本的敏感性可以解释其中大部分净超额差，但仍不能证明逐期持仓一致。T10
 冲击/规模组合的 RankIC 和 Top20 已接近，但毛超额仍差约 `4~6pp`，更可能是平台内部
 high/low/amount、停牌处理或收益路径口径差异，当前没有证据支持切换 `total_mv` 或 qfq。
 
-剩余大差异主要来自市场冲击/行情字段、复权与停牌处理，以及平台内部财务和 Barra 字段的语义差异；不能仅靠继续替换 CFP 代理声称已经抹平。
+EV/价格这一类因子的收益路径差异较小，但平台换手 `89.85%`、本地换手约 `3.38%`，按平台换手计成本后本地敏感性净超额约为 `-24.97%`，接近平台 `-25.49%`。这说明该条的主要差距来自成本/换手口径，而不是收益路径；没有逐期持仓数据时，仍标记为换手不可完全等价。
+
+其余大差异主要来自市场冲击/行情字段、复权与停牌处理，以及平台内部财务和 Barra 字段的语义差异；不能仅靠继续替换 CFP 代理声称已经抹平。
 
 ## 复现前强制检查
 
@@ -209,6 +265,7 @@ python scripts/validate_platform_alignment.py
 - 不得把平台 headline 长短收益、平台 `excessAnnualized`、本地毛超额、本地净超额和换手成本混成一个指标；报告必须分别保留原始平台值和本地代理值。
 - 不得用全 A 基准或另一版标签选择财务/CFP 代理后直接套入当前结果；候选代理必须在同一 `factor_valid`、同一标签和同一规则版本下比较，并保存诊断表。
 - 不得把“RankIC 接近”解释为字段字节等价，也不得为了抹平单因子差异擅自切换复权、市场规模字段、停牌处理或平台隐藏排序。
+- 正式净超额只能使用本地实际成员换手；平台换手成本敏感性必须单独命名、单独报告，并在 `turnover_alignment` 为非 `comparable` 时提示语义不一致。
 - 不得将不同规则版本放在同一输出目录或混合计算均值。正式脚本发现目录已有不同版本 metadata 时会停止，而不是覆盖旧结果。
 
 ## 新因子接入约定

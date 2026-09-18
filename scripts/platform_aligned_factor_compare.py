@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable
@@ -173,10 +174,13 @@ def read_platform_run(path: Path) -> dict[str, Any]:
         if not isinstance(row, dict):
             continue
         label = str(row.get("group", ""))
-        digits = "".join(character for character in label if character.isdigit())
-        if not digits:
+        # Only ordinary decile rows define group metrics.  Labels such as
+        # ``多空组合2`` are separate portfolios and must not overwrite group 2.
+        match = re.fullmatch(r"分组\s*(\d+)", label)
+        if not match:
             continue
-        group_metrics[int(digits)] = {
+        group = int(match.group(1))
+        group_metrics[group] = {
             key: as_float(row.get(key))
             for key in ["annualizedReturn", "excessAnnualized", "turnoverRate", "sharpeRatio"]
         }

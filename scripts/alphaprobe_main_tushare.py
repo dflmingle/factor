@@ -428,6 +428,7 @@ class MainlineAlphaPool(AlphaPool):
         times_decay: float,
         net_excess_weight: float,
         net_excess_scale: float,
+        max_size_corr: float | None,
     ) -> None:
         super().__init__(capacity, stock_data, target)
         self.graph = graph
@@ -438,12 +439,24 @@ class MainlineAlphaPool(AlphaPool):
         self.times_decay = float(times_decay)
         self.net_excess_weight = float(net_excess_weight)
         self.net_excess_scale = float(net_excess_scale)
+        self.max_size_corr = None if max_size_corr is None else float(max_size_corr)
+        self._market_cap: Optional[torch.Tensor] = None
         self.topics: list[Optional[str]] = [None] * (capacity + 1)
         self.descriptions: list[Optional[str]] = [None] * (capacity + 1)
         self.expr2node: list[Optional[ExpressionNode]] = [None] * (capacity + 1)
         self.icir: np.ndarray = np.zeros(capacity + 1, dtype=float)
         self.net_excess: np.ndarray = np.full(capacity + 1, np.nan, dtype=float)
+        self.size_corr: np.ndarray = np.full(capacity + 1, np.nan, dtype=float)
         self.objective_scores: np.ndarray = np.zeros(capacity + 1, dtype=float)
+
+    def _size_exposure(self, value: torch.Tensor) -> float | None:
+        if self._market_cap is None:
+            self._market_cap = clean_tensor(self.data.get_named_feature("market_cap"))
+        daily_corr = batch_spearman_linear(value, self._market_cap)
+        daily_corr = daily_corr[torch.isfinite(daily_corr)]
+        if daily_corr.numel() == 0:
+            return None
+        return float(daily_corr.abs().mean().item())
 
     def _daily_metrics(self, value: torch.Tensor) -> dict[str, float | None]:
         normalized = self._normalize_by_day(clean_tensor(value))
@@ -474,6 +487,7 @@ class MainlineAlphaPool(AlphaPool):
         net_stats = self.net_context.score(raw)
         net = net_stats.get("net_excess")
         net_value = float(net) if net is not None and np.isfinite(net) else None
+        size_corr = self._size_exposure(raw)
         ic = metrics.get("ic")
         objective = float(ic) if ic is not None else -1.0
         objective += scaled_net_excess(net_value, self.net_excess_weight, self.net_excess_scale)
@@ -486,6 +500,7 @@ class MainlineAlphaPool(AlphaPool):
             "periods": metrics.get("periods"),
             "mutual_ics": mutual,
             "max_mutual_ic": max((abs(item) for item in mutual), default=0.0),
+            "size_corr": size_corr,
             "objective": objective,
             "net": net_stats,
         }
@@ -510,6 +525,7 @@ class MainlineAlphaPool(AlphaPool):
         self.expr2node[index] = node
         self.icir[index] = float(scored["icir"] or 0.0)
         self.net_excess[index] = float(scored["net"].get("net_excess")) if scored["net"].get("net_excess") is not None else np.nan
+        self.size_corr[index] = float(scored["size_corr"]) if scored.get("size_corr") is not None else np.nan
         self.objective_scores[index] = float(scored["objective"])
         self.weights[index] = float(scored["ic"])
 
@@ -533,6 +549,13 @@ class MainlineAlphaPool(AlphaPool):
         ic = scored.get("ic")
         if ic is None or float(ic) <= 0.0:
             return False
+        size_corr = scored.get("size_corr")
+        if (
+            self.max_size_corr is not None
+            and size_corr is not None
+            and float(size_corr) > self.max_size_corr
+        ):
+            return False
         if float(scored["max_mutual_ic"]) > self.ic_mut_threshold:
             return False
         if self.size >= self.capacity and float(scored["objective"]) <= float(np.min(self.objective_scores[: self.size])):
@@ -551,6 +574,7 @@ class MainlineAlphaPool(AlphaPool):
         self.expr2node[first], self.expr2node[second] = self.expr2node[second], self.expr2node[first]
         self.icir[first], self.icir[second] = self.icir[second], self.icir[first]
         self.net_excess[first], self.net_excess[second] = self.net_excess[second], self.net_excess[first]
+        self.size_corr[first], self.size_corr[second] = self.size_corr[second], self.size_corr[first]
         self.objective_scores[first], self.objective_scores[second] = self.objective_scores[second], self.objective_scores[first]
 
     def _pop_by_objective(self) -> None:
@@ -622,6 +646,7 @@ class MainlineAlphaPool(AlphaPool):
                     "icir": float(self.icir[index]),
                     "rank": float(self.objective_scores[index]),
                     "net_excess": None if not np.isfinite(self.net_excess[index]) else float(self.net_excess[index]),
+                    "size_corr": None if not np.isfinite(self.size_corr[index]) else float(self.size_corr[index]),
                     "node": self.expr2node[index].as_dict() if self.expr2node[index] is not None else None,
                 }
             )
@@ -743,6 +768,12 @@ def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[st
             "round_trip_cost": ALIGNMENT_ROUND_TRIP_COST,
             "benchmark_mode": alignment_config_snapshot()["benchmark_mode"],
         },
+        "size_neutrality": {
+            "reference_field": "market_cap",
+            "metric": "mean_absolute_daily_cross_sectional_spearman",
+            "max_allowed": args.max_size_corr,
+            "search_excludes_size_and_valuation_fields": args.max_size_corr is not None,
+        },
         "generator": {
             "provider": args.generator,
             "model": args.model,
@@ -810,6 +841,7 @@ Allowed leaves: {', '.join(leaves)}
 Allowed operators: {OPERATOR_NAMES}
 Use integer `%d` as the window in rolling operators except Ref; use only arithmetic constants 0.000001, 0.0, 1.0, or 2.0.
 Every expression must be valid for the AlphaPROBE prefix expression parser. Prefer one or two meaningful modifications, field diversity, and low redundancy with the parent.
+Do not introduce size or valuation leaves that are absent from the allowed-leaves list; the search applies a market-cap exposure filter.
 Never use infix symbols such as `*`, `/`, `+`, or `-`; always spell arithmetic as `Mul`, `Div`, `Add`, or `Sub`.
 JSON schema: {{"expressions": ["..."], "explanations": ["..."]}}"""
         payload = {
@@ -870,6 +902,26 @@ SEEDS: tuple[tuple[str, str, str], ...] = (
         "Div(TsMean($volume,20),Add($volume,0.000001))",
         "volume movements",
         "recent average volume relative to current volume",
+    ),
+    (
+        "Div(Div($amount,$volume),$high)",
+        "intraday price-volume",
+        "volume-weighted average price relative to the daily high",
+    ),
+    (
+        "Div($amount,$volume)",
+        "intraday price-volume",
+        "volume-weighted average price reconstructed from amount and volume",
+    ),
+    (
+        "Sub(Rank($oper_roe_lyr),Rank($gr_total_asset_lyr))",
+        "fundamental quality-growth",
+        "operating return on equity relative to latest total-asset growth",
+    ),
+    (
+        "Rank($gr_total_asset_lyr)",
+        "fundamental growth",
+        "latest announced total-asset growth rate",
     ),
     (
         "Rank($book_to_market_ratio_lf)",
@@ -964,6 +1016,9 @@ def panel_metrics(
     rank_daily = batch_spearman_linear(normalized, target_value)
     ic_daily = ic_daily[torch.isfinite(ic_daily)]
     rank_daily = rank_daily[torch.isfinite(rank_daily)]
+    market_cap = clean_tensor(panel.get_named_feature("market_cap"))
+    size_daily = batch_spearman_linear(raw, market_cap)
+    size_daily = size_daily[torch.isfinite(size_daily)]
     net = net_context.score(raw)
     ic = float(ic_daily.mean().item()) if ic_daily.numel() else None
     icir = None
@@ -973,6 +1028,7 @@ def panel_metrics(
         "ic": ic,
         "icir": icir,
         "rank_ic": float(rank_daily.mean().item()) if rank_daily.numel() else None,
+        "size_corr": float(size_daily.abs().mean().item()) if size_daily.numel() else None,
         "periods": int(ic_daily.numel()),
         "gross_excess": net.get("gross_excess"),
         "turnover": net.get("turnover"),
@@ -1089,6 +1145,7 @@ def run(args: argparse.Namespace) -> Path:
         times_decay=args.times_decay,
         net_excess_weight=args.net_excess_weight,
         net_excess_scale=args.net_excess_scale,
+        max_size_corr=args.max_size_corr,
     )
 
     lineage: list[dict[str, Any]] = []
@@ -1245,6 +1302,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ic-new-threshold", type=float, default=0.45)
     parser.add_argument("--net-excess-weight", type=float, default=0.10)
     parser.add_argument("--net-excess-scale", type=float, default=0.10)
+    parser.add_argument(
+        "--max-size-corr",
+        type=float,
+        default=0.35,
+        help="maximum mean absolute daily Spearman exposure to market_cap; use 1.0 to disable the practical filter",
+    )
     parser.add_argument("--generator", choices=["ollama", "fallback"], default="ollama")
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     parser.add_argument("--model", default="goekdenizguelmez/JOSIEFIED-Qwen3:latest")
@@ -1261,6 +1324,8 @@ def main() -> int:
         raise ValueError("cycle, iterations and generate-num must be positive")
     if args.max_extra_fields < 0:
         raise ValueError("max-extra-fields must be non-negative")
+    if args.max_size_corr is not None and not 0.0 <= args.max_size_corr <= 1.0:
+        raise ValueError("max-size-corr must be between 0 and 1")
     run(args)
     return 0
 

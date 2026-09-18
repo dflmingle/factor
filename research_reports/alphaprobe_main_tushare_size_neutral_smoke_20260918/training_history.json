@@ -1,0 +1,32 @@
+[
+  {
+    "iteration": 1,
+    "parents": [
+      {
+        "expression": "TsRank($close,20)",
+        "retriever_score": 0.0020718835294246674,
+        "generation_status": "ollama",
+        "candidates": [
+          {
+            "expression": "TsRank(Mul($close, TsPctChange($close, 20)), 20)",
+            "status": "accepted",
+            "ic": 0.0029002088122069836,
+            "icir": 0.01855430784409972,
+            "net_excess": null
+          },
+          {
+            "expression": "TsDelta(TsRank($close, 20), TsRank($open, 20))",
+            "status": "invalid_or_nonpositive"
+          },
+          {
+            "expression": "TsCorr(TsPctChange($close, 20), TsWMA($volume, 20))",
+            "status": "invalid_or_nonpositive"
+          }
+        ]
+      }
+    ],
+    "accepted": [
+      "TsRank(Mul($close, TsPctChange($close, 20)), 20)"
+    ]
+  }
+]

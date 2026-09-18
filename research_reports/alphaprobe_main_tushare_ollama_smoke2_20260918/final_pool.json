@@ -1,0 +1,180 @@
+{
+  "capacity": 6,
+  "size": 6,
+  "factors": [
+    {
+      "expression": "TsRank($close,20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close within a 20-day window",
+      "ic": 0.014324803836643696,
+      "icir": 0.10429432949400656,
+      "rank": -0.08554344806119453,
+      "net_excess": -0.3662260952740499,
+      "node": {
+        "expression": "TsRank($close,20)",
+        "length": 3,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close within a 20-day window",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "TsRank(Mul($close, TsPctChange($close, 10)), 20)",
+          "TsRank(Add($close, TsDelta($close, 5)), 20)"
+        ]
+      }
+    },
+    {
+      "expression": "Rank($book_to_market_ratio_lf)",
+      "topic": "fundamental value",
+      "description": "cross-sectional rank of the latest announced book-to-market proxy",
+      "ic": 0.009723988361656666,
+      "icir": 0.07781759273323344,
+      "rank": -0.04468468236479465,
+      "net_excess": -0.06099426213192614,
+      "node": {
+        "expression": "Rank($book_to_market_ratio_lf)",
+        "length": 2,
+        "tokens": [
+          "OP:Rank",
+          "FIELD:book_to_market_ratio_lf"
+        ],
+        "topic": "fundamental value",
+        "description": "cross-sectional rank of the latest announced book-to-market proxy",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Rank($ratio_ep_ttm)",
+      "topic": "fundamental value",
+      "description": "cross-sectional rank of the latest announced earnings-to-price proxy",
+      "ic": 0.006607200019061565,
+      "icir": 0.04762194402216213,
+      "rank": -0.0020164930326146777,
+      "net_excess": -0.008645166533613857,
+      "node": {
+        "expression": "Rank($ratio_ep_ttm)",
+        "length": 2,
+        "tokens": [
+          "OP:Rank",
+          "FIELD:ratio_ep_ttm"
+        ],
+        "topic": "fundamental value",
+        "description": "cross-sectional rank of the latest announced earnings-to-price proxy",
+        "depth": 0,
+        "ic": 0.0,
+        "icir": 0.0,
+        "times": 1,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": [
+          "Rank(Mul($ratio_ep_ttm, $book_to_market_ratio_lf))"
+        ]
+      }
+    },
+    {
+      "expression": "TsRank(Mul($close,TsPctChange($close,10)),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close multiplied by the percentage change over a 10-day window, within a 20-day window",
+      "ic": 0.010761887766420841,
+      "icir": 0.08823156908138151,
+      "rank": -0.08906772010582097,
+      "net_excess": -0.353355895352037,
+      "node": {
+        "expression": "TsRank(Mul($close, TsPctChange($close, 10)), 20)",
+        "length": 7,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Mul",
+          "FEATURE:CLOSE",
+          "OP:TsPctChange",
+          "DT:10",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close multiplied by the percentage change over a 10-day window, within a 20-day window",
+        "depth": 1,
+        "ic": 0.010761887766420841,
+        "icir": 0.08823156908138151,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "TsRank(Add($close,TsDelta($close,5)),20)",
+      "topic": "interday price movements",
+      "description": "time-series position of close added to the change in close over a 5-day window, within a 20-day window",
+      "ic": 0.01772184856235981,
+      "icir": 0.13465941606189832,
+      "rank": -0.08224357682954903,
+      "net_excess": -0.43313901075467676,
+      "node": {
+        "expression": "TsRank(Add($close, TsDelta($close, 5)), 20)",
+        "length": 7,
+        "tokens": [
+          "OP:TsRank",
+          "DT:20",
+          "OP:Add",
+          "FEATURE:CLOSE",
+          "OP:TsDelta",
+          "DT:5",
+          "FEATURE:CLOSE"
+        ],
+        "topic": "interday price movements",
+        "description": "time-series position of close added to the change in close over a 5-day window, within a 20-day window",
+        "depth": 1,
+        "ic": 0.01772184856235981,
+        "icir": 0.13465941606189832,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    },
+    {
+      "expression": "Rank(Mul($ratio_ep_ttm,$book_to_market_ratio_lf))",
+      "topic": "fundamental value",
+      "description": "cross-sectional rank of the product of the latest earnings-to-price ratio and the latest book-to-market ratio",
+      "ic": 0.006001847330480814,
+      "icir": 0.047656922520673224,
+      "rank": -0.02415136513486646,
+      "net_excess": -0.031120411009821172,
+      "node": {
+        "expression": "Rank(Mul($ratio_ep_ttm, $book_to_market_ratio_lf))",
+        "length": 4,
+        "tokens": [
+          "OP:Rank",
+          "OP:Mul",
+          "FIELD:ratio_ep_ttm",
+          "FIELD:book_to_market_ratio_lf"
+        ],
+        "topic": "fundamental value",
+        "description": "cross-sectional rank of the product of the latest earnings-to-price ratio and the latest book-to-market ratio",
+        "depth": 1,
+        "ic": 0.006001847330480814,
+        "icir": 0.047656922520673224,
+        "times": 0,
+        "test_ic": 0.0,
+        "test_icir": 0.0,
+        "children": []
+      }
+    }
+  ]
+}

@@ -40,13 +40,21 @@ from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_RULES_DOCUMENT,
     ALIGNMENT_RULE_VERSION,
     ALIGNMENT_ROUND_TRIP_COST,
+    ALIGNMENT_TURNOVER_SENSITIVITY_METHOD,
     ALIGNMENT_START,
     ALIGNMENT_TIE_BREAK_DESCRIPTION,
     ALIGNMENT_TIE_BREAK_HANDLERS,
     ALIGNMENT_TIE_BREAK_SEED,
     ALIGNMENT_UNIVERSE,
     alignment_config_snapshot,
+    annualized_turnover_cost,
+    classify_alignment_quality,
+    classify_turnover_alignment,
     validate_alignment_config,
+)
+from alignment_failure_registry import (  # noqa: E402
+    UNACCEPTABLE_NET_DELTA_PP,
+    classify_failure,
 )
 from platform_aligned_factor_compare import read_platform_run  # noqa: E402
 from full_a_local_data import load_full_a_data, select_market_cap  # noqa: E402
@@ -93,6 +101,31 @@ def rolling_stat(frame: pd.DataFrame, values: pd.Series, window: int, method: st
     work = frame[["instrument"]].copy()
     work["_value"] = pd.to_numeric(values, errors="coerce")
     return grouped_rolling(work, "_value", window, method)
+
+
+def rolling_rsquare(frame: pd.DataFrame, values: pd.Series, window: int) -> pd.Series:
+    """Reconstruct Qlib/PandaAI-style rolling R-square against time."""
+    work = frame[["instrument"]].copy()
+    value = pd.to_numeric(values, errors="coerce")
+    position = frame.groupby("instrument", sort=False, observed=True).cumcount().astype(float)
+    work["_value"] = value
+    work["_value_sq"] = value * value
+    work["_position"] = position
+    work["_position_sq"] = position * position
+    work["_position_value"] = position * value
+
+    count = grouped_rolling(work, "_value", window, "count")
+    sum_value = grouped_rolling(work, "_value", window, "sum")
+    sum_value_sq = grouped_rolling(work, "_value_sq", window, "sum")
+    sum_position = grouped_rolling(work, "_position", window, "sum")
+    sum_position_sq = grouped_rolling(work, "_position_sq", window, "sum")
+    sum_position_value = grouped_rolling(work, "_position_value", window, "sum")
+
+    covariance_numerator = count * sum_position_value - sum_position * sum_value
+    position_variance = count * sum_position_sq - sum_position * sum_position
+    value_variance = count * sum_value_sq - sum_value * sum_value
+    denominator = (position_variance * value_variance).pow(0.5)
+    return (covariance_numerator / denominator.replace(0.0, np.nan)).pow(2)
 
 
 def rolling_corr(
@@ -398,6 +431,8 @@ def report_cycle(report_name: str) -> int | None:
 
 def handler_for(formula: str) -> str | None:
     normalized = normalize_formula(formula)
+    if normalized in {"RSQUARE(CLOSE,60)", "RSQUARE($CLOSE,60)"}:
+        return "rsquare60"
     exact = {
         "RETURNS(CLOSE,120)": "momentum120",
         "MA(TURNOVER,21)/MA(TURNOVER,504)-1": "turn_bias",
@@ -628,6 +663,8 @@ def handler_for(formula: str) -> str | None:
         return "impact_aggregate60"
     if normalized == "RANK(MARKET_CAP)":
         return "size_only"
+    if normalized == "BOOK_TO_MARKET_RATIO_LF/OPER_MAIN_PROFIT_TTM":
+        return "book_to_market_lf_div_oper_main_profit_ttm"
     if normalized == "RANK(-RATIO_EV_EBITDA_TTM)":
         return "ev_ebitda_proxy"
     if normalized == "RANK(BOOK_TO_MARKET_RATIO_LF)-RANK(MARKET_CAP)":
@@ -675,6 +712,16 @@ def handler_for(formula: str) -> str | None:
         return "asset_growth"
     if "RESIDUAL_VOLATILITY" in normalized:
         return "residual_volatility"
+    if normalized == "AMOUNT/VOLUME/HIGH":
+        # The cached qfq high is not a verified equivalent of PandaAI's HIGH
+        # for this run: the saved platform result has a different ranking and
+        # all latest Top20 values tie. Keep the formula unsupported until the
+        # field semantics are independently verified.
+        return None
+    if normalized == "(BOOK_TO_MARKET_RATIO_LYR*MA(INSURANCE_COMMISSION_EXPENSE_MRQ_9,10))":
+        # This MRQ field has no verified local equivalent.  Do not let the
+        # broad book-to-market fallback produce a false paper-composite result.
+        return None
     if "BOOK_TO_MARKET_RATIO_LYR" in normalized:
         if "RANK(1-RETURNS(CLOSE,40))" not in normalized:
             return (
@@ -764,9 +811,15 @@ def saved_records(
                     "platform_net_excess_pct": platform_net,
                     "platform_rank_ic": float(row["rank_ic"]) if row.get("rank_ic") else None,
                     "platform_ic_mean": float(row["ic_mean"]) if row.get("ic_mean") else None,
+                    "platform_ic_ir": float(row["ic_ir"]) if row.get("ic_ir") else None,
+                    "platform_ic_p_value": float(row["ic_p_value"]) if row.get("ic_p_value") else None,
+                    "platform_monotonicity": float(row["monotonicity"]) if row.get("monotonicity") else None,
                     "platform_turnover_pct": float(row["turnover_pct"]) if row.get("turnover_pct") else None,
                     "platform_gross_excess_pct": float(row["long_excess_pct"]) if row.get("long_excess_pct") else None,
                     "platform_annual_cost_pct": float(row["annual_cost_pct"]) if row.get("annual_cost_pct") else None,
+                    "platform_long_sharpe": float(row["long_sharpe"]) if row.get("long_sharpe") else None,
+                    "platform_long_max_drawdown_pct": float(row["long_max_drawdown_pct"]) if row.get("long_max_drawdown_pct") else None,
+                    "platform_long_monthly_win_rate_pct": float(row["long_monthly_win_rate_pct"]) if row.get("long_monthly_win_rate_pct") else None,
                     "raw_result": str(row.get("raw_result", "")).replace("\\", "/"),
                     "formula": formula,
                     "handler": handler,
@@ -820,6 +873,8 @@ def build_factor(
         return open_price.div(grouped["close_qfq"].shift(20)).sub(1.0)
     if handler == "ma_reversion40":
         return close.div(rolling_stat(frame, close, 40, "mean")).mul(-1.0)
+    if handler == "rsquare60":
+        return rolling_rsquare(frame, close, 60)
 
     reversal_windows = {
         "reversal5": (5, ret5),
@@ -1110,6 +1165,15 @@ def build_factor(
 
 
 def fidelity_note(handler: str) -> str:
+    if handler == "rsquare60":
+        return "direct local reconstruction: 60-day rolling R-square of qfq close against the time index"
+    if handler == "amount_volume_high":
+        return "direct local market-data reconstruction: cached amount / volume / qfq high"
+    if handler == "book_to_market_lf_div_oper_main_profit_ttm":
+        return (
+            "Tushare PIT proxy: BOOK_TO_MARKET_RATIO_LF is latest announced equity / total_mv; "
+            "OPER_MAIN_PROFIT_TTM is TTM (income.revenue - income.oper_cost - income.biz_tax_surchg)"
+        )
     if handler == "growth_roe":
         return (
             "Tushare PIT proxy: YoY growth of TTM attributable net income / "
@@ -1186,6 +1250,10 @@ def fidelity_note(handler: str) -> str:
 
 def unsupported_reason(formula: str | None) -> str:
     normalized = normalize_formula(formula or "")
+    if normalized == "AMOUNT/VOLUME/HIGH":
+        return "HIGH/AMOUNT/VOLUME field semantics do not match the saved platform ranking; qfq high proxy is rejected"
+    if normalized == "(BOOK_TO_MARKET_RATIO_LYR*MA(INSURANCE_COMMISSION_EXPENSE_MRQ_9,10))":
+        return "insurance_commission_expense_mrq_9 needs a verified MRQ field mapping; no local equivalent"
     if "CAL_" in normalized:
         return "platform intraday cal_* fields are not present in the local daily cache"
     if "DIVIDEND_YIELD_TTM" in normalized:
@@ -1352,7 +1420,7 @@ def evaluate(
         selected_excess = float(periods[f"excess_{selected_group}"].sum() / years)
     if group_turnovers[selected_group]:
         selected_turnover = float(np.mean(group_turnovers[selected_group]))
-    selected_cost = selected_turnover * (252.0 / cycle) * ROUND_TRIP_COST if selected_turnover is not None else None
+    selected_cost = annualized_turnover_cost(selected_turnover, cycle, ROUND_TRIP_COST)
     selected_net = selected_excess - selected_cost if selected_excess is not None and selected_cost is not None else None
 
     platform_top_rows = [
@@ -1374,6 +1442,14 @@ def evaluate(
         if pd.Timestamp(row["date"]).normalize() == latest_date
     ]
     platform_group = platform.get("group_metrics", {}).get(selected_group, {})
+    platform_turnover = platform_group.get("turnoverRate")
+    turnover_alignment = classify_turnover_alignment(platform_turnover, selected_turnover)
+    platform_turnover_cost = annualized_turnover_cost(platform_turnover, cycle, ROUND_TRIP_COST)
+    local_net_using_platform_turnover = (
+        selected_excess - platform_turnover_cost
+        if selected_excess is not None and platform_turnover_cost is not None
+        else None
+    )
     platform_rank = platform.get("metrics", {}).get("Rank_IC")
     platform_ic = platform.get("metrics", {}).get("IC_mean")
     platform_net = None
@@ -1389,10 +1465,13 @@ def evaluate(
         "turnover": selected_turnover,
         "annual_cost": selected_cost,
         "net_excess": selected_net,
+        "platform_turnover_cost": platform_turnover_cost,
+        "local_net_excess_using_platform_turnover": local_net_using_platform_turnover,
+        "turnover_alignment": turnover_alignment,
         "platform_rank_ic": platform_rank,
         "platform_ic_mean": platform_ic,
         "platform_gross_excess": platform_group.get("excessAnnualized"),
-        "platform_turnover": platform_group.get("turnoverRate"),
+        "platform_turnover": platform_turnover,
         "top20_overlap": len(set(local_top).intersection(platform_top)) if platform_top else None,
         "local_top20": local_top,
         "platform_top20": platform_top,
@@ -1512,10 +1591,18 @@ def write_outputs(
             "local_universe": local_universe,
             "supported_records": len(supported),
             "unsupported_records": len(unsupported),
+            "quality_status_counts": dict(
+                Counter(row.get("alignment_quality", "unsupported") for row in rows)
+            ),
+            "local_mining_eligible_records": sum(
+                bool(row.get("local_mining_eligible")) for row in rows
+            ),
             "market_field_sources": market_field_sources or {},
             "tie_break_handlers": sorted(ALIGNMENT_TIE_BREAK_HANDLERS),
             "tie_break_seed": ALIGNMENT_TIE_BREAK_SEED,
             "tie_break_description": ALIGNMENT_TIE_BREAK_DESCRIPTION,
+            "turnover_sensitivity_method": ALIGNMENT_TURNOVER_SENSITIVITY_METHOD,
+            "unacceptable_net_delta_pp": UNACCEPTABLE_NET_DELTA_PP,
         },
         "results": rows,
         "unsupported": unsupported,
@@ -1534,6 +1621,8 @@ def write_outputs(
         f"Local forward return label: `close(t+{label_offset}) -> close(t+{label_offset}+cycle)`.",
         f"Local benchmark mode: `{ALIGNMENT_BENCHMARK_MODE}` ({ALIGNMENT_BENCHMARK_DESCRIPTION}).",
         f"Local net excess = arithmetic gross excess - annualized turnover cost using {100 * ALIGNMENT_ONE_WAY_COST:.2f}% one-way cost.",
+        f"Platform-turnover sensitivity = local gross excess - annualized cost using the saved platform turnover; `{ALIGNMENT_TURNOVER_SENSITIVITY_METHOD}`.",
+        "Alignment quality is a separate gate: `aligned` rows are eligible for local mining only when turnover is also comparable; `turnover_dominant` and `field_or_path_mismatch` rows remain diagnostic.",
         "",
         f"- selected platform records: `{len(supported) + len(unsupported)}`",
         f"- locally reproduced: `{len(rows)}`",
@@ -1541,8 +1630,8 @@ def write_outputs(
         "",
         "## Locally reproduced",
         "",
-        "| run | handler | platform pool | cycle | dates | platform net | local net | delta net (pp) | platform RankIC | local RankIC | platform gross excess | local gross excess | platform turnover | local turnover | Top20 |",
-        "|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| run | handler | quality | mining | platform pool | cycle | dates | platform net | local net | local delta (pp) | platform-turnover sensitivity net | sensitivity delta (pp) | turnover alignment | turnover gap (pp) | platform RankIC | local RankIC | platform gross excess | local gross excess | platform turnover | local turnover | Top20 |",
+        "|---|---|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         def pct(value: Any) -> str:
@@ -1553,9 +1642,38 @@ def write_outputs(
 
         platform_net = row["platform_net_excess_pct"]
         local_net = row["local_net_excess"]
-        delta = None if local_net is None else 100 * local_net - platform_net
+        local_delta = None if local_net is None else 100 * local_net - platform_net
+        sensitivity_net = row["platform_turnover_cost_sensitivity"]
+        sensitivity_delta = (
+            None if sensitivity_net is None else 100 * sensitivity_net - platform_net
+        )
+        turnover_gap = (
+            "n/a" if row["turnover_gap_pp"] is None else f"{row['turnover_gap_pp']:.2f}"
+        )
         lines.append(
-            f"| {row['id']} | {row['handler']} | {row.get('platform_stock_pool', 'unknown')} | {row['cycle']} | {row['date_source']} ({row['platform_chart_periods']}) | {platform_net:.2f}% | {pct(local_net)} | {'n/a' if delta is None else f'{delta:.2f}'} | {num(row['platform_rank_ic'])} | {num(row['local_rank_ic'])} | {pct(row['platform_gross_excess'])} | {pct(row['local_gross_excess'])} | {pct(row['platform_turnover'])} | {pct(row['local_turnover'])} | {row['top20_overlap'] if row['top20_overlap'] is not None else 'n/a'}/20 |"
+            f"| {row['id']} | {row['handler']} | {row['alignment_quality']} | {str(row['local_mining_eligible']).lower()} | {row.get('platform_stock_pool', 'unknown')} | {row['cycle']} | {row['date_source']} ({row['platform_chart_periods']}) | {platform_net:.2f}% | {pct(local_net)} | {'n/a' if local_delta is None else f'{local_delta:.2f}'} | {pct(sensitivity_net)} | {'n/a' if sensitivity_delta is None else f'{sensitivity_delta:.2f}'} | {row['turnover_alignment']} | {turnover_gap} | {num(row['platform_rank_ic'])} | {num(row['local_rank_ic'])} | {pct(row['platform_gross_excess'])} | {pct(row['local_gross_excess'])} | {pct(row['platform_turnover'])} | {pct(row['local_turnover'])} | {row['top20_overlap'] if row['top20_overlap'] is not None else 'n/a'}/20 |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Net-excess failures above 5pp",
+            "",
+            f"Only rows with `abs(local_net_delta_pp) > {UNACCEPTABLE_NET_DELTA_PP:.2f}pp` are hard failures under the net-excess acceptance rule. The `failure_attribution` field records formula leaves, operators, cause codes and field-level confidence.",
+            "",
+            "| run | handler | net delta (pp) | gross delta (pp) | cause codes | formula fields | field notes |",
+            "|---|---|---:|---:|---|---|---|",
+        ]
+    )
+    for row in rows:
+        attribution = row.get("failure_attribution") or {}
+        if not attribution.get("unacceptable_by_net_excess"):
+            continue
+        field_notes = "; ".join(
+            f"{item.get('field')}: {item.get('confidence')}"
+            for item in attribution.get("field_attribution", [])
+        ) or "n/a"
+        lines.append(
+            f"| {row['id']} | {row['handler']} | {row.get('local_net_delta_pp', 'n/a')} | {row.get('local_gross_delta_pp', 'n/a')} | {', '.join(attribution.get('cause_codes', []))} | {', '.join(attribution.get('formula_fields', []))} | {field_notes} |"
         )
     lines.extend(
         [
@@ -1568,6 +1686,9 @@ def write_outputs(
             f"- Market-cap formulas use Tushare daily_basic `{market_cap_field}`; impact formulas use cached high/low/amount when available, with explicit open/close and volume*average-price proxies only where needed.",
             "- `book_to_market_ratio_lf` uses the latest point-in-time balance-sheet equity; the working-capital and EV/EBITDA formulas use documented fallbacks when their raw fields are absent.",
             "- Close net-excess differences do not prove exact field equivalence; local membership follows the selected universe mode.",
+            "- `turnover_alignment` is a comparability diagnostic. `platform_high_local_low`, `platform_turnover_over_100`, and `large_turnover_gap` keep platform summary turnover from being mistaken for recovered per-period holdings.",
+            "- `platform_turnover_cost_sensitivity` is diagnostic only: it keeps the local gross excess and substitutes the saved platform turnover for cost. It does not replace canonical local net excess.",
+            "- `alignment_quality` is the mining gate. `field_or_path_mismatch` means the local factor values or return path are not close enough; `turnover_dominant` means only the unavailable platform turnover summary explains the gap; both are excluded from net-excess mining.",
             "",
             "## Not reproducible from current local cache",
             "",
@@ -1614,6 +1735,12 @@ def main() -> int:
         default=ALIGNMENT_LABEL_OFFSET,
         help="Trading-day offset applied to both the current and future close in the forward label.",
     )
+    parser.add_argument(
+        "--name",
+        action="append",
+        default=[],
+        help="Only rebuild the named candidate(s); may be repeated.",
+    )
     args = parser.parse_args()
 
     data_start = pd.Timestamp(
@@ -1648,6 +1775,10 @@ def main() -> int:
     calendar = [pd.Timestamp(value).normalize() for value in ensure_calendar(data_start, END, token=None)]
     catalog = formula_catalog()
     supported, unsupported = saved_records(catalog, args.platform_net_filter)
+    if args.name:
+        wanted_names = set(args.name)
+        supported = [record for record in supported if record["name"] in wanted_names]
+        unsupported = [record for record in unsupported if record["name"] in wanted_names]
     configs = platform_configs()
     for record in supported + unsupported:
         record["platform_config"] = configs.get(str(record.get("factor_id")))
@@ -1768,6 +1899,53 @@ def main() -> int:
                 args.label_offset,
                 handler,
             )
+            platform_turnover_cost_sensitivity = result[
+                "local_net_excess_using_platform_turnover"
+            ]
+            local_net_delta_pp = (
+                None
+                if result["net_excess"] is None
+                else 100.0 * result["net_excess"] - record["platform_net_excess_pct"]
+            )
+            platform_turnover_sensitivity_delta_pp = (
+                None
+                if platform_turnover_cost_sensitivity is None
+                else 100.0 * platform_turnover_cost_sensitivity
+                - record["platform_net_excess_pct"]
+            )
+            local_gross_delta_pp = (
+                None
+                if result["gross_excess"] is None
+                or result["platform_gross_excess"] is None
+                else 100.0 * result["gross_excess"]
+                - 100.0 * result["platform_gross_excess"]
+            )
+            quality = classify_alignment_quality(
+                net_delta_pp=local_net_delta_pp,
+                gross_delta_pp=local_gross_delta_pp,
+                platform_rank_ic=result["platform_rank_ic"],
+                local_rank_ic=result["rank_ic"],
+                top20_overlap=result["top20_overlap"],
+                local_periods=result["periods"],
+                platform_periods=len(platform.get("dates", [])),
+                turnover_status=result["turnover_alignment"]["status"],
+                sensitivity_delta_pp=platform_turnover_sensitivity_delta_pp,
+            )
+            failure_attribution = classify_failure(
+                {
+                    "id": record["id"],
+                    "formula": record["formula"],
+                    "local_net_delta_pp": local_net_delta_pp,
+                    "local_gross_delta_pp": local_gross_delta_pp,
+                    "platform_turnover_sensitivity_delta_pp": platform_turnover_sensitivity_delta_pp,
+                    "turnover_alignment": result["turnover_alignment"]["status"],
+                    "alignment_quality": quality["status"],
+                    "alignment_quality_flags": quality["flags"],
+                    "rank_ic_delta": quality["rank_ic_delta"],
+                    "top20_overlap": result["top20_overlap"],
+                    "period_coverage": quality["period_coverage"],
+                }
+            )
             output = {
                 "id": record["id"],
                 "name": record["name"],
@@ -1786,7 +1964,12 @@ def main() -> int:
                 "cycle": cycle,
                 "platform_net_excess_pct": record["platform_net_excess_pct"],
                 "local_net_excess": result["net_excess"],
+                "platform_turnover_cost_sensitivity": platform_turnover_cost_sensitivity,
+                "platform_turnover_annual_cost": result["platform_turnover_cost"],
+                "local_net_delta_pp": local_net_delta_pp,
+                "platform_turnover_sensitivity_delta_pp": platform_turnover_sensitivity_delta_pp,
                 "local_gross_excess": result["gross_excess"],
+                "local_gross_delta_pp": local_gross_delta_pp,
                 "local_turnover": result["turnover"],
                 "local_rank_ic": result["rank_ic"],
                 "local_ic_mean": result["ic_mean"],
@@ -1801,6 +1984,25 @@ def main() -> int:
                 "platform_chart_periods": len(platform["dates"]),
                 "fidelity": fidelity_note(handler),
                 "tie_break_proxy": result["tie_break_proxy"],
+                "turnover_alignment": result["turnover_alignment"]["status"],
+                "turnover_comparable": result["turnover_alignment"]["comparable"],
+                "turnover_gap_pp": result["turnover_alignment"]["gap_pp"],
+                "turnover_absolute_gap_pp": result["turnover_alignment"]["absolute_gap_pp"],
+                "turnover_diagnostic_flags": result["turnover_alignment"]["flags"],
+                "alignment_quality": quality["status"],
+                "local_mining_eligible": quality["mining_eligible"],
+                "alignment_quality_flags": quality["flags"],
+                "alignment_quality_reason": quality["reason"],
+                "rank_ic_delta": quality["rank_ic_delta"],
+                "period_coverage": quality["period_coverage"],
+                "net_excess_acceptance": (
+                    "unacceptable"
+                    if failure_attribution["unacceptable_by_net_excess"]
+                    else "acceptable"
+                    if failure_attribution["acceptable_by_net_excess"]
+                    else "unassessable"
+                ),
+                "failure_attribution": failure_attribution,
             }
             rows.append(output)
             print(

@@ -1,0 +1,146 @@
+[
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($volume,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 1
+  },
+  {
+    "parent": "TsRank($close,20)",
+    "child": "TsRank($open,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of open price within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window)",
+    "iteration": 1
+  },
+  {
+    "parent": "Div(Div($amount,$volume),$high)",
+    "child": "TsPctChange(Div(Div($amount,$volume), $high), 2)",
+    "topic": "intraday price-volume",
+    "description": "2-period percentage change of volume-weighted average price relative to the daily high",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high)",
+    "iteration": 1
+  },
+  {
+    "parent": "Div(Div($amount,$volume),$high)",
+    "child": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+    "topic": "intraday price-volume",
+    "description": "volume-weighted average price relative to the daily high minus the 2-period mean of the daily high",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high)",
+    "iteration": 1
+  },
+  {
+    "parent": "Div(Div($amount,$volume),$high)",
+    "child": "Div(Rank(Div($amount,$volume)), Rank($high))",
+    "topic": "intraday price-volume",
+    "description": "rank of volume-weighted average price relative to the rank of the daily high",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high)",
+    "iteration": 1
+  },
+  {
+    "parent": "Sub(Div(Div($amount,$volume), $high), TsMean($high, 2))",
+    "child": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+    "topic": "intraday price-volume",
+    "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high) -> Sub(Div(Div($amount,$volume), $high), TsMean($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period mean of the daily high)",
+    "iteration": 2
+  },
+  {
+    "parent": "Div(Div($amount,$volume),$high)",
+    "child": "Div(Div($amount, TsSum($volume, 2)), $high)",
+    "topic": "intraday price-volume",
+    "description": "rolling 2-period volume-sum normalized volume-weighted average price relative to daily high",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high)",
+    "iteration": 2
+  },
+  {
+    "parent": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+    "child": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+    "topic": "intraday price-volume",
+    "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily close",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high) -> Sub(Div(Div($amount,$volume), $high), TsMean($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period mean of the daily high) -> Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high)",
+    "iteration": 3
+  },
+  {
+    "parent": "Div(TsMean($volume,20),Add($volume,0.000001))",
+    "child": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+    "topic": "volume movements",
+    "description": "recent average volume relative to current volume with a small increment and recent average volume",
+    "trace": "Div(TsMean($volume,20),Add($volume,0.000001)) (recent average volume relative to current volume)",
+    "iteration": 3
+  },
+  {
+    "parent": "TsRank($volume,20)",
+    "child": "TsRank($amount,20)",
+    "topic": "interday price movements",
+    "description": "time-series position of amount within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window)",
+    "iteration": 4
+  },
+  {
+    "parent": "Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20)))",
+    "child": "Div(TsMean($volume,20),Add(Add(Add($volume,0.000001),TsPctChange($volume,20)),TsMean($volume,20)))",
+    "topic": "volume movements",
+    "description": "recent average volume relative to current volume with a small increment, percentage change of volume, and recent average volume",
+    "trace": "Div(TsMean($volume,20),Add($volume,0.000001)) (recent average volume relative to current volume) -> Div(TsMean($volume,20),Add(Add($volume,0.000001),TsMean($volume,20))) (recent average volume relative to current volume with a small increment and recent average volume)",
+    "iteration": 4
+  },
+  {
+    "parent": "Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2))",
+    "child": "Sub(Div(Div($amount,$volume), $high), TsPctChange($open, 2))",
+    "topic": "intraday price-volume",
+    "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily open",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high) -> Sub(Div(Div($amount,$volume), $high), TsMean($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period mean of the daily high) -> Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high) -> Sub(Div(Div($amount,$volume), $high), TsPctChange($close, 2)) (volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily close)",
+    "iteration": 4
+  },
+  {
+    "parent": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+    "child": "Sub(Div(Div($amount,$volume), $high), TsPctChange($low, 2))",
+    "topic": "intraday price-volume",
+    "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily low",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high) -> Sub(Div(Div($amount,$volume), $high), TsMean($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period mean of the daily high) -> Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high)",
+    "iteration": 4
+  },
+  {
+    "parent": "Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2))",
+    "child": "Sub(Div(Div($amount,$volume), $high), TsPctChange(TsMean($high, 2), 2))",
+    "topic": "intraday price-volume",
+    "description": "volume-weighted average price relative to the daily high minus the 2-period percentage change of the 2-period mean of the daily high",
+    "trace": "Div(Div($amount,$volume),$high) (volume-weighted average price relative to the daily high) -> Sub(Div(Div($amount,$volume), $high), TsMean($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period mean of the daily high) -> Sub(Div(Div($amount,$volume), $high), TsPctChange($high, 2)) (volume-weighted average price relative to the daily high minus the 2-period percentage change of the daily high)",
+    "iteration": 4
+  },
+  {
+    "parent": "TsRank($amount,20)",
+    "child": "TsRank(Mul($amount, TsPctChange($close, 5)), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of amount multiplied by 5-day percentage change in close within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window) -> TsRank($amount,20) (time-series position of amount within a 20-day window)",
+    "iteration": 5
+  },
+  {
+    "parent": "TsRank($amount,20)",
+    "child": "TsRank(Add($amount, TsDelta($volume, 10)), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of amount plus 10-day change in volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window) -> TsRank($amount,20) (time-series position of amount within a 20-day window)",
+    "iteration": 5
+  },
+  {
+    "parent": "TsRank($amount,20)",
+    "child": "TsRank(SLog1p(TsSum($amount, 15)), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of log1p of sum of amount within a 15-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window) -> TsRank($amount,20) (time-series position of amount within a 20-day window)",
+    "iteration": 5
+  },
+  {
+    "parent": "TsRank($amount,20)",
+    "child": "TsRank(Greater($amount, TsMean($volume, 10)), 20)",
+    "topic": "interday price movements",
+    "description": "time-series position of amount greater than 10-day mean of volume within a 20-day window",
+    "trace": "TsRank($close,20) (time-series position of close within a 20-day window) -> TsRank($volume,20) (time-series position of volume within a 20-day window) -> TsRank($amount,20) (time-series position of amount within a 20-day window)",
+    "iteration": 5
+  }
+]

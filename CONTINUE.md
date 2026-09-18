@@ -248,7 +248,7 @@ The formal comparison entry point now defaults to `--platform-net-filter all`, v
 
 ## 11.1 2026-09-15 pythonindex1 修正复现
 
-针对 `NONHT-MAX5-LOW-21D` 已确认平台 Python 运行时的 MultiIndex 为 `[date, symbol]`，其 `groupby(level=0)` 会在同一交易日的股票序列上做滚动 `MAX(5)`。本地 handler 已按该语义兼容，并将规则版本升级为 `full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1`。
+针对 `NONHT-MAX5-LOW-21D` 已确认平台 Python 运行时的 MultiIndex 为 `[date, symbol]`，其 `groupby(level=0)` 会在同一交易日的股票序列上做滚动 `MAX(5)`。本地 handler 已按该语义兼容；该版本是 `turnoverdiag1` 之前的历史版本。
 
 新结果目录：
 
@@ -275,6 +275,32 @@ python scripts/positive_factor_local_compare.py \
 - 仍最大的非异常差异集中在 T10 冲击/规模组合（毛超额约差 `4~6pp`）；RankIC 和 Top20 基本一致，现有证据不足以合理替换 qfq 或 `total_mv`。
 - `HT13-EXPWRET-6M` 的 `26.60pp` 差异主要由平台换手 `216.73%` 对本地 `45.50%` 造成，不能通过修改因子公式抹平。
 
+## 11.2 2026-09-17 turnoverdiag1 换手差异诊断
+
+在 `pythonindex1` 规则上新增 `turnoverdiag1`，把平台汇总换手与本地实际成员交集换手的可比性单独记录。规则版本为：
+
+`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1`
+
+新结果目录：
+
+`quantlab/.quantlab/cache/research/cn_equity/reports/all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1/`
+
+本次按当前机器实际缓存路径重跑了全部已保存平台记录：
+
+- `173` 条已保存平台记录，`160` 条有本地 handler，`13` 条当前不支持；
+- `159` 条可产出有效本地净超额；其中 `157` 条换手状态为 `comparable`；
+- `HT13-EXPWRET-6M` 标记为 `platform_turnover_over_100`，平台/本地换手为 `216.73%/45.50%`，按平台换手计成本后的敏感性差约 `0.71pp`，主要差异来自换手摘要；
+- `F-NET-D02` 标记为 `platform_high_local_low`，但敏感性差仍约 `-16.17pp`，不能只靠换手口径解释；
+- 完整诊断表（CSV/JSON/Markdown）为 [`turnover_alignment_diagnosis_20260917.csv`](research_reports/platform_alignment/turnover_alignment_diagnosis_20260917.csv)、[`turnover_alignment_diagnosis_20260917.json`](research_reports/platform_alignment/turnover_alignment_diagnosis_20260917.json) 和 [`turnover_alignment_diagnosis_20260917.md`](research_reports/platform_alignment/turnover_alignment_diagnosis_20260917.md)。
+
+重新生成诊断表：
+
+```bash
+python scripts/diagnose_turnover_alignment.py
+```
+
+正式本地净超额仍使用本地实际成员换手；`platform_turnover_cost_sensitivity` 只用于回答“如果只把平台摘要换手代入成本，净超额会变成多少”，不能替代正式结果，也不能证明平台逐期持仓已经恢复。
+
 ## 12. 因子档案中的相关性记录
 
 以后每个完成平台回测并进入本地研究档案的因子，都要同时记录与已有因子的相关性参考，不只记录 IC、净超额、换手和回撤等表现指标。
@@ -293,7 +319,7 @@ python scripts/register_factor_correlations.py
 
 AlphaPROBE 本地搜索的字段目录以 `vendor/skill-pandaai-factor-online/references/fields.md` 的公式模式字段为准：348 个基础字段，扩展为基础字段、`_lyr`、`_ttm`、`_mrq_1..12` 等公式名称。搜索时保留平台公式目录中尚未单独回测的字段，排除 Barra 字段，并排除已被 FactorBuild 明确拒绝的 `contract_liabilities`、`net_profit_parent_company` 字段族；仅本地 Tushare 有而不在平台公式目录的字段不会进入终端。字段解析、Tushare PIT 映射、TTM 还原和懒加载面板在 `scripts/pandaai_fields_local.py`；GP 入口是 `scripts/alphaprobe_gp_tushare.py`。
 
-本地字段搜索和净超额评分统一使用 `full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1`：沪深全 A、Tushare qfq、`daily_basic.total_mv`、公告日 PIT、`comp_type=1` 优先、TTM 季度还原、`close(t+1) -> close(t+cycle+1)`、10 组、单边 0.30% 成本；相关性使用每日有效截面 Spearman 平均秩后取每日均值。`max5_low21` 额外复现已验证的平台 Python `[date, symbol]` level-0 滚动语义。每次 GP 输出会同时写 `field_coverage.json` 和 `field_coverage.md`。
+本地字段搜索和净超额评分统一使用 `full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1`：沪深全 A、Tushare qfq、`daily_basic.total_mv`、公告日 PIT、`comp_type=1` 优先、TTM 季度还原、`close(t+1) -> close(t+cycle+1)`、10 组、单边 0.30% 成本；相关性使用每日有效截面 Spearman 平均秩后取每日均值。`max5_low21` 额外复现已验证的平台 Python `[date, symbol]` level-0 滚动语义；换手诊断保留本地实际换手与平台换手成本敏感性两套值。对齐挖掘默认只使用规则文件中的已验证字段集合；每次 GP 输出会同时写 `field_coverage.json` 和 `field_coverage.md`，并记录搜索范围。
 
 刷新完整本地财务字段前只需在当前机器设置 token，不要写入仓库：
 
@@ -308,15 +334,36 @@ python scripts/tushare_financial_cache.py --universe full_a --start-date 2018010
 
 本地 GFlowNet 因子挖掘入口为 `scripts/alphaprobe_gfn_tushare.py`，使用 AlphaPROBE 的 trajectory-balance GFlowNet、AlphaPool 和表达式 token 环境；数据使用现有 Tushare qfq 价格、`daily_basic.total_mv` 和 `amount/volume` VWAP 缓存。它不调用 PandaAI 在线回测接口。
 
+## 15. 不可接受差异与字段风险登记
+
+当前净超额验收线为绝对差 `>5pp`。现行全量结果中 159 条有有效本地净超额，其中 150 条在 5pp 内、9 条超过 5pp；换手主导的 HT13 单独标记为平台汇总换手问题，不把 `TURNOVER` 叶子误判为字段错误。
+
+每次正式复现后刷新登记表：
+
+```bash
+python scripts/build_alignment_failure_registry.py
+```
+
+输出：
+
+- `research_reports/platform_alignment/factor_alignment_failure_registry.json`
+- `research_reports/platform_alignment/factor_alignment_failure_registry.md`
+
+登记表保存硬失败的公式字段、算子、净/毛超额差、Top20、RankIC、有效期覆盖、换手敏感性和原因代码。只有同一字段至少两次超过 5pp 且没有任何 5pp 内的已评估证据，才进入 GP/GFN 默认排除列表；当前 `blocked_fields` 为空，`CLOSE/HIGH/AMOUNT/VOLUME/TURNOVER/MARKET_CAP` 仅作为组合风险或诊断嫌疑，不能全局拉黑。诊断复查可显式使用 `--allow-blocked-fields`。
+
 环境必须使用 `requirements-alphaprobe-gfn.txt` 中的 `torchgfn==1.2.1`。AlphaPROBE 当前源码使用旧版 `torchgfn` 的 `device_str` 和策略头 API，直接安装 2.x 会在环境初始化阶段失败。若目标机器已有其他 NumPy 元数据损坏，先清理该环境后再安装依赖；不要把修复产生的环境文件放进仓库。
 
 训练口径固定为：沪深全 A、qfq、label-1（`close(t+1) -> close(t+1+cycle)`）、5 日周期、2021-09-07 至 2026-09-07，训练/验证/测试分别为 2021-09-07..2024-09-06、2024-09-09..2025-09-05、2025-09-08..2026-09-07。运行：
 
 ```bash
 python -m pip install -r requirements-alphaprobe-gfn.txt
-python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --feature-set fundamental_core --backtrack-days 512 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_run2
+python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --feature-set verified --backtrack-days 512 --net-excess-weight 0.10 --net-excess-scale 0.10 --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive_verified_net_reward_run1
 python scripts/alphaprobe_gfn_tushare.py --device cuda:0 --ic-objective signed_positive --output quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quantlab/.quantlab/cache/research/cn_equity/reports/alphaprobe_gfn_tushare_cycle5_signed_positive
 ```
 
 评估脚本使用线性内存的逐日 Spearman，避免 AlphaPROBE 原始 `batch_spearmanr` 在全 A 股票数上创建二次方矩阵。默认 `signed_positive` 目标保留单因子 IC 符号并拒绝非正 IC 候选；旧绝对 IC 轮仍保留在 `alphaprobe_gfn_tushare_cycle5_run2/`。正 IC 轮的 10,000 episode 结果在 `alphaprobe_gfn_tushare_cycle5_signed_positive_run1/`，ensemble train/valid/test Rank IC 为 `0.0913/0.0794/0.0556`，Pearson IC 为 `0.0337/0.0181/0.0066`。这是本地历史样本结果，仍需对单因子做独立泛化和成本检验。
+
+净超额 reward 默认使用 `--net-excess-weight 0.10 --net-excess-scale 0.10`，其形式为 `weight * tanh(net_excess / scale)`，并叠加到 IC、SSL 和 novelty reward。净超额只在训练区间计算，采用本契约的 `factor_valid` 基准、10 组、label-1、5 日周期和双边 0.60% 成本；验证/测试只做事后报告。输出 metadata 会保存这组参数，`factor_metrics.csv/json` 会保存每个候选的毛超额、换手、年化成本和净超额。新训练使用独立目录 `alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_net_reward_run1/`，不会覆盖旧的 `run2/`。
+
+本轮净超额 reward 训练已完成 10,000 episodes，训练池 50 个因子；完整逐因子结果见 [`research_reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_net_reward_run1_eval/`](./research_reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_net_reward_run1_eval/)。ensemble 的 train/valid/test Rank IC 为 `0.0822/0.0932/0.0669`，但按同一成本口径的净超额为 `-5.34%/-12.83%/-8.11%`，原因是 ensemble 换手约 `50.73%`、年化成本约 `15.34%`。测试期最佳单因子为 `Div($vwap,$high)`：Rank IC `0.0580`、毛超额 `19.69%`、换手 `17.16%`、净超额 `14.50%`；测试期净超额为正的因子 `6/50`，因此本轮证明 reward 能找到成本后较好的单因子，但不能判定整池或 ensemble 已通过泛化验证。旧无净超额 reward 池的测试期最佳净超额为 `5.49%`，正净超额因子为 `11/50`；两轮仍只有单次随机种子，不能据此宣称稳定改进。
