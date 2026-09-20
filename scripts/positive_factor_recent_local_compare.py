@@ -28,6 +28,7 @@ sys.path.insert(0, str(SCRIPTS_ROOT))
 
 from financial_factor_local import FINANCIAL_HANDLERS, load_financial_cache  # noqa: E402
 from full_a_local_data import load_full_a_data, select_market_cap  # noqa: E402
+from machine_profile import resolve_machine_profile  # noqa: E402
 from platform_aligned_factor_compare import read_platform_run  # noqa: E402
 from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_DATA_START,
@@ -45,6 +46,8 @@ from positive_factor_local_compare import (  # noqa: E402
     DATA_START,
     END,
     build_factor,
+    compact_financial_instruments,
+    compact_full_a_frame,
     evaluate,
     formula_catalog,
     infer_cycle,
@@ -124,6 +127,7 @@ def write_outputs(
     unsupported: list[dict[str, Any]],
 ) -> None:
     paths["json"].parent.mkdir(parents=True, exist_ok=True)
+    settings = {**settings, **resolve_machine_profile()}
     payload = {
         "settings": settings,
         "results": rows,
@@ -154,6 +158,7 @@ def write_outputs(
     lines = [
         "# Recent local diagnostics for platform-net-positive factors",
         "",
+        f"Machine: `{settings['machine_profile']}` ({settings['machine_label']}).",
         "This report is a recent-window diagnostic, not a replacement for the canonical five-year alignment report.",
         f"Alignment rules: `{ALIGNMENT_RULE_VERSION}`; see `{ALIGNMENT_RULES_DOCUMENT}`.",
         f"Factor values use `{settings['data_start']}` warm-up; portfolio statistics use signal dates from `{settings['recent_start']}`.",
@@ -231,6 +236,18 @@ def main() -> int:
     parser.add_argument("--price-root", type=Path, default=DEFAULT_PRICE_ROOT)
     parser.add_argument("--cap-root", type=Path, default=DEFAULT_CAP_ROOT)
     parser.add_argument("--financial-root", type=Path, default=DEFAULT_FINANCIAL_ROOT)
+    parser.add_argument(
+        "--name",
+        action="append",
+        default=[],
+        help="Only rebuild the named candidate(s); may be repeated.",
+    )
+    parser.add_argument(
+        "--id",
+        action="append",
+        default=[],
+        help="Only rebuild the saved report record id(s); may be repeated.",
+    )
     args = parser.parse_args()
 
     recent_start = pd.Timestamp(
@@ -250,6 +267,14 @@ def main() -> int:
     ]
     catalog = formula_catalog()
     supported, unsupported = saved_records(catalog, "positive")
+    if args.name:
+        wanted_names = set(args.name)
+        supported = [record for record in supported if record["name"] in wanted_names]
+        unsupported = [record for record in unsupported if record["name"] in wanted_names]
+    if args.id:
+        wanted_ids = set(args.id)
+        supported = [record for record in supported if record["id"] in wanted_ids]
+        unsupported = [record for record in unsupported if record["id"] in wanted_ids]
     platform_positive_count = len(supported) + len(unsupported)
     print(
         f"platform_positive_records={platform_positive_count} "
@@ -257,15 +282,23 @@ def main() -> int:
         flush=True,
     )
 
-    frame = load_full_a_data(args.price_root, args.cap_root, DATA_START, END)
+    frame = load_full_a_data(
+        args.price_root,
+        args.cap_root,
+        DATA_START,
+        END,
+        market_cap_field=ALIGNMENT_MARKET_CAP_FIELD,
+    )
     frame = select_market_cap(frame, ALIGNMENT_MARKET_CAP_FIELD)
     frame = frame.sort_values(["instrument", "date"], ignore_index=True)
+    frame, instrument_categories = compact_full_a_frame(frame)
     close = panel_close(frame, calendar)
     print(f"local_rows={len(frame)}", flush=True)
 
     financial: dict[str, pd.DataFrame] | None = None
     if any(record.get("handler") in FINANCIAL_HANDLERS for record in supported):
         financial = load_financial_cache(args.financial_root)
+        compact_financial_instruments(financial, instrument_categories)
         print("financial_cache=loaded", flush=True)
 
     prepared: list[tuple[dict[str, Any], dict[str, Any], list[pd.Timestamp], int]] = []

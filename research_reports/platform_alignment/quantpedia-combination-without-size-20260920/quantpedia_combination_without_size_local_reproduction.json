@@ -1,0 +1,129 @@
+{
+  "combination": "H03+RESVOL",
+  "formula": "(RANK(H03) + RANK(-RESIDUAL_VOLATILITY)) / 2",
+  "status": "local_combination_proxy",
+  "source": "Offline exhaustive representative combination search; components are saved positive mechanisms.",
+  "notes": [
+    "SIZE is the low-market-cap direction of RANK(MARKET_CAP).",
+    "H03 is the saved 60-day high-low/amount impact mechanism.",
+    "RESVOL is a local market-model residual-volatility proxy for the unavailable platform Barra field.",
+    "The equal-weight combination is a local portfolio proxy, not a PandaAI official pool score."
+  ],
+  "settings": {
+    "machine_profile": "home",
+    "machine_label": "家用电脑",
+    "data_provider": "Tushare",
+    "network_access": "none",
+    "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1",
+    "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+    "alignment_config": {
+      "universe": "full_a",
+      "price_mode": "qfq",
+      "market_cap_field": "total_mv",
+      "data_start": "20180101",
+      "start": "20210907",
+      "end": "20260907",
+      "groups": 10,
+      "label_offset": 1,
+      "round_trip_cost": 0.006,
+      "one_way_cost": 0.003,
+      "benchmark_mode": "factor_valid",
+      "correlation_method": "daily_cross_sectional_spearman_mean",
+      "platform_turnover_high_threshold": 0.85,
+      "local_turnover_low_threshold": 0.5,
+      "turnover_gap_alert_threshold": 0.25,
+      "platform_turnover_over_100_threshold": 1.0,
+      "turnover_sensitivity_method": "local gross excess minus annualized cost using saved platform turnover; diagnostic only",
+      "large_net_delta_pp": 5.0,
+      "large_gross_delta_pp": 5.0,
+      "large_rank_ic_delta": 0.02,
+      "min_top20_overlap": 15,
+      "min_period_coverage": 0.95,
+      "turnover_dominant_max_sensitivity_delta_pp": 2.0,
+      "verified_search_fields": [
+        "amount",
+        "book_to_market_ratio_lf",
+        "book_to_market_ratio_lyr",
+        "close",
+        "current_assets",
+        "current_liabilities",
+        "gr_total_asset_lyr",
+        "high",
+        "inventory",
+        "low",
+        "market_cap",
+        "open",
+        "oper_main_profit_ttm",
+        "oper_roe_lyr",
+        "ratio_bm_ttm",
+        "ratio_ep_ttm",
+        "ratio_pcf_ocf_ttm",
+        "ratio_sp_ttm",
+        "turnover",
+        "volume"
+      ]
+    },
+    "data_start": "2018-01-01",
+    "formal_start": "2021-09-07",
+    "formal_end": "2026-09-07",
+    "recent_start": "2026-01-01",
+    "mid_start": "2026-06-01",
+    "local_data_end": "2026-09-07",
+    "universe": "full_a",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "groups": 10,
+    "cycle": 10,
+    "label_offset": 1,
+    "round_trip_cost": 0.006,
+    "one_way_cost": 0.003,
+    "benchmark_mode": "factor_valid",
+    "signal_schedule": "generated_calendar_10d_anchor_2021-09-07",
+    "rows": 9401373,
+    "instruments": 5456
+  },
+  "components": [
+    {
+      "key": "H03",
+      "handler": "impact60",
+      "direction": 1
+    },
+    {
+      "key": "RESVOL",
+      "handler": "residual_volatility",
+      "direction": 1
+    }
+  ],
+  "results": {
+    "formal_5y": {
+      "periods": 120,
+      "stock_count_mean": 4934.866666666667,
+      "rank_ic": 0.0801779722334809,
+      "ic_mean": 0.04580393138587314,
+      "gross_excess": 0.12426635904663882,
+      "turnover": 0.08972137613697741,
+      "annual_cost": 0.013565872071910984,
+      "net_excess": 0.11070048697472784
+    },
+    "recent_2026": {
+      "periods": 15,
+      "stock_count_mean": 5163.933333333333,
+      "rank_ic": 0.08651668379003927,
+      "ic_mean": 0.03598174482699177,
+      "gross_excess": 0.12543334515073715,
+      "turnover": 0.08289611681653174,
+      "annual_cost": 0.012533892862659598,
+      "net_excess": 0.11289945228807755
+    },
+    "since_2026_06_01": {
+      "periods": 5,
+      "stock_count_mean": 5176.6,
+      "rank_ic": 0.1556406106938518,
+      "ic_mean": 0.1250349968659284,
+      "gross_excess": 0.42262260637063415,
+      "turnover": 0.0767459864434406,
+      "annual_cost": 0.01160399315024822,
+      "net_excess": 0.4110186132203859
+    }
+  }
+}

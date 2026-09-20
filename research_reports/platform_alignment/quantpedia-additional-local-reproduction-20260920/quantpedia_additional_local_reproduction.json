@@ -1,0 +1,253 @@
+{
+  "settings": {
+    "alignment_rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1",
+    "alignment_rules_document": "research_reports/platform_alignment/ALIGNMENT_RULES.md",
+    "alignment_config": {
+      "universe": "full_a",
+      "price_mode": "qfq",
+      "market_cap_field": "total_mv",
+      "data_start": "20180101",
+      "start": "20210907",
+      "end": "20260907",
+      "groups": 10,
+      "label_offset": 1,
+      "round_trip_cost": 0.006,
+      "one_way_cost": 0.003,
+      "benchmark_mode": "factor_valid",
+      "correlation_method": "daily_cross_sectional_spearman_mean",
+      "platform_turnover_high_threshold": 0.85,
+      "local_turnover_low_threshold": 0.5,
+      "turnover_gap_alert_threshold": 0.25,
+      "platform_turnover_over_100_threshold": 1.0,
+      "turnover_sensitivity_method": "local gross excess minus annualized cost using saved platform turnover; diagnostic only",
+      "large_net_delta_pp": 5.0,
+      "large_gross_delta_pp": 5.0,
+      "large_rank_ic_delta": 0.02,
+      "min_top20_overlap": 15,
+      "min_period_coverage": 0.95,
+      "turnover_dominant_max_sensitivity_delta_pp": 2.0,
+      "verified_search_fields": [
+        "amount",
+        "book_to_market_ratio_lf",
+        "book_to_market_ratio_lyr",
+        "close",
+        "current_assets",
+        "current_liabilities",
+        "gr_total_asset_lyr",
+        "high",
+        "inventory",
+        "low",
+        "market_cap",
+        "open",
+        "oper_main_profit_ttm",
+        "oper_roe_lyr",
+        "ratio_bm_ttm",
+        "ratio_ep_ttm",
+        "ratio_pcf_ocf_ttm",
+        "ratio_sp_ttm",
+        "turnover",
+        "volume"
+      ]
+    },
+    "machine_profile": "home",
+    "machine_label": "家用电脑",
+    "data_provider": "Tushare",
+    "network_access": "none",
+    "price_source": "stk_factor qfq",
+    "market_cap_source": "daily_basic.total_mv",
+    "universe": "full_a",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "data_start": "2018-01-01",
+    "formal_start": "2021-09-07",
+    "formal_end": "2026-09-07",
+    "recent_start": "2026-01-01",
+    "local_data_end": "2026-09-07",
+    "latest_signal_date": "2026-07-21",
+    "groups": 10,
+    "cycle": 21,
+    "label_offset": 1,
+    "round_trip_cost": 0.006,
+    "one_way_cost": 0.003,
+    "benchmark_mode": "factor_valid",
+    "signal_schedule": "generated_calendar_21d",
+    "lookback_days": 126,
+    "skip_recent_days": 5,
+    "large_cap_fraction": 0.5,
+    "high_volatility_fraction": 0.5,
+    "holding_period_note": "21-day label proxy; source uses overlapping six-month holdings",
+    "pool_count": 5456,
+    "local_rows": 9401373,
+    "signal_rows": 69326,
+    "calendar_dates": 2107,
+    "formal_signal_periods": 57,
+    "recent_signal_periods": 7,
+    "subset_diagnostics": {
+      "large_cap_count_mean": 2431.9298245614036,
+      "high_vol_count_mean": 1216.2456140350878,
+      "high_vol_count_min": 1052.0,
+      "high_vol_count_max": 1284.0
+    },
+    "memory_limits": {
+      "max_rss_gb": 2.6,
+      "min_available_gb": 3.0
+    }
+  },
+  "candidates": {
+    "momentum_reversal_volatility": {
+      "status": "computed_proxy",
+      "source": "https://quantpedia.com/strategies/momentum-and-reversal-combined-with-volatility-effect-in-stocks",
+      "formula": "large-cap & high-volatility subset; rank RET126 and skip 5 days",
+      "direction": 1,
+      "note": "Local proxy: RET126 = CLOSE/DELAY(CLOSE,126)-1, VOL126 = STDDEV(RETURNS(CLOSE,1),126), both shifted by 5 trading days. Top 50% total_mv, then top 50% VOL126; top/bottom RET126 deciles."
+    },
+    "ncav_market_cap": {
+      "status": "unsupported",
+      "source": "https://quantpedia.com/strategies/net-current-asset-value-effect",
+      "formula": "NCAV / MARKET_CAP",
+      "direction": 1,
+      "note": "Unsupported: the local financial cache does not contain a reliable current-assets field required by the source definition."
+    },
+    "accrual_anomaly": {
+      "status": "unsupported",
+      "source": "https://quantpedia.com/strategies/accrual-anomaly",
+      "formula": "BS_ACC / TOTAL_ASSETS",
+      "direction": -1,
+      "note": "Unsupported: the local cache lacks the cash, short-term debt, income-tax payable, and depreciation fields needed for the source balance-sheet accrual formula."
+    }
+  },
+  "results": [
+    {
+      "factor": "momentum_reversal_volatility",
+      "window": "formal_5y",
+      "requested_start": "2021-09-07",
+      "requested_end": "2026-09-07",
+      "signal_start": "2021-09-07",
+      "signal_end": "2026-07-21",
+      "signal_periods": 57,
+      "direction": 1,
+      "selected_group": 10,
+      "stock_count_mean": 1216.2456140350878,
+      "long_count_mean": 122.10526315789474,
+      "short_count_mean": 121.17543859649123,
+      "rank_ic": -0.06582501358071377,
+      "ic_mean": -0.0515034529791012,
+      "gross_excess_pct": -17.562938408581736,
+      "long_turnover_pct": 42.4924583302864,
+      "long_annual_cost_pct": 3.0594569997806205,
+      "net_excess_pct": -20.622395408362358,
+      "long_short_gross_pct": -24.269364390403066,
+      "long_short_turnover_pct": 47.14270148761579,
+      "long_short_annual_cost_pct": 3.3942745071083373,
+      "long_short_net_pct": -27.6636388975114,
+      "short_turnover_pct": 51.79294464494518
+    },
+    {
+      "factor": "momentum_reversal_volatility",
+      "window": "recent_diagnostic",
+      "requested_start": "2026-01-01",
+      "requested_end": "2026-09-07",
+      "signal_start": "2026-01-09",
+      "signal_end": "2026-07-21",
+      "signal_periods": 7,
+      "direction": 1,
+      "selected_group": 10,
+      "stock_count_mean": 1277.7142857142858,
+      "long_count_mean": 128.14285714285714,
+      "short_count_mean": 127.14285714285714,
+      "rank_ic": 0.01898498950585079,
+      "ic_mean": 0.019510686621924782,
+      "gross_excess_pct": 16.847195808139993,
+      "long_turnover_pct": 38.761708656330754,
+      "long_annual_cost_pct": 2.790843023255814,
+      "net_excess_pct": 14.056352784884178,
+      "long_short_gross_pct": 42.39239465343183,
+      "long_short_turnover_pct": 46.250420437089254,
+      "long_short_annual_cost_pct": 3.3300302714704264,
+      "long_short_net_pct": 39.06236438196141,
+      "short_turnover_pct": 53.73913221784776
+    }
+  ],
+  "latest_snapshot": [
+    {
+      "instrument": "688146.SH",
+      "factor": 4.984739564782143
+    },
+    {
+      "instrument": "603629.SH",
+      "factor": 4.940614879925979
+    },
+    {
+      "instrument": "002636.SZ",
+      "factor": 4.739986069975278
+    },
+    {
+      "instrument": "603256.SH",
+      "factor": 4.599816283629812
+    },
+    {
+      "instrument": "301526.SZ",
+      "factor": 4.5850672337482115
+    },
+    {
+      "instrument": "300209.SZ",
+      "factor": 4.570642201834862
+    },
+    {
+      "instrument": "001331.SZ",
+      "factor": 4.495385781736428
+    },
+    {
+      "instrument": "301362.SZ",
+      "factor": 4.352964626764542
+    },
+    {
+      "instrument": "300489.SZ",
+      "factor": 4.177165354330709
+    },
+    {
+      "instrument": "688766.SH",
+      "factor": 4.071829689688947
+    },
+    {
+      "instrument": "301396.SZ",
+      "factor": 4.00004966236985
+    },
+    {
+      "instrument": "003036.SZ",
+      "factor": 3.885471106851817
+    },
+    {
+      "instrument": "603115.SH",
+      "factor": 3.869543919354423
+    },
+    {
+      "instrument": "688530.SH",
+      "factor": 3.559002433090024
+    },
+    {
+      "instrument": "688519.SH",
+      "factor": 3.545367262329881
+    },
+    {
+      "instrument": "603823.SH",
+      "factor": 3.4385424115145726
+    },
+    {
+      "instrument": "002980.SZ",
+      "factor": 3.406739439962031
+    },
+    {
+      "instrument": "300903.SZ",
+      "factor": 3.400207361327112
+    },
+    {
+      "instrument": "600396.SH",
+      "factor": 3.182456140350877
+    },
+    {
+      "instrument": "603618.SH",
+      "factor": 3.179900744416873
+    }
+  ]
+}

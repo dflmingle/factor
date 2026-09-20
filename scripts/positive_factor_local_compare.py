@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import argparse
+import gc
 import hashlib
 import json
 import re
@@ -56,6 +57,8 @@ from alignment_failure_registry import (  # noqa: E402
     UNACCEPTABLE_NET_DELTA_PP,
     classify_failure,
 )
+import financial_factor_local as financial_factor_module  # noqa: E402
+from machine_profile import resolve_machine_profile  # noqa: E402
 from platform_aligned_factor_compare import read_platform_run  # noqa: E402
 from full_a_local_data import load_full_a_data, select_market_cap  # noqa: E402
 from financial_factor_local import (  # noqa: E402
@@ -1283,16 +1286,22 @@ def fallback_signal_dates(
     calendar: list[pd.Timestamp],
     cycle: int,
     templates: dict[int, list[pd.Timestamp]],
+    label_offset: int = ALIGNMENT_LABEL_OFFSET,
 ) -> tuple[list[pd.Timestamp], str]:
     template = templates.get(cycle)
     if template:
-        return list(template), f"reference_chart_{cycle}d"
+        dates = [
+            date
+            for date in template
+            if calendar.index(date) + label_offset + cycle < len(calendar)
+        ]
+        return dates, f"reference_chart_{cycle}d"
 
     start_position = calendar.index(PLATFORM_START)
     dates = [
-        date
-        for position, date in enumerate(calendar[start_position::cycle], start=start_position)
-        if position + cycle < len(calendar)
+        calendar[position]
+        for position in range(start_position, len(calendar), cycle)
+        if position + label_offset + cycle < len(calendar)
     ]
     return dates, "generated_calendar"
 
@@ -1300,6 +1309,44 @@ def fallback_signal_dates(
 def panel_close(frame: pd.DataFrame, calendar: list[pd.Timestamp]) -> pd.DataFrame:
     panel = frame.pivot(index="date", columns="instrument", values="close_qfq")
     return panel.reindex(calendar).sort_index(axis=1).ffill()
+
+
+def compact_full_a_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Index]:
+    """Keep canonical inputs while reducing repeated full-panel copies."""
+    columns = [
+        "date",
+        "instrument",
+        "open_qfq",
+        "close_qfq",
+        "volume",
+        "high_qfq",
+        "low_qfq",
+        "amount",
+        "turnover",
+        "total_mv",
+    ]
+    missing = sorted(set(columns).difference(frame.columns))
+    if missing:
+        raise RuntimeError(f"Full-A frame is missing canonical columns: {missing}")
+    extra = [column for column in frame.columns if column not in columns]
+    if extra:
+        frame.drop(columns=extra, inplace=True)
+    categories = pd.Index(frame["instrument"].astype(str).unique(), dtype=object)
+    frame["instrument"] = pd.Categorical(
+        frame["instrument"].astype(str), categories=categories, ordered=False
+    )
+    return frame, categories
+
+
+def compact_financial_instruments(
+    financial: dict[str, pd.DataFrame], categories: pd.Index
+) -> None:
+    """Use one join-key dtype for PIT joins without changing values."""
+    for table in financial.values():
+        if "instrument" in table.columns:
+            table["instrument"] = pd.Categorical(
+                table["instrument"].astype(str), categories=categories, ordered=False
+            )
 
 
 def forward_returns(
@@ -1559,6 +1606,7 @@ def write_outputs(
     output_name = f"{net_filter}_factor_local_compare"
     validate_existing_output(output_root, output_name, alignment_config)
     output_root.mkdir(parents=True, exist_ok=True)
+    machine = resolve_machine_profile()
     local_universe = (
         "full-A Tushare qfq rows joined with daily_basic and filtered to .SH/.SZ"
         if universe == "full_a"
@@ -1573,6 +1621,8 @@ def write_outputs(
         "settings": {
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
             "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
+            "machine_profile": machine["machine_profile"],
+            "machine_label": machine["machine_label"],
             "alignment_config": alignment_config,
             "alignment_status": "canonical",
             "data_start": data_start.strftime("%Y%m%d"),
@@ -1614,6 +1664,7 @@ def write_outputs(
     lines = [
         f"# {net_filter.title()} platform-net-excess factors: local reproduction",
         "",
+        f"Machine: `{machine['machine_profile']}` ({machine['machine_label']}).",
         f"The catalog contains every completed saved run whose platform `net_excess_pct` is {net_description}.",
         f"Alignment rules: `{ALIGNMENT_RULE_VERSION}`; see `{ALIGNMENT_RULES_DOCUMENT}`.",
         f"The local side uses `{local_universe}` and `{ALIGNMENT_PRICE_MODE}` Tushare daily data.",
@@ -1741,6 +1792,12 @@ def main() -> int:
         default=[],
         help="Only rebuild the named candidate(s); may be repeated.",
     )
+    parser.add_argument(
+        "--id",
+        action="append",
+        default=[],
+        help="Only rebuild the saved report record id(s); may be repeated.",
+    )
     args = parser.parse_args()
 
     data_start = pd.Timestamp(
@@ -1779,6 +1836,10 @@ def main() -> int:
         wanted_names = set(args.name)
         supported = [record for record in supported if record["name"] in wanted_names]
         unsupported = [record for record in unsupported if record["name"] in wanted_names]
+    if args.id:
+        wanted_ids = set(args.id)
+        supported = [record for record in supported if record["id"] in wanted_ids]
+        unsupported = [record for record in unsupported if record["id"] in wanted_ids]
     configs = platform_configs()
     for record in supported + unsupported:
         record["platform_config"] = configs.get(str(record.get("factor_id")))
@@ -1804,6 +1865,7 @@ def main() -> int:
             Path(args.cap_root),
             data_start,
             END,
+            market_cap_field=args.market_cap_field,
         )
         frame = select_market_cap(frame, args.market_cap_field)
         pool = set(frame["instrument"].astype(str).unique())
@@ -1812,6 +1874,9 @@ def main() -> int:
         pool = load_st_pool()
         frame = frame[frame["instrument"].isin(pool)].copy()
     frame = frame.sort_values(["instrument", "date"], ignore_index=True)
+    instrument_categories: pd.Index | None = None
+    if args.universe == "full_a":
+        frame, instrument_categories = compact_full_a_frame(frame)
     print(f"local_rows={len(frame)} pool={len(pool)}", flush=True)
     close = panel_close(frame, calendar)
 
@@ -1825,6 +1890,8 @@ def main() -> int:
                 f"fina_rows={len(financial['fina_indicator'])}",
                 flush=True,
             )
+            if instrument_categories is not None:
+                compact_financial_instruments(financial, instrument_categories)
         except FileNotFoundError as exc:
             for record in list(financial_records):
                 supported.remove(record)
@@ -1858,7 +1925,9 @@ def main() -> int:
         if signal_dates:
             date_source = "platform_chart"
         elif cycle:
-            signal_dates, date_source = fallback_signal_dates(calendar, cycle, chart_templates)
+            signal_dates, date_source = fallback_signal_dates(
+                calendar, cycle, chart_templates, args.label_offset
+            )
         else:
             raise RuntimeError(f"Cannot determine rebalance cycle for {record['id']}")
         if not signal_dates:
@@ -2011,6 +2080,8 @@ def main() -> int:
                 flush=True,
             )
         del values
+        financial_factor_module._HISTORICAL_RANK_CACHE.clear()
+        gc.collect()
 
     rows.sort(key=lambda row: row["id"])
     output_root = Path(args.output)

@@ -1,5 +1,7 @@
 # Recent local diagnostics for platform-net-positive factors
 
+Machine: `office` (公司电脑).
+
 This report is a recent-window diagnostic, not a replacement for the canonical five-year alignment report.
 Alignment rules: `full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1`; see `research_reports/platform_alignment/ALIGNMENT_RULES.md`.
 Factor values use `2018-01-01 00:00:00` warm-up; portfolio statistics use signal dates from `2026-01-01 00:00:00`.

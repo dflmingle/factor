@@ -1,0 +1,14 @@
+﻿representative_rank,factor_id,factor_name,handler,formula,platform_net_excess_pct,platform_rank_ic,mechanism
+1,size-only-20260911-candidates.report:SIZE-ONLY-20260911,SIZE-ONLY-20260911,size_only,RANK(MARKET_CAP),21.433287999999997,-0.0558,size
+2,t10-more-additions-20260911-candidates.report:T10-ADD-AGG-IMPACT-20260911,T10-ADD-AGG-IMPACT-20260911,t10_size_plus_impact_aggregate,"(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1),60) / (SUM(AMOUNT,60) + 1))) / 6",19.759592,0.1057,size_plus_impact
+3,verify-field-scan-20260910-candidates.report:VERIFY-E260910-04,VERIFY-E260910-04,book_to_market_lf_minus_size,RANK(book_to_market_ratio_lf) - RANK(MARKET_CAP),17.75808,0.0681,value_minus_size
+4,h03-t10-single-20260911-candidates.report:H03-T10-SINGLE,H03-T10-SINGLE,impact60,"RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))",16.443255999999998,0.0665,pure_impact
+5,alphaprobe-net1-platform-20260914-candidates.report:F-NET01-PLAT-20260914,F-NET01-PLAT-20260914,wma_low_volume40,"WMA((((1/LOW)/LOW)/VOLUME),40)",13.628703999999999,0.0577,low_volume
+6,combo-direct-4factor-paper-20260909-candidates.report:COMBO-DIRECT-OSR2-CHIP-TURN-PAPER-EQ,COMBO-DIRECT-OSR2-CHIP-TURN-PAPER-EQ,reversal_chip_turn_paper,"(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(ZSCORE(RANK(book_to_market_ratio_lyr)) + ZSCORE(RANK(oper_roe_lyr)) - ZSCORE(RANK(gr_total_asset_lyr)) - ZSCORE(RANK(MARKET_CAP)))) / 4",12.774432000000001,0.115,reversal_chip_turn_value_composite
+7,huatai-series13-candidates.report:HT13-TURN-BIAS-1M,HT13-TURN-BIAS-1M,turn_bias,"MA(TURNOVER,21) / MA(TURNOVER,504) - 1",6.428368,-0.0652,turnover_bias
+8,positive-cycle10-candidates.report:OSR2-RET40,OSR2-RET40,reversal40,"RANK(1 - RETURNS(CLOSE,40))",5.030975999999999,0.0908,reversal
+9,oversold-rebound-recovery-candidates.report:OSR2-DD120,OSR2-DD120,drawdown120,"RANK(1 - CLOSE / TS_MAX(CLOSE,120))",4.791456,0.0329,drawdown
+10,nonht-report-directions-20260909-formula.report:NONHT-CHIP-COST-250,NONHT-CHIP-COST-250,chip250,"RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1)",4.279336,0.0677,chip_cost
+11,osr3-ret40-value-candidates.report:OSR3-RET40-BP-CFP,OSR3-RET40-BP-CFP,reversal_bm_cfp,"(RANK(1 - RETURNS(CLOSE,40)) + RANK(ratio_bm_ttm) + RANK(ratio_cfp_ttm)) / 3",3.560943999999999,0.067,value_cfp
+12,high-potential-5-20260910-candidates.report:NEW-VALUE-EVEBITDA,NEW-VALUE-EVEBITDA,ev_ebitda_proxy,RANK(-ratio_ev_ebitda_ttm),3.3196399999999997,0.0202,ev_value
+13,nonhuatai-factor-6-20260909.report:NONHT-RESVOL-LOW,NONHT-RESVOL-LOW,residual_volatility,RANK(-residual_volatility),0.37087199999999987,0.0884,residual_volatility

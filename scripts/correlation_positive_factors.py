@@ -266,6 +266,8 @@ def slim_financial_cache(
         "income_ttm": {
             "ttm_total_revenue",
             "ttm_revenue",
+            "ttm_oper_cost",
+            "ttm_biz_tax_surchg",
             "ttm_n_income_attr_p",
             "ttm_n_income",
             "ttm_operate_profit",
@@ -323,15 +325,19 @@ def install_financial_snapshot_cache(
     return snapshot
 
 
-def load_platform_records() -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Load positive platform records from the saved project catalog.
+def load_platform_records(
+    net_filter: str = "positive",
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Load supported platform records from the saved project catalog.
 
     This path deliberately does not use a prior local comparison report.  It
     keeps the current alignment rule version attached to the factors that are
     rebuilt below, even while a newly bumped full comparison report is being
     regenerated elsewhere.
     """
-    supported, _unsupported = saved_records(formula_catalog(), "positive")
+    if net_filter not in {"positive", "negative", "all"}:
+        raise ValueError(f"Unsupported platform net filter: {net_filter}")
+    supported, _unsupported = saved_records(formula_catalog(), net_filter)
     selected: list[dict[str, Any]] = []
     for record in supported:
         selected.append(
@@ -345,13 +351,13 @@ def load_platform_records() -> tuple[dict[str, Any], list[dict[str, Any]]]:
     selected.sort(key=lambda record: (str(record.get("name")), str(record.get("id"))))
     if len(selected) < 2:
         raise ValueError(
-            f"Only {len(selected)} supported positive platform records were found"
+            f"Only {len(selected)} supported {net_filter} platform records were found"
         )
     payload = {
         "settings": {
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
             "source_type": "saved platform report CSVs plus project formula catalog",
-            "platform_net_filter": "positive",
+            "platform_net_filter": net_filter,
         }
     }
     return payload, selected
@@ -804,14 +810,15 @@ def write_outputs(
     )
 
     high_rows = [row for row in pair_rows if row["high_correlation"]]
+    selection_condition = settings.get("selection_condition", "saved records")
     lines = [
-        "# Positive-net factor pair correlations",
+        "# Saved-platform factor pair correlations",
         "",
         "This is an offline local calculation. It does not contact PandaAI, create factors, or spend compute credits.",
         "",
         "## Fixed inputs",
         "",
-        f"- Source: `{settings['source_type']}` under `{source_path}`; selection: `{settings['selection_metric']}` net excess `> 0`.",
+        f"- Source: `{settings['source_type']}` under `{source_path}`; selection: `{selection_condition}`.",
         f"- Selected factors: `{settings['factor_count']}` records, `{settings['handler_count']}` unique handlers; pair count: `{settings['pair_count']}`.",
         f"- Window: `{settings['comparison_start']}..{settings['comparison_end']}`; warm-up starts `{settings['data_start']}`; trading dates: `{settings['comparison_dates']}`.",
         f"- Universe: `{ALIGNMENT_UNIVERSE_LABEL}`; prices `{ALIGNMENT_PRICE_MODE}`; market cap `{ALIGNMENT_MARKET_CAP_FIELD}`.",
@@ -866,6 +873,12 @@ def main() -> int:
         default="platform",
         help="Select records by platform_net_excess_pct or local_net_excess",
     )
+    parser.add_argument(
+        "--platform-net-filter",
+        choices=["positive", "negative", "all"],
+        default="positive",
+        help="When loading saved report CSVs, select positive, negative, or all completed records",
+    )
     parser.add_argument("--data-start", default=ALIGNMENT_DATA_START)
     parser.add_argument("--start", default=ALIGNMENT_START)
     parser.add_argument("--end", default=ALIGNMENT_END)
@@ -897,11 +910,17 @@ def main() -> int:
     if args.records is None:
         if args.selection_metric != "platform":
             raise SystemExit("--records is required when --selection-metric=local")
-        source_payload, records = load_platform_records()
+        source_payload, records = load_platform_records(args.platform_net_filter)
         source_path = PROJECT_ROOT
+        selection_condition = (
+            "all completed saved platform records"
+            if args.platform_net_filter == "all"
+            else f"platform net excess {args.platform_net_filter} 0"
+        )
     else:
         source_path = Path(args.records)
         source_payload, records = load_records(source_path, args.selection_metric)
+        selection_condition = f"{args.selection_metric} net excess > 0"
     print(
         f"selected_records={len(records)} unique_handlers={len({r['handler'] for r in records})} "
         f"selection={args.selection_metric}",
@@ -1005,7 +1024,8 @@ def main() -> int:
         "alignment_rules_document": ALIGNMENT_RULES_DOCUMENT,
         "source_type": "saved project platform report CSVs and candidate formula catalog",
         "selection_metric": args.selection_metric,
-        "selection_condition": "net_excess > 0",
+        "platform_net_filter": args.platform_net_filter,
+        "selection_condition": selection_condition,
         "universe": ALIGNMENT_UNIVERSE_LABEL,
         "price_mode": ALIGNMENT_PRICE_MODE,
         "market_cap_field": ALIGNMENT_MARKET_CAP_FIELD,
