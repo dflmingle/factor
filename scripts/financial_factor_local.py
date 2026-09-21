@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
 from platform_alignment_rules import CFP_PROXY_BY_HANDLER
 
@@ -111,6 +112,77 @@ CFP_PROXIES = {
 }
 
 
+# The Tushare statement endpoints expose many fields that are unrelated to the
+# saved factor handlers.  Reading them all at once is expensive on the local
+# 16 GB machine and creates large temporary copies during PIT normalization.
+# Keep the complete key set needed for deduplication, plus the fields used by
+# the local financial proxies and their TTM reconstruction.
+_FINANCIAL_METADATA = [
+    "ts_code",
+    "ann_date",
+    "f_ann_date",
+    "end_date",
+    "end_type",
+    "report_type",
+    "comp_type",
+    "update_flag",
+]
+
+_FINANCIAL_VALUE_COLUMNS = {
+    "fina_indicator": [
+        "cfps",
+        "ocfps",
+        "current_ratio",
+        "assets_turn",
+        "grossprofit_margin",
+        "netprofit_margin",
+        "roe",
+        "roe_dt",
+        "roa",
+        "roic",
+        "roe_yearly",
+        "roa_yearly",
+        "roic_yearly",
+        "debt_to_assets",
+        "ocf_to_debt",
+        "op_to_debt",
+        "op_yoy",
+        "netprofit_yoy",
+        "ocf_yoy",
+        "assets_yoy",
+    ],
+    "income": [
+        "total_revenue",
+        "revenue",
+        "oper_cost",
+        "biz_tax_surchg",
+        "operate_profit",
+        "ebit",
+        "ebitda",
+        "n_income",
+        "n_income_attr_p",
+    ],
+    "balancesheet": [
+        "total_cur_assets",
+        "inventories",
+        "inventory",
+        "total_cur_liab",
+        "current_liabilities",
+        "total_assets",
+        "total_liab",
+        "total_hldr_eqy_exc_min_int",
+        "money_cap",
+        "cash_reser",
+        "cash_reser_cb",
+        "cash_equivalent",
+    ],
+    "cashflow": [
+        "n_cashflow_act",
+        "free_cashflow",
+    ],
+}
+
+
 def _as_numeric(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     for column in columns:
         if column in frame.columns:
@@ -119,7 +191,9 @@ def _as_numeric(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 
 def _normalise_table(frame: pd.DataFrame, endpoint: str) -> pd.DataFrame:
-    result = frame.copy()
+    # ``frame`` is freshly read by ``load_financial_cache`` and is not shared
+    # with callers, so normalizing in place avoids a full-table peak copy.
+    result = frame
     result["instrument"] = result["ts_code"].astype(str)
     for column in ["ann_date", "f_ann_date", "end_date"]:
         if column in result.columns:
@@ -269,7 +343,15 @@ def load_financial_cache(root: Path) -> dict[str, pd.DataFrame]:
         paths = sorted((root / endpoint).glob("batch_*.parquet"))
         if not paths:
             raise FileNotFoundError(f"Missing financial cache: {root / endpoint}")
-        frame = pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
+        available = set(pq.ParquetFile(paths[0]).schema_arrow.names)
+        columns = [
+            column
+            for column in _FINANCIAL_METADATA + _FINANCIAL_VALUE_COLUMNS[endpoint]
+            if column in available
+        ]
+        frames = [pd.read_parquet(path, columns=columns) for path in paths]
+        frame = pd.concat(frames, ignore_index=True)
+        del frames
         normalized = _normalise_table(frame, endpoint)
         if endpoint in {"income", "balancesheet", "cashflow"}:
             normalized = _prefer_consolidated(normalized)
@@ -495,7 +577,19 @@ def _value_columns(signal: pd.DataFrame) -> pd.DataFrame:
 
 
 def _market_snapshot(frame: pd.DataFrame, dates: list[pd.Timestamp]) -> pd.DataFrame:
-    work = frame.copy()
+    columns = [
+        "date",
+        "instrument",
+        "open_qfq",
+        "close_qfq",
+        "volume",
+        "turnover",
+        "total_mv",
+    ]
+    missing = sorted(set(columns).difference(frame.columns))
+    if missing:
+        raise RuntimeError(f"Market snapshot is missing columns: {missing}")
+    work = frame[columns].copy()
     work["row_id"] = np.arange(len(work), dtype=np.int64)
     grouped = work.groupby("instrument", sort=False, observed=True)
     work["ret40"] = work["close_qfq"].div(grouped["close_qfq"].shift(40)).sub(1.0)
