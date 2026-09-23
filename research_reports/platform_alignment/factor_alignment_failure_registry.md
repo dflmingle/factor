@@ -1,37 +1,33 @@
 # 因子对齐失败登记表
 
-规则版本：`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1`
+规则版本：`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate3`
 硬失败标准：`abs(delta) > 5.00pp`
-来源：`D:\factor\quantlab\.quantlab\cache\research\cn_equity\reports\all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate1\all_factor_local_compare.json`
+来源：`quantlab/.quantlab/cache/research/cn_equity/reports/all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate3/all_factor_local_compare.json`
 
 ## 摘要
 
 | 指标 | 数值 |
 |---|---:|
-| 平台记录 | 178 |
-| 本地复现记录 | 160 |
-| 有效净超额 | 158 |
-| 净超额可接受（<=5pp） | 152 |
-| 净超额不可接受（>5pp） | 6 |
-| 暂无法判断 | 2 |
+| 平台记录 | 196 |
+| 本地复现记录 | 164 |
+| 有效净超额 | 164 |
+| 净超额可接受（<=5pp） | 160 |
+| 净超额不可接受（>5pp） | 4 |
+| 暂无法判断 | 0 |
 | 默认拉黑字段 | 无；当前证据不足以全局拉黑已验证字段 |
 
 ## 不可接受记录
 
 | 记录 | handler | 净超额差(pp) | 毛超额差(pp) | 原因 | 公式字段 | 字段归因 |
 |---|---|---:|---:|---|---|---|
-| combo-direct-4factor-size-2026-ytd-candidates.report:COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ-2026YTD | reversal_chip_turn_size_eq | -6.927464404903839 | -8.323534098436895 | gross_return_path_mismatch, factor_ranking_path_mismatch, unexplained_net_excess_gap | close, market_cap, open, turnover, volume | close(low); market_cap(low); open(low); turnover(low); volume(low) |
-|  |  |  |  | 说明 | `(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP)))) / 4` | 毛超额差异为 -8.32pp，优先检查字段值、复权、停牌处理、标签和算子路径。 Top20 仅重合 2/20，说明因子值或排序路径仍不一致。 净超额绝对差为 6.93pp，超过不可接受阈值 5.00pp。 |
-| combo-direct-4factor-size-20260909-candidates.report:COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ | reversal_chip_turn_size_eq | -5.217884461719908 | -5.358444268433484 | gross_return_path_mismatch, unexplained_net_excess_gap | close, market_cap, open, turnover, volume | close(low); market_cap(low); open(low); turnover(low); volume(low) |
-|  |  |  |  | 说明 | `(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP)))) / 4` | 毛超额差异为 -5.36pp，优先检查字段值、复权、停牌处理、标签和算子路径。 净超额绝对差为 5.22pp，超过不可接受阈值 5.00pp。 |
-| dls2014-candidates.report:DLS14-NCF-PROXY-20D | reversal20_growth_net | 6.212996974735411 | 7.469549710508566 | gross_return_path_mismatch, factor_ranking_path_mismatch, unexplained_net_excess_gap | close, gr_net_profit_ttm | close(low); gr_net_profit_ttm(medium) |
-|  |  |  |  | 说明 | `RANK(1 - RETURNS(CLOSE,20)) + RANK(gr_net_profit_ttm)` | 毛超额差异为 +7.47pp，优先检查字段值、复权、停牌处理、标签和算子路径。 Top20 仅重合 5/20，说明因子值或排序路径仍不一致。 净超额绝对差为 6.21pp，超过不可接受阈值 5.00pp。 |
-| huatai-momentum-weighted-20260909.report:HT13-EXPWRET-6M | exp_weighted_reversal126 | 26.595098661690088 | 0.7052211821175254 | platform_turnover_summary_mismatch | close, turnover | close(low); turnover(high) |
-|  |  |  |  | 说明 | `-(TURNOVER * RETURNS(CLOSE,1) + 0.959189457109 * DELAY(TURNOVER * RETURNS(CLOSE,1),1) + 0.920044414629 * DELAY(TURNOVER * RETURNS(CLOSE,1),2) + 0.882496902585 * DELAY(TURNOVER *...` | 正式净超额差异在替换平台汇总换手成本后降至 2pp 以内；平台没有逐期持仓，不能把该差异归因到因子字段。 |
-| oversold-rebound-candidates.report:OSR-DD20-20D | drawdown20 | -5.023050174882558 | -5.1921218495033665 | gross_return_path_mismatch, unexplained_net_excess_gap | close | close(low) |
-|  |  |  |  | 说明 | `RANK(1 - CLOSE / TS_MAX(CLOSE,20))` | 毛超额差异为 -5.19pp，优先检查字段值、复权、停牌处理、标签和算子路径。 净超额绝对差为 5.02pp，超过不可接受阈值 5.00pp。 |
-| t10-additions-20260911-candidates.report:T10-ADD-G13-20260911 | t10_size_plus_impact_g13 | -5.292664223796464 | -5.257627561011308 | gross_return_path_mismatch, unexplained_net_excess_gap | amount, close, high, low, market_cap, open, turnover, volume | amount(low); close(low); high(low); low(low); market_cap(low); open(low); turnover(low); volume(low) |
-|  |  |  |  | 说明 | `(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(S...` | 毛超额差异为 -5.26pp，优先检查字段值、复权、停牌处理、标签和算子路径。 净超额绝对差为 5.29pp，超过不可接受阈值 5.00pp。 |
+| alphaprobe-net1-platform-20260914-candidates.report:F-NET01-PLAT-20260914 | wma_low_volume40 | 5.537728525730216 | 5.235088224658288 | gross_return_path_mismatch, factor_ranking_path_mismatch, unexplained_net_excess_gap | low, volume | low(low); volume(low) |
+|  |  |  |  | 说明 | `WMA((((1/LOW)/LOW)/VOLUME),40)` | 毛超额差异为 +5.24pp，优先检查字段值、复权、停牌处理、标签和算子路径。 Top20 仅重合 5/20，说明因子值或排序路径仍不一致。 净超额绝对差为 5.54pp，超过不可接受阈值 5.00pp。 |
+| dls2014-candidates.report:DLS14-NCF-PROXY-20D | reversal20_growth_net | 7.35730718703989 | 8.537249430147531 | gross_return_path_mismatch, factor_ranking_path_mismatch, unexplained_net_excess_gap | close, gr_net_profit_ttm | close(low); gr_net_profit_ttm(medium) |
+|  |  |  |  | 说明 | `RANK(1 - RETURNS(CLOSE,20)) + RANK(gr_net_profit_ttm)` | 毛超额差异为 +8.54pp，优先检查字段值、复权、停牌处理、标签和算子路径。 Top20 仅重合 5/20，说明因子值或排序路径仍不一致。 净超额绝对差为 7.36pp，超过不可接受阈值 5.00pp。 |
+| dls2014-candidates.report:DLS14-STREV-20D | reversal20 | 5.784520342088754 | 5.582278741373443 | gross_return_path_mismatch, unexplained_net_excess_gap | close | close(low) |
+|  |  |  |  | 说明 | `1 - RETURNS(CLOSE,20)` | 毛超额差异为 +5.58pp，优先检查字段值、复权、停牌处理、标签和算子路径。 净超额绝对差为 5.78pp，超过不可接受阈值 5.00pp。 |
+| huatai-momentum-weighted-20260909.report:HT13-EXPWRET-6M | exp_weighted_reversal126 | 29.33497439442103 | 3.4538928913745384 | unexplained_net_excess_gap | close, turnover | close(low); turnover(low) |
+|  |  |  |  | 说明 | `-(TURNOVER * RETURNS(CLOSE,1) + 0.959189457109 * DELAY(TURNOVER * RETURNS(CLOSE,1),1) + 0.920044414629 * DELAY(TURNOVER * RETURNS(CLOSE,1),2) + 0.882496902585 * DELAY(TURNOVER *...` | 净超额绝对差为 29.33pp，超过不可接受阈值 5.00pp。 |
 
 ## 字段风险
 
@@ -39,52 +35,52 @@
 
 | 字段 | 公式数 | >5pp | <=5pp | 换手主导 | 平均绝对差(pp) | 最大绝对差(pp) | 决策 |
 |---|---:|---:|---:|---:|---:|---:|---|
-| `close` | 113 | 5 | 107 | 1 | 2.35 | 6.93 | suspect |
-| `market_cap` | 19 | 3 | 16 | 0 | 3.71 | 6.93 | suspect |
-| `open` | 19 | 3 | 16 | 0 | 3.89 | 6.93 | suspect |
-| `turnover` | 33 | 3 | 29 | 1 | 2.81 | 6.93 | suspect |
-| `volume` | 29 | 3 | 26 | 0 | 2.78 | 6.93 | suspect |
-| `amount` | 15 | 1 | 14 | 0 | 3.64 | 5.29 | suspect |
-| `gr_net_profit_ttm` | 5 | 1 | 4 | 0 | 2.19 | 6.21 | suspect |
-| `high` | 18 | 1 | 17 | 0 | 2.51 | 5.29 | suspect |
-| `low` | 14 | 1 | 13 | 0 | 3.20 | 5.29 | suspect |
-| `beta` | 1 | 0 | 1 | 0 | 4.62 | 4.62 | retain |
-| `book_to_market_ratio_lf` | 6 | 0 | 5 | 0 | 2.53 | 4.24 | retain |
-| `book_to_market_ratio_lyr` | 8 | 0 | 8 | 0 | 2.12 | 4.08 | retain |
-| `cfd_ocf_to_debt_ttm` | 4 | 0 | 4 | 0 | 1.45 | 3.76 | retain |
-| `cfd_surplus_cash_multi_ttm` | 4 | 0 | 4 | 0 | 1.45 | 3.76 | retain |
-| `current_assets` | 2 | 0 | 2 | 0 | 3.43 | 3.56 | retain |
-| `current_liabilities` | 2 | 0 | 2 | 0 | 3.43 | 3.56 | retain |
-| `fin_current_ratio_lyr` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `fin_current_ratio_ttm` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `fin_debt_to_asset_lyr` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `fin_debt_to_asset_ttm` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `gr_ocf_ttm` | 3 | 0 | 3 | 0 | 0.47 | 0.73 | retain |
-| `gr_oper_profit_ttm` | 2 | 0 | 2 | 0 | 0.34 | 0.48 | retain |
-| `gr_revenue_ttm` | 2 | 0 | 2 | 0 | 0.75 | 1.02 | retain |
-| `gr_roe_ttm` | 1 | 0 | 1 | 0 | 0.32 | 0.32 | retain |
-| `gr_total_asset_lyr` | 9 | 0 | 9 | 0 | 2.23 | 4.08 | retain |
-| `inventory` | 2 | 0 | 2 | 0 | 3.43 | 3.56 | retain |
-| `oper_gross_margin_lyr` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `oper_gross_margin_ttm` | 4 | 0 | 4 | 0 | 2.57 | 4.56 | retain |
-| `oper_main_profit_ttm` | 1 | 0 | 0 | 0 | n/a | n/a | retain |
-| `oper_net_margin_ttm` | 1 | 0 | 1 | 0 | 2.77 | 2.77 | retain |
-| `oper_oper_profit_to_tp_ttm` | 1 | 0 | 0 | 0 | n/a | n/a | retain |
-| `oper_roa_net_lyr` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `oper_roa_net_ttm` | 4 | 0 | 4 | 0 | 1.65 | 3.76 | retain |
-| `oper_roe_lyr` | 9 | 0 | 9 | 0 | 2.00 | 4.08 | retain |
-| `oper_roe_ttm` | 5 | 0 | 5 | 0 | 1.23 | 3.88 | retain |
-| `oper_roic_ttm` | 1 | 0 | 1 | 0 | 0.41 | 0.41 | retain |
-| `oper_total_asset_turnover_lyr` | 3 | 0 | 3 | 0 | 1.91 | 3.76 | retain |
-| `oper_total_asset_turnover_ttm` | 4 | 0 | 4 | 0 | 1.64 | 3.76 | retain |
-| `profitability` | 1 | 0 | 1 | 0 | 2.27 | 2.27 | retain |
-| `ratio_bm_ttm` | 22 | 0 | 22 | 0 | 1.57 | 4.42 | retain |
-| `ratio_cfp_ttm` | 10 | 0 | 10 | 0 | 1.15 | 2.11 | retain |
-| `ratio_ep_ttm` | 7 | 0 | 7 | 0 | 0.60 | 1.50 | retain |
-| `ratio_ev_ebitda_ttm` | 1 | 0 | 1 | 0 | 0.14 | 0.14 | retain |
-| `ratio_pcf_ocf_ttm` | 3 | 0 | 3 | 0 | 0.66 | 1.33 | retain |
-| `ratio_sp_ttm` | 3 | 0 | 3 | 0 | 0.59 | 0.97 | retain |
-| `residual_volatility` | 2 | 0 | 2 | 0 | 1.90 | 3.25 | retain |
+| `close` | 113 | 3 | 110 | 0 | 1.60 | 29.33 | suspect |
+| `gr_net_profit_ttm` | 5 | 1 | 4 | 0 | 2.39 | 7.36 | suspect |
+| `low` | 15 | 1 | 14 | 0 | 2.39 | 5.54 | suspect |
+| `turnover` | 33 | 1 | 32 | 0 | 2.52 | 29.33 | suspect |
+| `volume` | 30 | 1 | 29 | 0 | 1.88 | 5.54 | suspect |
+| `amount` | 15 | 0 | 15 | 0 | 2.28 | 3.12 | retain |
+| `beta` | 1 | 0 | 1 | 0 | 4.54 | 4.54 | retain |
+| `book_to_market_ratio_lf` | 7 | 0 | 7 | 0 | 1.36 | 2.42 | retain |
+| `book_to_market_ratio_lyr` | 8 | 0 | 8 | 0 | 0.65 | 2.40 | retain |
+| `cfd_ocf_to_debt_ttm` | 4 | 0 | 4 | 0 | 1.05 | 2.31 | retain |
+| `cfd_surplus_cash_multi_ttm` | 4 | 0 | 4 | 0 | 0.79 | 2.31 | retain |
+| `current_assets` | 2 | 0 | 2 | 0 | 2.08 | 2.33 | retain |
+| `current_liabilities` | 2 | 0 | 2 | 0 | 2.08 | 2.33 | retain |
+| `fin_current_ratio_lyr` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `fin_current_ratio_ttm` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `fin_debt_to_asset_lyr` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `fin_debt_to_asset_ttm` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `gr_ocf_ttm` | 3 | 0 | 3 | 0 | 0.74 | 0.95 | retain |
+| `gr_oper_profit_ttm` | 2 | 0 | 2 | 0 | 0.93 | 0.95 | retain |
+| `gr_revenue_ttm` | 2 | 0 | 2 | 0 | 0.64 | 0.95 | retain |
+| `gr_roe_ttm` | 1 | 0 | 1 | 0 | 0.14 | 0.14 | retain |
+| `gr_total_asset_lyr` | 10 | 0 | 10 | 0 | 1.07 | 2.82 | retain |
+| `high` | 18 | 0 | 18 | 0 | 1.67 | 3.12 | retain |
+| `inventory` | 2 | 0 | 2 | 0 | 2.08 | 2.33 | retain |
+| `market_cap` | 19 | 0 | 19 | 0 | 1.54 | 4.72 | retain |
+| `open` | 19 | 0 | 19 | 0 | 1.94 | 4.72 | retain |
+| `oper_gross_margin_lyr` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `oper_gross_margin_ttm` | 4 | 0 | 4 | 0 | 1.81 | 4.36 | retain |
+| `oper_main_profit_ttm` | 2 | 0 | 2 | 0 | 1.10 | 1.38 | retain |
+| `oper_net_margin_ttm` | 1 | 0 | 1 | 0 | 2.90 | 2.90 | retain |
+| `oper_oper_profit_to_tp_ttm` | 1 | 0 | 1 | 0 | 0.53 | 0.53 | retain |
+| `oper_roa_net_lyr` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `oper_roa_net_ttm` | 4 | 0 | 4 | 0 | 0.99 | 2.31 | retain |
+| `oper_roe_lyr` | 9 | 0 | 9 | 0 | 0.88 | 2.69 | retain |
+| `oper_roe_ttm` | 5 | 0 | 5 | 0 | 1.60 | 4.70 | retain |
+| `oper_roic_ttm` | 1 | 0 | 1 | 0 | 0.18 | 0.18 | retain |
+| `oper_total_asset_turnover_lyr` | 3 | 0 | 3 | 0 | 0.96 | 2.31 | retain |
+| `oper_total_asset_turnover_ttm` | 4 | 0 | 4 | 0 | 1.00 | 2.31 | retain |
+| `profitability` | 1 | 0 | 1 | 0 | 2.26 | 2.26 | retain |
+| `ratio_bm_ttm` | 23 | 0 | 23 | 0 | 0.60 | 1.44 | retain |
+| `ratio_cfp_ttm` | 10 | 0 | 10 | 0 | 0.60 | 1.44 | retain |
+| `ratio_ep_ttm` | 7 | 0 | 7 | 0 | 0.79 | 1.08 | retain |
+| `ratio_ev_ebitda_ttm` | 1 | 0 | 1 | 0 | 4.52 | 4.52 | retain |
+| `ratio_pcf_ocf_ttm` | 3 | 0 | 3 | 0 | 0.65 | 1.02 | retain |
+| `ratio_sp_ttm` | 3 | 0 | 3 | 0 | 0.56 | 1.02 | retain |
+| `residual_volatility` | 2 | 0 | 2 | 0 | 2.46 | 4.15 | retain |
 
 ## 使用规则
 

@@ -850,6 +850,72 @@ class AlignedNetExcessContext:
             "excess_max_drawdown": excess_max_drawdown,
         }
 
+    def ic_series_stats(
+        self,
+        factor: torch.Tensor,
+        *,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None,
+    ) -> dict[str, float | int | None]:
+        """Competition A inputs: period RankIC / IC series -> S_i.
+
+        ``S_i = |mean RankIC| * |ICIR| * IC win rate`` with the platform
+        convention: ICIR is mean(IC)/sample_std(IC) over the aligned periods,
+        and the win rate counts IC beyond +-0.02 in the chosen direction.
+        """
+        if factor.ndim != 2:
+            raise ValueError(f"Expected a two-dimensional factor panel, got shape {tuple(factor.shape)}")
+        empty = {
+            "ic_periods": 0,
+            "rank_ic": None,
+            "ic_mean": None,
+            "ic_ir": None,
+            "ic_win": None,
+            "s_i": None,
+            "direction": None,
+        }
+        indices = self._selected_indices(start_date, end_date)
+        if not indices:
+            return empty
+        data_positions = [self.signal_data_positions[index] for index in indices]
+        factor_rows = factor[data_positions]
+        returns = self.forward_returns[indices]
+        eligible = self.signal_eligible[indices]
+        valid = torch.isfinite(factor_rows) & eligible & torch.isfinite(returns)
+        counts = valid.sum(dim=1)
+        rank_ic_series = batch_spearmanr_linear(factor_rows, returns)
+        ic_series = batch_pearsonr(factor_rows, returns)
+        keep = (
+            (counts >= self.groups * 10)
+            & torch.isfinite(rank_ic_series)
+            & torch.isfinite(ic_series)
+        )
+        if not bool(keep.any().item()):
+            return empty
+        rank_ic_series = rank_ic_series[keep]
+        ic_series = ic_series[keep]
+        periods = int(rank_ic_series.shape[0])
+        rank_ic = float(rank_ic_series.mean().detach().item())
+        ic_mean = float(ic_series.mean().detach().item())
+        ic_std = float(ic_series.std(unbiased=True).detach().item()) if periods > 1 else 0.0
+        direction = 1 if ic_mean >= 0 else 0
+        win = (
+            float((ic_series > 0.02).to(dtype=torch.float32).mean().detach().item())
+            if direction == 1
+            else float((ic_series < -0.02).to(dtype=torch.float32).mean().detach().item())
+        )
+        ic_ir = ic_mean / ic_std if ic_std > 0 else 0.0
+        s_i = abs(rank_ic) * abs(ic_ir) * win
+        return {
+            "ic_periods": periods,
+            "rank_ic": rank_ic,
+            "ic_mean": ic_mean,
+            "ic_ir": ic_ir,
+            "ic_win": win,
+            "s_i": s_i,
+            "direction": direction,
+        }
+
 
 def finite_as_nan(value: torch.Tensor) -> torch.Tensor:
     return torch.where(torch.isfinite(value), value, torch.full_like(value, torch.nan))
@@ -1231,6 +1297,7 @@ def run_aligned_net_excess(
 ) -> int:
     """Run GP with the local full-A, cost-adjusted long-side objective."""
     risk_control = args.objective == "aligned_net_excess_drawdown"
+    ic_efficiency = args.objective == "aligned_ic_efficiency"
     if args.universe.lower() != "full_a":
         raise ValueError("--objective aligned_net_excess requires --universe full_a")
     if args.universe_limit is not None:
@@ -1243,6 +1310,11 @@ def run_aligned_net_excess(
         raise ValueError("--aligned-label-offset must be non-negative")
     if args.aligned_round_trip_cost < 0:
         raise ValueError("--aligned-round-trip-cost must be non-negative")
+    if ic_efficiency:
+        if not 0.0 < args.aligned_turnover_cap <= 1.0:
+            raise ValueError("--aligned-turnover-cap must be within (0, 1]")
+        if args.aligned_net_floor < 0:
+            raise ValueError("--aligned-net-floor must be non-negative")
     if risk_control:
         if args.aligned_absolute_dd_target < 0 or args.aligned_excess_dd_target < 0:
             raise ValueError("Drawdown targets must be non-negative")
@@ -1416,7 +1488,30 @@ def run_aligned_net_excess(
         net_excess = stats.get("net_excess")
         periods = int(stats.get("periods") or 0)
         if net_excess is None or periods < args.aligned_min_periods:
-            return -1.0
+            return -6.0 if ic_efficiency else -1.0
+        if ic_efficiency:
+            turnover = stats.get("turnover")
+            s_i = stats.get("s_i")
+            if turnover is None or s_i is None:
+                return -6.0
+            turnover = float(turnover)
+            s_i = float(s_i)
+            if not np.isfinite(turnover) or not np.isfinite(s_i):
+                return -6.0
+            stats["turnover_cap_pass"] = int(turnover <= args.aligned_turnover_cap)
+            stats["net_floor_pass"] = int(float(net_excess) >= args.aligned_net_floor)
+            stats["efficiency"] = s_i / max(turnover, 0.02)
+            # Feasible candidates are scored by S_i per unit turnover; infeasible
+            # ones are pushed far below any feasible score, while still being
+            # ordered by how close they are to the gate.
+            score = stats["efficiency"]
+            if not stats["turnover_cap_pass"]:
+                score = -1.0 - 10.0 * max(turnover - args.aligned_turnover_cap, 0.0)
+            if not stats["net_floor_pass"]:
+                score = min(score, -2.0) + max(
+                    args.aligned_net_floor - float(net_excess), 0.0
+                )
+            return float(score)
         if not risk_control:
             return float(net_excess) if np.isfinite(float(net_excess)) else -1.0
 
@@ -1452,10 +1547,11 @@ def run_aligned_net_excess(
         formula = str(np.asarray(formula_values, dtype=object).reshape(-1)[0])
         if formula in cache:
             return cache[formula]
+        invalid_score = -9.0 if ic_efficiency else -1.0
         try:
             expression = evaluate_formula(formula, namespace)
             if not bool(getattr(expression, "is_featured", False)):
-                score = -1.0
+                score = invalid_score
             elif len(
                 {
                     token.lower()
@@ -1463,15 +1559,17 @@ def run_aligned_net_excess(
                     if token.lower() in search_leaf_names
                 }
             ) < args.minimum_distinct_fields:
-                score = -1.0
+                score = invalid_score
             else:
                 with torch.no_grad():
                     factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
                     stats = context.score(factor)
+                    if ic_efficiency:
+                        stats.update(context.ic_series_stats(factor))
                 cache_stats[formula] = stats
                 score = fitness_for_stats(stats)
         except Exception as exc:  # Invalid generated expressions are terminal candidates.
-            score = -1.0
+            score = invalid_score
             cache_errors[formula] = f"{type(exc).__name__}: {exc}"
         cache[formula] = score
         return score
@@ -1516,6 +1614,16 @@ def run_aligned_net_excess(
             "risk_adjusted_score": stats.get("risk_adjusted_score"),
             "absolute_dd_target_pass": stats.get("absolute_dd_target_pass"),
             "excess_dd_target_pass": stats.get("excess_dd_target_pass"),
+            "rank_ic": stats.get("rank_ic"),
+            "ic_mean": stats.get("ic_mean"),
+            "ic_ir": stats.get("ic_ir"),
+            "ic_win": stats.get("ic_win"),
+            "ic_periods": stats.get("ic_periods"),
+            "ic_direction": stats.get("direction"),
+            "s_i": stats.get("s_i"),
+            "efficiency": stats.get("efficiency"),
+            "turnover_cap_pass": stats.get("turnover_cap_pass"),
+            "net_floor_pass": stats.get("net_floor_pass"),
             "periods": stats.get("periods"),
             "coverage": (
                 float(stats["periods"]) / len(context.signal_dates)
@@ -1581,6 +1689,8 @@ def run_aligned_net_excess(
     with torch.no_grad():
         best_factor = finite_as_nan(best_expression.evaluate(data))  # type: ignore[attr-defined]
     best_stats = context.score(best_factor)
+    if ic_efficiency:
+        best_stats.update(context.ic_series_stats(best_factor))
     best_fitness = fitness_for_stats(best_stats)
     try:
         best_panda_formula = expression_to_panda_formula(best_formula)
@@ -1596,6 +1706,15 @@ def run_aligned_net_excess(
         start_date=aligned_start,
         end_date=pd.Timestamp("2024-12-31"),
     )
+    if ic_efficiency:
+        late_stats.update(
+            context.ic_series_stats(best_factor, start_date=pd.Timestamp("2025-01-01"), end_date=aligned_end)
+        )
+        early_stats.update(
+            context.ic_series_stats(
+                best_factor, start_date=aligned_start, end_date=pd.Timestamp("2024-12-31")
+            )
+        )
 
     def risk_eligible(item: dict[str, Any]) -> bool:
         net_excess = item.get("net_excess")
@@ -1839,6 +1958,20 @@ def run_aligned_net_excess(
         candidate_lines.append(f"F-NET{index:02d} ~ {item['panda_formula']} ~ 1")
     candidate_path.write_text("\n".join(candidate_lines) + "\n", encoding="utf-8")
 
+    if ic_efficiency:
+        ic_records = [
+            record
+            for record in all_cached_records()
+            if record.get("s_i") is not None and np.isfinite(float(record["s_i"]))
+        ]
+        ic_records.sort(key=lambda item: float(item["s_i"]), reverse=True)
+        write_json(run_output / "aligned_ic_records.json", ic_records)
+        print(
+            f"aligned_ic_records={len(ic_records)} "
+            f"cap_pass={sum(int(item.get('turnover_cap_pass') or 0) for item in ic_records)}",
+            flush=True,
+        )
+
     result = {
         "status": "completed",
         "objective": args.objective,
@@ -1982,10 +2115,31 @@ def run_aligned_net_excess(
             f"(one-way `{args.aligned_round_trip_cost / 2:.4f}`)"
         )
         drawdown_lines = []
-        table_header = (
-            "| rank | raw AlphaPROBE formula | PandaAI formula | net excess | gross excess | turnover | annual cost | coverage | max prior Rank corr |"
-        )
-        table_divider = "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+        if ic_efficiency:
+            objective_line = (
+                f"- Objective: maximise `S_i = |RankIC| x |ICIR| x IC win` under turnover "
+                f"`<= {args.aligned_turnover_cap:.2%}` per rebalance and net excess "
+                f"`>= {args.aligned_net_floor:.2%}`"
+            )
+            table_header = (
+                "| rank | raw AlphaPROBE formula | PandaAI formula | S_i | efficiency | rank IC | ICIR | win | "
+                "turnover | net excess | coverage | max prior Rank corr |"
+            )
+            table_divider = "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+        else:
+            table_header = (
+                "| rank | raw AlphaPROBE formula | PandaAI formula | net excess | gross excess | turnover | annual cost | coverage | max prior Rank corr |"
+            )
+            table_divider = "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+
+    def _fmt(value: float | int | None, digits: int = 2, scale: float = 100.0) -> str:
+        try:
+            number = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return "n/a"
+        if not np.isfinite(number):
+            return "n/a"
+        return f"{number * scale:.{digits}f}%"
     report_lines = [
         report_title,
         "",
@@ -2020,13 +2174,23 @@ def run_aligned_net_excess(
                 f"{rank_corr_text} |"
             )
         else:
+            if ic_efficiency:
+                report_lines.append(
+                    f"| {index} | `{item['formula']}` | `{item['panda_formula']}` | "
+                    f"{_fmt(item.get('s_i'), 4, 1.0)} | {_fmt(item.get('efficiency'), 3, 1.0)} | "
+                    f"{_fmt(item.get('rank_ic'), 4, 1.0)} | {_fmt(item.get('ic_ir'), 3, 1.0)} | "
+                    f"{_fmt(item.get('ic_win'), 2, 1.0)} | {_fmt(item.get('turnover'))} | "
+                    f"{_fmt(item.get('net_excess'))} | {_fmt(item.get('coverage'), 1)} | "
+                    f"{rank_corr_text} |"
+                )
+                continue
             report_lines.append(
                 f"| {index} | `{item['formula']}` | `{item['panda_formula']}` | "
-                f"{float(item['net_excess']) * 100:.2f}% | "
-                f"{float(item['gross_excess']) * 100:.2f}% | "
-                f"{float(item['turnover']) * 100:.2f}% | "
-                f"{float(item['annual_cost']) * 100:.2f}% | "
-                f"{float(item['coverage']) * 100:.1f}% | "
+                f"{_fmt(item['net_excess'])} | "
+                f"{_fmt(item['gross_excess'])} | "
+                f"{_fmt(item['turnover'])} | "
+                f"{_fmt(item['annual_cost'])} | "
+                f"{_fmt(item['coverage'], 1)} | "
                 f"{rank_corr_text} |"
             )
     report_lines.extend(
@@ -2036,14 +2200,23 @@ def run_aligned_net_excess(
             "",
             f"- Raw AlphaPROBE formula: `{best_formula}`",
             f"- PandaAI formula: `{result['best_panda_formula']}`",
-            f"- Full aligned net excess: `{float(best_stats['net_excess']) * 100:.2f}%`",
-            f"- Early net excess through 2024-12-31: `{float(early_stats['net_excess']) * 100:.2f}%`",
-            f"- Late net excess from 2025-01-01: `{float(late_stats['net_excess']) * 100:.2f}%`",
+            f"- Full aligned net excess: `{_fmt(best_stats['net_excess'])}`",
+            f"- Early net excess through 2024-12-31: `{_fmt(early_stats['net_excess'])}`",
+            f"- Late net excess from 2025-01-01: `{_fmt(late_stats['net_excess'])}`",
             *(
                 [
-                    f"- Full absolute max drawdown: `{float(best_stats['absolute_max_drawdown']) * 100:.2f}%`",
-                    f"- Full excess max drawdown proxy: `{float(best_stats['excess_max_drawdown']) * 100:.2f}%`",
-                    f"- Full risk-adjusted score: `{float(best_stats['risk_adjusted_score']) * 100:.2f}%`",
+                    f"- Full S_i: `{_fmt(best_stats.get('s_i'), 4, 1.0)}`; turnover "
+                    f"`{_fmt(best_stats.get('turnover'))}`; rank IC `{_fmt(best_stats.get('rank_ic'), 4, 1.0)}`; "
+                    f"ICIR `{_fmt(best_stats.get('ic_ir'), 3, 1.0)}`; win `{_fmt(best_stats.get('ic_win'), 2, 1.0)}`"
+                ]
+                if ic_efficiency
+                else []
+            ),
+            *(
+                [
+                    f"- Full absolute max drawdown: `{_fmt(best_stats['absolute_max_drawdown'])}`",
+                    f"- Full excess max drawdown proxy: `{_fmt(best_stats['excess_max_drawdown'])}`",
+                    f"- Full risk-adjusted score: `{_fmt(best_stats['risk_adjusted_score'])}`",
                 ]
                 if risk_control
                 else []
@@ -2067,11 +2240,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--objective",
-        choices=["ic", "aligned_net_excess", "aligned_net_excess_drawdown"],
+        choices=[
+            "ic",
+            "aligned_net_excess",
+            "aligned_net_excess_drawdown",
+            "aligned_ic_efficiency",
+        ],
         default="ic",
         help=(
             "fitness objective; aligned_net_excess uses the local full-A alignment proxy, "
-            "aligned_net_excess_drawdown adds absolute and excess drawdown control"
+            "aligned_net_excess_drawdown adds absolute and excess drawdown control, "
+            "aligned_ic_efficiency maximises S_i under a turnover cap and a net-excess floor"
         ),
     )
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
@@ -2179,6 +2358,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="round-trip cost used by the local net-excess objective",
     )
     parser.add_argument(
+        "--aligned-turnover-cap",
+        type=float,
+        default=0.12,
+        help="per-rebalance turnover ceiling for the aligned_ic_efficiency objective",
+    )
+    parser.add_argument(
+        "--aligned-net-floor",
+        type=float,
+        default=0.12,
+        help="net-excess floor required by the aligned_ic_efficiency objective",
+    )
+    parser.add_argument(
         "--aligned-absolute-dd-target",
         type=float,
         default=ALIGNED_ABSOLUTE_DD_TARGET,
@@ -2251,7 +2442,11 @@ def main() -> int:
             "--aligned-drawdown-candidate-rank-corr-threshold must be between 0 and 1"
         )
     pool_sizes = parse_pool_sizes(args.pool_sizes)
-    if args.objective in {"aligned_net_excess", "aligned_net_excess_drawdown"}:
+    if args.objective in {
+        "aligned_net_excess",
+        "aligned_net_excess_drawdown",
+        "aligned_ic_efficiency",
+    }:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)
     calendar = load_trade_dates(cache_root)
     universe = resolve_universe(cache_root, args.universe, args.universe_limit)
