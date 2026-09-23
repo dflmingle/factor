@@ -1,0 +1,326 @@
+{
+ "size_only": {
+  "handler": "size_only",
+  "name": "SIZE-ONLY-20260911",
+  "direction": 0,
+  "formula": "RANK(MARKET_CAP)"
+ },
+ "t10_size_plus_impact_aggregate": {
+  "handler": "t10_size_plus_impact_aggregate",
+  "name": "T10-ADD-AGG-IMPACT-20260911",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1),60) / (SUM(AMOUNT,60) + 1))) / 6"
+ },
+ "t10_size_plus_impact_g13": {
+  "handler": "t10_size_plus_impact_g13",
+  "name": "T10-ADD-G13-20260911",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)) / 6"
+ },
+ "t10_size_plus_impact_downside": {
+  "handler": "t10_size_plus_impact_downside",
+  "name": "T10-ADD-DOWNSIDE-IMPACT-20260911",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(SUM((ABS(CLOSE / DELAY(CLOSE,1) - 1) - (CLOSE / DELAY(CLOSE,1) - 1)) / 2,60) / (SUM(AMOUNT,60) + 1))) / 6"
+ },
+ "t10_size_plus_impact": {
+  "handler": "t10_size_plus_impact",
+  "name": "T10-SIZE-PLUS-IMPACT",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 5"
+ },
+ "t10_size_plus_impact_bm": {
+  "handler": "t10_size_plus_impact_bm",
+  "name": "T10-ADD-BM-20260911",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(book_to_market_ratio_lf)) / 6"
+ },
+ "t10_size_plus_impact_fscore": {
+  "handler": "t10_size_plus_impact_fscore",
+  "name": "T10-ADD-FSCORE-20260911",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)) / 6"
+ },
+ "t10_size_plus_impact_wc": {
+  "handler": "t10_size_plus_impact_wc",
+  "name": "T10-SIZE-PLUS-IMPACT-WC",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK((CURRENT_ASSETS-INVENTORY-CURRENT_LIABILITIES)/(ABS(MARKET_CAP)+1))) / 6"
+ },
+ "t10_size_plus_impact_dd120": {
+  "handler": "t10_size_plus_impact_dd120",
+  "name": "T10-ADD-DD120-20260911",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1)) + RANK(1-CLOSE/TS_MAX(CLOSE,120))) / 6"
+ },
+ "book_to_market_lf_minus_size": {
+  "handler": "book_to_market_lf_minus_size",
+  "name": "VERIFY10-E260910-04",
+  "direction": 1,
+  "formula": "RANK(book_to_market_ratio_lf) - RANK(MARKET_CAP)"
+ },
+ "impact60": {
+  "handler": "impact60",
+  "name": "H03-T10-SINGLE",
+  "direction": 1,
+  "formula": "RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))"
+ },
+ "reversal_chip_turn_size_eq": {
+  "handler": "reversal_chip_turn_size_eq",
+  "name": "COMBO-DIRECT-OSR2-CHIP-TURN-SIZE-EQ",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP)))) / 4"
+ },
+ "book_to_market_lf_plus_impact": {
+  "handler": "book_to_market_lf_plus_impact",
+  "name": "VERIFY10-F260910-12",
+  "direction": 1,
+  "formula": "RANK(book_to_market_ratio_lf) + RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)"
+ },
+ "t10_size_plus_wc_mcap": {
+  "handler": "t10_size_plus_wc_mcap",
+  "name": "T10-SIZE-PLUS-WC-MCAP",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(-ZSCORE(RANK(MARKET_CAP))) + RANK((CURRENT_ASSETS-INVENTORY-CURRENT_LIABILITIES)/(ABS(MARKET_CAP)+1))) / 5"
+ },
+ "t10_nomcap_plus_impact": {
+  "handler": "t10_nomcap_plus_impact",
+  "name": "T10-NOMCAP-PLUS-IMPACT",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(SUM((HIGH-LOW)/(DELAY(CLOSE,1)+0.000001),60)/(SUM(AMOUNT,60)+1))) / 4"
+ },
+ "impact_abs_return60": {
+  "handler": "impact_abs_return60",
+  "name": "VERIFY10-G260910-13",
+  "direction": 1,
+  "formula": "RANK(SUM(ABS(CLOSE / DELAY(CLOSE,1) - 1) / (AMOUNT + 1),60) / 60)"
+ },
+ "reversal_chip_turn_paper": {
+  "handler": "reversal_chip_turn_paper",
+  "name": "COMBO-DIRECT-OSR2-CHIP-TURN-PAPER-EQ",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504)) + RANK(ZSCORE(RANK(book_to_market_ratio_lyr)) + ZSCORE(RANK(oper_roe_lyr)) - ZSCORE(RANK(gr_total_asset_lyr)) - ZSCORE(RANK(MARKET_CAP)))) / 4"
+ },
+ "book_to_market_lf_div_oper_main_profit_ttm": {
+  "handler": "book_to_market_lf_div_oper_main_profit_ttm",
+  "name": "F-N34-260921-T10",
+  "direction": 1,
+  "formula": "BOOK_TO_MARKET_RATIO_LF / OPER_MAIN_PROFIT_TTM"
+ },
+ "reversal_turn_paper": {
+  "handler": "reversal_turn_paper",
+  "name": "OSR2-RET40-TURN-BIAS-PAPER-EQ",
+  "direction": 1,
+  "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK(1 - MA(TURNOVER,21) / MA(TURNOVER,504)) + RANK(ZSCORE(RANK(book_to_market_ratio_lyr)) + ZSCORE(RANK(oper_roe_lyr)) - ZSCORE(RANK(gr_total_asset_lyr)) - ZSCORE(RANK(MARKET_CAP)))) / 3"
+ },
+ "paper_composite": {
+  "handler": "paper_composite",
+  "name": "paper-derived-composite",
+  "direction": 1,
+  "formula": "ZSCORE(RANK(book_to_market_ratio_lyr))+ZSCORE(RANK(oper_roe_lyr))-ZSCORE(RANK(gr_total_asset_lyr))-ZSCORE(RANK(MARKET_CAP))"
+ },
+ "reversal_chip_turn_eq": {
+  "handler": "reversal_chip_turn_eq",
+  "name": "COMBO-DIRECT-OSR2-CHIP-TURN-EQ",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1) + RANK(1-MA(TURNOVER,21)/MA(TURNOVER,504))) / 3"
+ },
+ "reversal_chip_eq": {
+  "handler": "reversal_chip_eq",
+  "name": "COMBO-DIRECT-OSR2-CHIP-EQ",
+  "direction": 1,
+  "formula": "(RANK(1-RETURNS(CLOSE,40)) + RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1)) / 2"
+ },
+ "reversal_turn_eq": {
+  "handler": "reversal_turn_eq",
+  "name": "OSR2-RET40-TURN-BIAS-EQ",
+  "direction": 1,
+  "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK(1 - MA(TURNOVER,21) / MA(TURNOVER,504))) / 2"
+ },
+ "reversal_turn_paper_nomcap": {
+  "handler": "reversal_turn_paper_nomcap",
+  "name": "OSR2-RET40-TURN-BIAS-PAPER-NOMCAP-EQ",
+  "direction": 1,
+  "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK(1 - MA(TURNOVER,21) / MA(TURNOVER,504)) + RANK(ZSCORE(RANK(book_to_market_ratio_lyr)) + ZSCORE(RANK(oper_roe_lyr)) - ZSCORE(RANK(gr_total_asset_lyr)))) / 3"
+ },
+ "reversal40": {
+  "handler": "reversal40",
+  "name": "OSR2-RET40",
+  "direction": 1,
+  "formula": "RANK(1 - RETURNS(CLOSE,40))"
+ },
+ "turn_bias": {
+  "handler": "turn_bias",
+  "name": "HT13-TURN-BIAS-1M",
+  "direction": 0,
+  "formula": "MA(TURNOVER,21) / MA(TURNOVER,504) - 1"
+ },
+ "chip250": {
+  "handler": "chip250",
+  "name": "NONHT-CHIP-COST-250",
+  "direction": 1,
+  "formula": "RANK((SUM(VOLUME*(OPEN+CLOSE)/2,250)/SUM(VOLUME,250))/CLOSE-1)"
+ },
+ "drawdown120": {
+  "handler": "drawdown120",
+  "name": "OSR2-DD120",
+  "direction": 1,
+  "formula": "RANK(1 - CLOSE / TS_MAX(CLOSE,120))"
+ },
+ "ev_ebitda_proxy": {
+  "handler": "ev_ebitda_proxy",
+  "name": "NEW-VALUE-EVEBITDA",
+  "direction": 1,
+  "formula": "RANK(-ratio_ev_ebitda_ttm)"
+ },
+ "weighted_reversal_lowturn": {
+  "handler": "weighted_reversal_lowturn",
+  "name": "HT-WREV-LOWTURN-21D",
+  "direction": 1,
+  "formula": "(RANK(-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)) + RANK(1 - MA(TURNOVER,21) / MA(TURNOVER,504))) / 2"
+ },
+ "value_bm": {
+  "handler": "value_bm",
+  "name": "F-B08-260921-T10",
+  "direction": 1,
+  "formula": "ratio_bm_ttm"
+ },
+ "momentum120": {
+  "handler": "momentum120",
+  "name": "HT13-MOMENTUM-120D-D0",
+  "direction": 0,
+  "formula": "RETURNS(CLOSE,120)"
+ },
+ "fscore_interact": {
+  "handler": "fscore_interact",
+  "name": "NONHT-FSCORELIKE-REV40-INTERACT",
+  "direction": 1,
+  "formula": "RANK(1 - RETURNS(CLOSE,40)) * RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)"
+ },
+ "fscore_eq": {
+  "handler": "fscore_eq",
+  "name": "NONHT-FSCORELIKE-REV40",
+  "direction": 1,
+  "formula": "(RANK(1 - RETURNS(CLOSE,40)) + RANK((IF(oper_roa_net_ttm > 0,1,0) + IF(cfd_ocf_to_debt_ttm > 0,1,0) + IF(oper_roa_net_ttm > oper_roa_net_lyr,1,0) + IF(cfd_surplus_cash_multi_ttm > 1,1,0) + IF(fin_debt_to_asset_ttm < fin_debt_to_asset_lyr,1,0) + IF(fin_current_ratio_ttm > fin_current_ratio_lyr,1,0) + IF(oper_gross_margin_ttm > oper_gross_margin_lyr,1,0) + IF(oper_total_asset_turnover_ttm > oper_total_asset_turnover_lyr,1,0)) / 8)) / 2"
+ },
+ "asset_growth": {
+  "handler": "asset_growth",
+  "name": "F-AG260921-T10",
+  "direction": 1,
+  "formula": "RANK(gr_total_asset_lyr)"
+ },
+ "cash_conversion": {
+  "handler": "cash_conversion",
+  "name": "NONHT-CASH-CONVERSION",
+  "direction": 1,
+  "formula": "RANK(cfd_surplus_cash_multi_ttm)"
+ },
+ "reversal20": {
+  "handler": "reversal20",
+  "name": "OSR2-RET20",
+  "direction": 1,
+  "formula": "1 - RETURNS(CLOSE,20)"
+ },
+ "momentum20": {
+  "handler": "momentum20",
+  "name": "WF6AA4-D0-CLOSE20-MOM-20260912",
+  "direction": 0,
+  "formula": "RANK((CLOSE / DELAY(CLOSE, 20)) - 1)"
+ },
+ "paper_composite_nomcap": {
+  "handler": "paper_composite_nomcap",
+  "name": "PAPER-DERIVED-COMPOSITE-NOMCAP",
+  "direction": 1,
+  "formula": "ZSCORE(RANK(book_to_market_ratio_lyr)) + ZSCORE(RANK(oper_roe_lyr)) - ZSCORE(RANK(gr_total_asset_lyr))"
+ },
+ "momentum20_open": {
+  "handler": "momentum20_open",
+  "name": "WF6AA4-D0-OPEN20-MOM-20260912",
+  "direction": 0,
+  "formula": "RANK((OPEN / DELAY(CLOSE, 20)) - 1)"
+ },
+ "skew60_low": {
+  "handler": "skew60_low",
+  "name": "NONHT-SKEW-LOW-60D",
+  "direction": 1,
+  "formula": "RANK(-TS_SKEW(RETURNS(CLOSE,1),60))"
+ },
+ "weighted_reversal": {
+  "handler": "weighted_reversal",
+  "name": "HT-WREV-21D",
+  "direction": 1,
+  "formula": "-SUM(TURNOVER * RETURNS(CLOSE,1),21) / SUM(TURNOVER,21)"
+ },
+ "quality_asset_turnover_tsrank378": {
+  "handler": "quality_asset_turnover_tsrank378",
+  "name": "REPORT-HIST-ASSETTURN-6Q-10D-20260910",
+  "direction": 1,
+  "formula": "TS_RANK(oper_total_asset_turnover_ttm,378)"
+ },
+ "exp_weighted_reversal63": {
+  "handler": "exp_weighted_reversal63",
+  "name": "HT13-EXPWRET-3M",
+  "direction": 1,
+  "formula": "-(TURNOVER * RETURNS(CLOSE,1) + 0.920044414629 * DELAY(TURNOVER * RETURNS(CLOSE,1),1) + 0.846481724891 * DELAY(TURNOVER * RETURNS(CLOSE,1),2) + 0.778800783071 * DELAY(TURNOVER * RETURNS(CLOSE,1),3) + 0.716531310574 * DELAY(TURNOVER * RETURNS(CLOSE,1),4) + 0.659240630200 * DELAY(TURNOVER * RETURNS(CLOSE,1),5) + 0.606530659713 * DELAY(TURNOVER * RETURNS(CLOSE,1),6) + 0.558035145770 * DELAY(TURNOVER * RETURNS(CLOSE,1),7) + 0.513417119033 * DELAY(TURNOVER * RETURNS(CLOSE,1),8) + 0.472366552741 * DELAY(TURNOVER * RETURNS(CLOSE,1),9) + 0.434598208507 * DELAY(TURNOVER * RETURNS(CLOSE,1),10) + 0.399849654345 * DELAY(TURNOVER * RETURNS(CLOSE,1),11) + 0.367879441171 * DELAY(TURNOVER * RETURNS(CLOSE,1),12) + 0.338465425107 * DELAY(TURNOVER * RETURNS(CLOSE,1),13) + 0.311403223915 * DELAY(TURNOVER * RETURNS(CLOSE,1),14) + 0.286504796860 * DELAY(TURNOVER * RETURNS(CLOSE,1),15) + 0.263597138116 * DELAY(TURNOVER * RETURNS(CLOSE,1),16) + 0.242521074636 * DELAY(TURNOVER * RETURNS(CLOSE,1),17) + 0.223130160148 * DELAY(TURNOVER * RETURNS(CLOSE,1),18) + 0.205289657580 * DELAY(TURNOVER * RETURNS(CLOSE,1),19) + 0.188875602838 * DELAY(TURNOVER * RETURNS(CLOSE,1),20) + 0.173773943450 * DELAY(TURNOVER * RETURNS(CLOSE,1),21) + 0.159879746080 * DELAY(TURNOVER * RETURNS(CLOSE,1),22) + 0.147096467393 * DELAY(TURNOVER * RETURNS(CLOSE,1),23) + 0.135335283237 * DELAY(TURNOVER * RETURNS(CLOSE,1),24) + 0.124514471444 * DELAY(TURNOVER * RETURNS(CLOSE,1),25) + 0.114558843993 * DELAY(TURNOVER * RETURNS(CLOSE,1),26) + 0.105399224562 * DELAY(TURNOVER * RETURNS(CLOSE,1),27) + 0.096971967864 * DELAY(TURNOVER * RETURNS(CLOSE,1),28) + 0.089218517409 * DELAY(TURNOVER * RETURNS(CLOSE,1),29) + 0.082084998624 * DELAY(TURNOVER * RETURNS(CLOSE,1),30) + 0.075521844509 * DELAY(TURNOVER * RETURNS(CLOSE,1),31) + 0.069483451223 * DELAY(TURNOVER * RETURNS(CLOSE,1),32) + 0.063927861207 * DELAY(TURNOVER * RETURNS(CLOSE,1),33) + 0.058816471642 * DELAY(TURNOVER * RETURNS(CLOSE,1),34) + 0.054113766223 * DELAY(TURNOVER * RETURNS(CLOSE,1),35) + 0.049787068368 * DELAY(TURNOVER * RETURNS(CLOSE,1),36) + 0.045806314173 * DELAY(TURNOVER * RETURNS(CLOSE,1),37) + 0.042143843509 * DELAY(TURNOVER * RETURNS(CLOSE,1),38) + 0.038774207832 * DELAY(TURNOVER * RETURNS(CLOSE,1),39) + 0.035673993347 * DELAY(TURNOVER * RETURNS(CLOSE,1),40) + 0.032821658327 * DELAY(TURNOVER * RETURNS(CLOSE,1),41) + 0.030197383422 * DELAY(TURNOVER * RETURNS(CLOSE,1),42) + 0.027782933954 * DELAY(TURNOVER * RETURNS(CLOSE,1),43) + 0.025561533207 * DELAY(TURNOVER * RETURNS(CLOSE,1),44) + 0.023517745856 * DELAY(TURNOVER * RETURNS(CLOSE,1),45) + 0.021637370719 * DELAY(TURNOVER * RETURNS(CLOSE,1),46) + 0.019907342078 * DELAY(TURNOVER * RETURNS(CLOSE,1),47) + 0.018315638889 * DELAY(TURNOVER * RETURNS(CLOSE,1),48) + 0.016851201260 * DELAY(TURNOVER * RETURNS(CLOSE,1),49) + 0.015503853599 * DELAY(TURNOVER * RETURNS(CLOSE,1),50) + 0.014264233909 * DELAY(TURNOVER * RETURNS(CLOSE,1),51) + 0.013123728737 * DELAY(TURNOVER * RETURNS(CLOSE,1),52) + 0.012074413324 * DELAY(TURNOVER * RETURNS(CLOSE,1),53) + 0.011108996538 * DELAY(TURNOVER * RETURNS(CLOSE,1),54) + 0.010220770217 * DELAY(TURNOVER * RETURNS(CLOSE,1),55) + 0.009403562551 * DELAY(TURNOVER * RETURNS(CLOSE,1),56) + 0.008651695203 * DELAY(TURNOVER * RETURNS(CLOSE,1),57) + 0.007959943849 * DELAY(TURNOVER * RETURNS(CLOSE,1),58) + 0.007323501879 * DELAY(TURNOVER * RETURNS(CLOSE,1),59) + 0.006737946999 * DELAY(TURNOVER * RETURNS(CLOSE,1),60) + 0.006199210503 * DELAY(TURNOVER * RETURNS(CLOSE,1),61) + 0.005703548998 * DELAY(TURNOVER * RETURNS(CLOSE,1),62)) / (TURNOVER + 0.920044414629 * DELAY(TURNOVER,1) + 0.846481724891 * DELAY(TURNOVER,2) + 0.778800783071 * DELAY(TURNOVER,3) + 0.716531310574 * DELAY(TURNOVER,4) + 0.659240630200 * DELAY(TURNOVER,5) + 0.606530659713 * DELAY(TURNOVER,6) + 0.558035145770 * DELAY(TURNOVER,7) + 0.513417119033 * DELAY(TURNOVER,8) + 0.472366552741 * DELAY(TURNOVER,9) + 0.434598208507 * DELAY(TURNOVER,10) + 0.399849654345 * DELAY(TURNOVER,11) + 0.367879441171 * DELAY(TURNOVER,12) + 0.338465425107 * DELAY(TURNOVER,13) + 0.311403223915 * DELAY(TURNOVER,14) + 0.286504796860 * DELAY(TURNOVER,15) + 0.263597138116 * DELAY(TURNOVER,16) + 0.242521074636 * DELAY(TURNOVER,17) + 0.223130160148 * DELAY(TURNOVER,18) + 0.205289657580 * DELAY(TURNOVER,19) + 0.188875602838 * DELAY(TURNOVER,20) + 0.173773943450 * DELAY(TURNOVER,21) + 0.159879746080 * DELAY(TURNOVER,22) + 0.147096467393 * DELAY(TURNOVER,23) + 0.135335283237 * DELAY(TURNOVER,24) + 0.124514471444 * DELAY(TURNOVER,25) + 0.114558843993 * DELAY(TURNOVER,26) + 0.105399224562 * DELAY(TURNOVER,27) + 0.096971967864 * DELAY(TURNOVER,28) + 0.089218517409 * DELAY(TURNOVER,29) + 0.082084998624 * DELAY(TURNOVER,30) + 0.075521844509 * DELAY(TURNOVER,31) + 0.069483451223 * DELAY(TURNOVER,32) + 0.063927861207 * DELAY(TURNOVER,33) + 0.058816471642 * DELAY(TURNOVER,34) + 0.054113766223 * DELAY(TURNOVER,35) + 0.049787068368 * DELAY(TURNOVER,36) + 0.045806314173 * DELAY(TURNOVER,37) + 0.042143843509 * DELAY(TURNOVER,38) + 0.038774207832 * DELAY(TURNOVER,39) + 0.035673993347 * DELAY(TURNOVER,40) + 0.032821658327 * DELAY(TURNOVER,41) + 0.030197383422 * DELAY(TURNOVER,42) + 0.027782933954 * DELAY(TURNOVER,43) + 0.025561533207 * DELAY(TURNOVER,44) + 0.023517745856 * DELAY(TURNOVER,45) + 0.021637370719 * DELAY(TURNOVER,46) + 0.019907342078 * DELAY(TURNOVER,47) + 0.018315638889 * DELAY(TURNOVER,48) + 0.016851201260 * DELAY(TURNOVER,49) + 0.015503853599 * DELAY(TURNOVER,50) + 0.014264233909 * DELAY(TURNOVER,51) + 0.013123728737 * DELAY(TURNOVER,52) + 0.012074413324 * DELAY(TURNOVER,53) + 0.011108996538 * DELAY(TURNOVER,54) + 0.010220770217 * DELAY(TURNOVER,55) + 0.009403562551 * DELAY(TURNOVER,56) + 0.008651695203 * DELAY(TURNOVER,57) + 0.007959943849 * DELAY(TURNOVER,58) + 0.007323501879 * DELAY(TURNOVER,59) + 0.006737946999 * DELAY(TURNOVER,60) + 0.006199210503 * DELAY(TURNOVER,61) + 0.005703548998 * DELAY(TURNOVER,62))"
+ },
+ "growth_revenue": {
+  "handler": "growth_revenue",
+  "name": "NEW-GROWTH-REV-TTM",
+  "direction": 1,
+  "formula": "RANK(gr_revenue_ttm)"
+ },
+ "growth_roe": {
+  "handler": "growth_roe",
+  "name": "NEW-GROWTH-ROE-TTM",
+  "direction": 1,
+  "formula": "RANK(gr_roe_ttm)"
+ },
+ "ltmom_exhigh252_21": {
+  "handler": "ltmom_exhigh252_21",
+  "name": "NONHT-LTMOM-EXHIGH-252-21",
+  "direction": 1,
+  "formula": "RANK(SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),252)-SUM(IF(TS_RANK(ABS(RETURNS(CLOSE,1)),252)<=0.80,RETURNS(CLOSE,1),0),21))"
+ },
+ "quality_net_margin_tsrank378": {
+  "handler": "quality_net_margin_tsrank378",
+  "name": "REPORT-HIST-NETMARGIN-6Q-10D-20260910",
+  "direction": 1,
+  "formula": "TS_RANK(oper_net_margin_ttm,378)"
+ },
+ "rsi14": {
+  "handler": "rsi14",
+  "name": "OSR-RSI14-20D",
+  "direction": 1,
+  "formula": "RANK(1 - RSI(CLOSE,14) / 100)"
+ },
+ "max_return21_low": {
+  "handler": "max_return21_low",
+  "name": "NONHT-MAX-LOW-21D",
+  "direction": 1,
+  "formula": "RANK(-TS_MAX(RETURNS(CLOSE,1),21))"
+ },
+ "alpha13": {
+  "handler": "alpha13",
+  "name": "HT13-ALPHA13",
+  "direction": 1,
+  "formula": "-1 * RANK(COV(RANK(CLOSE), RANK(VOLUME), 5))"
+ },
+ "quality_roic": {
+  "handler": "quality_roic",
+  "name": "REPORT-ROIC-TTM-10D-20260910",
+  "direction": 1,
+  "formula": "RANK(oper_roic_ttm)"
+ },
+ "alpha44": {
+  "handler": "alpha44",
+  "name": "HT13-ALPHA44",
+  "direction": 1,
+  "formula": "-1 * CORR(HIGH, RANK(VOLUME), 5)"
+ },
+ "max5_low21": {
+  "handler": "max5_low21",
+  "name": "NONHT-MAX5-LOW-21D",
+  "direction": 1,
+  "formula": "literature-rankic-optimization-20260909-max5.py"
+ }
+}
