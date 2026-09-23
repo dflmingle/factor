@@ -1298,6 +1298,8 @@ def run_aligned_net_excess(
     """Run GP with the local full-A, cost-adjusted long-side objective."""
     risk_control = args.objective == "aligned_net_excess_drawdown"
     ic_efficiency = args.objective == "aligned_ic_efficiency"
+    ic_frontier = args.objective == "aligned_ic_frontier"
+    ic_objective = ic_efficiency or ic_frontier
     if args.universe.lower() != "full_a":
         raise ValueError("--objective aligned_net_excess requires --universe full_a")
     if args.universe_limit is not None:
@@ -1489,7 +1491,7 @@ def run_aligned_net_excess(
         periods = int(stats.get("periods") or 0)
         if net_excess is None or periods < args.aligned_min_periods:
             return -6.0 if ic_efficiency else -1.0
-        if ic_efficiency:
+        if ic_objective:
             turnover = stats.get("turnover")
             s_i = stats.get("s_i")
             if turnover is None or s_i is None:
@@ -1501,6 +1503,9 @@ def run_aligned_net_excess(
             stats["turnover_cap_pass"] = int(turnover <= args.aligned_turnover_cap)
             stats["net_floor_pass"] = int(float(net_excess) >= args.aligned_net_floor)
             stats["efficiency"] = s_i / max(turnover, 0.02)
+            if ic_frontier:
+                # Pure A frontier: maximise S_i, keep turnover/net only for post-filtering.
+                return s_i
             # Feasible candidates are scored by S_i per unit turnover; infeasible
             # ones are pushed far below any feasible score, while still being
             # ordered by how close they are to the gate.
@@ -1547,7 +1552,7 @@ def run_aligned_net_excess(
         formula = str(np.asarray(formula_values, dtype=object).reshape(-1)[0])
         if formula in cache:
             return cache[formula]
-        invalid_score = -9.0 if ic_efficiency else -1.0
+        invalid_score = -9.0 if ic_objective else -1.0
         try:
             expression = evaluate_formula(formula, namespace)
             if not bool(getattr(expression, "is_featured", False)):
@@ -1564,7 +1569,7 @@ def run_aligned_net_excess(
                 with torch.no_grad():
                     factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
                     stats = context.score(factor)
-                    if ic_efficiency:
+                    if ic_objective:
                         stats.update(context.ic_series_stats(factor))
                 cache_stats[formula] = stats
                 score = fitness_for_stats(stats)
@@ -1689,7 +1694,7 @@ def run_aligned_net_excess(
     with torch.no_grad():
         best_factor = finite_as_nan(best_expression.evaluate(data))  # type: ignore[attr-defined]
     best_stats = context.score(best_factor)
-    if ic_efficiency:
+    if ic_objective:
         best_stats.update(context.ic_series_stats(best_factor))
     best_fitness = fitness_for_stats(best_stats)
     try:
@@ -1706,7 +1711,7 @@ def run_aligned_net_excess(
         start_date=aligned_start,
         end_date=pd.Timestamp("2024-12-31"),
     )
-    if ic_efficiency:
+    if ic_objective:
         late_stats.update(
             context.ic_series_stats(best_factor, start_date=pd.Timestamp("2025-01-01"), end_date=aligned_end)
         )
@@ -1958,7 +1963,7 @@ def run_aligned_net_excess(
         candidate_lines.append(f"F-NET{index:02d} ~ {item['panda_formula']} ~ 1")
     candidate_path.write_text("\n".join(candidate_lines) + "\n", encoding="utf-8")
 
-    if ic_efficiency:
+    if ic_objective:
         ic_records = [
             record
             for record in all_cached_records()
@@ -2115,7 +2120,7 @@ def run_aligned_net_excess(
             f"(one-way `{args.aligned_round_trip_cost / 2:.4f}`)"
         )
         drawdown_lines = []
-        if ic_efficiency:
+        if ic_objective:
             objective_line = (
                 f"- Objective: maximise `S_i = |RankIC| x |ICIR| x IC win` under turnover "
                 f"`<= {args.aligned_turnover_cap:.2%}` per rebalance and net excess "
@@ -2174,7 +2179,7 @@ def run_aligned_net_excess(
                 f"{rank_corr_text} |"
             )
         else:
-            if ic_efficiency:
+            if ic_objective:
                 report_lines.append(
                     f"| {index} | `{item['formula']}` | `{item['panda_formula']}` | "
                     f"{_fmt(item.get('s_i'), 4, 1.0)} | {_fmt(item.get('efficiency'), 3, 1.0)} | "
@@ -2209,7 +2214,7 @@ def run_aligned_net_excess(
                     f"`{_fmt(best_stats.get('turnover'))}`; rank IC `{_fmt(best_stats.get('rank_ic'), 4, 1.0)}`; "
                     f"ICIR `{_fmt(best_stats.get('ic_ir'), 3, 1.0)}`; win `{_fmt(best_stats.get('ic_win'), 2, 1.0)}`"
                 ]
-                if ic_efficiency
+                if ic_objective
                 else []
             ),
             *(
@@ -2245,12 +2250,14 @@ def build_parser() -> argparse.ArgumentParser:
             "aligned_net_excess",
             "aligned_net_excess_drawdown",
             "aligned_ic_efficiency",
+            "aligned_ic_frontier",
         ],
         default="ic",
         help=(
             "fitness objective; aligned_net_excess uses the local full-A alignment proxy, "
             "aligned_net_excess_drawdown adds absolute and excess drawdown control, "
-            "aligned_ic_efficiency maximises S_i under a turnover cap and a net-excess floor"
+            "aligned_ic_efficiency maximises S_i under a turnover cap and a net-excess floor, "
+            "aligned_ic_frontier maximises raw S_i with no turnover constraint"
         ),
     )
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
@@ -2446,6 +2453,7 @@ def main() -> int:
         "aligned_net_excess",
         "aligned_net_excess_drawdown",
         "aligned_ic_efficiency",
+        "aligned_ic_frontier",
     }:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)
     calendar = load_trade_dates(cache_root)
