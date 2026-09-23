@@ -82,9 +82,38 @@ def pool_metrics(score: pd.DataFrame, forward: pd.DataFrame, seat_si: dict[str, 
 
 
 def main() -> int:
-    records = pd.read_csv(OUT / "frontier_records.csv")
-    records = records[(records.turnover <= 0.40) | (records.s_i >= 0.05)]
-    top = records.nlargest(40, "s_i")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--records", type=Path, default=OUT / "frontier_records.csv")
+    parser.add_argument("--max-turnover", type=float, default=0.30)
+    parser.add_argument("--min-net", type=float, default=0.20)
+    parser.add_argument("--top", type=int, default=40)
+    parser.add_argument("--out", type=Path, default=OUT / "swap_simulation.csv")
+    args = parser.parse_args()
+    records = pd.read_csv(args.records)
+    records = records[(records.turnover <= args.max_turnover) & (records.net_excess.abs() >= args.min_net)]
+    def s_i_from_panel(panel: pd.DataFrame) -> float:
+        rics, ics = [], []
+        for i in range(len(panel)):
+            f = panel.iloc[i].to_numpy(dtype="float64")
+            y = forward.iloc[i].to_numpy(dtype="float64")
+            ok = np.isfinite(f) & np.isfinite(y)
+            if ok.sum() < 100:
+                continue
+            x, r = f[ok], y[ok]
+            if np.std(x) == 0 or np.std(r) == 0:
+                continue
+            rics.append(float(np.corrcoef(pd.Series(x).rank().to_numpy(),
+                                         pd.Series(r).rank().to_numpy())[0, 1]))
+            ics.append(float(np.corrcoef(x, r)[0, 1]))
+        if len(ics) < 3:
+            return float("nan")
+        rics = np.array(rics); ics = np.array(ics)
+        mean_rank, mean_ic, std_ic = float(rics.mean()), float(ics.mean()), float(ics.std(ddof=1))
+        win = float((ics > 0.02).mean()) if mean_ic >= 0 else float((ics < -0.02).mean())
+        ic_ir = mean_ic / std_ic if std_ic > 0 else 0.0
+        return abs(mean_rank) * abs(ic_ir) * win
+    top = records.nlargest(args.top, "net_excess")
     # cache root / panels
     cache_root = gp.DEFAULT_CACHE_ROOT
     batch_root = gp.DEFAULT_BATCH_ROOT
@@ -125,6 +154,7 @@ def main() -> int:
     base_score = sum(zscore(panel) for panel in seat_panels.values()) / len(POOL)
     base = pool_metrics(base_score, forward, SEAT_SI)
     print("seed:", {k: round(v, 4) for k, v in base.items()}, flush=True)
+    print(f"candidates after filter: {len(records)}", flush=True)
 
     rows = [dict(candidate="seed", formula="+".join(POOL), s_i=float(np.mean(list(SEAT_SI.values()))),
                  seat_turnover=np.nan, tag="seed", **base)]
@@ -145,17 +175,21 @@ def main() -> int:
         if finite_share < 0.5:
             print(f"skip degenerate {formula[:44]} finite_share={finite_share:.3f}", flush=True)
             continue
+        seat_s_i = float(record["s_i"]) if np.isfinite(float(record.get("s_i") or np.nan)) else s_i_from_panel(candidate_panel)
+        if not np.isfinite(seat_s_i):
+            print(f"skip no-IC {formula[:44]}", flush=True)
+            continue
         candidate_z = zscore(candidate_panel)
         for tag, keep in (("replace-SIZE", [k for k in POOL if k != WEAKEST]), ("add-6th", POOL)):
             score = (sum(zscore(seat_panels[k]) for k in keep) + candidate_z) / (len(keep) + 1)
             seat_si = {k: SEAT_SI[k] for k in keep}
-            seat_si["candidate"] = float(record["s_i"])
+            seat_si["candidate"] = seat_s_i
             metrics = pool_metrics(score, forward, seat_si)
-            rows.append(dict(candidate=formula[:60], formula=formula, s_i=float(record["s_i"]),
+            rows.append(dict(candidate=formula[:60], formula=formula, s_i=seat_s_i,
                              seat_turnover=float(record["turnover"]), finite_share=finite_share,
                              tag=tag, **metrics))
     result = pd.DataFrame(rows).sort_values("comb", ascending=False)
-    result.to_csv(OUT / "swap_simulation.csv", index=False)
+    result.to_csv(args.out, index=False)
     pd.set_option("display.width", 200)
     print(result[["tag", "s_i", "seat_turnover", "na", "nc", "comb", "net", "monthly_turnover", "sr", "dd"]]
           .head(20).round(4).to_string(index=False), flush=True)

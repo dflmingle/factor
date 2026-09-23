@@ -1963,19 +1963,15 @@ def run_aligned_net_excess(
         candidate_lines.append(f"F-NET{index:02d} ~ {item['panda_formula']} ~ 1")
     candidate_path.write_text("\n".join(candidate_lines) + "\n", encoding="utf-8")
 
-    if ic_objective:
-        ic_records = [
-            record
-            for record in all_cached_records()
-            if record.get("s_i") is not None and np.isfinite(float(record["s_i"]))
-        ]
-        ic_records.sort(key=lambda item: float(item["s_i"]), reverse=True)
-        write_json(run_output / "aligned_ic_records.json", ic_records)
-        print(
-            f"aligned_ic_records={len(ic_records)} "
-            f"cap_pass={sum(int(item.get('turnover_cap_pass') or 0) for item in ic_records)}",
-            flush=True,
-        )
+    records_key = "s_i" if ic_objective else "net_excess"
+    records = [
+        record
+        for record in all_cached_records()
+        if record.get(records_key) is not None and np.isfinite(float(record[records_key]))
+    ]
+    records.sort(key=lambda item: float(item[records_key]), reverse=True)
+    write_json(run_output / "aligned_ic_records.json", records)
+    print(f"aligned_records={len(records)} key={records_key}", flush=True)
 
     result = {
         "status": "completed",
