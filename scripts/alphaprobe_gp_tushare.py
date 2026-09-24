@@ -372,6 +372,7 @@ class TushareStockData:
         # rebuilds a full 1211 x N_stock panel (financial legs go through
         # pandas); a search over hundreds of fields then runs ~30x slower.
         self.field_cache_size = 24
+        self.field_array_cache_size = 512
         self._start_time = parse_date(start_time)
         self._end_time = parse_date(end_time)
         if self._start_time > self._end_time:
@@ -473,6 +474,11 @@ class TushareStockData:
         obj.field_cache_size = int(
             os.environ.get("FACTOR_LOCAL_FIELD_CACHE", str(getattr(obj, "field_cache_size", 24)))
         )
+        obj.field_array_cache_size = int(
+            os.environ.get(
+                "FACTOR_LOCAL_FIELD_ARRAY_CACHE", str(getattr(obj, "field_array_cache_size", 512))
+            )
+        )
         obj._start_time = parse_date(start_time)
         obj._end_time = parse_date(end_time)
         if obj._start_time > obj._end_time:
@@ -551,6 +557,7 @@ class TushareStockData:
                 frame=self.df_bak,
                 financial_root=self.financial_root,
                 max_cached_fields=self.field_cache_size,
+                max_cached_arrays=self.field_array_cache_size,
             )
         return self._pandaai_field_store
 
@@ -2110,6 +2117,7 @@ def run_aligned_net_excess(
             "allow_stale_failure_registry": args.allow_stale_failure_registry,
             "failure_registry_policy": field_exclusion_policy,
             "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
+            "field_array_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_ARRAY_CACHE", "512"),
             "search_fields": terminals,
             "search_field_count": active_terminal_count,
             "minimum_distinct_fields": args.minimum_distinct_fields,
@@ -2161,6 +2169,7 @@ def run_aligned_net_excess(
             "allow_stale_failure_registry": args.allow_stale_failure_registry,
             "failure_registry_policy": field_exclusion_policy,
             "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
+            "field_array_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_ARRAY_CACHE", "512"),
             "fields": terminals,
             "field_count": active_terminal_count,
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
@@ -2438,6 +2447,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--field-array-cache-size",
+        type=int,
+        default=None,
+        help=(
+            "resident CPU named-field arrays per run (default: env "
+            "FACTOR_LOCAL_FIELD_ARRAY_CACHE or 512).  Rebuilding one array costs "
+            "seconds, so a wide terminal set needs this to cover every field."
+        ),
+    )
+    parser.add_argument(
         "--allow-stale-failure-registry",
         action="store_true",
         help=(
@@ -2558,6 +2577,10 @@ def main() -> int:
         if args.field_cache_size < 1:
             raise ValueError("--field-cache-size must be positive")
         os.environ["FACTOR_LOCAL_FIELD_CACHE"] = str(args.field_cache_size)
+    if args.field_array_cache_size is not None:
+        if args.field_array_cache_size < 1:
+            raise ValueError("--field-array-cache-size must be positive")
+        os.environ["FACTOR_LOCAL_FIELD_ARRAY_CACHE"] = str(args.field_array_cache_size)
     cache_root = args.cache_root.expanduser().resolve()
     batch_root = (args.batch_root or cache_root / "tushare_factor_recheck" / "qfq" / "daily_batches").expanduser().resolve()
     run_output = args.output
@@ -2810,6 +2833,7 @@ def main() -> int:
             "allow_stale_failure_registry": args.allow_stale_failure_registry,
             "failure_registry_policy": field_exclusion_policy,
             "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
+            "field_array_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_ARRAY_CACHE", "512"),
             "search_fields": terminals,
             "search_field_count": active_terminal_count,
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
@@ -2842,6 +2866,7 @@ def main() -> int:
             "allow_stale_failure_registry": args.allow_stale_failure_registry,
             "failure_registry_policy": field_exclusion_policy,
             "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
+            "field_array_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_ARRAY_CACHE", "512"),
             "fields": terminals,
             "field_count": active_terminal_count,
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,

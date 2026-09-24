@@ -297,7 +297,23 @@ python scripts/build_alignment_failure_registry.py
 
 脚本生成 [`factor_alignment_failure_registry.json`](./factor_alignment_failure_registry.json) 和对应 Markdown 报告。每条硬失败记录至少保存：公式字段、算子、净/毛超额差、换手敏感性、Top20、RankIC、有效期覆盖、原因代码和字段归因置信度。字段只因出现在失败公式中不会自动拉黑；至少两条 `>5pp` 失败且没有任何 `<=5pp` 通过证据时，才进入 `blocked_fields`。
 
-GP/GFN 默认不使用登记表中的 `blocked_fields`。需要复查被拉黑字段时，必须显式使用 `--allow-blocked-fields`，并将该轮标记为诊断模式。当前登记表没有足够证据全局拉黑已验证的 `CLOSE`、`HIGH`、`AMOUNT`、`VOLUME`、`TURNOVER` 或 `MARKET_CAP`；已有单字段隔离结果显示不能把组合失败错误归因给这些单个字段。
+GP/GFN 默认不使用登记表中的 `blocked_fields`。需要复查被拉黑字段时，必须显式使用 `--allow-blocked-fields`，并将该轮标记为诊断模式。
+
+登记表是**按规则版本**生成的：`load_field_exclusion_policy` 会拒绝版本不一致的登记表。
+当规则版本先递增、登记表还没重跑时（2026-09-24 的 `qualitygate3` → `qualitygate4` 就是这种
+情况），搜索工具可用 `--allow-stale-failure-registry` 显式放行；该开关：
+
+- 默认**关闭**，不加开关仍然直接报错，避免悄悄用旧版本的排除决定；
+- 只在 `blocked_fields` 为空、即"旧版本与新版本的排除名单一致"时才有意义——
+  放行后会把 `version_mismatch` / `expected_alignment_rule_version` 写进 `gp_run.json`
+  的 `search.failure_registry_policy`，每轮都能审计；
+- 不替代正式流程：规则版本变化后仍要按上面的命令重跑 `build_alignment_failure_registry.py`。
+
+本地命名字段面板有两层 LRU，宽度不同的字段集需要分别设置：
+`--field-cache-size`（GPU 上常驻的面板张量，默认 24）与 `--field-array-cache-size`
+（CPU 上的原始数组，默认 512）。单个字段首次物化实测 >3 秒，面板张量每次重建即一次
+全量 pandas 重算，所以宽字段搜索（数百个终端）必须让 CPU 数组缓存覆盖整套字段，
+否则每次求值都在重算字段、宽字段跑法会慢一到两个数量级。当前登记表没有足够证据全局拉黑已验证的 `CLOSE`、`HIGH`、`AMOUNT`、`VOLUME`、`TURNOVER` 或 `MARKET_CAP`；已有单字段隔离结果显示不能把组合失败错误归因给这些单个字段。
 
 CFP 组合使用经过同一评估器诊断的公式级代理：
 

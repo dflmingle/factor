@@ -1245,11 +1245,21 @@ class PandaAIFieldStore:
         frame: pd.DataFrame,
         financial_root: Path | None = None,
         max_cached_fields: int = 24,
+        max_cached_arrays: int | None = None,
     ) -> None:
         self.data = data
         self.frame = frame.copy() if not frame.empty else frame
         self.financial_root = financial_root
         self.max_cached_fields = max(1, int(max_cached_fields))
+        # The numpy array cache is cheap (CPU) next to the torch panel cache
+        # (device memory), so a wide terminal set wants many more resident
+        # arrays than panels: rebuilding a panel is seconds, copying one to the
+        # device is milliseconds.
+        self.max_cached_arrays = (
+            max(1, int(max_cached_arrays))
+            if max_cached_arrays is not None
+            else self.max_cached_fields
+        )
         # Keep raw real-date arrays separate from the padded tensors consumed
         # by AlphaPROBE.  Derived fields recurse through the raw cache and do
         # not depend on a tensor cache entry surviving LRU eviction.
@@ -2343,7 +2353,7 @@ class PandaAIFieldStore:
         array = np.asarray(array, dtype=np.float32)
         self._array_cache[key] = array
         self._array_cache.move_to_end(key)
-        while len(self._array_cache) > self.max_cached_fields:
+        while len(self._array_cache) > self.max_cached_arrays:
             self._array_cache.popitem(last=False)
         return array
 
@@ -2489,6 +2499,7 @@ class PandaAIFieldStore:
             "active_search_fields": len(self.active_search_fields()),
             "formula_names": len(formula_field_name_set()),
             "max_cached_fields": self.max_cached_fields,
+            "max_cached_arrays": self.max_cached_arrays,
         }
 
     def coverage_report(self) -> dict[str, Any]:

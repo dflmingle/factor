@@ -1,0 +1,30 @@
+objective=aligned_net_excess
+data_source=local_tushare_qfq_daily_basic
+price_root=/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/qfq/daily_batches
+cap_root=/data/games/factor_/quantlab/.quantlab/cache/research/cn_equity/tushare_factor_recheck/daily_basic_full_a
+alignment=2021-09-07..2026-09-07 cycle=10 label_offset=1 groups=10 round_trip_cost=0.006
+aligned_rows=8584574 aligned_instruments=5395
+device=cuda:0
+data={'start_date': '2021-09-07', 'end_date': '2026-09-07', 'trading_days': 1211, 'stocks': 5395, 'features': ['open', 'close', 'high', 'low', 'volume', 'vwap'], 'device': 'cuda:0', 'max_backtrack_days': 756, 'max_future_days': 0, 'high_low_fallback': False}
+signal_dates=120 min_periods=100
+/data/games/factor_/scripts/financial_factor_local.py:370: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  frame = pd.concat(frames, ignore_index=True)
+Traceback (most recent call last):
+  File "/data/games/factor_/scripts/alphaprobe_gp_tushare.py", line 2811, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/data/games/factor_/scripts/alphaprobe_gp_tushare.py", line 2545, in main
+    return run_aligned_net_excess(args, cache_root, batch_root, run_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/games/factor_/scripts/alphaprobe_gp_tushare.py", line 1526, in run_aligned_net_excess
+    terminals = local_terminals(
+                ^^^^^^^^^^^^^^^^
+  File "/data/games/factor_/scripts/alphaprobe_gp_tushare.py", line 1102, in local_terminals
+    return resolve_terminal_fields(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/games/factor_/scripts/search_field_policy.py", line 112, in resolve_terminal_fields
+    exclusion_policy = load_field_exclusion_policy(failure_registry)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/games/factor_/scripts/search_field_policy.py", line 35, in load_field_exclusion_policy
+    raise ValueError(
+ValueError: Field failure registry uses alignment rule 'full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate3'; expected 'full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4'
