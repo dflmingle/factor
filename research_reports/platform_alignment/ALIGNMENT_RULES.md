@@ -1,6 +1,6 @@
 # 平台/本地对齐规则
 
-规则版本：`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1`<br>
+规则版本：`full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4`<br>
 适用范围：保存的 PandaAI 因子结果与本地 Tushare 重建结果的离线对比。<br>
 性质：研究复现规则，不是 PandaAI 内部实现的声明，也不会创建因子或发起平台回测。
 
@@ -114,6 +114,165 @@
 - `unsupported`：本地没有有效计算结果；禁止进入本地挖掘候选池。
 
 `AMOUNT/VOLUME/HIGH` 的当前 qfq 高价代理已被保存结果证明排名不一致，因此暂时回到 `unsupported`，直到拿到可验证的字段语义映射。旧版本结果目录保留作诊断，不能和新质量门槛版本混合。
+
+## 逐期 IC 一致性门槛（qualitygate2）
+
+qualitygate1 把"最新一期 Top20 重合度 ≥ 15/20"当作硬门槛。诊断显示这条才是大部分
+`field_or_path_mismatch` 的真正原因：最新一期的最高因子值恰好落在字段语义差异最大的极端尾部
+（换手率的分母口径、账面权益的入账口径），而净超额、毛超额、RankIC、换手水平和有效期覆盖
+其实都对得上。对组合预筛来说，这些因子是有用的；被挡住只是尾部一期的敏感性。
+
+qualitygate2 因此改为用**平台已保存的逐期 RankIC 图表序列**与本地逐期 RankIC 比较：
+
+| 指标 | 阈值 |
+|---|---:|
+| 逐期 RankIC 相关系数 | `>= 0.50` |
+| 逐期 RankIC 平均绝对差 | `<= 0.06` |
+| 可比期数 | `>= 20` |
+
+- Top20 重合度降级为诊断标记 `low_top20_overlap` / `missing_top20_overlap`，写入结果但不再单独否决记录。
+- 其余门槛不变：净超额 5pp、毛超额 5pp、RankIC 差 0.02、有效期覆盖 95%、换手可比性。
+- 标定证据（`calib_qualitygate2` 目录）：已知对齐记录的逐期相关系数为 0.906–0.997、平均绝对差 ≤ 0.039；本次被 Top20 拦下的 TURN-BIAS-1M、VALUE-BP、VALUE-SP 分别为 0.998/0.997/0.999 与 0.006/0.015/0.008，恢复为 `aligned`；真正不一致的 NONHT-RESVOL-LOW（0.887 / 0.070）与 NEW-VALUE-EVEBITDA（−0.322 / 0.103）仍然被拦下。
+- 平台图表期数少到无法计算逐期一致性时（< 20 期），回退到旧的 Top20 硬门槛，并写入 `ic_series_unavailable_top20_fallback` 诊断标记；不会因为"没有证据"而放进挖掘池。
+- 恢复的记录仍然带 `low_top20_overlap` 诊断标记，用于组合预筛时必须显式说明尾部一期选股不可复现。
+- 旧 `qualitygate1` 结果目录保留，不与本版本混合统计。
+
+全量重算结果：`qualitygate1` 可挖掘 76/160 条，`qualitygate2` 为 143/164 条；仍有 21 条被拦，原因是真实的净额/毛额偏差（如 T10-ADD-G13 −6.0pp）、逐期 IC 序列不一致（RESVOL、LOW-BETA、VWAP 组合等）、平台图表缺失（动量 120D-D0）或换手不可比（HT13-EXPWRET-6M）。
+
+### 净超额一致性分级（net_close / net_proxy）
+
+5pp 的拦截线只回答"能不能用"，不回答"绝对收益可不可信"。因此对可挖掘记录再分两级：
+
+| 分级 | 条件 | 用途 |
+|---|---|---|
+| `net_close` | \|本地 − 平台净超额\| ≤ `2pp` | 可直接按其净超额排名与比较水平 |
+| `net_proxy` | `2pp` < \|差\| < `5pp` | 保留在候选集中，但绝对收益带已知偏移；只用于相对排名与结构（相关、换手、方向）判断 |
+| 拦截 | \|差\| ≥ `5pp` | 不进入挖掘池 |
+
+- `net_proxy` 记录带 `net_proxy_offset` 标记；结果表另列 `net_tier` 字段。
+- 组合预筛必须输出每条候选里 `net_close` / `net_proxy` 的成员数，以及 proxy 中偏移最大的成员和偏移值。
+- 本地组合预筛的绝对净超额一律按"下限"阅读：已验证的两个五成员池（F-P260921-01、F-P260921-06）平台结果比本地高 `+6.5pp` / `+5.1pp`，所以预筛只用于排序，最终结论必须由平台实测确认。
+
+## 股票池过滤与复利年化（qualitygate3）
+
+qualitygate2 之后仍有 2–6pp 的系统性缺口：本地净超额一致低于平台。逐条排查后定位到两处口径差，
+两处都与因子信号无关，属于组合构造层面。
+
+**一、股票池过滤。** 平台的组合不持有 ST 与次新股，本地面板此前两者都保留。以 SIZE 单因子的最小市值
+十分组为例（2021-09-07–2026-09-07，复利年化）：
+
+| 口径 | 分组年化 |
+|---|---:|
+| 全样本（旧） | 28.49% |
+| 剔除 ST | 31.13% |
+| 剔除 ST + 上市未满一年 | 31.75% |
+| 平台保存的分组1 | 34.02% |
+
+本地因此按逐日 ST 状态（`stock_basic/namechange.parquet`，由 `scripts/fetch_tushare_namechange.py`
+从 Tushare 拉取，token 只从环境变量读取、不入库）与 `stock_basic.list_date` 过滤股票池；
+`FACTOR_LOCAL_UNIVERSE_FILTER=off` 可关闭该过滤用于诊断。
+
+**证据强度提示。** 这条过滤是**由收益水平拟合推断**的，不是平台侧的直接证据：平台保存的
+`query_last_date_top_factor` 里确实出现 ST 名称（例如 2026-09-04 的 `*ST瑞茂`、`*ST卓然`，
+经 PIT 更名记录核实当天就是 ST），但该列表是"因子值最高端"，对方向 0 的因子并不是持仓端
+（SIZE 的列表全是工商银行/建设银行等最大市值股，而组合持有的是最小市值端），因此它只说明
+平台**展示截面**包含 ST，不能证明平台**组合**包含 ST。判别实验：VALUE-BP（方向 1，高端即持仓端）
+开过滤净额差 +0.49pp、关过滤 −0.35pp；SIZE 最小市值分组开过滤 31.75%、关过滤 28.49%（平台 34.02%）。
+两个实验都不反驳该过滤，但都不足以定论；若平台页面给出分组口径说明，应以其为准并重跑。
+
+**二、复利年化。** 旧口径把每期超额直接求和再除以年数，平台则是把持有组和基准两条腿分别复利、
+分别年化后相减。对高波动组合，求和口径会系统性低估年化收益（SIZE 分组低估约 5pp）。
+
+两处修正后抽样对照：
+
+| 因子 | 旧净额差 | 新净额差 |
+|---|---:|---:|
+| SIZE-ONLY | −4.27pp | **+0.27pp** |
+| H03-T10-SINGLE | −2.18pp | +1.66pp |
+| HT13-TURN-BIAS-1M | −1.27pp | +1.93pp |
+| NONHT-CHIP-COST-250 | −1.65pp | +1.79pp |
+
+系统性低估消失，残差转为约 +1.5pp 的轻微高估（可能来自仍缺失的停牌/一字板处理）。规则版本因此
+递增为 `qualitygate3`，旧 `qualitygate1/2` 目录保留，不混合统计。
+
+## 逐期 IC 幅度归一化门槛（qualitygate4）
+
+`qualitygate2/3` 用本地逐期 RankIC 与平台保存图表的**平均绝对差 ≤ 0.06** 判定字段/路径是否一致。
+`F-NET01`（`WMA((((1/LOW)/LOW)/VOLUME),40)`）暴露了这条门槛的一个盲点：平台自己保存的两条 RankIC 序列
+**幅度不一致**——图表序列 std 为 `0.149`（cycle5）/`0.163`（cycle10），而同一结果里的 `Rank_IC / IC_IR`
+隐含 std 为 `0.190 / 0.195`。本地逐期 IC std 是 `0.193 / 0.212`，匹配的是**指标隐含幅度**。
+于是即使逐期排序一致（Spearman 秩相关 `0.894 / 0.888`），原始平均绝对差仍被振幅差顶到 `0.065–0.081`。
+
+qualitygate4 因此把这一步拆成"形状 + 幅度归一化残差"：
+
+| 指标 | 阈值 |
+|---|---:|
+| 逐期 RankIC 相关系数（Pearson） | `>= 0.50` |
+| 逐期 RankIC 秩相关（Spearman） | `>= 0.50` |
+| 幅度归一化残差 `mean(abs(beta*local - platform))`，`beta` 为 platform 对 local 的 OLS 斜率 | `<= 0.06` |
+
+- 原始平均绝对差继续记录；当它超过 `0.06` 而幅度比 `|std_local/std_platform - 1|` 超过 `0.20` 时，
+  只写诊断标记 `ic_chart_scale_gap`，不再单独否决记录。
+- 归一化只剥掉**振幅**：水平偏移、形状不一致仍然会顶高归一化残差。
+  `beta = rho*sigma_p/sigma_l` 时残差 std 的闭式解为 `sigma_p*sqrt(1-rho^2)`，因此该判据实际要求
+  "形状相关 + 平台图表幅度可控"两个条件同时成立。
+- 旧记录若缺少新字段，自动回退到 qualitygate2/3 的原始比较，行为与旧版本一致；不会因为"没有新字段"而放宽。
+- 标定预览（`qualitygate4_preview_20260924.py`，解析估计）：164 条记录中 149 条本来就是 `aligned`，
+  规则变化只影响 2 条：`F-B06-260921-T10` 转 `aligned`（带 `ic_chart_scale_gap`），
+  `F-NET01-PLAT-20260914` 的 IC 侧通过但仍被自身净额差（5 日口径 `+5.5pp`）挡住；
+  被拦的 `VWAP10-VOL20-MOM20-RAW`（相关 `0.506`）与 `HT13-NEW-HIST-OPPROFIT-6Q`（相关 `0.339`）保持被拦。
+- 只重跑了 `F-NET01` 家族两条记录到目录
+  `all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate4/`；
+  这是**局部**质量门槛回归，不是全量重算，不能和 qualitygate3 的全量统计混合。
+  完整诊断见 [`fnet01-alignment-20260924/summary.md`](./fnet01-alignment-20260924/summary.md)。
+- 该版本同时确认：平台保存的"最新一期 Top20"可能是**退化尾部**（20 条因子值完全相同，且多为 ST 名），
+  此时 `low_top20_overlap` 不具判别力——它本来就是诊断标记，不能单独否决记录。
+
+### 平台不支持的因子族
+
+平台已明确表示不支持 Barra 类风险字段。这类记录不再计入"本地/平台差异"：本地代理永远没有可对标的
+平台定义，所以单列为 `platform_unsupported`，不进入候选池，也不在失败登记中占位。当前名单见
+`ALIGNMENT_PLATFORM_UNSUPPORTED_HANDLERS`：`residual_volatility`、`residual_volatility_max_interact`、
+`beta_low`（对应 NONHT-RESVOL-LOW、NONHT-RESVOL-MAX-INTERACT-21D、NONHT-LOW-BETA 三条）。
+此前为对齐 RESVOL 试过的 252/126 日、等权/市值加权市场四个变体因此作废：
+`FACTOR_LOCAL_RESVOL_VARIANT` 保留仅为诊断开关，默认 `ew252` 不变。
+
+### 字段投影与载荷解析修复（qualitygate3 补充）
+
+两轮排查发现"缺数据"多数其实是本地读取路径的问题，修复后不必重拉 Tushare：
+
+- **财务列投影**：`load_financial_cache` 只读取 `_FINANCIAL_VALUE_COLUMNS` 列出的字段，导致
+  资产负债表的 `st_borr/lt_borr/bond_payable/non_cur_liab_due_1y/lease_liab`、利润表的
+  `total_profit`、现金流的折旧摊销三项虽然已在缓存里（资产负债表共 158 列）却没有进入本地信号。
+  现已补齐：EV 改用有息负债而非总负债；EBITDA 缺失时用 `EBIT + 折旧摊销` 重建。
+- **分母取错表**：`TS_RANK(oper_oper_profit_to_tp_ttm,756)` 的分母此前从资产负债表取（该表没有此字段），
+  永远算不出值；`_ttm_ratio_history` 增加 `denominator_source` 参数后改为从利润表取 TTM 利润总额，
+  该记录本地净额差从"无法计算"变为 −0.53pp。
+- **载荷结构**：`factor_result` 返回的分析 JSON 位于顶层 `factor_analysis`，旧解析器只认
+  `results.factor_analysis`，导致部分记录被误判为"平台无图表"。解析器现同时支持两种结构；
+  两份被截断的本地保存（HT13-MOMENTUM-120D-D0、WF6AA4-D0-OPEN20-MOM-20260912）已用只读的
+  `factor_result` 重新拉取，`scripts/refresh_saved_platform_runs.py` 可复现该修复。
+- **逐期 IC 最少期数**：从 20 期降到 10 期。平台部分保存只有 10–16 期图表，要求 20 期会把它们退回
+  单期 Top20 门槛；现在这类记录仍须同时通过相关系数 ≥0.5 与平均绝对差 ≤0.06。
+
+本轮结束后：可挖掘 147 条，`field_or_path_mismatch` 14 条，`platform_unsupported` 3 条；
+`|净额差|` 中位 0.95pp、均值 1.18pp，其中 118 条属于 `net_close`。剩余 14 条均为真实的收益路径差
+（>5pp）、信号定义差或平台换手口径不同，不再是本地读取问题。
+
+### EV / CFP / Barra 字段的后续修复
+
+- **EV 单位越界（重要）**：`daily_basic.total_mv` 的单位是万元，资产负债表的有息负债与货币资金是元。
+  二者直接相加减使 `ratio_ev_ebitda_ttm` 的本地代理在 51% 的截面上变成负值、排序近乎随机。
+  统一到万元后，`NEW-VALUE-EVEBITDA` 的逐期 IC 相关从 **−0.53 提升到 +0.96**、RankIC 差 −0.005，
+  直接进入 `aligned`。任何"市值与报表项相加/相减"的新因子都必须先统一单位。
+- **CFP 代理改选**：`ratio_cfp_ttm`（现金收益率ttm）此前用自建 `ocf_ttm_mv`（逐期 IC 相关 0.837、
+  平均差 0.063，超 0.06 门槛）；改用厂商 CFPS/现价口径 `cfps_cur_price` 后为 0.906 / 0.049，
+  `OSR4-RET40-BP-CFP-TSRANK756` 进入 `aligned`。覆盖开关为 `FACTOR_LOCAL_CFP_PROXY`。
+- **`profitability` 属于 Barra 因子表**（`references/fields-barra.md`，与 beta、residual_volatility 同表），
+  因此 `paper-derived-profitability` 从 `field_or_path_mismatch` 改判为 `platform_unsupported`，
+  不再计入"可修差异"。
+
+本轮后：可挖掘 **149** 条，`field_or_path_mismatch` 11 条，`platform_unsupported` 4 条。
 
 ## 本地挖掘字段边界
 

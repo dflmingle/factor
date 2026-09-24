@@ -135,12 +135,18 @@ def chart_series(chart: dict[str, Any] | None) -> tuple[list[pd.Timestamp], list
 
 
 def factor_analysis_payload(raw: dict[str, Any]) -> dict[str, Any]:
-    direct = raw.get("results", {}).get("factor_analysis")
+    # ``factor_result`` returns the analysis at the top level, while older saved
+    # payloads nest it under ``results``; accept both shapes.
+    direct = raw.get("results", {}).get("factor_analysis") if isinstance(raw.get("results"), dict) else None
+    if direct is None:
+        direct = raw.get("factor_analysis")
     if isinstance(direct, dict):
         return direct
 
     # Some saved CLI responses retain the analysis JSON only inside a node.
     nodes = raw.get("results", {}).get("nodes", {})
+    if not nodes:
+        nodes = raw.get("nodes", {}) or {}
     for node in nodes.values():
         if not isinstance(node, dict) or not node.get("result_json"):
             continue

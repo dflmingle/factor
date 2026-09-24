@@ -14,6 +14,7 @@ import argparse
 import gc
 import hashlib
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -35,6 +36,7 @@ from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_GROUPS,
     ALIGNMENT_LABEL_OFFSET,
     ALIGNMENT_MARKET_CAP_FIELD,
+    ALIGNMENT_MIN_IC_SERIES_PERIODS,
     ALIGNMENT_PYTHON_INDEX_HANDLERS,
     ALIGNMENT_ONE_WAY_COST,
     ALIGNMENT_PRICE_MODE,
@@ -287,18 +289,47 @@ def python_date_level_top_n_mean(
 def rolling_weighted_mean(
     frame: pd.DataFrame, values: pd.Series, window: int
 ) -> pd.Series:
-    """Return a linearly weighted moving average with the newest row largest."""
+    """Return a weighted moving average with the newest row largest.
+
+    The platform documents WMA only as an "N-day weighted moving average", so
+    the weight scheme is selected by ``FACTOR_LOCAL_WMA_SCHEME``: ``linear``
+    (default, weights 1..N) or ``exp09`` (weights 0.9**i).
+    """
     work = frame[["instrument"]].copy()
     work["_value"] = pd.to_numeric(values, errors="coerce")
-    weights = np.arange(1.0, window + 1.0)
+    scheme = os.environ.get("FACTOR_LOCAL_WMA_SCHEME", "linear").strip().lower()
+    if scheme == "exp09":
+        weights = 0.9 ** (window - np.arange(1.0, window + 1.0))
+    else:
+        weights = np.arange(1.0, window + 1.0)
+    # The platform's exact missing-value policy is undocumented.  ``full`` (the
+    # default) needs every observation in the window; ``partial`` allows shorter
+    # histories, which changes which stocks receive a factor value at all.
+    min_periods = window
+    if os.environ.get("FACTOR_LOCAL_WMA_MIN_PERIODS", "full").strip().lower() == "partial":
+        min_periods = max(2, window // 2)
 
     def weighted_mean(window_values: np.ndarray) -> float:
-        if np.isnan(window_values).any():
+        # pandas hands over only the available observations when min_periods is
+        # below the window, so the weights are rebuilt for the actual length
+        # (the newest observation stays last).
+        length = len(window_values)
+        if scheme == "exp09":
+            local_weights = 0.9 ** (length - np.arange(1.0, length + 1.0))
+        else:
+            local_weights = np.arange(1.0, length + 1.0)
+        valid = ~np.isnan(window_values)
+        if not valid.all():
+            if min_periods >= window:
+                return np.nan
+        if valid.sum() < min_periods:
             return np.nan
-        return float(np.dot(window_values, weights) / weights.sum())
+        return float(
+            np.dot(window_values[valid], local_weights[valid]) / local_weights[valid].sum()
+        )
 
     grouped = work.groupby("instrument", sort=False, observed=True)["_value"]
-    result = grouped.rolling(window=window, min_periods=window).apply(
+    result = grouped.rolling(window=window, min_periods=min_periods).apply(
         weighted_mean, raw=True
     )
     return result.reset_index(level=0, drop=True).reindex(frame.index)
@@ -946,7 +977,16 @@ def build_factor(
         return cross_rank(-max5, dates)
 
     if handler == "wma_low_volume40":
-        raw = 1.0 / frame["low_qfq"].pow(2) / frame["volume"]
+        # The rich price cache keeps the unadjusted low/volume next to the qfq
+        # series; this factor's platform definition matches the unadjusted
+        # ranking, so prefer those columns when the cache provides them.
+        low = frame["raw_low"] if "raw_low" in frame.columns and frame["raw_low"].notna().any() else frame["low_qfq"]
+        volume = (
+            frame["raw_volume"]
+            if "raw_volume" in frame.columns and frame["raw_volume"].notna().any()
+            else frame["volume"]
+        )
+        raw = 1.0 / low.pow(2) / volume
         return rolling_weighted_mean(frame, raw, 40)
 
     if handler == "wma_amount_mad10_50":
@@ -1064,14 +1104,24 @@ def build_factor(
         return score_rank.where(crossed, 0.0)
 
     if handler == "vwap10_volume20_momentum20":
-        amount = pd.to_numeric(frame.get("amount"), errors="coerce")
-        if amount is None or amount.isna().all():
-            amount = frame["volume"] * (open_price + close) / 2.0
-        amount_per_volume = amount.div(frame["volume"].replace(0.0, np.nan))
+        if "raw_amount" in frame.columns and frame["raw_amount"].notna().any():
+            amount = pd.to_numeric(frame["raw_amount"], errors="coerce")
+            volume = pd.to_numeric(frame["raw_volume"], errors="coerce")
+        else:
+            amount = pd.to_numeric(frame.get("amount"), errors="coerce")
+            volume = frame["volume"]
+            if amount is None or amount.isna().all():
+                amount = frame["volume"] * (open_price + close) / 2.0
+        amount_per_volume = amount.div(volume.replace(0.0, np.nan))
         vwap10 = rolling_stat(frame, amount_per_volume, 10, "mean")
-        volume20 = rolling_stat(frame, frame["volume"], 20, "mean")
-        bias = close.div(rolling_stat(frame, close, 20, "mean")).sub(1.0)
-        return vwap10.div(close).sub(1.0) * frame["volume"].div(volume20) * bias
+        volume20 = rolling_stat(frame, volume, 20, "mean")
+        reference = (
+            frame["raw_close"]
+            if "raw_close" in frame.columns and frame["raw_close"].notna().any()
+            else close
+        )
+        bias = reference.div(rolling_stat(frame, reference, 20, "mean")).sub(1.0)
+        return vwap10.div(reference).sub(1.0) * volume.div(volume20) * bias
 
     if handler.startswith("alpha"):
         open_rank = cross_rank(open_price, dates)
@@ -1423,6 +1473,7 @@ def evaluate(
     selected_group = GROUPS if direction == 1 else 1
     previous: dict[int, set[str]] = {}
     rank_ics: list[float] = []
+    rank_ic_by_date: dict[pd.Timestamp, float] = {}
     ics: list[float] = []
     group_returns: dict[int, list[float]] = {group: [] for group in range(1, GROUPS + 1)}
     group_turnovers: dict[int, list[float]] = {group: [] for group in range(1, GROUPS + 1)}
@@ -1438,6 +1489,7 @@ def evaluate(
         ic = current["factor"].corr(current["forward_return"])
         if pd.notna(rank_ic):
             rank_ics.append(float(rank_ic))
+            rank_ic_by_date[pd.Timestamp(date).normalize()] = float(rank_ic)
         if pd.notna(ic):
             ics.append(float(ic))
         benchmark = float(current["forward_return"].mean())
@@ -1464,7 +1516,15 @@ def evaluate(
     selected_excess = None
     selected_turnover = None
     if years and len(periods):
-        selected_excess = float(periods[f"excess_{selected_group}"].sum() / years)
+        # qualitygate3: compound the held group and benchmark legs separately.
+        held_series = np.nan_to_num(periods[f"excess_{selected_group}"].to_numpy(dtype=float) + periods["benchmark"].to_numpy(dtype=float))
+        benchmark_series = np.nan_to_num(periods["benchmark"].to_numpy(dtype=float))
+        held_wealth = float(np.prod(1.0 + held_series))
+        benchmark_wealth = float(np.prod(1.0 + benchmark_series))
+        if held_wealth > 0 and benchmark_wealth > 0:
+            selected_excess = held_wealth ** (1.0 / years) - benchmark_wealth ** (1.0 / years)
+        else:
+            selected_excess = float(periods[f"excess_{selected_group}"].sum() / years)
     if group_turnovers[selected_group]:
         selected_turnover = float(np.mean(group_turnovers[selected_group]))
     selected_cost = annualized_turnover_cost(selected_turnover, cycle, ROUND_TRIP_COST)
@@ -1475,6 +1535,51 @@ def evaluate(
         for row in platform.get("top", [])
         if row.get("symbol") and row.get("date")
     ]
+
+    # Per-period agreement between the local and saved platform RankIC series.
+    # qualitygate2 uses this in place of the single-period Top20 membership
+    # count, which is dominated by the extreme tail of one rebalance date.
+    platform_rank_ic_map: dict[pd.Timestamp, float] = {}
+    platform_chart_dates = [pd.Timestamp(value).normalize() for value in platform.get("dates", [])]
+    platform_chart_rank_ic = platform.get("rank_ic_values", []) or []
+    for chart_date, value in zip(platform_chart_dates, platform_chart_rank_ic):
+        numeric = pd.to_numeric(value, errors="coerce")
+        if pd.notna(numeric):
+            platform_rank_ic_map[chart_date] = float(numeric)
+    shared_dates = sorted(set(rank_ic_by_date).intersection(platform_rank_ic_map))
+    ic_series_corr = None
+    ic_series_mean_abs_delta = None
+    ic_series_dump = None
+    # qualitygate4 amplitude diagnostics: the saved platform run carries a chart
+    # series and a metric-implied series whose amplitudes differ, so the raw
+    # mean-absolute difference is split into a scale factor (beta, the OLS slope
+    # of platform on local) and the remaining amplitude-normalised difference.
+    ic_series_rank_corr = None
+    ic_series_std_local = None
+    ic_series_std_platform = None
+    ic_series_beta = None
+    ic_series_mean_abs_delta_scaled = None
+    if len(shared_dates) >= ALIGNMENT_MIN_IC_SERIES_PERIODS:
+        local_series = np.array([rank_ic_by_date[day] for day in shared_dates], dtype=float)
+        platform_series = np.array([platform_rank_ic_map[day] for day in shared_dates], dtype=float)
+        if local_series.std() > 0 and platform_series.std() > 0:
+            ic_series_corr = float(np.corrcoef(local_series, platform_series)[0, 1])
+            ic_series_rank_corr = float(
+                pd.Series(local_series).corr(pd.Series(platform_series), method="spearman")
+            )
+            ic_series_std_local = float(local_series.std(ddof=1))
+            ic_series_std_platform = float(platform_series.std(ddof=1))
+            ic_series_beta = float(np.polyfit(local_series, platform_series, 1)[0])
+            ic_series_mean_abs_delta_scaled = float(
+                np.mean(np.abs(local_series * ic_series_beta - platform_series))
+            )
+        ic_series_mean_abs_delta = float(np.mean(np.abs(local_series - platform_series)))
+        if ic_series_corr is not None and ic_series_corr < 0.5:
+            ic_series_dump = {
+                "dates": [day.strftime("%Y-%m-%d") for day in shared_dates],
+                "local": [float(v) for v in local_series],
+                "platform": [float(v) for v in platform_series],
+            }
     top_dates = [pd.Timestamp(row["date"]).normalize() for row in platform_top_rows]
     latest_date = max(top_dates) if top_dates else signal_dates[-1]
     latest = factor_frame[factor_frame["date"].eq(latest_date)].dropna()
@@ -1522,6 +1627,15 @@ def evaluate(
         "top20_overlap": len(set(local_top).intersection(platform_top)) if platform_top else None,
         "local_top20": local_top,
         "platform_top20": platform_top,
+        "ic_series_corr": ic_series_corr,
+        "ic_series_mean_abs_delta": ic_series_mean_abs_delta,
+        "ic_series_periods": len(shared_dates),
+        "ic_series_rank_corr": ic_series_rank_corr,
+        "ic_series_std_local": ic_series_std_local,
+        "ic_series_std_platform": ic_series_std_platform,
+        "ic_series_beta": ic_series_beta,
+        "ic_series_mean_abs_delta_scaled": ic_series_mean_abs_delta_scaled,
+        "ic_series_dump": ic_series_dump,
         "tie_break_proxy": handler if handler in ALIGNMENT_TIE_BREAK_HANDLERS else None,
     }
 
@@ -1999,6 +2113,15 @@ def main() -> int:
                 platform_periods=len(platform.get("dates", [])),
                 turnover_status=result["turnover_alignment"]["status"],
                 sensitivity_delta_pp=platform_turnover_sensitivity_delta_pp,
+                ic_series_corr=result.get("ic_series_corr"),
+                ic_series_mean_abs_delta=result.get("ic_series_mean_abs_delta"),
+                ic_series_periods=result.get("ic_series_periods"),
+                ic_series_rank_corr=result.get("ic_series_rank_corr"),
+                ic_series_std_local=result.get("ic_series_std_local"),
+                ic_series_std_platform=result.get("ic_series_std_platform"),
+                ic_series_beta=result.get("ic_series_beta"),
+                ic_series_mean_abs_delta_scaled=result.get("ic_series_mean_abs_delta_scaled"),
+                handler=handler,
             )
             failure_attribution = classify_failure(
                 {
@@ -2048,6 +2171,15 @@ def main() -> int:
                 "platform_gross_excess": result["platform_gross_excess"],
                 "platform_turnover": result["platform_turnover"],
                 "top20_overlap": result["top20_overlap"],
+                "ic_series_corr": result.get("ic_series_corr"),
+                "ic_series_mean_abs_delta": result.get("ic_series_mean_abs_delta"),
+                "ic_series_periods": result.get("ic_series_periods"),
+                "ic_series_rank_corr": result.get("ic_series_rank_corr"),
+                "ic_series_std_local": result.get("ic_series_std_local"),
+                "ic_series_std_platform": result.get("ic_series_std_platform"),
+                "ic_series_beta": result.get("ic_series_beta"),
+                "ic_series_mean_abs_delta_scaled": result.get("ic_series_mean_abs_delta_scaled"),
+                "ic_series_dump": result.get("ic_series_dump"),
                 "periods": result["periods"],
                 "date_source": date_source,
                 "platform_chart_periods": len(platform["dates"]),

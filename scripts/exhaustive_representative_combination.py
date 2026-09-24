@@ -90,7 +90,7 @@ COMMON_CYCLE = 10
 DEFAULT_ALIGNMENT_REPORT = (
     PROJECT_ROOT
     / "quantlab/.quantlab/cache/research/cn_equity/reports"
-    / "all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate1"
+    / "all_factor_compare_full_a_label1_financialfix2_tieproxy1_pythonindex1_turnoverdiag1_qualitygate3"
     / "all_factor_local_compare.json"
 )
 DEFAULT_PRICE_ROOT = CACHE_ROOT / "tushare_factor_recheck" / "qfq" / "daily_batches"
@@ -769,7 +769,18 @@ def _summary(
     years = len(selected) * cycle / 252.0
     finite_turnover = selected_turnover[np.isfinite(selected_turnover)]
     turnover_mean = float(finite_turnover.mean()) if len(finite_turnover) else None
-    gross_annual = float(np.nansum(selected_gross) / years)
+    # qualitygate3: compound the held leg and the benchmark leg separately and
+    # subtract the annualized results, instead of summing per-period excess.
+    # Summing understates high-return portfolios because the per-period excess
+    # does not compound; the platform reports compounded leg returns.
+    held_clean = np.nan_to_num(selected_held)
+    benchmark_clean = np.nan_to_num(selected_held - selected_gross)
+    held_wealth = float(np.prod(1.0 + held_clean))
+    benchmark_wealth = float(np.prod(1.0 + benchmark_clean))
+    if held_wealth > 0 and benchmark_wealth > 0:
+        gross_annual = held_wealth ** (1.0 / years) - 1.0 - (benchmark_wealth ** (1.0 / years) - 1.0)
+    else:
+        gross_annual = float(np.nansum(selected_gross) / years)
     cost = _annual_cost(turnover_mean, cycle)
     net = gross_annual - cost if cost is not None else None
     after_cost = selected_held - np.where(

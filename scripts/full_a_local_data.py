@@ -4,14 +4,110 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pyarrow.parquet as pq
 import pandas as pd
 
 
 PRICE_COLUMNS = ["date", "instrument", "open", "close", "volume"]
-OPTIONAL_PRICE_COLUMNS = ["high", "low", "high_qfq", "low_qfq", "amount"]
+OPTIONAL_PRICE_COLUMNS = [
+    "high",
+    "low",
+    "high_qfq",
+    "low_qfq",
+    "amount",
+    # Unadjusted series kept alongside the qfq fields so factors whose platform
+    # definition uses raw prices can select them.
+    "raw_low",
+    "raw_high",
+    "raw_close",
+    "raw_amount",
+    "raw_volume",
+]
 BASIC_COLUMNS = ["date", "instrument", "turnover", "total_mv", "circ_mv"]
 BASIC_BASE_COLUMNS = ["date", "instrument", "turnover"]
+
+# qualitygate3 universe rule: the platform holds neither ST names nor recent
+# listings in its portfolio universe.  Both filters are worth several
+# percentage points on small-cap-heavy books, so the local panel applies them
+# by default.  Set FACTOR_LOCAL_UNIVERSE_FILTER=off for diagnostics.
+CACHE_ROOT = Path("quantlab/.quantlab/cache/research/cn_equity")
+STOCK_BASIC_ROOT = CACHE_ROOT / "stock_basic"
+NAMECHANGE_PATH = STOCK_BASIC_ROOT / "namechange.parquet"
+STOCK_BASIC_PATH = STOCK_BASIC_ROOT / "data.parquet"
+UNIVERSE_FILTER_ENV = "FACTOR_LOCAL_UNIVERSE_FILTER"
+MIN_LISTING_DAYS_ENV = "FACTOR_LOCAL_MIN_LISTING_DAYS"
+DEFAULT_MIN_LISTING_DAYS = 365
+
+
+def universe_filter_enabled() -> bool:
+    import os
+
+    return os.environ.get(UNIVERSE_FILTER_ENV, "on").strip().lower() not in {"off", "0", "false"}
+
+
+def min_listing_days() -> int:
+    import os
+
+    raw = os.environ.get(MIN_LISTING_DAYS_ENV, "").strip()
+    if not raw:
+        return DEFAULT_MIN_LISTING_DAYS
+    try:
+        return int(raw)
+    except ValueError:
+        return DEFAULT_MIN_LISTING_DAYS
+
+
+def apply_trading_universe_filter(frame: pd.DataFrame) -> pd.DataFrame:
+    """Drop ST names (point in time) and stocks listed less than the minimum window."""
+    if frame.empty:
+        return frame
+    work = frame.sort_values(["instrument", "date"], ignore_index=True)
+    is_st = pd.Series(False, index=work.index)
+    if NAMECHANGE_PATH.exists():
+        history = pd.read_parquet(NAMECHANGE_PATH)
+        history["is_st"] = history["name"].astype(str).str.upper().str.contains("ST")
+        history = history[["ts_code", "start_date", "end_date", "is_st"]].sort_values(
+            ["ts_code", "start_date"]
+        )
+        flags = np.zeros(len(work), dtype=bool)
+        work_dates = work["date"].to_numpy()
+        positions = work.groupby("instrument", sort=False).indices
+        for instrument, rows in positions.items():
+            records = history[history["ts_code"].eq(instrument)]
+            if records.empty:
+                continue
+            starts = records["start_date"].to_numpy()
+            ends = records["end_date"].to_numpy()
+            record_st = records["is_st"].to_numpy(dtype=bool)
+            rows = np.asarray(rows, dtype=np.int64)
+            dates = work_dates[rows]
+            slot = np.searchsorted(starts, dates, side="right") - 1
+            valid = slot >= 0
+            st_now = np.zeros(len(rows), dtype=bool)
+            if valid.any():
+                picked = slot[valid]
+                still_open = pd.isna(ends[picked]) | (ends[picked] > dates[valid])
+                st_now[valid] = record_st[picked] & still_open
+            flags[rows] = st_now
+        is_st = pd.Series(flags, index=work.index)
+
+    keep = ~is_st.to_numpy()
+    if STOCK_BASIC_PATH.exists():
+        basic = pd.read_parquet(STOCK_BASIC_PATH).drop_duplicates("ts_code")
+        listing = pd.to_datetime(
+            basic.set_index("ts_code")["list_date"], format="%Y%m%d", errors="coerce"
+        )
+        age_days = work["date"] - work["instrument"].map(listing)
+        keep = keep & (age_days.isna() | age_days.dt.days.ge(min_listing_days()).to_numpy())
+
+    filtered = work.loc[keep].reset_index(drop=True)
+    filtered.attrs.update(frame.attrs)
+    filtered.attrs["universe_filter"] = (
+        f"st_pit+listing<{min_listing_days()}d removed "
+        f"{len(work) - len(filtered)}/{len(work)} rows"
+    )
+    return filtered
 
 
 def _read_price_batch(path: Path) -> pd.DataFrame:
@@ -80,7 +176,18 @@ def load_full_a_data(
 
         rich_columns = [
             column
-            for column in ["high_qfq", "low_qfq", "high", "low", "amount"]
+            for column in [
+                "high_qfq",
+                "low_qfq",
+                "high",
+                "low",
+                "amount",
+                "raw_low",
+                "raw_high",
+                "raw_close",
+                "raw_amount",
+                "raw_volume",
+            ]
             if column in prices.columns
         ]
         if rich_columns:
@@ -168,7 +275,18 @@ def load_full_a_data(
     if frame.duplicated(["date", "instrument"], keep=False).any():
         rich_columns = [
             column
-            for column in ["high_qfq", "low_qfq", "high", "low", "amount"]
+            for column in [
+                "high_qfq",
+                "low_qfq",
+                "high",
+                "low",
+                "amount",
+                "raw_low",
+                "raw_high",
+                "raw_close",
+                "raw_amount",
+                "raw_volume",
+            ]
             if column in frame.columns
         ]
         frame["_rich_field_count"] = frame[rich_columns].notna().sum(axis=1)
@@ -185,6 +303,8 @@ def load_full_a_data(
         "low_qfq": "cached" if not missing_low_any else "open/close range proxy",
         "amount": "cached" if not missing_amount_any else "volume * average(open, close) proxy",
     }
+    if universe_filter_enabled():
+        frame = apply_trading_universe_filter(frame)
     return frame
 
 

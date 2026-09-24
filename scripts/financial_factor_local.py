@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -159,6 +160,7 @@ _FINANCIAL_VALUE_COLUMNS = {
         "operate_profit",
         "ebit",
         "ebitda",
+        "total_profit",
         "n_income",
         "n_income_attr_p",
     ],
@@ -175,10 +177,25 @@ _FINANCIAL_VALUE_COLUMNS = {
         "cash_reser",
         "cash_reser_cb",
         "cash_equivalent",
+        # Interest-bearing debt legs.  EV must use debt, not total liabilities:
+        # banks and insurers carry enormous non-debt liabilities, so a
+        # total-liabilities EV ranks financials as permanently expensive.
+        "st_borr",
+        "lt_borr",
+        "bond_payable",
+        "st_bonds_payable",
+        "non_cur_liab_due_1y",
+        "lease_liab",
     ],
     "cashflow": [
         "n_cashflow_act",
         "free_cashflow",
+        # Depreciation and amortisation legs, used to rebuild EBITDA from EBIT
+        # when the vendor's income-statement EBITDA is missing (about half the
+        # rows carry it).
+        "depr_fa_coga_dpba",
+        "amort_intang_assets",
+        "lt_amort_deferred_exp",
     ],
 }
 
@@ -505,10 +522,24 @@ def _market_raw(frame: pd.DataFrame, variant: str) -> pd.Series:
     raise KeyError(f"Unsupported impact variant: {variant}")
 
 
-def _residual_volatility(frame: pd.DataFrame, window: int = 252) -> pd.Series:
+def _residual_volatility(frame: pd.DataFrame, window: int = 252, market: str = "equal") -> pd.Series:
+    """Market-model residual volatility.
+
+    ``market`` selects the market proxy: ``equal`` (equal-weighted mean return,
+    the historical default) or ``cap`` (total_mv-weighted, closer to an index).
+    The variant is used to align the platform's Barra-style residual-volatility
+    field, which is not byte-equivalent to this reconstruction.
+    """
     grouped = frame.groupby("instrument", sort=False, observed=True)
     ret = frame["close_qfq"].div(grouped["close_qfq"].shift(1)).sub(1.0)
-    market = ret.groupby(frame["date"], sort=False, observed=True).transform("mean")
+    if market == "cap" and "total_mv" in frame.columns:
+        weights = pd.to_numeric(frame["total_mv"], errors="coerce").clip(lower=0.0)
+        weighted = ret.mul(weights).groupby(frame["date"], sort=False, observed=True).transform("sum")
+        denom = weights.groupby(frame["date"], sort=False, observed=True).transform("sum")
+        market_return = weighted.div(denom.replace(0.0, np.nan))
+    else:
+        market_return = ret.groupby(frame["date"], sort=False, observed=True).transform("mean")
+    market = market_return
     work = frame[["instrument"]].copy()
     work["ret"] = ret
     work["market"] = market
@@ -526,6 +557,18 @@ def _residual_volatility(frame: pd.DataFrame, window: int = 252) -> pd.Series:
     residual_mean = _rolling(work.assign(residual=residual), "residual", window, "mean")
     residual_sq_mean = _rolling(work.assign(residual=residual * residual), "residual", window, "mean")
     return residual_sq_mean.sub(residual_mean.mul(residual_mean)).clip(lower=0.0).pow(0.5)
+
+
+def _resvol_variant() -> tuple[int, str]:
+    """Residual-volatility variant selected by FACTOR_LOCAL_RESVOL_VARIANT."""
+    variants = {
+        "ew252": (252, "equal"),
+        "ew126": (126, "equal"),
+        "ew504": (504, "equal"),
+        "mw252": (252, "cap"),
+        "mw126": (126, "cap"),
+    }
+    return variants.get(os.environ.get("FACTOR_LOCAL_RESVOL_VARIANT", "ew252").strip().lower(), (252, "equal"))
 
 
 def _comparison(left: pd.Series, right: pd.Series, op: str) -> pd.Series:
@@ -817,6 +860,7 @@ def _ttm_ratio_history(
     denominator_columns: list[str],
     average_denominator: bool = False,
     lag: int = 252,
+    denominator_source: str = "balancesheet",
 ) -> pd.DataFrame:
     """Build a daily PIT TTM ratio from announced income and balance data."""
     if not dates:
@@ -828,6 +872,16 @@ def _ttm_ratio_history(
     ][["date", "instrument"]].copy()
     history["row_id"] = history.index.to_numpy(dtype=np.int64)
     history = _attach(history, cache["income_ttm"], "", numerator_columns)
+    if denominator_source == "income_ttm":
+        history = _attach(history, cache["income_ttm"], "", denominator_columns)
+        history["_numerator"] = _coalesce_numeric(history, numerator_columns)
+        history["_denominator"] = _coalesce_numeric(history, denominator_columns)
+        history = history.sort_values(["instrument", "date"]).reset_index(drop=True)
+        if average_denominator:
+            previous = history.groupby("instrument", sort=False, observed=True)["_denominator"].shift(lag)
+            history["_denominator"] = history["_denominator"].add(previous).div(2.0)
+        history["ratio"] = history["_numerator"].div(history["_denominator"].replace(0.0, np.nan))
+        return history
     history = _attach(
         history,
         cache["balancesheet"],
@@ -858,6 +912,7 @@ def _historical_ttm_ratio_rank(
     numerator_columns: list[str],
     denominator_columns: list[str],
     window: int,
+    denominator_source: str = "balancesheet",
 ) -> pd.Series:
     """Cross-sectionally rank a strict time-series rank of a PIT TTM ratio."""
     cache_key = (
@@ -867,6 +922,7 @@ def _historical_ttm_ratio_rank(
         tuple(numerator_columns),
         tuple(denominator_columns),
         window,
+        denominator_source,
     )
     cached = _HISTORICAL_RANK_CACHE.get(cache_key)
     if cached is not None:
@@ -877,6 +933,7 @@ def _historical_ttm_ratio_rank(
         cache,
         numerator_columns,
         denominator_columns,
+        denominator_source=denominator_source,
     )
     if history.empty:
         return pd.Series(dtype=float)
@@ -973,10 +1030,28 @@ def _working_capital_to_market(selected: pd.DataFrame) -> pd.Series:
 def _ev_to_ebitda_proxy(selected: pd.DataFrame) -> pd.Series:
     """Use the closest available PIT enterprise-value / EBITDA inputs."""
     mv = _numeric_series(selected, "total_mv").abs()
-    liabilities = _coalesce_numeric(
+    # ``total_mv`` comes from daily_basic in 万元 while the statement fields are
+    # in 元.  Mixing the two inflated or inverted EV for most stocks (51% of the
+    # cross-section ended up with a negative EV/EBITDA), so the debt and cash
+    # legs are scaled to the same unit as the market cap.
+    yuan_to_wan = 1.0 / 1e4
+    interest_debt = _coalesce_numeric(
+        selected,
+        ["st_borr_bs_cur", "st_borr_bs_lyr"],
+    ).fillna(0.0)
+    for column in (
+        "lt_borr_bs_cur",
+        "bond_payable_bs_cur",
+        "st_bonds_payable_bs_cur",
+        "non_cur_liab_due_1y_bs_cur",
+        "lease_liab_bs_cur",
+    ):
+        interest_debt = interest_debt.add(_numeric_series(selected, column).fillna(0.0))
+    fallback_liabilities = _coalesce_numeric(
         selected,
         ["total_liab_bs_cur", "total_liab_bs_lyr"],
     ).fillna(0.0)
+    liabilities = interest_debt.where(interest_debt.gt(0.0), fallback_liabilities).mul(yuan_to_wan)
     cash = _coalesce_numeric(
         selected,
         [
@@ -988,11 +1063,23 @@ def _ev_to_ebitda_proxy(selected: pd.DataFrame) -> pd.Series:
             "cash_equivalent_bs_lyr",
         ],
     ).fillna(0.0)
-    enterprise_value = mv.add(liabilities).sub(cash)
-    ebitda = _coalesce_numeric(
+    enterprise_value = mv.add(liabilities).sub(cash.mul(yuan_to_wan))
+    vendor_ebitda = _coalesce_numeric(
         selected,
-        ["ttm_ebitda", "ttm_ebit", "ttm_operate_profit"],
+        ["ttm_ebitda"],
     )
+    ebit = _coalesce_numeric(selected, ["ttm_ebit"])
+    depreciation = _coalesce_numeric(
+        selected,
+        [
+            "ttm_depr_fa_coga_dpba",
+            "ttm_amort_intang_assets",
+            "ttm_lt_amort_deferred_exp",
+        ],
+    ).fillna(0.0)
+    rebuilt_ebitda = ebit.add(depreciation, fill_value=0.0)
+    ebitda = vendor_ebitda.where(vendor_ebitda.notna(), rebuilt_ebitda)
+    ebitda = ebitda.where(ebitda.notna(), _coalesce_numeric(selected, ["ttm_operate_profit"]))
     return enterprise_value.div(ebitda.where(ebitda.abs().gt(1e-12)))
 
 
@@ -1126,7 +1213,10 @@ def build_financial_factor(
     selected["bm_lf_rank"] = _rank(selected["book_to_market_ratio_lf"], dates_series)
     selected["bm_lyr_rank"] = _rank(selected["book_to_market_ratio_lyr"], dates_series)
     selected["sp_rank"] = _rank(selected["ratio_sp_ttm"], dates_series)
-    cfp_proxy = CFP_PROXY_BY_HANDLER.get(handler, "ocf_ttm_mv")
+    cfp_proxy = (
+        os.environ.get("FACTOR_LOCAL_CFP_PROXY", "").strip()
+        or CFP_PROXY_BY_HANDLER.get(handler, "ocf_ttm_mv")
+    )
     if handler in {"reversal_bm_cfp_ma63", "reversal_bm_cfp_tsrank756"}:
         operation = "ma" if handler.endswith("ma63") else "ts_rank"
         window = 63 if operation == "ma" else 756
@@ -1363,11 +1453,11 @@ def build_financial_factor(
     elif handler == "ev_ebitda_proxy":
         factor = _rank(-_ev_to_ebitda_proxy(selected), dates_series)
     elif handler == "residual_volatility":
-        residual = _residual_volatility(frame)
+        residual = _residual_volatility(frame, *_resvol_variant())
         selected["residual"] = residual.reindex(selected["row_id"]).to_numpy()
         factor = _rank(-selected["residual"], dates_series)
     elif handler == "residual_volatility_max_interact":
-        residual = _residual_volatility(frame)
+        residual = _residual_volatility(frame, *_resvol_variant())
         selected["residual"] = residual.reindex(selected["row_id"]).to_numpy()
         grouped = frame.groupby("instrument", sort=False, observed=True)
         ret1 = frame["close_qfq"].div(grouped["close_qfq"].shift(1)).sub(1.0)
@@ -1448,8 +1538,9 @@ def build_financial_factor(
             dates,
             cache,
             ["ttm_operate_profit"],
-            ["ttm_n_income", "ttm_n_income_attr_p"],
+            ["ttm_total_profit"],
             756,
+            denominator_source="income_ttm",
         )
         factor = selected["row_id"].map(ratio)
     elif handler == "quality_net_margin_tsrank378":

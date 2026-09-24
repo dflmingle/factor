@@ -17,8 +17,18 @@ DEFAULT_FAILURE_REGISTRY = (
 
 def load_field_exclusion_policy(
     registry_path: str | Path | None = None,
+    *,
+    allow_version_mismatch: bool = False,
 ) -> dict[str, Any]:
-    """Load versioned field exclusions without making the registry mandatory."""
+    """Load versioned field exclusions without making the registry mandatory.
+
+    A registry built under a different alignment rule version is rejected by
+    default.  ``allow_version_mismatch`` is the explicit diagnostic escape
+    hatch: the mismatch is recorded in the returned policy so every run that
+    used a stale registry stays auditable.  The blocking rule itself ("at
+    least two >5pp failures and no <=5pp evidence") is what would change under
+    a new gate version, so the caller must justify the override.
+    """
     path = Path(registry_path).expanduser() if registry_path else DEFAULT_FAILURE_REGISTRY
     if not path.exists():
         return {
@@ -31,7 +41,8 @@ def load_field_exclusion_policy(
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     registry_version = payload.get("alignment_rule_version")
-    if registry_version and registry_version != ALIGNMENT_RULE_VERSION:
+    version_mismatch = bool(registry_version) and registry_version != ALIGNMENT_RULE_VERSION
+    if version_mismatch and not allow_version_mismatch:
         raise ValueError(
             f"Field failure registry uses alignment rule {registry_version!r}; "
             f"expected {ALIGNMENT_RULE_VERSION!r}"
@@ -47,6 +58,9 @@ def load_field_exclusion_policy(
         "path": str(path),
         "status": "loaded",
         "alignment_rule_version": payload.get("alignment_rule_version"),
+        "expected_alignment_rule_version": ALIGNMENT_RULE_VERSION,
+        "version_mismatch": version_mismatch,
+        "allow_version_mismatch": bool(allow_version_mismatch),
         "blocked_fields": sorted(blocked),
         "blocked_field_reasons": reasons,
     }
@@ -82,6 +96,7 @@ def resolve_terminal_fields(
     allow_unverified_fields: bool,
     allow_blocked_fields: bool = False,
     failure_registry: str | Path | None = None,
+    allow_stale_failure_registry: bool = False,
 ) -> list[str]:
     """Resolve a GP terminal set and reject unverified broadening by default."""
     active = {str(field).strip().lower() for field in active_fields}
@@ -109,7 +124,9 @@ def resolve_terminal_fields(
             "The requested search range contains unverified fields "
             f"({preview}{suffix}); use --allow-unverified-fields for diagnostic mode"
         )
-    exclusion_policy = load_field_exclusion_policy(failure_registry)
+    exclusion_policy = load_field_exclusion_policy(
+        failure_registry, allow_version_mismatch=allow_stale_failure_registry
+    )
     blocked = set(exclusion_policy["blocked_fields"])
     blocked_requested = sorted(requested.intersection(blocked))
     if blocked_requested and not allow_blocked_fields:

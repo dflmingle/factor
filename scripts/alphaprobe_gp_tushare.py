@@ -8,6 +8,8 @@ files, so Qlib is not used for data loading or calendar lookup.
 
 from __future__ import annotations
 
+import os
+
 import argparse
 import ast
 import json
@@ -53,7 +55,10 @@ from pandaai_fields_local import (  # noqa: E402
     build_pandaai_namespace,
     formula_field_name_set,
 )
-from search_field_policy import resolve_terminal_fields  # noqa: E402
+from search_field_policy import (  # noqa: E402
+    load_field_exclusion_policy,
+    resolve_terminal_fields,
+)
 from platform_alignment_rules import (  # noqa: E402
     ALIGNMENT_DATA_START,
     ALIGNMENT_CORRELATION_METHOD,
@@ -362,6 +367,11 @@ class TushareStockData:
         self.max_future_days = max_future_days
         self.financial_root = financial_root
         self._pandaai_field_store: PandaAIFieldStore | None = None
+        # Resident named-field panels.  The stock default of 24 makes every
+        # evaluation of a wide terminal set a cache miss, because each miss
+        # rebuilds a full 1211 x N_stock panel (financial legs go through
+        # pandas); a search over hundreds of fields then runs ~30x slower.
+        self.field_cache_size = 24
         self._start_time = parse_date(start_time)
         self._end_time = parse_date(end_time)
         if self._start_time > self._end_time:
@@ -460,6 +470,9 @@ class TushareStockData:
         obj.max_future_days = max_future_days
         obj.financial_root = financial_root
         obj._pandaai_field_store = None
+        obj.field_cache_size = int(
+            os.environ.get("FACTOR_LOCAL_FIELD_CACHE", str(getattr(obj, "field_cache_size", 24)))
+        )
         obj._start_time = parse_date(start_time)
         obj._end_time = parse_date(end_time)
         if obj._start_time > obj._end_time:
@@ -537,6 +550,7 @@ class TushareStockData:
                 data=self,
                 frame=self.df_bak,
                 financial_root=self.financial_root,
+                max_cached_fields=self.field_cache_size,
             )
         return self._pandaai_field_store
 
@@ -654,6 +668,63 @@ def _relative_max_drawdown(
     peaks = torch.cummax(relative_equity, dim=0).values
     drawdown = torch.clamp_min(1.0 - relative_equity / peaks, 0.0)
     return float(drawdown.max().detach().item())
+
+
+def build_size_bucket_panel(
+    frame: pd.DataFrame,
+    context: "AlignedNetExcessContext",
+    data: "TushareStockData",
+    buckets: int,
+) -> np.ndarray:
+    """Percentile-bucket every evaluation date by total_mv; -1 where missing.
+
+    Bucket membership depends only on the size axis, so it is computed once and
+    reused for every candidate instead of being rebuilt per formula.
+    """
+    if buckets < 2:
+        raise ValueError("--aligned-size-buckets must be at least 2")
+    total_mv = frame.set_index(["date", "instrument"])["total_mv"].unstack("instrument")
+    total_mv = total_mv.reindex(index=context.calendar, columns=context.stock_ids)
+    ranks = total_mv.rank(axis=1, na_option="keep")
+    counts = total_mv.notna().sum(axis=1).replace(0, np.nan)
+    percentiles = ranks.div(counts, axis=0).clip(upper=1.0).to_numpy(dtype=np.float64)
+    bucket = np.where(
+        np.isfinite(percentiles),
+        np.minimum(np.floor(percentiles * buckets), buckets - 1),
+        -1.0,
+    ).astype(np.int64)
+    panel = np.full(
+        (len(data._evaluation_dates), len(context.stock_ids)), -1, dtype=np.int64
+    )
+    positions = {date: index for index, date in enumerate(data._evaluation_dates)}
+    for calendar_position, date in enumerate(context.calendar):
+        position = positions.get(pd.Timestamp(date))
+        if position is None:
+            continue
+        panel[position] = bucket[calendar_position]
+    return panel
+
+
+def size_neutralise_panel(
+    values: torch.Tensor,
+    bucket: torch.Tensor,
+    offsets: torch.Tensor,
+    buckets: int,
+    min_members: int = 5,
+) -> torch.Tensor:
+    """Subtract the within-bucket cross-sectional mean from every row."""
+    finite = torch.isfinite(values)
+    valid = finite & (bucket >= 0)
+    safe = torch.where(bucket >= 0, bucket, torch.zeros_like(bucket))
+    flat = safe + offsets
+    total = values.shape[0] * buckets
+    sums = torch.zeros(total, device=values.device, dtype=values.dtype)
+    counts = torch.zeros(total, device=values.device, dtype=values.dtype)
+    sums = sums.index_add(0, flat[valid], values[valid])
+    counts = counts.index_add(0, flat[valid], torch.ones_like(values[valid]))
+    means = sums / counts.clamp(min=1.0)
+    keep = valid & (counts[flat] >= min_members)
+    return torch.where(keep, values - means[flat], values)
 
 
 class AlignedNetExcessContext:
@@ -1034,6 +1105,7 @@ def local_terminals(
     field_file: Path | None = None,
     allow_unverified_fields: bool = False,
     allow_blocked_fields: bool = False,
+    allow_stale_failure_registry: bool = False,
 ) -> list[str]:
     """Return locally resolvable terminals within the selected search boundary.
 
@@ -1052,6 +1124,7 @@ def local_terminals(
         formula_fields=formula_field_name_set(include_period_variants=False),
         allow_unverified_fields=allow_unverified_fields,
         allow_blocked_fields=allow_blocked_fields,
+        allow_stale_failure_registry=allow_stale_failure_registry,
     )
 
 
@@ -1299,6 +1372,7 @@ def run_aligned_net_excess(
     risk_control = args.objective == "aligned_net_excess_drawdown"
     ic_efficiency = args.objective == "aligned_ic_efficiency"
     ic_frontier = args.objective == "aligned_ic_frontier"
+    size_neutral = args.objective == "aligned_size_neutral_net"
     ic_objective = ic_efficiency or ic_frontier
     if args.universe.lower() != "full_a":
         raise ValueError("--objective aligned_net_excess requires --universe full_a")
@@ -1420,6 +1494,22 @@ def run_aligned_net_excess(
         groups=args.aligned_groups,
         round_trip_cost=args.aligned_round_trip_cost,
     )
+    size_bucket = None
+    size_offsets = None
+    if size_neutral:
+        bucket_panel = build_size_bucket_panel(
+            frame, context, data, args.aligned_size_buckets
+        )
+        size_bucket = torch.tensor(bucket_panel, dtype=torch.long, device=device)
+        size_offsets = (
+            torch.arange(bucket_panel.shape[0], device=device, dtype=torch.long).unsqueeze(1)
+            * args.aligned_size_buckets
+        ).expand_as(size_bucket)
+        print(
+            f"size_neutral=True buckets={args.aligned_size_buckets} "
+            f"bucketed_share={float((bucket_panel >= 0).mean()):.3f}",
+            flush=True,
+        )
     if args.aligned_min_periods < 1 or args.aligned_min_periods > len(context.signal_dates):
         raise ValueError(
             "--aligned-min-periods must be between 1 and the number of aligned signal dates "
@@ -1455,6 +1545,10 @@ def run_aligned_net_excess(
         field_file=args.search_field_file,
         allow_unverified_fields=args.allow_unverified_fields,
         allow_blocked_fields=args.allow_blocked_fields,
+        allow_stale_failure_registry=args.allow_stale_failure_registry,
+    )
+    field_exclusion_policy = load_field_exclusion_policy(
+        allow_version_mismatch=args.allow_stale_failure_registry
     )
     print(
         f"pandaai_fields base={field_coverage['platform_base_fields']} "
@@ -1568,6 +1662,13 @@ def run_aligned_net_excess(
             else:
                 with torch.no_grad():
                     factor = finite_as_nan(expression.evaluate(data))  # type: ignore[attr-defined]
+                    if size_neutral:
+                        factor = size_neutralise_panel(
+                            factor,
+                            size_bucket,
+                            size_offsets,
+                            args.aligned_size_buckets,
+                        )
                     stats = context.score(factor)
                     if ic_objective:
                         stats.update(context.ic_series_stats(factor))
@@ -2006,6 +2107,9 @@ def run_aligned_net_excess(
             "search_field_file": args.search_field_file,
             "allow_unverified_fields": args.allow_unverified_fields,
             "allow_blocked_fields": args.allow_blocked_fields,
+            "allow_stale_failure_registry": args.allow_stale_failure_registry,
+            "failure_registry_policy": field_exclusion_policy,
+            "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
             "search_fields": terminals,
             "search_field_count": active_terminal_count,
             "minimum_distinct_fields": args.minimum_distinct_fields,
@@ -2054,6 +2158,9 @@ def run_aligned_net_excess(
             "field_file": args.search_field_file,
             "allow_unverified_fields": args.allow_unverified_fields,
             "allow_blocked_fields": args.allow_blocked_fields,
+            "allow_stale_failure_registry": args.allow_stale_failure_registry,
+            "failure_registry_policy": field_exclusion_policy,
+            "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
             "fields": terminals,
             "field_count": active_terminal_count,
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
@@ -2247,14 +2354,23 @@ def build_parser() -> argparse.ArgumentParser:
             "aligned_net_excess_drawdown",
             "aligned_ic_efficiency",
             "aligned_ic_frontier",
+            "aligned_size_neutral_net",
         ],
         default="ic",
         help=(
             "fitness objective; aligned_net_excess uses the local full-A alignment proxy, "
             "aligned_net_excess_drawdown adds absolute and excess drawdown control, "
             "aligned_ic_efficiency maximises S_i under a turnover cap and a net-excess floor, "
-            "aligned_ic_frontier maximises raw S_i with no turnover constraint"
+            "aligned_ic_frontier maximises raw S_i with no turnover constraint, "
+            "aligned_size_neutral_net maximises cost-adjusted net excess after "
+            "demeaning each cross-section inside total_mv percentile buckets"
         ),
+    )
+    parser.add_argument(
+        "--aligned-size-buckets",
+        type=int,
+        default=20,
+        help="total_mv percentile buckets used by aligned_size_neutral_net",
     )
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--batch-root", type=Path, default=None)
@@ -2310,6 +2426,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-blocked-fields",
         action="store_true",
         help="allow fields blocked by the alignment failure registry (diagnostic only)",
+    )
+    parser.add_argument(
+        "--field-cache-size",
+        type=int,
+        default=None,
+        help=(
+            "resident named-field panels kept per run (default: env "
+            "FACTOR_LOCAL_FIELD_CACHE or 24).  Pure speed knob: it only changes how "
+            "many already-computed field panels stay in memory."
+        ),
+    )
+    parser.add_argument(
+        "--allow-stale-failure-registry",
+        action="store_true",
+        help=(
+            "diagnostic: accept a field failure registry built under a different "
+            "alignment rule version; the mismatch is recorded in gp_run.json"
+        ),
     )
     parser.add_argument(
         "--novelty-registry",
@@ -2420,6 +2554,10 @@ def parse_pool_sizes(value: str) -> list[int]:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.field_cache_size is not None:
+        if args.field_cache_size < 1:
+            raise ValueError("--field-cache-size must be positive")
+        os.environ["FACTOR_LOCAL_FIELD_CACHE"] = str(args.field_cache_size)
     cache_root = args.cache_root.expanduser().resolve()
     batch_root = (args.batch_root or cache_root / "tushare_factor_recheck" / "qfq" / "daily_batches").expanduser().resolve()
     run_output = args.output
@@ -2450,6 +2588,7 @@ def main() -> int:
         "aligned_net_excess_drawdown",
         "aligned_ic_efficiency",
         "aligned_ic_frontier",
+        "aligned_size_neutral_net",
     }:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)
     calendar = load_trade_dates(cache_root)
@@ -2506,6 +2645,10 @@ def main() -> int:
         field_file=args.search_field_file,
         allow_unverified_fields=args.allow_unverified_fields,
         allow_blocked_fields=args.allow_blocked_fields,
+        allow_stale_failure_registry=args.allow_stale_failure_registry,
+    )
+    field_exclusion_policy = load_field_exclusion_policy(
+        allow_version_mismatch=args.allow_stale_failure_registry
     )
     print(
         f"pandaai_fields base={field_coverage['platform_base_fields']} "
@@ -2664,6 +2807,9 @@ def main() -> int:
             "search_field_file": args.search_field_file,
             "allow_unverified_fields": args.allow_unverified_fields,
             "allow_blocked_fields": args.allow_blocked_fields,
+            "allow_stale_failure_registry": args.allow_stale_failure_registry,
+            "failure_registry_policy": field_exclusion_policy,
+            "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
             "search_fields": terminals,
             "search_field_count": active_terminal_count,
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
@@ -2693,6 +2839,9 @@ def main() -> int:
             "field_file": args.search_field_file,
             "allow_unverified_fields": args.allow_unverified_fields,
             "allow_blocked_fields": args.allow_blocked_fields,
+            "allow_stale_failure_registry": args.allow_stale_failure_registry,
+            "failure_registry_policy": field_exclusion_policy,
+            "field_cache_size": os.environ.get("FACTOR_LOCAL_FIELD_CACHE", "24"),
             "fields": terminals,
             "field_count": active_terminal_count,
             "alignment_rule_version": ALIGNMENT_RULE_VERSION,
