@@ -1,0 +1,101 @@
+{
+  "generated": "2026-09-24",
+  "generated_on": "old machine (/data/games/factor_)",
+  "rule_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+  "purpose": "换机交接：本机大体积本地缓存清单。仓库 .gitignore 忽略 *.pkl，因此这些文件既不在 git 也不在 LFS；新机需要 rsync/移动盘直拷，或按 rebuild 命令重建（重建不消耗平台算力）。",
+  "checker": "python scripts/handoff_check_20260924.py",
+  "entries": [
+    {
+      "path": "research_reports/platform_alignment/pool-screen-20260921-qualitygate3/signals.pkl",
+      "size_bytes": 55610518,
+      "sha256": "b4dcbc461f2693da8a995f5dfadfc57424402e33a8da2b3b4a414428f52b7339",
+      "content": "7 个基础成员（SIZE/H03/RET40/DD120/CHIP250/DD60/ASSET_GROWTH）的信号面板 + C01/C02/C03 复合 + 前向收益 + 平台信号日",
+      "rebuild": "POOL_SCREEN_OUT=research_reports/platform_alignment/pool-screen-20260921-qualitygate3 python scripts/screen_competition_pool_20260921.py",
+      "rebuild_notes": "加载全 A qfq 面板并构建 7 个成员信号；需要 LFS 快照导入后的 quantlab 缓存；耗时分钟级到十几分钟",
+      "used_by": [
+        "scripts/exhaustive_pool_search_20260922.py",
+        "scripts/prescreen_low_turnover_pool_20260921.py",
+        "scripts/prescreen_extended_members_20260922.py",
+        "scripts/final_pool_search_20260922.py",
+        "scripts/alpha191_local_screen_20260923.py",
+        "scripts/widened_pool_search_20260923.py",
+        "scripts/frontier_swap_simulation_20260923.py",
+        "scripts/high_ic_composite_search_20260923.py",
+        "scripts/ic_efficiency_candidate_report_20260923.py",
+        "scripts/cluster_member_size_check_20260924.py",
+        "scripts/full374b_net_seat_simulation_20260924.py",
+        "scripts/nc_turn_tradeoff_20260924.py",
+        "scripts/neutralisation_variants_20260924.py",
+        "scripts/pool_seat_rescreen_20260924.py",
+        "scripts/relaxed_gp_screen_20260924.py",
+        "scripts/size_dominance_probe_20260924.py",
+        "scripts/sizeneut_candidate_verify_20260924.py",
+        "scripts/verify_score_rules_local.py"
+      ]
+    },
+    {
+      "path": "research_reports/platform_alignment/pool-extended-search-20260922/built_signals.pkl",
+      "size_bytes": 238594618,
+      "sha256": "224a06118da66ef4bebf13165c125b6039a3e2af1311e60e6f49c84c8a6f7b0a",
+      "content": "54 个本地可复现 10 日因子的已建面板信号（含 f_i10_01），extended/final/exhaustive 搜索的公共输入",
+      "rebuild": "python scripts/prescreen_extended_members_20260922.py",
+      "rebuild_notes": "首次运行会构建 54 个成员面板并写回 built_signals.pkl（最慢的一步，小时级）；文件已存在时脚本直接读缓存并只做席位搜索",
+      "used_by": [
+        "scripts/exhaustive_pool_search_20260922.py",
+        "scripts/final_pool_search_20260922.py",
+        "scripts/widened_pool_search_20260923.py",
+        "scripts/frontier_swap_simulation_20260923.py",
+        "scripts/high_ic_composite_search_20260923.py",
+        "scripts/alpha191_local_screen_20260923.py",
+        "scripts/ic_efficiency_candidate_report_20260923.py",
+        "scripts/cluster_member_size_check_20260924.py",
+        "scripts/full374b_net_seat_simulation_20260924.py",
+        "scripts/neutralisation_variants_20260924.py",
+        "scripts/pool_seat_rescreen_20260924.py",
+        "scripts/relaxed_gp_screen_20260924.py",
+        "scripts/size_dominance_probe_20260924.py",
+        "scripts/sizeneut_candidate_verify_20260924.py",
+        "scripts/verify_score_rules_local.py"
+      ]
+    },
+    {
+      "path": "research_reports/platform_alignment/alpha191-local-20260923/panels.pkl",
+      "size_bytes": 500591201,
+      "sha256": "502ac750dbcf53c8820ab835b0898fdff9da3923ab5b8af1b6d529e240f3bb90",
+      "content": "Alpha191 本地筛选的宽表面板（open/close/high/low/volume/amount/turnover/total_mv/circ_mv，2018-01-01..2026-09-07）",
+      "rebuild": "python scripts/alpha191_panel_build_20260923.py",
+      "rebuild_notes": "脚本无跳过逻辑，重跑会直接覆盖 panels.pkl；之后跑 python scripts/alpha191_local_screen_20260923.py 复现筛选",
+      "used_by": [
+        "scripts/alpha191_local_screen_20260923.py"
+      ]
+    },
+    {
+      "path": "research_reports/platform_alignment/seat-rescreen-20260924/fnet01_panels.pkl",
+      "size_bytes": 8837493,
+      "sha256": "2b6568ad66211337e00c8eb5ac98837afa1cf123303383fe8a9e689ba202a84d",
+      "content": "F-NET01 在池子同一网格上的信号面板（qfq 与 raw 两种口径）",
+      "rebuild": "python scripts/pool_seat_rescreen_20260924.py",
+      "rebuild_notes": "build_fnet01 会在文件缺失时重建；已有文件时所有依赖脚本直接读缓存",
+      "used_by": [
+        "scripts/pool_seat_rescreen_20260924.py",
+        "scripts/pool_size_guard_20260924.py",
+        "scripts/pool_daily_ledger_dd_20260924.py",
+        "scripts/nb_dilution_timing_20260924.py"
+      ]
+    },
+    {
+      "path": "research_reports/platform_alignment/pool-screen-20260921/signals.pkl",
+      "size_bytes": 59252187,
+      "sha256": "718fc56fb95b9a30a0bd7eae4f0a9e0e5fd2f79249cc743256a19d3dcd2a360f",
+      "content": "qualitygate3 之前的旧版成员信号缓存（历史目录，只作对照）",
+      "rebuild": "POOL_SCREEN_OUT=research_reports/platform_alignment/pool-screen-20260921 python scripts/screen_competition_pool_20260921.py",
+      "rebuild_notes": "当前脚本默认指向 pool-screen-20260921（旧目录）；qualitygate3 版本靠 POOL_SCREEN_OUT 指定，见第 1 条",
+      "used_by": []
+    }
+  ],
+  "not_included_here": [
+    "quantlab/.quantlab/cache（约 4.5 GB 的行情/财务缓存）：其中约 0.8 GB 走 Git LFS 快照 data/local_recheck/factor-local-recheck-data.tar.gz，按 CONTINUE.md 第 2 节导入",
+    "~/.pandaai（平台 token）：只在本机，新机必须重新登录",
+    "quantlab 子模块的本地脏改动：未提交、未交接，新机 clone 到的是纯净的 9cd90d4"
+  ]
+}

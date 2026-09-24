@@ -367,3 +367,35 @@ python scripts/evaluate_alphaprobe_gfn_tushare.py --device cuda:0 --run-dir quan
 净超额 reward 默认使用 `--net-excess-weight 0.10 --net-excess-scale 0.10`，其形式为 `weight * tanh(net_excess / scale)`，并叠加到 IC、SSL 和 novelty reward。净超额只在训练区间计算，采用本契约的 `factor_valid` 基准、10 组、label-1、5 日周期和双边 0.60% 成本；验证/测试只做事后报告。输出 metadata 会保存这组参数，`factor_metrics.csv/json` 会保存每个候选的毛超额、换手、年化成本和净超额。新训练使用独立目录 `alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_net_reward_run1/`，不会覆盖旧的 `run2/`。
 
 本轮净超额 reward 训练已完成 10,000 episodes，训练池 50 个因子；完整逐因子结果见 [`research_reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_net_reward_run1_eval/`](./research_reports/alphaprobe_gfn_tushare_cycle5_signed_positive_fundamental_net_reward_run1_eval/)。ensemble 的 train/valid/test Rank IC 为 `0.0822/0.0932/0.0669`，但按同一成本口径的净超额为 `-5.34%/-12.83%/-8.11%`，原因是 ensemble 换手约 `50.73%`、年化成本约 `15.34%`。测试期最佳单因子为 `Div($vwap,$high)`：Rank IC `0.0580`、毛超额 `19.69%`、换手 `17.16%`、净超额 `14.50%`；测试期净超额为正的因子 `6/50`，因此本轮证明 reward 能找到成本后较好的单因子，但不能判定整池或 ensemble 已通过泛化验证。旧无净超额 reward 池的测试期最佳净超额为 `5.49%`，正净超额因子为 `11/50`；两轮仍只有单次随机种子，不能据此宣称稳定改进。
+
+## 16. 2026-09-24 换机交接（宽字段 GP 批次与大缓存清单）
+
+完整交接单：`research_reports/platform_alignment/handoff_20260924/HANDOFF_20260924.md`；
+机器可读清单（sha256 + 生成脚本）：`research_reports/platform_alignment/handoff_20260924/local_data_manifest.json`。
+
+**重要**：仓库从 2026-09-24 起忽略 `*.pkl`。因此下面这些本地面板缓存**不在 git、也不在 LFS**，
+只 `git clone` 拿不到；新机要直拷（rsync/U 盘）或重建（重建不消耗平台算力）：
+
+- `research_reports/platform_alignment/pool-screen-20260921-qualitygate3/signals.pkl`（53 MB，18 个脚本依赖）
+- `research_reports/platform_alignment/pool-extended-search-20260922/built_signals.pkl`（228 MB，15 个脚本依赖）
+- `research_reports/platform_alignment/alpha191-local-20260923/panels.pkl`（477 MB）
+- `research_reports/platform_alignment/seat-rescreen-20260924/fnet01_panels.pkl`（8.4 MB）
+
+新机自检（只读，缺什么就打印对应重建命令）：
+
+```bash
+python scripts/handoff_check_20260924.py            # 完整 sha256 核对
+python scripts/handoff_check_20260924.py --size-only # 快速自检
+```
+
+不要把上述 `*.pkl` 提交进仓库（GitHub LFS 免费额度 1 GB，已被 541 MB 数据快照占用；
+再塞约 780 MB 会超额），也不要把 `~/.pandaai` token 复制进项目。若选择重建，
+`built_signals.pkl` 最慢（首次构建 54 个成员面板），其余为分钟级。
+
+宽字段 GP 的性能开关（纯本地、不影响结果口径）：`--field-cache-size`（GPU 面板缓存，默认 24）、
+`--field-array-cache-size`（CPU 数组缓存，默认 512）；显存/内存更小的机器往下调。
+批次参数与结论见 `research_reports/platform_alignment/relaxed-gp-20260924/summary.md`，
+该批 253 个候选的重算表在 `screen2/screened_candidates.csv`（已在仓库内）。
+
+未决事项：AGG / G13 / DOWNSIDE / WC 四条候选是否上平台验证（每条 4 算力，共 16），
+需用户明确批准后再提交；换手筛选举措仍按"以最终 ΔComb 排序 + size 防作弊列"的新规执行。
