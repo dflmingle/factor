@@ -6,6 +6,11 @@
 
 脚本侧的单一配置源是 [`scripts/platform_alignment_rules.py`](../../scripts/platform_alignment_rules.py)。正式复现和 CFP 代理诊断都必须读取它；改变已验证规则时，应递增规则版本并生成新的结果目录。
 
+池级评分口径（`s_i` / `na` / `nb` / `nc` / `comb` / 积分、加席边际）另有单一配置源：
+[`SCORE_RULES.md`](SCORE_RULES.md) + [`scripts/platform_score_rules.py`](../../scripts/platform_score_rules.py)，
+规则版本 `score-v2-seatbridge-20260924`，校验脚本 [`scripts/verify_score_rules_local.py`](../../scripts/verify_score_rules_local.py)；
+它不改变上面这个复现规则版本，也不能和它混用结论。
+
 ## 固定口径
 
 | 项目 | 固定规则 |
