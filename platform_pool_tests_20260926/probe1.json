@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "_id": "6ab75e8d9e9d797cfb2cf878",
+  "name": "POOL6-T2V2-20260926",
+  "create_at": 1790402189668,
+  "last_run_id": "6ab75e8fcd820fa2a40a6cbe",
+  "mode": "code",
+  "content": "import numpy as np\n\n\nclass Pool6SeatFactor(Factor):\n    \"\"\"Existing five seats + T2 (inverse of amount-median minus turnover-vol band).\"\"\"\n\n    def calculate(self, factors):\n        close = factors['close']\n        open_ = factors['open']\n        high = factors['high']\n        low = factors['low']\n        volume = factors['volume']\n        amount = factors['amount']\n        turnover = factors['turnover']\n        market_cap = factors['market_cap']\n        ret1 = close / DELAY(close, 1) - 1\n        impact60 = RANK(\n            SUM((high - low) / (DELAY(close, 1) + 0.000001), 60)\n            / (SUM(amount, 60) + 1)\n        )\n        bm = RANK(factors['book_to_market_ratio_lf'])\n        t10 = (\n            RANK(1 - RETURNS(close, 40))\n            + RANK((SUM(volume * (open_ + close) / 2, 250) / SUM(volume, 250)) / close - 1)\n            + RANK(1 - MA(turnover, 21) / MA(turnover, 504))\n            + RANK(-ZSCORE(RANK(market_cap)))\n            + impact60\n        )\n        vol250 = factors['vol250']\n        t2 = 1.0 / (\n            TS_MEDIAN(amount, 10)\n            - STDDEV(TS_MEDIAN(STDDEV(vol250, 30), 40), 30)\n        )\n        signals = [\n            -RANK(market_cap),\n            impact60,\n            (t10 + bm) / 6,\n            bm - RANK(market_cap),\n            bm + RANK(SUM(ABS(ret1) / (amount + 1), 60) / 60),\n            t2,\n        ]\n\n        def normalize(series):\n            series = series.replace([np.inf, -np.inf], np.nan)\n            clipped = series.clip(lower=series.quantile(0.01), upper=series.quantile(0.99))\n            std = clipped.std(ddof=0)\n            if not np.isfinite(std) or std <= 1e-12:\n                return clipped * 0.0\n            return (clipped - clipped.mean()) / std\n\n        normalized = [signal.groupby(level=0).transform(normalize) for signal in signals]\n        return sum(normalized) / len(normalized)",
+  "start_date": "20210907",
+  "end_date": "20260907",
+  "market": "¹ÉÆ±",
+  "adjustment_cycle": "10",
+  "group_number": "10",
+  "factor_direction": "1",
+  "stock_pool": "»¦ÉîÈ«A"
+}
