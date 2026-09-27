@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Serve the desktop Markdown reader and read local Markdown paths."""
+"""Serve the desktop Markdown reader and read local Markdown paths.
 
+只用标准库，任何 Python 3.8+ 都能跑。
+启动脚本：桌面 `Markdown阅读器启动.bat`。
+"""
 from __future__ import annotations
 
 import argparse
 import json
 import re
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -13,7 +17,26 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 SUPPORTED_SUFFIXES = {".md", ".markdown", ".mdown", ".mkdn", ".txt"}
 DEFAULT_PORT = 8765
-DEFAULT_HTML = Path.home() / "Desktop" / "Markdown阅读器.html"
+SERVER_TAG = "markdown-reader/1.1"
+SCRIPT_DIR = Path(__file__).resolve().parent
+DESKTOP_HTML = Path.home() / "Desktop" / "Markdown阅读器.html"
+FALLBACK_HTMLS = (SCRIPT_DIR / "markdown_reader_ui.html",)
+
+
+def resolve_html(explicit: Path | None) -> Path | None:
+    """按 显式参数 -> 桌面 -> 仓库副本 的顺序找一个存在的页面文件。"""
+    candidates = []
+    if explicit is not None:
+        candidates.append(Path(explicit))
+    candidates.append(DESKTOP_HTML)
+    candidates.extend(FALLBACK_HTMLS)
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate.resolve()
+        except OSError:
+            continue
+    return None
 
 
 def local_path(raw: str) -> Path:
@@ -47,7 +70,7 @@ def decode_markdown(raw: bytes) -> str:
 
 
 class ReaderHandler(BaseHTTPRequestHandler):
-    server_version = "MarkdownReader/1.0"
+    server_version = "MarkdownReader/1.1"
 
     def end_headers(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -62,10 +85,18 @@ class ReaderHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         if parsed.path in {"", "/"}:
+            if self.server.html_path is None:
+                self.send_error(500, "Reader HTML not found")
+                return
             self.send_file(self.server.html_path, "text/html; charset=utf-8")
             return
         if parsed.path == "/api/health":
-            self.send_json(200, {"ok": True})
+            self.send_json(200, {
+                "ok": True,
+                "server": SERVER_TAG,
+                "pid": __import__("os").getpid(),
+                "html": str(self.server.html_path) if self.server.html_path else None,
+            })
             return
         if parsed.path == "/api/read":
             self.read_markdown(parse_qs(parsed.query).get("path", [""])[0])
@@ -111,7 +142,7 @@ class ReaderHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def send_json(self, status: int, payload: dict[str, object]) -> None:
+    def send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -119,7 +150,7 @@ class ReaderHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, format: str, *args: object) -> None:
+    def log_message(self, format: str, *args) -> None:
         print(f"[markdown-reader] {format % args}", flush=True)
 
 
@@ -127,12 +158,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument("--html", type=Path, default=DEFAULT_HTML)
+    parser.add_argument("--html", type=Path, default=None)
     args = parser.parse_args()
-    server = ThreadingHTTPServer((args.host, args.port), ReaderHandler)
-    server.html_path = args.html.resolve()
+
+    html_path = resolve_html(args.html)
+    try:
+        server = ThreadingHTTPServer((args.host, args.port), ReaderHandler)
+    except OSError as exc:
+        print(f"[error] 端口 {args.port} 无法绑定：{exc}", flush=True)
+        return 2
+    server.html_path = html_path
     print(f"Markdown reader: http://{args.host}:{args.port}/", flush=True)
-    print(f"Reader HTML: {server.html_path}", flush=True)
+    print(f"Reader HTML: {html_path}", flush=True)
+    if html_path is None:
+        print("[warn] 没找到阅读器页面文件，根路径会返回 500", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -14,6 +14,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+import os
 import re
 from typing import Any, Iterable
 
@@ -1266,6 +1267,9 @@ class PandaAIFieldStore:
         self._array_cache: OrderedDict[str, np.ndarray] = OrderedDict()
         self._panel_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
         self._technical_cache: dict[str, np.ndarray] = {}
+        self.max_cached_technical = max(
+            1, int(os.environ.get("FACTOR_LOCAL_TECHNICAL_CACHE", "6"))
+        )
         self._status_cache: dict[str, dict[str, Any]] = {}
         self._financial_cache: dict[str, pd.DataFrame] | None = None
         self._source_columns: dict[str, set[str]] = {}
@@ -1854,6 +1858,11 @@ class PandaAIFieldStore:
         def finish(value: np.ndarray) -> tuple[np.ndarray, str, str, str]:
             result = np.asarray(value, dtype=np.float32)
             self._technical_cache[base] = result
+            cache = self._technical_cache
+            if len(cache) > self.max_cached_technical:
+                for key in list(cache)[: len(cache) - self.max_cached_technical]:
+                    if key != base:
+                        cache.pop(key, None)
             return result, "local_proxy", source, note
 
         if base.startswith("cal_"):
