@@ -1,0 +1,16 @@
+﻿{
+  "success": true,
+  "_id": "6ab8e2129e9d797cfb2cfa50",
+  "name": "POOL6-SIDE-NB60T5-20260927",
+  "create_at": 1790501394263,
+  "last_run_id": "6ab8e2149e9d797cfb2cfa51",
+  "mode": "code",
+  "content": "import numpy as np\n\n\nclass Pool6SideNb60T5Factor(Factor):\n    \"\"\"Incumbent 5 seats + SIDE-NB60T5 (6th-seat test, 2026-09-27 side run).\n\n    Pool = equal-weight average of per-seat cross-sectional z-scores\n    (1%/99% winsorized), same convention as pool6_bm4fscore_e_v2.\n\n    Seats:\n      1. -RANK(market_cap)                        (SIZE-ONLY-20260911)\n      2. impact60                                 (H03-T10-SINGLE)\n      3. RANK(bm_lf) - RANK(market_cap)           (VERIFY10-E260910-04)\n      4. RANK(bm_lf) + RANK(SUM(ABS(ret1)/(amount+1),60)/60)\n                                                  (VERIFY10-F260910-12)\n      5. (t10_base + RANK(bm_lf)) / 6             (T10-ADD-BM-20260911)\n      6. RANK(1 - close/MA(close,60)) * (1 - RANK(MA(turnover,5)))\n                                                  (SIDE-NB60T5-20260927)\n    \"\"\"\n\n    def calculate(self, factors):\n        close = factors['close']\n        open_ = factors['open']\n        high = factors['high']\n        low = factors['low']\n        volume = factors['volume']\n        amount = factors['amount']\n        turnover = factors['turnover']\n        market_cap = factors['market_cap']\n        ret1 = close / DELAY(close, 1) - 1\n        rank_cap = RANK(market_cap)\n        impact60 = RANK(\n            SUM((high - low) / (DELAY(close, 1) + 0.000001), 60)\n            / (SUM(amount, 60) + 1)\n        )\n        bm = RANK(factors['book_to_market_ratio_lf'])\n        t10 = (\n            RANK(1 - RETURNS(close, 40))\n            + RANK((SUM(volume * (open_ + close) / 2, 250) / SUM(volume, 250)) / close - 1)\n            + RANK(1 - MA(turnover, 21) / MA(turnover, 504))\n            + RANK(-ZSCORE(rank_cap))\n            + impact60\n        )\n        seats = [\n            -rank_cap,\n            impact60,\n            bm - rank_cap,\n            bm + RANK(SUM(ABS(ret1) / (amount + 1), 60) / 60),\n            (t10 + bm) / 6,\n            RANK(1 - close / MA(close, 60)) * (1 - RANK(MA(turnover, 5))),\n        ]\n\n        def normalize(series):\n            series = series.replace([np.inf, -np.inf], np.nan)\n            clipped = series.clip(lower=series.quantile(0.01), upper=series.quantile(0.99))\n            std = clipped.std(ddof=0)\n            if not np.isfinite(std) or std <= 1e-12:\n                return clipped * 0.0\n            return (clipped - clipped.mean()) / std\n\n        normalized = [signal.groupby(level=0).transform(normalize) for signal in seats]\n        return sum(normalized) / len(normalized)",
+  "start_date": "20210907",
+  "end_date": "20260907",
+  "market": "股票",
+  "adjustment_cycle": "10",
+  "group_number": "10",
+  "factor_direction": "1",
+  "stock_pool": "沪深全A"
+}
