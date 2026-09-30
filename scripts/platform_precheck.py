@@ -4,7 +4,7 @@
     python scripts/platform_precheck.py <candidates_file> [--direction-from-file]
 候选文件格式（与提交器一致）：name ~ formula ~ direction
 """
-import io, sys, re, ast, math
+import io, sys, re, ast, math, builtins, tokenize
 from pathlib import Path
 
 # --- 2026-09-25 扩展：分母含"有符号/近零"字段（不限于 corr）-----------------
@@ -79,12 +79,53 @@ DEFAULT_FIELD_MAG = 1.0
 SCALE_TARGET = 0.1        # 归一目标量级
 CORR_FIELD_MAG = 0.1
 
+# 本地 GP 名 -> 平台算子名的建议映射（教训：2026-09-29 VV6_1250 首次提交因 TSSTD 不在平台而失败）
+LOCAL_TS_ALIASES = {
+    "tsstd": "STDDEV", "tsstddev": "STDDEV", "tsmean": "MA / TS_MEAN", "tsmax": "TS_MAX",
+    "tsmin": "TS_MIN", "tssum": "SUM", "tsvar": "VAR", "tsmed": "TS_MEDIAN", "tsmad": "TS_MAD",
+    "tsdelta": "DELTA", "tspctchange": "PCT_CHANGE", "tscorr": "CORR", "tscov": "COV",
+    "tsrank": "TS_RANK", "tsema": "EMA", "tswma": "WMA", "tskurt": "TS_KURT",
+}
+
 
 def load_platform_ops() -> set[str]:
     text = OPS_MD.read_text(encoding="utf-8")
     ops = {m.group(1).lower() for m in re.finditer(r"\|\s*`?([A-Z][A-Z0-9_]{1,24})\s*\(", text)}
     ops |= {m.group(1).lower() for m in re.finditer(r"`([A-Za-z][A-Za-z0-9_]{1,24})\(", text)}
     return ops
+
+
+# 公式模式基础字段（2026-09-29 教训：VWAP 不在平台字段表 -> "Missing required base factors"）
+BASE_FIELDS = {"open", "close", "high", "low", "volume", "amount", "turnover", "market_cap"}
+FIELD_DOC_PATTERNS = ("fields*.md",)
+
+
+def load_known_fields() -> set[str]:
+    known = set(BASE_FIELDS)
+    ref_dir = OPS_MD.parent
+    for pat in FIELD_DOC_PATTERNS:
+        for md in ref_dir.glob(pat):
+            text = md.read_text(encoding="utf-8", errors="ignore")
+            known |= {m.group(1).lower() for m in re.finditer(r"`([a-z][a-z0-9_]{2,40})`", text)}
+    return known
+
+
+def unknown_field_tokens(formula: str, known: set[str]) -> list[str]:
+    tree = ast.parse(formula, mode="eval")
+    called = {getattr(n.func, "id", "").lower() for n in ast.walk(tree)
+              if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    bare = {n.id.lower() for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    bare -= called
+    bad = []
+    for name in sorted(bare):
+        if name in known or name.isdigit():
+            continue
+        if re.match(r"^alpha191_\d{3}$", name):   # 平台已注册的 191 因子名
+            continue
+        if re.match(r"^(bs|is|cf|cal|val|fin|gro|op|ma|osc|vi|barra)_", name):
+            continue
+        bad.append(name)
+    return bad
 
 
 def field_mag(name: str) -> float:
@@ -148,10 +189,13 @@ def _is_ma_of(node: ast.AST, inner: ast.AST) -> bool:
     return ast.dump(node.args[0]) == ast.dump(inner)
 
 
-def analyze(name: str, formula: str, platform_ops: set[str]) -> dict:
+def analyze(name: str, formula: str, platform_ops: set[str], known_fields: set[str] | None = None) -> dict:
     tree = ast.parse(formula, mode="eval")
     called = {getattr(n.func, "id", "").lower() for n in ast.walk(tree)
               if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    local_ops = sorted(fn for fn in called if fn in LOCAL_TS_ALIASES and fn not in platform_ops)
+    unknown_ops = sorted(fn for fn in called if fn not in platform_ops)
+    unknown_fields = unknown_field_tokens(formula, known_fields) if known_fields is not None else []
     bare = {n.id.lower() for n in ast.walk(tree) if isinstance(n, ast.Name)}
     bare -= called
     collisions = sorted(t for t in bare if t in platform_ops)
@@ -165,7 +209,67 @@ def analyze(name: str, formula: str, platform_ops: set[str]) -> dict:
     n_fields = len([t for t in bare if not t.isdigit()])
     cost = 2.0 if (n_fields <= 1 and not called) else 4.0
     return dict(name=name, formula=formula, collisions=collisions, fragile=frag, est=est, k=k,
-                needs_scale=needs_scale, cost=cost, n_ops=len(called))
+                needs_scale=needs_scale, cost=cost, n_ops=len(called), local_ops=local_ops,
+                unknown_ops=unknown_ops, unknown_fields=unknown_fields)
+
+
+PY_OP_ALLOW = {
+    "Factor", "RANK", "ZSCORE", "DELAY", "SUM", "MA", "STD", "STDDEV", "TS_MAX",
+    "TS_MAX", "CORR", "ABS", "RETURNS", "np", "numpy",
+}
+
+
+def _code_only(src: str) -> str:
+    """去掉注释与字符串字面量，只留代码 token（避免把文档里描述的坏模式误报）。"""
+    try:
+        toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
+    except Exception:
+        return src
+    return " ".join(t.string for t in toks
+                    if t.type not in (tokenize.COMMENT, tokenize.STRING))
+
+
+def python_candidate_check(py_path: Path) -> dict:
+    """Python 合成因子候选（`name ~ file.py ~ dir`）的提交前检查：存在性 + 语法 + 未定义名。"""
+    if not py_path.exists():
+        return dict(ok=False, notes=[f"Python 文件不存在: {py_path}"])
+    source = py_path.read_text(encoding="utf-8")
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        return dict(ok=False, notes=[f"Python 语法错误: {exc}"])
+    defined = set(dir(builtins))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            defined.add(node.name)
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            defined.add(node.id)
+        elif isinstance(node, ast.arg):
+            defined.add(node.arg)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            defined.add(node.name)
+    loads = {n.id for n in ast.walk(tree)
+             if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    unknown = sorted(n for n in loads if n not in defined and n not in PY_OP_ALLOW)
+    notes = []
+    if unknown:
+        notes.append("未定义名（平台会 NameError）: " + "|".join(unknown))
+    # --- 2026-09-29 增补：未来泄漏静态模式（pythonindex1 教训）-------------------
+    # 平台 Python 索引固定 [date, symbol]（level 0 = 日期）。历史事故：
+    # `str(v)[:4].isdigit()` 兜底把 "000001.SZ" 误判为日期层 → 按股票全样本 z-score
+    # （均值/标准差/分位用整段回测窗口，含未来）→ 平台净超额 20.3% 虚高到 46.7%。
+    code = _code_only(source)
+    leak = []
+    if re.search(r"isdigit\(\s*\)", code) and "get_level_values" in code:
+        leak.append("用取值格式探测索引层（str(...).isdigit）——会把 symbol 误判为日期层")
+    if re.search(r"groupby\(\s*level\s*=\s*1\s*\)", code) or \
+       re.search(r"groupby\(\s*(level\s*=\s*)?[\"']symbol[\"']\s*\)", code):
+        leak.append("按 level=1/symbol 层 groupby——平台 [date, symbol] 下非 0 层是股票，"
+                    "全样本 mean/std/quantile 即未来泄漏")
+    if leak:
+        notes.append("⚠ 泄漏风险: " + "；".join(leak)
+                     + " → 改为逐日截面 groupby(level=0)，并跑 scripts/repaint_check.py")
+    return dict(ok=not unknown and not leak, notes=notes)
 
 
 def main() -> int:
@@ -174,8 +278,9 @@ def main() -> int:
         print(__doc__); return 2
     path = Path(args[0])
     ops = load_platform_ops()
+    known_fields = load_known_fields()
     print(f"候选文件: {path}")
-    print(f"平台算子名: {len(ops)}\n")
+    print(f"平台算子名: {len(ops)}；已知字段名: {len(known_fields)}\n")
     rows = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
@@ -183,21 +288,45 @@ def main() -> int:
         parts = [p.strip() for p in line.split("~")]
         name, formula = parts[0], parts[1]
         direction = parts[2] if len(parts) > 2 else "?"
-        rows.append(analyze(name, formula, ops) | {"direction": direction})
+        if formula.lower().endswith(".py"):
+            py = Path(formula)
+            if not py.is_absolute():
+                py = path.parent / py
+            rows.append({"name": name, "formula": formula, "kind": "python",
+                         "direction": direction, **python_candidate_check(py)})
+            continue
+        rows.append(analyze(name, formula, ops, known_fields) | {"direction": direction})
     print(f"{'cand':30s} {'撞名':>6s} {'脆弱':>6s} {'估计量级':>10s} {'建议k':>6s} {'费用':>5s}  备注")
     for r in rows:
+        if r.get("kind") == "python":
+            print(f"{r['name']:30s} python合成  {'OK' if r['ok'] else 'FAIL'}  {'; '.join(r['notes'])}"
+                  f"  （费用按平台运行时长计档；池合成实测约 6.0/条）")
+            continue
         note = []
         if r["needs_scale"]:
             note.append(f"需前置 POWER(10,{r['k']})")
         if r["fragile"]:
             note.append("方向必须实测")
+        if r["local_ops"]:
+            note.append("算子名不在平台表: " + "|".join(r["local_ops"]))
+        if r["unknown_ops"]:
+            note.append("算子名不在平台表: " + "|".join(r["unknown_ops"]))
+        if r["unknown_fields"]:
+            note.append("字段不在平台字段表: " + "|".join(r["unknown_fields"]))
         print(f"{r['name']:30s} {('有' if r['collisions'] else '无'):>6s} "
               f"{('有' if r['fragile'] else '无'):>6s} {r['est']:>10.3g} {r['k']:>6d} {r['cost']:>5.1f}  {'; '.join(note)}")
         if r["collisions"]:
             print(f"     ⚠ 裸字段与平台算子撞名: {r['collisions']} → 改用算子形式或换字段")
         if r["fragile"]:
             print(f"     ⚠ 分母含相关系数/有符号近零字段（{','.join(r['fragile'])}）→ 平台排序/方向不可预测，优先替换、方向必须实测")
-    total = sum(r["cost"] for r in rows)
+        if r["local_ops"]:
+            sugg = "; ".join(f"{o}→{LOCAL_TS_ALIASES[o]}" for o in r["local_ops"])
+            print(f"     ⚠ 本地算子名不在平台算子表（{sugg}）→ 直接提交会 run failed，先换名")
+        if r["unknown_ops"]:
+            print(f"     ⚠ 算子名不在平台算子表: {r['unknown_ops']} → 直接提交会 run failed（变量未定义）")
+        if r["unknown_fields"]:
+            print(f"     ⚠ 字段不在平台字段表: {r['unknown_fields']} → Missing required base factors，先换字段/表达式")
+    total = sum(r.get("cost", 0.0) for r in rows)
     print(f"\n预估费用: {total:.1f} 算力（{len(rows)} 条）")
     return 0
 

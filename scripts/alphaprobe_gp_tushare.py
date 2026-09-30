@@ -110,6 +110,48 @@ ALIGNED_GROUPS = ALIGNMENT_GROUPS
 ALIGNED_ROUND_TRIP_COST = ALIGNMENT_ROUND_TRIP_COST
 ALIGNED_CANDIDATE_RANK_CORR_THRESHOLD = 0.999
 ALIGNED_DRAWDOWN_CANDIDATE_RANK_CORR_THRESHOLD = 0.90
+
+# --- 席位场景目标（seat_scenario）：加席 + 5 种换席，取最优 ---
+# A 段结构性（官方汇率 + 本地 uplift）+ B 段稳态（官方 0.01NB 汇率，不乘 uplift），
+# C 段用 46 个候选账本回归出的换手惩罚代理。三段账依据：e-decomp-20260928。
+SEAT_SCENARIO_MEAN_S_LOCAL = 0.019121
+SEAT_SCENARIO_UPLIFT = 0.025892808090325757 / 0.019121
+SEAT_SCENARIO_SEATS = {
+    "size_only": 0.00881,
+    "impact60": 0.01761,
+    "t10_size_plus_impact_bm": 0.06061,
+    "book_to_market_lf_minus_size": 0.02274,
+    "book_to_market_lf_plus_impact": 0.02317,
+}
+SEAT_SCENARIO_B_PTS_PER_RAW = 15400.0 / 0.06
+SEAT_SCENARIO_C_TURNOVER = -12000.0
+SEAT_SCENARIO_C_TURNOVER_FLOOR = 0.13
+SEAT_SCENARIO_CORR_FREE = 0.40
+SEAT_SCENARIO_CORR_PENALTY = 20000.0
+
+
+def seat_scenario_fitness(s_i: float, turnover: float) -> float:
+    """max over {append, swap x5} of (A+B 段分 + C 段纯换手惩罚代理)。
+
+    2026-09-28 修订 1：去掉截距（旧版零信号候选可拿 +1615 底分，GP 学会刷
+    "零信号+极低换手"假高分）；换手惩罚只在标定观测区间 (turn>FLOOR) 内线性生效。
+    2026-09-28 修订 2（三段账）：补回 B 段稳态分（15400/0.06 per raw unit，
+    append 除以 6、swap 除以 5，不乘 uplift）。此前只算 A+C 两段，B 段缺席
+    导致 46 条真实账本上 H01/M07/H03/H04/VV6_MIX500 被误杀；三段目标下
+    λ=12000 的评分-账本 spearman +0.955（两段口径 +0.862）。
+    """
+
+    a6 = 44000.0 * 0.20 / (6 * 0.08) * SEAT_SCENARIO_UPLIFT
+    a5 = 44000.0 * 0.20 / (5 * 0.08) * SEAT_SCENARIO_UPLIFT
+    b6 = SEAT_SCENARIO_B_PTS_PER_RAW / 6.0
+    b5 = SEAT_SCENARIO_B_PTS_PER_RAW / 5.0
+    c_pts = SEAT_SCENARIO_C_TURNOVER * max(
+        turnover - SEAT_SCENARIO_C_TURNOVER_FLOOR, 0.0
+    )
+    best = (a6 + b6) * (s_i - SEAT_SCENARIO_MEAN_S_LOCAL) + c_pts
+    for seat_s in SEAT_SCENARIO_SEATS.values():
+        best = max(best, (a5 + b5) * (s_i - seat_s) + c_pts)
+    return float(best)
 ALIGNED_MIN_PERIODS = 200
 ALIGNED_ABSOLUTE_DD_TARGET = 0.30
 ALIGNED_EXCESS_DD_TARGET = 0.15
@@ -812,6 +854,21 @@ class AlignedNetExcessContext:
             device=data.device,
         )
 
+        # Size axis for the seat-scenario anti-cheat term: log(total_mv) on the
+        # same evaluation-date x stock grid as candidate factor panels.
+        size_indexed = indexed["total_mv"].unstack("instrument")
+        size_indexed = size_indexed.reindex(index=self.calendar, columns=self.stock_ids)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            size_values = np.log(size_indexed.to_numpy(dtype=np.float64))
+        size_panel = np.full(
+            (len(data._evaluation_dates), len(self.stock_ids)), np.nan, dtype=np.float32
+        )
+        for calendar_position, date in enumerate(self.calendar):
+            position = evaluation_positions.get(pd.Timestamp(date))
+            if position is not None:
+                size_panel[position] = size_values[calendar_position]
+        self._size_panel = torch.tensor(size_panel, dtype=torch.float32, device=data.device)
+
     def _selected_indices(
         self,
         start_date: pd.Timestamp | None,
@@ -993,6 +1050,22 @@ class AlignedNetExcessContext:
             "s_i": s_i,
             "direction": direction,
         }
+
+    def size_corr(self, factor: torch.Tensor) -> float | None:
+        """Mean daily Spearman corr between factor and the size axis (log total_mv)."""
+        if factor.ndim != 2:
+            return None
+        indices = self._selected_indices(None, None)
+        if not indices:
+            return None
+        data_positions = [self.signal_data_positions[index] for index in indices]
+        factor_rows = factor[data_positions]
+        size_rows = self._size_panel[data_positions]
+        series = batch_spearmanr_linear(factor_rows, size_rows)
+        series = series[torch.isfinite(series)]
+        if series.numel() == 0:
+            return None
+        return float(series.mean().detach().item())
 
 
 def finite_as_nan(value: torch.Tensor) -> torch.Tensor:
@@ -1379,8 +1452,11 @@ def run_aligned_net_excess(
     risk_control = args.objective == "aligned_net_excess_drawdown"
     ic_efficiency = args.objective == "aligned_ic_efficiency"
     ic_frontier = args.objective == "aligned_ic_frontier"
-    size_neutral = args.objective == "aligned_size_neutral_net"
-    ic_objective = ic_efficiency or ic_frontier
+    seat_scenario = args.objective == "seat_scenario"
+    size_neutral = args.objective == "aligned_size_neutral_net" or (
+        seat_scenario and bool(getattr(args, "seat_size_neutral", False))
+    )
+    ic_objective = ic_efficiency or ic_frontier or seat_scenario
     if args.universe.lower() != "full_a":
         raise ValueError("--objective aligned_net_excess requires --universe full_a")
     if args.universe_limit is not None:
@@ -1590,17 +1666,29 @@ def run_aligned_net_excess(
         """Convert aligned metrics into the GP's scalar search fitness."""
         net_excess = stats.get("net_excess")
         periods = int(stats.get("periods") or 0)
+        # seat_scenario 的合法分可低至 -1.2e4，不可评分公式必须被压到其下，
+        # 否则 GP 会优先演化 periods<min 的低覆盖垃圾（-6 > -262 的倒挂）。
+        unscored = -1e6 if seat_scenario else (-6.0 if ic_efficiency else -1.0)
         if net_excess is None or periods < args.aligned_min_periods:
-            return -6.0 if ic_efficiency else -1.0
+            return unscored
         if ic_objective:
             turnover = stats.get("turnover")
             s_i = stats.get("s_i")
             if turnover is None or s_i is None:
-                return -6.0
+                return unscored
             turnover = float(turnover)
             s_i = float(s_i)
             if not np.isfinite(turnover) or not np.isfinite(s_i):
-                return -6.0
+                return unscored
+            if seat_scenario:
+                score = seat_scenario_fitness(s_i, turnover)
+                corr_size = stats.get("corr_size")
+                if corr_size is not None and np.isfinite(float(corr_size)):
+                    score -= SEAT_SCENARIO_CORR_PENALTY * max(
+                        abs(float(corr_size)) - SEAT_SCENARIO_CORR_FREE, 0.0
+                    )
+                stats["seat_scenario_fitness"] = score
+                return score
             stats["turnover_cap_pass"] = int(turnover <= args.aligned_turnover_cap)
             stats["net_floor_pass"] = int(float(net_excess) >= args.aligned_net_floor)
             stats["efficiency"] = s_i / max(turnover, 0.02)
@@ -1653,7 +1741,7 @@ def run_aligned_net_excess(
         formula = str(np.asarray(formula_values, dtype=object).reshape(-1)[0])
         if formula in cache:
             return cache[formula]
-        invalid_score = -9.0 if ic_objective else -1.0
+        invalid_score = -1e6 if seat_scenario else (-9.0 if ic_objective else -1.0)
         try:
             expression = evaluate_formula(formula, namespace)
             if not bool(getattr(expression, "is_featured", False)):
@@ -1679,6 +1767,10 @@ def run_aligned_net_excess(
                     stats = context.score(factor)
                     if ic_objective:
                         stats.update(context.ic_series_stats(factor))
+                    if seat_scenario:
+                        corr_size = context.size_corr(factor)
+                        if corr_size is not None:
+                            stats["corr_size"] = corr_size
                 cache_stats[formula] = stats
                 score = fitness_for_stats(stats)
         except Exception as exc:  # Invalid generated expressions are terminal candidates.
@@ -1734,6 +1826,7 @@ def run_aligned_net_excess(
             "ic_periods": stats.get("ic_periods"),
             "ic_direction": stats.get("direction"),
             "s_i": stats.get("s_i"),
+            "corr_size": stats.get("corr_size"),
             "efficiency": stats.get("efficiency"),
             "turnover_cap_pass": stats.get("turnover_cap_pass"),
             "net_floor_pass": stats.get("net_floor_pass"),
@@ -1776,7 +1869,7 @@ def run_aligned_net_excess(
         generations=args.generations,
         init_depth=(2, 6),
         tournament_size=args.tournament_size,
-        stopping_criteria=1.0,
+        stopping_criteria=1e12 if seat_scenario else 1.0,
         p_crossover=0.3,
         p_subtree_mutation=0.1,
         p_hoist_mutation=0.01,
@@ -2364,6 +2457,7 @@ def build_parser() -> argparse.ArgumentParser:
             "aligned_ic_efficiency",
             "aligned_ic_frontier",
             "aligned_size_neutral_net",
+            "seat_scenario",
         ],
         default="ic",
         help=(
@@ -2374,6 +2468,11 @@ def build_parser() -> argparse.ArgumentParser:
             "aligned_size_neutral_net maximises cost-adjusted net excess after "
             "demeaning each cross-section inside total_mv percentile buckets"
         ),
+    )
+    parser.add_argument(
+        "--seat-size-neutral",
+        action="store_true",
+        help="seat_scenario 目标下先按 total_mv 分桶去均值再评分（防 size 刷分）",
     )
     parser.add_argument(
         "--aligned-size-buckets",
@@ -2612,6 +2711,7 @@ def main() -> int:
         "aligned_ic_efficiency",
         "aligned_ic_frontier",
         "aligned_size_neutral_net",
+        "seat_scenario",
     }:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)
     calendar = load_trade_dates(cache_root)

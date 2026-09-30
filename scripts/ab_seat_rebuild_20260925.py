@@ -12,6 +12,7 @@ handoff_20260924 列为需直拷或重建的缓存）。本脚本只重建 A/B �
 """
 from __future__ import annotations
 
+import argparse
 import gc
 import io
 import json
@@ -88,6 +89,15 @@ def seat_specs() -> list[dict]:
 
 
 def main() -> int:
+    global OUT, CACHE, VALIDATION
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out", type=Path, default=None,
+                        help="output directory (default: ab-batch-20260925)")
+    args = parser.parse_args()
+    if args.out is not None:
+        OUT = args.out
+        CACHE = OUT / "seat_panels_rebuilt.pkl"
+        VALIDATION = OUT / "seat_rebuild_validation.csv"
     OUT.mkdir(parents=True, exist_ok=True)
     specs = seat_specs()
     for spec in specs:
@@ -192,7 +202,7 @@ def main() -> int:
         raw=raw,
         pool_summary=pool_summary,
         provenance=dict(
-            rebuilt_on="local D:/factor (15.4 GB RAM machine)",
+            rebuilt_on=f"local {sys.platform} python{sys.version_info.major}.{sys.version_info.minor}",
             source_catalog=str(CATALOG.relative_to(ROOT)),
             source_rule_version=json.loads(CATALOG.read_text(encoding="utf-8"))["settings"].get(
                 "alignment_rule_version"

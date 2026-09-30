@@ -57,10 +57,13 @@ def main() -> int:
         path = ROOT / entry["path"]
         expected_size = int(entry.get("size_bytes", -1))
         expected_sha = entry.get("sha256")
+        optional = bool(entry.get("optional"))
         if not path.exists():
-            print(f"MISSING  {entry['path']}")
+            tag = "MISSING (optional)" if optional else "MISSING"
+            print(f"{tag}  {entry['path']}")
             print(f"         rebuild: {entry.get('rebuild', 'n/a')}")
-            failures.append(entry["path"])
+            if not optional:
+                failures.append(entry["path"])
             continue
         actual_size = path.stat().st_size
         if expected_size >= 0 and actual_size != expected_size:
@@ -85,7 +88,7 @@ def main() -> int:
     if failures:
         print(f"{len(failures)}/{len(entries)} 项需要处理：先拷贝或重建，再重跑本脚本。")
         return 1
-    print(f"全部 {len(entries)} 项与旧机一致。")
+    print(f"全部 {len(entries)} 项通过（optional 条目缺失只提示）。")
     return 0
 
 
