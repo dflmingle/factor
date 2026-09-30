@@ -91,11 +91,27 @@
       "rebuild": "POOL_SCREEN_OUT=research_reports/platform_alignment/pool-screen-20260921 python scripts/screen_competition_pool_20260921.py",
       "rebuild_notes": "当前脚本默认指向 pool-screen-20260921（旧目录）；qualitygate3 版本靠 POOL_SCREEN_OUT 指定，见第 1 条",
       "used_by": []
+    },
+    {
+      "path": "research_reports/platform_alignment/ab-batch-20260925/seat_panels_rebuilt.pkl",
+      "content": "现役 5 席的 Z 分数面板 + 10 日信号帧 + 前向收益（Windows 机为绕开 228 MB 大缓存而重建的精简缓存）",
+      "rebuild": "python scripts/ab_seat_rebuild_20260925.py",
+      "rebuild_notes": "需要 signals.pkl 之外的全 A qfq/daily_basic/financial 缓存；Windows 机实测约 71.5 MB",
+      "optional": true,
+      "used_by": [
+        "scripts/ab_batch_20260925.py",
+        "scripts/agg_validate_20260926.py",
+        "scripts/pending4_seat_eval_20260926.py",
+        "scripts/turnover_relaxed_pool_sim_20260926.py",
+        "scripts/_inspect_rebuilt.py",
+        "scripts/_patch_abbatch.py"
+      ]
     }
   ],
   "not_included_here": [
     "quantlab/.quantlab/cache（约 4.5 GB 的行情/财务缓存）：其中约 0.8 GB 走 Git LFS 快照 data/local_recheck/factor-local-recheck-data.tar.gz，按 CONTINUE.md 第 2 节导入",
     "~/.pandaai（平台 token）：只在本机，新机必须重新登录",
     "quantlab 子模块的本地脏改动：未提交、未交接，新机 clone 到的是纯净的 9cd90d4"
-  ]
+  ],
+  "checker_note": "optional=true 的条目缺失只提示，不计入失败（各机按需重建）"
 }

@@ -1,0 +1,30 @@
+seat size_only                        dir=0 name=SIZE-ONLY-20260911 plat_net=21.43 quality=aligned
+seat impact60                         dir=1 name=H03-T10-SINGLE plat_net=16.44 quality=aligned
+seat t10_size_plus_impact_bm          dir=1 name=T10-ADD-BM-20260911 plat_net=18.09 quality=aligned
+seat book_to_market_lf_minus_size     dir=1 name=VERIFY10-E260910-04 plat_net=16.74 quality=aligned
+seat book_to_market_lf_plus_impact    dir=1 name=VERIFY10-F260910-12 plat_net=15.05 quality=aligned
+signal dates 2021-09-07..2026-08-10 (120)
+loading full-A panel
+panel rows 8584574 signal rows 552290
+/data/games/factor_/scripts/positive_factor_local_compare.py:1415: FutureWarning: The previous implementation of stack is deprecated and will be removed in a future version of pandas. See the What's New notes for pandas 2.1.0 for details. Specify future_stack=True to adopt the new implementation and silence this warning.
+  current = current.stack(dropna=False).rename("current_close").reset_index()
+/data/games/factor_/scripts/positive_factor_local_compare.py:1419: FutureWarning: The previous implementation of stack is deprecated and will be removed in a future version of pandas. See the What's New notes for pandas 2.1.0 for details. Specify future_stack=True to adopt the new implementation and silence this warning.
+  future = future.stack(dropna=False).rename("future_close").reset_index()
+/data/games/factor_/scripts/financial_factor_local.py:370: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  frame = pd.concat(frames, ignore_index=True)
+  built size_only                        finite_share=1.0000
+  built impact60                         finite_share=0.9842
+  built t10_size_plus_impact_bm          finite_share=0.8516
+  built book_to_market_lf_minus_size     finite_share=0.9991
+  built book_to_market_lf_plus_impact    finite_share=0.9833
+/home/minkefu/.conda/envs/ktransformers/lib/python3.11/site-packages/numba/np/ufunc/parallel.py:373: NumbaWarning: [1mThe TBB threading layer requires TBB version 2021 update 6 or later i.e., TBB_INTERFACE_VERSION >= 12060. Found TBB_INTERFACE_VERSION = 12050. The TBB threading layer is disabled.[0m
+  warnings.warn(problem)
+                          key                name  direction  platform_net_excess_pct  local_net_excess_pct  delta_pp  turnover_pct  sharpe_after_cost  max_drawdown_pct  rank_ic    ic_ir  periods  reference
+                    size_only  SIZE-ONLY-20260911          0                21.433288             21.774511  0.341223      8.637495           1.005530         33.209677 0.055990 0.274423      120  21.433288
+                     impact60      H03-T10-SINGLE          1                16.443256             18.098939  1.655683     10.539783           0.991254         28.172298 0.066253 0.369588      120  16.443256
+      t10_size_plus_impact_bm T10-ADD-BM-20260911          1                18.092280             19.610250  1.517970     30.066833           1.015134         24.517923 0.120322 0.431562      120  18.092280
+ book_to_market_lf_minus_size VERIFY10-E260910-04          1                16.740680             17.461521  0.720841      9.720104           0.970683         27.163410 0.079320 0.300922      120  16.740680
+book_to_market_lf_plus_impact VERIFY10-F260910-12          1                15.046176             16.654615  1.608439      9.449185           0.991835         23.480436 0.079171 0.311362      120  15.046176
+pool: net=23.78 turnover=14.28 sharpe=1.1304 maxdd=27.42 rankIC=0.0940 icIR=0.3716
+pool reference {'net_excess_pct': 20.3, 'turnover_pct': 13.39, 'sharpe_after_cost': 1.0648, 'max_drawdown_pct': 31.64, 'rank_ic': 0.0919, 'ic_ir': 0.3675, 'record': 'F-P260922-08'}
+written: research_reports/platform_alignment/ab-batch-20260929/seat_panels_rebuilt.pkl (68.9 MB)
