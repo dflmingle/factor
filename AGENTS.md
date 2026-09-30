@@ -15,6 +15,12 @@
 - 统一使用约定的 5 年回测窗口；不运行几个月的短窗口试跑。
 - 回测完成后先报告结果，不因结果好坏自动继续挖掘或回测。
 
+## Python 合成因子（提交前防未来泄漏）
+
+- 平台 Python 运行时索引固定为 `[date, symbol]`（level 0 = 日期、level 1 = 股票）。禁止用取值格式（如 `str(v)[:4].isdigit()`）探测索引层；禁止对个股做整段回测窗口的全样本标准化（`mean/std/quantile`）——2026-09-28/29 池合成收益虚高（净 20.30%→46.72%）即此因。时序统计只允许 `rolling/expanding` 等因果窗口。
+- 任何 `--mode python` 候选提交前必须：`python scripts/platform_precheck.py <batch>` 通过，且对每个 .py 跑 `python3 scripts/repaint_check.py <candidate.py>`（截断重算；历史值有差异即泄漏，禁止提交）。
+- 审计与泄漏归因见 `research_reports/platform_alignment/python-composite-audit-20260929/summary.md` 与 `research_reports/platform_alignment/lookahead-attrib-20260929/summary.md`。
+
 ## 跨电脑继续
 
 - 优先使用仓库内的 `vendor/skill-pandaai-factor-online/SKILL.md` 和 `python scripts/pandaai.py ...`；不要依赖某台机器的绝对 Skill 路径。
