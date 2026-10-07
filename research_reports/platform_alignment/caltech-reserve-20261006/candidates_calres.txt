@@ -1,0 +1,13 @@
+# 技术目录族（CAL）平台 s_i 校准——第 3 阶段：未测腿储备（2026-10-06，待用户批准）
+# 窗口 20210907..20260907, cycle 10, 10 组, 0.30% 单边；方向 1（负向已内嵌 0-(...)）
+# 目的：把 CAL 族里「已有本地 s_i、但从未上过平台」的腿一次校准完，作为池重构（唯一能点亮 NB 段的路径）的席位储备。
+#       本批字段/算子 100% 复用 2026-10-03 已平台跑通的表达式（无新字段，零 10068 风险）。
+# 本地 s_i（caltech-20261003/cand_summary_direct.csv；CAL 族平台/本地转移比 1.01~1.05）：
+#   CT-COMP-ACTIVITY   .0477（4 腿：amt_std20/amt_ma20/vol_std10/vol_std20）
+#   CT-COMP-TURNOVER   .0257（4 腿：tor_ratio10_120/vol5/vol10/vol3）
+#   CT-VOL-STD10       .0250（单腿；唯一 dNC 为正 +.0073 / dC +145 的腿）
+# 备选（本批未用，留给下一轮）：CT-AMT-MA20 .0407（单腿，加席 dComb_poolrule +70）。
+# 顺带裁决：若 CT-VOL-STD10 平台 s_i 站得住且换手低，它同时是「加第 6 席」候选（C 侧不赔）。
+CT-COMP-ACTIVITY-20261006 ~ 0.25*RANK(0-CAL_20D_AMT_STD) + 0.25*RANK(0-CAL_20D_AMT_MA) + 0.25*RANK(0-CAL_10D_VOL_STD) + 0.25*RANK(0-CAL_20D_VOL_STD) ~ 1
+CT-COMP-TURNOVER-20261006 ~ 0.25*RANK(0-CAL_10D_120D_TURNOVER_RATIO) + 0.25*RANK(0-MA(TURNOVER,5)) + 0.25*RANK(0-MA(TURNOVER,10)) + 0.25*RANK(0-MA(TURNOVER,3)) ~ 1
+CT-VOL-STD10-20261006 ~ 0 - CAL_10D_VOL_STD ~ 1
