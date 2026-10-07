@@ -50,3 +50,16 @@ factor_id `6abc8f17812a2a13b964559e`，run_id `6abc8f1745ce44aed9d16083`（raw �
 3. 决策规则未走完的检查：**池级 size 中性化净额**前后对比（规则②）尚未做；本地只有候选自身 corr_size −0.41。
 4. 若执行：10-01~03 是换人窗口（B 未累积，删除席历史价值≈0）；1 换 1 保持 ≥5 席。
 5. 附：本次顺带修正 `e_decomp_direct` 的 `seat_si` 字典（impact60 与 bm_plus 两值写反，影响换席 ΔA 约 90 分/月）。
+
+## 四、规则②补测（2026-10-03，本地零平台算力）：**PASS**
+
+- 场景：−VERIFY10-F +LAMD10-K5V2（与本文平台实测同配置）。
+- 口径：`pool_size_guard_20260924` 同款指标（20 桶、桶内去均值、top-decile、0.30% 单边、cycle 10；
+  corr_size = 日频秩相关均值）。
+- 结果：corr_size **0.842 → 0.829（−0.0133）**；size 中性化净额 **+4.58% → +5.12%（+0.54pp）**；
+  两项判据均改善（规则②要求：净额不降、corr_size 不升）⇒ **PASS**。
+- 数据源：本机重建席位集 `../ab-batch-20260925/seat_panels_rebuilt.pkl`（canonical signals/built pkl 本机缺失，
+  该重建集池级 net 20.66 vs 平台 20.30）+ `../e-decomp-20260929/panels_cache.pkl`（K5V2 复合 =
+  legmix 定义，与提交版 `seat_lamd10k5` 公式核对一致）；窗口 2021-09-07..2026-08-10（120 期）。
+- 锚点：canonical 09-24 守卫基线 corr_size .837 / 中性净额 4.97% ↔ 重建集基线 .842 / 4.58%，量级吻合。
+- 明细：`rule2_size_guard_20261003.json`。⇒ 换席候选①~④门槛全部齐备；执行决策待 10 月末 rc 校准（11-01~03 窗口）。
