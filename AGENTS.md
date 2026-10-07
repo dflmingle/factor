@@ -33,6 +33,10 @@
 - 启动脚本可以安装 CLI、运行预检并引导交互式登录；启动阶段不得自动创建因子或运行回测。
 - 启动完成后报告环境状态，等待用户指定研究任务。
 
+## 输出约定
+
+- 报告类 Markdown 与相关产物一律放在仓库内（如 `research_reports/` 下），不要写到桌面或仓库外路径。
+
 ## 本地复现对齐契约
 
 - 任何 PandaAI 因子的本地复现，包括新因子，都必须先读取 [`research_reports/platform_alignment/ALIGNMENT_RULES.md`](research_reports/platform_alignment/ALIGNMENT_RULES.md) 和 [`scripts/platform_alignment_rules.py`](scripts/platform_alignment_rules.py)。规则版本当前为 `full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate1`。
