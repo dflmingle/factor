@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import mimetypes
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -17,7 +20,8 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 SUPPORTED_SUFFIXES = {".md", ".markdown", ".mdown", ".mkdn", ".txt"}
 DEFAULT_PORT = 8765
-SERVER_TAG = "markdown-reader/1.1"
+SERVER_TAG = "markdown-reader/1.2"
+MAX_WRITE_BYTES = 10 * 1024 * 1024
 SCRIPT_DIR = Path(__file__).resolve().parent
 DESKTOP_HTML = Path.home() / "Desktop" / "Markdown阅读器.html"
 FALLBACK_HTMLS = (SCRIPT_DIR / "markdown_reader_ui.html",)
@@ -70,12 +74,12 @@ def decode_markdown(raw: bytes) -> str:
 
 
 class ReaderHandler(BaseHTTPRequestHandler):
-    server_version = "MarkdownReader/1.1"
+    server_version = "MarkdownReader/1.2"
 
     def end_headers(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Markdown-Reader")
         super().end_headers()
 
     def do_OPTIONS(self) -> None:  # noqa: N802
@@ -101,7 +105,39 @@ class ReaderHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/read":
             self.read_markdown(parse_qs(parsed.query).get("path", [""])[0])
             return
+        if parsed.path == "/api/asset":
+            self.read_asset(parse_qs(parsed.query).get("path", [""])[0])
+            return
         self.send_error(404, "Not found")
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlsplit(self.path)
+        if parsed.path != "/api/write":
+            self.send_error(404, "Not found")
+            return
+        origin = self.headers.get("Origin", "")
+        allowed_origin = (
+            not origin
+            or origin == "null"
+            or origin.startswith("http://127.0.0.1:")
+            or origin.startswith("http://localhost:")
+        )
+        if not allowed_origin or self.headers.get("X-Markdown-Reader") != "1":
+            self.send_json(403, {"error": "拒绝非本地阅读器的写入请求"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > MAX_WRITE_BYTES:
+            self.send_json(400, {"error": "保存内容为空或超过 10 MB"})
+            return
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(400, {"error": "保存请求格式不正确"})
+            return
+        self.write_markdown(payload.get("path", ""), payload.get("content"))
 
     def read_markdown(self, raw_path: str) -> None:
         if not raw_path:
@@ -129,6 +165,67 @@ class ReaderHandler(BaseHTTPRequestHandler):
                 "content": content,
             },
         )
+
+    def read_asset(self, raw_path: str) -> None:
+        """读取 Markdown 引用的本地图片等资源。路径由用户在阅读器中明确打开。"""
+        if not raw_path:
+            self.send_json(400, {"error": "缺少 path 参数"})
+            return
+        path = local_path(raw_path)
+        try:
+            if not path.is_file():
+                raise FileNotFoundError
+            payload = path.read_bytes()
+        except OSError:
+            self.send_json(404, {"error": f"无法读取资源：{path}"})
+            return
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def write_markdown(self, raw_path: str, content: object) -> None:
+        if not raw_path or not isinstance(content, str):
+            self.send_json(400, {"error": "缺少文件路径或正文"})
+            return
+        path = local_path(raw_path)
+        if path.suffix.lower() not in SUPPORTED_SUFFIXES:
+            self.send_json(400, {"error": "只允许保存 Markdown 或纯文本文件"})
+            return
+        temp_name = None
+        try:
+            if not path.is_file():
+                raise FileNotFoundError
+            payload = content.encode("utf-8")
+            if len(payload) > MAX_WRITE_BYTES:
+                self.send_json(400, {"error": "文件超过 10 MB，无法保存"})
+                return
+            with tempfile.NamedTemporaryFile(
+                mode="wb", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+            ) as temp_file:
+                temp_name = temp_file.name
+                temp_file.write(payload)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.replace(temp_name, path)
+            stat = path.stat()
+        except OSError as exc:
+            if temp_name:
+                try:
+                    Path(temp_name).unlink(missing_ok=True)
+                except OSError:
+                    pass
+            self.send_json(500, {"error": f"保存失败：{exc}"})
+            return
+        self.send_json(200, {
+            "ok": True,
+            "path": str(path),
+            "size": stat.st_size,
+            "lastModified": int(stat.st_mtime * 1000),
+        })
 
     def send_file(self, path: Path, content_type: str) -> None:
         try:

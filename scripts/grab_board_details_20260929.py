@@ -6,6 +6,10 @@
 用法：python3 scripts/grab_board_details_20260929.py \
         --board research_reports/platform_alignment/board-20260928/board_live.json \
         --out research_reports/platform_alignment/board-details-20260929
+
+注意（2026-10-04 补充）：平台 `/arenaRanking/players/{pid}` 按周期分页。
+不带参数时返回"当前周期"（新月份尚无数据时明细为空列表）；
+要抓历史月份必须传 `--period`，例如 `--period 2026-09`。
 """
 import argparse
 import csv
@@ -34,6 +38,8 @@ def main() -> None:
     ap.add_argument("--board", default="research_reports/platform_alignment/board-20260928/board_live.json")
     ap.add_argument("--out", default="research_reports/platform_alignment/board-details-20260929")
     ap.add_argument("--sleep", type=float, default=0.12)
+    ap.add_argument("--period", default=None,
+                    help="榜单周期（如 2026-09）；缺省不带参数=平台当前周期")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(CONFIG))
@@ -49,8 +55,11 @@ def main() -> None:
     factor_rows: list[dict] = []
     for i, r in enumerate(rows, 1):
         pid = r["participant_id"]
+        path = f"/arenaRanking/players/{pid}"
+        if args.period:
+            path += f"?period={args.period}"
         try:
-            data = get_one(gateway, f"/arenaRanking/players/{pid}", token, uid)["data"]
+            data = get_one(gateway, path, token, uid)["data"]
         except Exception as exc:  # noqa: BLE001 - 只读抓取，失败跳过
             print(f"[{i}/{len(rows)}] {str(r.get('display_name'))[:16]} FAILED {type(exc).__name__}: {exc}")
             time.sleep(args.sleep)
