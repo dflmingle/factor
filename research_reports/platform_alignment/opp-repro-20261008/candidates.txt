@@ -1,0 +1,6 @@
+# 目标：复现榜单未闭合的近邻目标（Lavine X 的 G17/E13 族、wesleywu 的 ks91-acf-3y）
+# 构造来源：opp-halfcenter-20260928/matches_top.csv（cycle10 / label 1+10 口径的最小距离混权，平台安全窗口）
+# 本地三元组：g17rep .1079/.834/.765 s_i .0688 | e13rep .1029/.816/.773 s_i .0650 | ks91rep .1011/.713/.706 s_i .0509
+g17rep-amt60xrelT5252-w30 ~ 0.3*RANK(0-MA(AMOUNT,60))+0.7*(1-RANK(MA(TURNOVER,5)/MA(TURNOVER,252))) ~ 1
+e13rep-amihud20xrelT5252-w25 ~ 0.25*RANK(MA(ABS(RETURNS(CLOSE,1))/AMOUNT,20))+0.75*(1-RANK(MA(TURNOVER,5)/MA(TURNOVER,252))) ~ 1
+ks91rep-intr60xrelT5252-w45 ~ 0.45*RANK(0-MA((CLOSE-OPEN)/OPEN,60))+0.55*(1-RANK(MA(TURNOVER,5)/MA(TURNOVER,252))) ~ 1
