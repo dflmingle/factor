@@ -56,6 +56,20 @@ def corr_in_denominator(tree: ast.AST) -> list[str]:  # noqa: F811 - 覆盖上�
     return sorted(set(tags))
 
 
+def board_collision(name: str, board_names: set[str], board_norm: dict[str, set[str]]) -> list[str]:
+    """因子展示名与榜单席位名的撞名检查（2026-10-08：提交名前必须清单）。"""
+    if not board_names:
+        return []
+    hits: list[str] = []
+    if name in board_names:
+        hits.append("原样与榜单席位名相同")
+    from board_name_guard import normalize  # 同目录脚本
+    fuzzy = sorted(board_norm.get(normalize(name), set()) - {name})
+    if fuzzy:
+        hits.append("归一化后与榜单重名: " + "|".join(fuzzy[:3]))
+    return hits
+
+
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
@@ -279,8 +293,17 @@ def main() -> int:
     path = Path(args[0])
     ops = load_platform_ops()
     known_fields = load_known_fields()
+    board_names: set[str] = set()
+    board_norm: dict[str, set[str]] = {}
+    try:
+        from board_name_guard import load_board_names, normalize
+        board_names = load_board_names()
+        for b in board_names:
+            board_norm.setdefault(normalize(b), set()).add(b)
+    except Exception as exc:  # 榜单文件缺失不应阻塞提交前预检
+        print(f"（榜单撞名检查跳过：{exc}）")
     print(f"候选文件: {path}")
-    print(f"平台算子名: {len(ops)}；已知字段名: {len(known_fields)}\n")
+    print(f"平台算子名: {len(ops)}；已知字段名: {len(known_fields)}；榜单席位名: {len(board_names)}\n")
     rows = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
@@ -301,6 +324,8 @@ def main() -> int:
         if r.get("kind") == "python":
             print(f"{r['name']:30s} python合成  {'OK' if r['ok'] else 'FAIL'}  {'; '.join(r['notes'])}"
                   f"  （费用按平台运行时长计档；池合成实测约 6.0/条）")
+            for hit in board_collision(r["name"], board_names, board_norm):
+                print(f"     ⚠ 榜单撞名: {hit} → 先改名再提交")
             continue
         note = []
         if r["needs_scale"]:
@@ -326,6 +351,8 @@ def main() -> int:
             print(f"     ⚠ 算子名不在平台算子表: {r['unknown_ops']} → 直接提交会 run failed（变量未定义）")
         if r["unknown_fields"]:
             print(f"     ⚠ 字段不在平台字段表: {r['unknown_fields']} → Missing required base factors，先换字段/表达式")
+        for hit in board_collision(r["name"], board_names, board_norm):
+            print(f"     ⚠ 榜单撞名: {hit} → 先改名再提交")
     total = sum(r.get("cost", 0.0) for r in rows)
     print(f"\n预估费用: {total:.1f} 算力（{len(rows)} 条）")
     return 0
