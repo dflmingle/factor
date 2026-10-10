@@ -12,6 +12,7 @@
 | U01/U02 平台验证 | 单因子储备证据，尚非入池建议 | [平台结果](platform_alignment/u01-u02-platform-20261010/summary.md) |
 | 平台支持的量价补测 | 日内量价与 Alpha191 候选成本后表现弱；不宣称已测遍平台空间 | [补测](platform_alignment/platform-uncovered-test-20261010/summary.md) |
 | 9 月发现的强新簇回收 | K008、K021、K015、K020 曾完成平台单因子验证；K008/K021 是最干净的两条，K015/K020 结构更敏感。单因子有效不等于加入现役池有效 | [四候选复核](platform_alignment/gp-platform-tests-20260925/verified-candidates-review.md)、[池级结果](../GOAL.md#四已知结构约束不要再重复投入) |
+| 其他已验证新簇 | N34 有平台净 12.27% 但规模相关偏高；K024 净 6.51% 但 IC p=0.81，分别列为独立候选与弱验证，不与强新簇混排 | [N34](platform_alignment/f-gfn-n02-cluster-assignment-20260920.md)、[K024 复核](platform_alignment/gp-platform-tests-20260925/desktop-md-20260925-26/新簇候选平台验证-20260925.md) |
 | LEGMIX 竞争力 | 13 场景×两个归档窗口；A/B 加席减规模相关，但池级 C 代理存在代价；历史缓存不是最新正式复现 | [池级诊断](platform_alignment/legmix-competitiveness-20261010/summary.md) |
 | 榜单借鉴三假设 | 下跌缩量、振幅切割、量价相关性变化；公共名称启发的自主构造 | [候选](platform_alignment/board-inspired-hypotheses-20261010/summary.md) |
 | 三候选本地诊断 | 三候选及四对照完成；振幅切割较裸反转改善，但近期亏损。数据校验和覆盖有限，不作正式验收 | [诊断及修正](platform_alignment/board-inspired-local-reproduction-20261010/summary.md) |
