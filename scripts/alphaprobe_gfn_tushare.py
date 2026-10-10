@@ -175,6 +175,8 @@ class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
         net_excess_context: AlignedNetExcessContext | None = None,
         net_excess_weight: float = 0.10,
         net_excess_scale: float = 0.10,
+        size_corr_penalty: float = 0.0,
+        size_corr_free: float = 0.30,
         **kwargs: Any,
     ):
         if ic_objective not in self.VALID_OBJECTIVES:
@@ -184,12 +186,19 @@ class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
             raise ValueError("net-excess-weight must be non-negative")
         if net_excess_scale <= 0.0:
             raise ValueError("net-excess-scale must be positive")
+        if size_corr_penalty < 0.0:
+            raise ValueError("size-corr-penalty must be non-negative")
+        if not 0.0 <= size_corr_free <= 1.0:
+            raise ValueError("size-corr-free must be within [0, 1]")
         super().__init__(*args, **kwargs)
         self.ic_objective = ic_objective
         self.net_excess_context = net_excess_context
         self.net_excess_weight = float(net_excess_weight)
         self.net_excess_scale = float(net_excess_scale)
+        self.size_corr_penalty = float(size_corr_penalty)
+        self.size_corr_free = float(size_corr_free)
         self.last_net_excess_stats: dict[str, float | int | None] | None = None
+        self.last_size_corr: float | None = None
 
     def _score_single_ic(self, ic_ret: float) -> float:
         return float(abs(ic_ret) if self.ic_objective == "absolute" else ic_ret)
@@ -256,9 +265,21 @@ class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
             scale=self.net_excess_scale,
         )
 
+    def _size_penalty(self, raw_value: torch.Tensor) -> float:
+        """Penalise |corr_size| above the free zone on the raw (platform-ranked) panel."""
+        if self.net_excess_context is None or self.size_corr_penalty == 0.0:
+            self.last_size_corr = None
+            return 0.0
+        with torch.no_grad():
+            corr = self.net_excess_context.size_corr(raw_value)
+        self.last_size_corr = None if corr is None else float(corr)
+        if corr is None or not np.isfinite(float(corr)):
+            return 0.0
+        return self.size_corr_penalty * max(abs(float(corr)) - self.size_corr_free, 0.0)
+
     def try_new_expr_with_ssl(
         self, expr: object, embedding: torch.Tensor | None = None
-    ) -> tuple[float, float, float, float]:
+    ) -> tuple[float, float, float, float, float]:
         raw_value = expr.evaluate(self.data)
         value = self._normalize_by_day(raw_value)
         ic_reward, nov_reward = self._try_new_expr_value(expr, value, embedding)
@@ -267,11 +288,13 @@ class ObjectiveAlphaPoolGFN(AlphaPoolGFN):
         # a high-reward trajectory in the signed-positive objective.
         if self.ic_objective == "signed_positive" and ic_reward <= 0.0:
             self.last_net_excess_stats = None
-            return ic_reward, 0.0, 0.0, 0.0
+            self.last_size_corr = None
+            return ic_reward, 0.0, 0.0, 0.0, 0.0
 
         net_excess_reward = self._net_excess_reward(raw_value)
+        size_penalty = self._size_penalty(raw_value)
         ssl_reward = self.compute_ssl_reward(expr, embedding) if embedding is not None else 0.0
-        return ic_reward, nov_reward, ssl_reward, net_excess_reward
+        return ic_reward, nov_reward, ssl_reward, net_excess_reward, size_penalty
 
 
 class GFNNamedField(PandaAIField):
@@ -673,6 +696,7 @@ def resolve_search_fields(
     max_extra_fields: int,
     allow_unverified_fields: bool,
     allow_blocked_fields: bool = False,
+    allow_stale_failure_registry: bool = False,
 ) -> dict[str, Any]:
     """Resolve and validate the named-field action space for one run."""
     return resolve_named_search_fields(
@@ -682,6 +706,7 @@ def resolve_search_fields(
         max_extra_fields=max_extra_fields,
         allow_unverified_fields=allow_unverified_fields,
         allow_blocked_fields=allow_blocked_fields,
+        allow_stale_failure_registry=allow_stale_failure_registry,
         base_feature_names=BASE_FEATURE_NAMES,
         fundamental_core_fields=FUNDAMENTAL_CORE_FIELDS,
     )
@@ -750,6 +775,7 @@ def load_panels(args: argparse.Namespace, device: torch.device) -> tuple[dict[st
         max_extra_fields=args.max_extra_fields,
         allow_unverified_fields=args.allow_unverified_fields,
         allow_blocked_fields=args.allow_blocked_fields,
+        allow_stale_failure_registry=args.allow_stale_failure_registry,
     )
     blocked_base_features = [
         field.strip().lower()
@@ -947,14 +973,19 @@ class NamedFieldGFNEnvCore(DiscreteEnv):
                     if self.encoder is not None:
                         with torch.no_grad():
                             embedding = self.encoder(state_tensor.unsqueeze(0)).squeeze(0)
-                    ic_reward, nov_reward, ssl_reward, net_excess_reward = self.pool.try_new_expr_with_ssl(
-                        expression, embedding
-                    )
+                    (
+                        ic_reward,
+                        nov_reward,
+                        ssl_reward,
+                        net_excess_reward,
+                        size_penalty,
+                    ) = self.pool.try_new_expr_with_ssl(expression, embedding)
                     reward = (
                         ic_reward
                         + net_excess_reward
                         + self.ssl_weight * ssl_reward
                         + self.nov_weight * nov_reward
+                        - size_penalty
                     )
                 except OutOfDataRangeError:
                     reward = 0.0
@@ -1088,6 +1119,8 @@ def dry_run(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], ta
         net_excess_context=net_context,
         net_excess_weight=args.net_excess_weight,
         net_excess_scale=args.net_excess_scale,
+        size_corr_penalty=args.size_corr_penalty,
+        size_corr_free=args.size_corr_free,
     )
     env, *_ = build_gfn_components(
         args,
@@ -1140,6 +1173,8 @@ def train(args: argparse.Namespace, panels: dict[str, TushareGFNStockData], targ
         net_excess_context=net_context,
         net_excess_weight=args.net_excess_weight,
         net_excess_scale=args.net_excess_scale,
+        size_corr_penalty=args.size_corr_penalty,
+        size_corr_free=args.size_corr_free,
     )
     env, backbone, _, _, loss_fn, sampler, optimizer = build_gfn_components(
         args,
@@ -1245,6 +1280,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="allow fundamental_core/all_active/custom fields outside the aligned set (diagnostic only)",
     )
     parser.add_argument(
+        "--allow-stale-failure-registry",
+        action="store_true",
+        help=(
+            "diagnostic: accept a field failure registry built under a different "
+            "alignment rule version; the mismatch is recorded in run metadata"
+        ),
+    )
+    parser.add_argument(
         "--allow-blocked-fields",
         action="store_true",
         help="allow fields blocked by the alignment failure registry (diagnostic only)",
@@ -1287,6 +1330,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.10,
         help="annualized net-excess scale used by tanh before applying the reward weight",
     )
+    parser.add_argument(
+        "--size-corr-penalty",
+        type=float,
+        default=0.0,
+        help="reward penalty slope for |corr_size| above the free zone (0 disables)",
+    )
+    parser.add_argument(
+        "--size-corr-free",
+        type=float,
+        default=0.30,
+        help="free zone for |corr_size| before --size-corr-penalty applies",
+    )
     parser.add_argument("--final-weight-ratio", type=float, default=0.0)
     parser.add_argument("--ic-mut-threshold", type=float, default=0.3)
     return parser
@@ -1302,6 +1357,10 @@ def main() -> int:
         raise ValueError("net-excess-weight must be non-negative")
     if args.net_excess_scale <= 0:
         raise ValueError("net-excess-scale must be positive")
+    if args.size_corr_penalty < 0:
+        raise ValueError("size-corr-penalty must be non-negative")
+    if not 0.0 <= args.size_corr_free <= 1.0:
+        raise ValueError("size-corr-free must be within [0, 1]")
 
     validate_alignment_config(alignment_config_snapshot())
     random.seed(args.seed)

@@ -1456,6 +1456,7 @@ def run_aligned_net_excess(
     size_neutral = args.objective == "aligned_size_neutral_net" or (
         seat_scenario and bool(getattr(args, "seat_size_neutral", False))
     )
+    size_cap = args.objective == "aligned_net_sizecap"
     ic_objective = ic_efficiency or ic_frontier or seat_scenario
     if args.universe.lower() != "full_a":
         raise ValueError("--objective aligned_net_excess requires --universe full_a")
@@ -1469,6 +1470,8 @@ def run_aligned_net_excess(
         raise ValueError("--aligned-label-offset must be non-negative")
     if args.aligned_round_trip_cost < 0:
         raise ValueError("--aligned-round-trip-cost must be non-negative")
+    if size_cap and not 0.0 < args.aligned_size_corr_cap <= 1.0:
+        raise ValueError("--aligned-size-corr-cap must be in (0, 1]")
     if ic_efficiency:
         if not 0.0 < args.aligned_turnover_cap <= 1.0:
             raise ValueError("--aligned-turnover-cap must be within (0, 1]")
@@ -1707,6 +1710,18 @@ def run_aligned_net_excess(
                 )
             return float(score)
         if not risk_control:
+            if size_cap:
+                corr_size = stats.get("corr_size")
+                if corr_size is None or not np.isfinite(float(corr_size)):
+                    return -1.5
+                corr_size = float(corr_size)
+                gap = abs(corr_size) - args.aligned_size_corr_cap
+                if gap <= 0.0:
+                    stats["size_cap_pass"] = 1
+                    return float(net_excess) if np.isfinite(float(net_excess)) else -1.0
+                # 不可行：压到任何可行分之下，同时按"离门槛还差多少"排序，保证 GP 能爬向可行区
+                stats["size_cap_pass"] = 0
+                return -10.0 - 10.0 * gap
             return float(net_excess) if np.isfinite(float(net_excess)) else -1.0
 
         absolute_dd = stats.get("absolute_max_drawdown")
@@ -1767,7 +1782,7 @@ def run_aligned_net_excess(
                     stats = context.score(factor)
                     if ic_objective:
                         stats.update(context.ic_series_stats(factor))
-                    if seat_scenario:
+                    if seat_scenario or size_cap:
                         corr_size = context.size_corr(factor)
                         if corr_size is not None:
                             stats["corr_size"] = corr_size
@@ -2457,6 +2472,7 @@ def build_parser() -> argparse.ArgumentParser:
             "aligned_ic_efficiency",
             "aligned_ic_frontier",
             "aligned_size_neutral_net",
+            "aligned_net_sizecap",
             "seat_scenario",
         ],
         default="ic",
@@ -2466,8 +2482,16 @@ def build_parser() -> argparse.ArgumentParser:
             "aligned_ic_efficiency maximises S_i under a turnover cap and a net-excess floor, "
             "aligned_ic_frontier maximises raw S_i with no turnover constraint, "
             "aligned_size_neutral_net maximises cost-adjusted net excess after "
-            "demeaning each cross-section inside total_mv percentile buckets"
+            "demeaning each cross-section inside total_mv percentile buckets, "
+            "aligned_net_sizecap maximises raw-panel net excess subject to a hard "
+            "|corr_size| cap (raw panel = what the platform actually ranks)"
         ),
+    )
+    parser.add_argument(
+        "--aligned-size-corr-cap",
+        type=float,
+        default=0.30,
+        help="hard |corr_size| cap used by aligned_net_sizecap",
     )
     parser.add_argument(
         "--seat-size-neutral",
@@ -2711,6 +2735,7 @@ def main() -> int:
         "aligned_ic_efficiency",
         "aligned_ic_frontier",
         "aligned_size_neutral_net",
+        "aligned_net_sizecap",
         "seat_scenario",
     }:
         return run_aligned_net_excess(args, cache_root, batch_root, run_output)

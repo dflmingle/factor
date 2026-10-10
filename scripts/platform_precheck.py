@@ -355,6 +355,27 @@ def main() -> int:
             print(f"     ⚠ 榜单撞名: {hit} → 先改名再提交")
     total = sum(r.get("cost", 0.0) for r in rows)
     print(f"\n预估费用: {total:.1f} 算力（{len(rows)} 条）")
+    # 历史同式检查（2026-10-09 新增）：与仓库内已提交过的候选做腿集去重
+    # 起因：POOL6-CAND-C-20261009 与 LAMD10-K5V2-20260929 同式（写法不同）未被发现。
+    try:
+        import dup_formula_check as DFC
+        hist: dict[str, list[dict]] = {}
+        for fpath in DFC.iter_candidate_files([]):
+            for hrow in DFC.parse_candidates(fpath):
+                hist.setdefault(DFC.canonical(hrow["formula"]), []).append(hrow)
+        flagged = 0
+        for r in rows:
+            if r.get("kind") == "python":
+                continue
+            hits = [h for h in hist.get(DFC.canonical(r["formula"]), []) if h["name"] != r["name"]]
+            if hits:
+                flagged += 1
+                shown = ", ".join(f"{h['name']}@{h['file']}:{h['line']}" for h in hits[:3])
+                print(f"     ⚠ 历史同式: {r['name']} ≈ {shown} → 已测过，换候选或说明复测目的")
+        if flagged:
+            print(f"⚠ {flagged} 条候选与历史已提交公式同式（详见 scripts/dup_formula_check.py）")
+    except Exception as exc:  # noqa: BLE001 去重检查失败不应阻塞预检
+        print(f"（历史同式检查跳过：{exc}）")
     return 0
 
 

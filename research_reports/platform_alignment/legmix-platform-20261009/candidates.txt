@@ -1,0 +1,10 @@
+# LEGMIX 复合腿平台实测（2026-10-09；待用户批准；窗口 20210907..20260907, cycle 10, 10 组, 0.30% 单边）
+# 目的：用临期算力量化 LEGMIX 三条候选的平台单因子 s_i / 换手 / IC（本地池级屏顺位前 3，见 legmix-size-20261009/summary.md §六）
+# 本地口径（原始面板 top-decile 净额、label close(t+1)->close(t+1+10)、往返 0.006、corr_size 对 total_mv 逐日 Spearman）：
+#   A: 净 +8.20%/年 (近1年 +4.64%)，corr_size -0.216，池级 s_i 0.0665（最高）/ T6 0.188 / ΔA +744~942
+#   B: 净 +8.57%/年 (近1年 +5.28%)，corr_size -0.246，池级 s_i 0.0417 / T6 0.156 / ΔA +289~413（双约束净额最高）
+#   C: 净 +12.06%/年 (近1年 +7.84%)，corr_size -0.412，池级 s_i 0.0729 / T6 0.190 / ΔA +862~1078（corr 超 0.30 box）
+# 预计算力：3 x 4.0 = 12.0（先扣今晚 23:59 到期 GIFT 10.0，余 2.0 走常规余额）
+POOL6-CAND-A-20261009 ~ (RANK(0-MA(AMOUNT,60))+RANK(0-MA((CLOSE-OPEN)/OPEN,20))+RANK(0-STD(TURNOVER,20)))/3 ~ 1
+POOL6-CAND-B-20261009 ~ 0.5*RANK(0-MA(TURNOVER,5))+0.5*RANK(0-MA(AMOUNT,60)) ~ 1
+POOL6-CAND-C-20261009 ~ 0.2*RANK(0-MA(AMOUNT,60))+0.2*RANK(0-MA((CLOSE-OPEN)/OPEN,20))+0.2*RANK(0-STD(TURNOVER,20))+0.2*RANK(MA(ABS(RETURNS(CLOSE,1))/AMOUNT,20))+0.2*RANK(0-(STDDEV(VOLUME,6)/STDDEV(VOLUME,756))) ~ 1

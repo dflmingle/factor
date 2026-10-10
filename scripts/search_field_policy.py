@@ -156,10 +156,13 @@ def resolve_named_search_fields(
     fundamental_core_fields: Iterable[str],
     allow_blocked_fields: bool = False,
     failure_registry: str | Path | None = None,
+    allow_stale_failure_registry: bool = False,
 ) -> dict[str, Any]:
     """Resolve GFN named fields while preserving explicit diagnostic mode."""
     base_names = {str(field).strip().lower() for field in base_feature_names}
-    exclusion_policy = load_field_exclusion_policy(failure_registry)
+    exclusion_policy = load_field_exclusion_policy(
+        failure_registry, allow_version_mismatch=allow_stale_failure_registry
+    )
     blocked = set(exclusion_policy["blocked_fields"])
     requested_override = parse_field_list(extra_fields)
     if requested_override:

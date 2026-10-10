@@ -1,0 +1,24 @@
+name,cluster,formula,window,blocked
+NEW-VALUE-EVEBITDA,B07,RANK(-ratio_ev_ebitda_ttm),0.0,ratio_ev_ebitda_ttm
+NONHT-RESVOL-LOW,B11,RANK(-residual_volatility),0.0,residual_volatility
+OSR-RSI14-20D,N01,"RANK(1 - RSI(CLOSE,14) / 100)",0.0,RSI(
+OSR-Z20-20D,N01,"RANK(1 - TS_ZSCORE(CLOSE,20))",0.0,TS_ZSCORE(
+OSR2-MODERATE-RSI35,N01,"RANK(IF(RSI(CLOSE,14)<50,-ABS(RSI(CLOSE,14)-35),-99999))",0.0,RSI(
+NEW-GROWTH-REV-TTM,N02,RANK(gr_revenue_ttm),0.0,gr_revenue_ttm
+NEW-GROWTH-ROE-TTM,N03,RANK(gr_roe_ttm),0.0,gr_roe_ttm
+HT13-HIST-ROA-6Q,N13,"TS_RANK(oper_roa_net_ttm,756)",756.0,oper_roa_net_ttm
+NONHT-MAX5-LOW-21D,N15,literature-rankic-optimization-20260909-max5.py,0.0,literature
+NONHT-CASH-CONVERSION,N17,RANK(cfd_surplus_cash_multi_ttm),0.0,cfd_surplus_cash_multi_ttm
+OSR2-MODERATE-BIAS5,N22,"RANK(-ABS(MIN(BIAS(CLOSE,20),0)+5))",0.0,BIAS(
+OSR2-RSI-CROSS30,N24,"RANK(1 - RSI(CLOSE,14) / 100) * AS_FLOAT(CROSS(RSI(CLOSE,14),30))",0.0,AS_FLOAT
+OSR2-PRICE-CROSS-MA5,N25,"RANK(1 - CLOSE / MA(CLOSE,20)) * AS_FLOAT(CROSS(CLOSE,MA(CLOSE,5)))",20.0,AS_FLOAT
+OSR2-SMOOTH-RSI28,N26,"RANK(MA(1 - RSI(CLOSE,28) / 100,10))",10.0,RSI(
+paper-derived-profitability,N28,RANK(profitability),0.0,profitability
+NONHT-LOW-BETA,,RANK(-beta),0.0,local_unparseable(beta/MFI/workflow)
+OSR-MFI14-20D,,"RANK(1 - MFI(CLOSE,HIGH,LOW,VOLUME,14) / 100)",0.0,local_unparseable(beta/MFI/workflow)
+WF6AA4-D0-PYTHON-OBV-20260912,,workflow-6aa40282-python.py,0.0,local_unparseable(beta/MFI/workflow)
+WF6AA4-PYTHON-OBV-20260911,,workflow-6aa40282-python.py,0.0,local_unparseable(beta/MFI/workflow)
+VV6-1250,S01,"0-(STDDEV(VOLUME,6)/STDDEV(VOLUME,1250))",,proxy(1250窗超本地预热)
+a046-t10x750-w30,S03(边界0.7997),"0.3*RANK(alpha191_046)+(0.7*(1-RANK(STDDEV(turnover,10)/STDDEV(turnover,750))))",,proxy(alpha191参考实现)
+a046-t10x750-w30-rsm20,S03,"0.3*RANK(alpha191_046)+(0.7*(1-RANK(MA(STDDEV(turnover,10)/STDDEV(turnover,750),20))))",,proxy(alpha191参考实现)
+a046-t10x750-w20-rsm40,S03,"0.2*RANK(alpha191_046)+(0.8*(1-RANK(MA(STDDEV(turnover,10)/STDDEV(turnover,750),40))))",,proxy(alpha191参考实现)

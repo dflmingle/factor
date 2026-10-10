@@ -130,9 +130,13 @@ def main() -> int:
     ap.add_argument("--seed", default="", help="legmix7 = 从 LEGMIX7 的 7 腿出发继续贪心")
     ap.add_argument("--exclude", default="", help="逗号分隔，禁用这些腿")
     ap.add_argument("--tag", default=None)
+    ap.add_argument("--out", default=None, help="输出目录（默认 2026-09-29 那轮的目录）")
     args = ap.parse_args()
 
     tag = args.tag or f"lam{args.lam_turn:.2f}"
+    global OUT
+    if args.out:
+        OUT = ROOT / args.out
     OUT.mkdir(parents=True, exist_ok=True)
 
     log("loading panels cache")
@@ -199,11 +203,16 @@ def main() -> int:
             t10 = turnover_top(combo, w5s, idx)
             raw_key = st["s_i"] if np.isfinite(st["s_i"]) else -1.0
             key = raw_key - args.lam_turn * max(0.0, t10 - args.soft_turn)
+            # 2026-10-09: --lam-size/--soft-size 此前是死开关（只记录不惩罚），这里接通：
+            # |corr_size| 超过 --soft-size 后按 --lam-size 扣 key（与 GP/GFN 的 size 目标一致）。
+            csz_c = corr_size(combo, w5s, idx, cap) if args.lam_size else float("nan")
+            if args.lam_size and np.isfinite(csz_c):
+                key -= args.lam_size * max(0.0, abs(csz_c) - args.soft_size)
             if best is None or key > best[0]:
-                best = (key, name, st, combo, t10, raw_key)
+                best = (key, name, st, combo, t10, raw_key, csz_c)
             else:
                 del combo
-        key, name, st5, combo, t10, raw_key = best
+        key, name, st5, combo, t10, raw_key, csz_best = best
         if key <= best_prev + args.min_improve:
             log(f"stop: no improvement at K={step + 1} (key {key:.5f} <= {best_prev:.5f})")
             del combo
@@ -212,7 +221,7 @@ def main() -> int:
         selected.append(name)
         cur = combo.astype("float32")
         s1 = stats(ic_series(cur, C, cal, w1s, idx))
-        csz = corr_size(cur, w5s, idx, cap)
+        csz = csz_best if np.isfinite(csz_best) else corr_size(cur, w5s, idx, cap)
         tpx = turn_proxy(cur, w5s, idx)
         row = dict(k=len(selected), added=name, key=key, s_i_5y=st5["s_i"], ic_5y=st5["ic"],
                    icir_5y=st5["icir"], win_5y=st5["win"], n_5y=st5["n"],
