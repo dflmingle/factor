@@ -2,8 +2,8 @@
 
 > 建立日期：2026-09-23 ｜ 基线快照：2026-09-22 preview（276 个池，见
 > [`research_reports/platform_alignment/goal-20260923/leaderboard_points_20260922.csv`](research_reports/platform_alignment/goal-20260923/leaderboard_points_20260922.csv)）
-> ｜ 最新快照：2026-10-08 preview（328 池，见
-> [`research_reports/platform_alignment/board-snapshot-20261009/board_live.json`](research_reports/platform_alignment/board-snapshot-20261009/board_live.json)）
+> ｜ 最新快照：2026-10-10 发布、cutoff 2026-10-09 preview（331 池，年度累计含当月预估，见
+> [`research_reports/literature/competition-optimization-20261010/board-live/board_live.json`](research_reports/literature/competition-optimization-20261010/board-live/board_live.json)）
 
 ## 一、目标与验收
 
@@ -53,7 +53,21 @@ VERIFY10-F / T10-ADD-BM。
 > **与 #1 分差 15,664 不变**（NA −267 / NB −15,400 / NC 0）⇒ 名次回升是结构项，A 段（40/331）与 B 段未动。
 > 详见 `research_reports/platform_alignment/board-snapshot-20261009c/summary.md`。
 
+> **2026-10-10 快照补记（10-09 cutoff，零算力）**：年度预估 rank **32/331**，
+> `cumulative_points` **45,296.42 = booked_points 22,648.21 + 当月预估 22,648.21**。
+> 榜首 hulai **76,625.16 = 38,312.58 + 38,312.58**。我方 A/B/C 与前次逐位不变，
+> 名次 85→32 主要来自累计入账口径，不能当作因子表现改善；当前月正式分仍为空。
+> rawA 排序 40，25 个当前 C 满分池的 rawA 更高；年度前 20 名中 19 个已有正 B。
+> 当前 C 仍是月初短路径，不能外推持续满分。完整统计及文献优先级见
+> [`competition-optimization-20261010/review.md`](research_reports/literature/competition-optimization-20261010/review.md)。
+
 ## 三、与第一名的差距（核心）
+
+**2026-10-10 最新口径**：与榜首年度累计预估差 **31,328.74**，其中已入账差
+**15,664.37**，当月预估差 **15,664.37**；不可把累计预估全称为已结算损失。
+下文历史月度情景仍保留，但“每月小幅反超”不足以证明能追回年度累计差：若双方 B=C=1、
+榜首 NA 固定且双方无新人加成，我方 rawA=.035 每月只领先约 670 分，rawA=.056
+约领先 2,770 分。竞争者改善、B/C 波动、加成期限与池龄封顶均须纳入剩余赛程情景。
 
 月度积分 = `min(Comb × 40000 × 加成, 40000)`，`Comb = 0.20 NA + 0.35 NB + 0.45 NC`。
 
@@ -1175,6 +1189,6 @@ top30 因子数众数 = 5 席（13/30）；cycle 5 日/10 日 = 130/95（top30 �
 | 2026-10 首份快照 | ✅ 已于 10-09 03:08（cutoff 10-08）落地（第 66 条）：C 段月末前不可读（全池 `nc=0`），我方 `den_b` 仍 0；新增观测项=**每个快照日**抄 `den_b`/`raw_b`/`nb`（≠月末限定） |
 | 2026-10 每个快照日 | 若 `den_b` 首次非零（≈10-18 或 10-31）：抄首值 `raw_b`/`nb` + live `rawC`/rc，跑 11-01~03 门槛表；同时用 `rawC = Rex_ann/max(turn,0.3)×SR×(1−1.2·MaxDD_month)` 反解月度 inputs，核对日频账本代理（月度 DD 中位 4.59%） |
 | 每月月末 | 若月度 MaxDD > 5.65%，加席的净贡献在**当月**转负（表 3 的 DD 盈亏平衡线） |
-| 2026-10 月末 | 首次正式结算：核对平台 NA/NB/NC 与本地代理，校准模型误差；**并用榜首 `cumulative_points` 判总榜口径**——≈38,313+10 月值（≈76k）即"逐月相加"（规则原文），≈38k 级则是平均（规则与此不符，需重估晚提交代价） |
+| 2026-10 月末 | 核对当月正式结算 NA/NB/NC 与本地代理，校准模型误差；**10-10 preview 已显示累计=booked+当前月预估**（榜首约 76,625），逐月相加已有公开证据，月末再核对 booked 与正式分迁移，不把当前估值当已结算分。 |
 | 每月月末（子榜） | 季度子榜 = 有效月份月值的**算术平均**（缺月不补 0，分母 = 有效月数）；总榜 = **逐月相加**。9 月是否入账（是否因"日账本不全"被排除）也在此确认 |
 | 每月末 | 更新基线、更新与榜首的分差、复核换手是否越过 0.30 |

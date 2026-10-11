@@ -1,0 +1,107 @@
+[
+  {
+    "engine": "AlphaGen_adapted_MaskablePPO_original_LSTM",
+    "formula": "Sub(Grp5(Sub(lowvolume3,volshift20),Blend3(smoothvol20,vrel3)),vol120)",
+    "training": {
+      "formula": "Sub(Grp5(Sub(lowvolume3,volshift20),Blend3(smoothvol20,vrel3)),vol120)",
+      "origin": "alphagen_ppo_20261101",
+      "status": "evaluated",
+      "fitness": 0.026384458075098507,
+      "periods": 55,
+      "ic_mean": 0.061422998344873796,
+      "rank_ic": 0.10993743122221666,
+      "icir": 0.4775873444724942,
+      "ic_win": 0.6727272727272727,
+      "s_i_proxy": 0.035321361016639984,
+      "gross_excess": 0.11171923016216238,
+      "turnover": 0.36742238167753666,
+      "annual_cost": 0.055554264109643536,
+      "net_excess": 0.05616496605251885,
+      "corr_size": -0.19877387962469154,
+      "tied_fraction": 0.0,
+      "p_naive": 0.0008276855194123568,
+      "first_signal": "2021-09-07",
+      "last_signal": "2023-12-01",
+      "abs_size_corr": 0.19877387962469154,
+      "train_worst_third_rank_ic": 0.0873895997274048
+    },
+    "seed": 20261101
+  },
+  {
+    "engine": "native_PyTorch_trajectory_balance_signed_subset",
+    "formula": "Resid5(Add(lowvolume3,Neg(vol252)),Mul(lowvolume20,vol252))",
+    "training": {
+      "formula": "Resid5(Add(lowvolume3,Neg(vol252)),Mul(lowvolume20,vol252))",
+      "origin": "existing_GP_training_frontier",
+      "status": "evaluated",
+      "fitness": 0.04283263854607262,
+      "periods": 55,
+      "ic_mean": 0.06103109771999377,
+      "rank_ic": 0.10387582754872585,
+      "icir": 0.5396719489539487,
+      "ic_win": 0.6909090909090909,
+      "s_i_proxy": 0.038731583118039196,
+      "gross_excess": 0.17294972992607716,
+      "turnover": 0.16678105695307585,
+      "annual_cost": 0.02521729581130507,
+      "net_excess": 0.14773243411477208,
+      "corr_size": -0.24721142901596127,
+      "tied_fraction": 0.0,
+      "p_naive": 0.00019265314324508177,
+      "first_signal": "2021-09-07",
+      "last_signal": "2023-12-01",
+      "abs_size_corr": 0.24721142901596127,
+      "train_worst_third_rank_ic": 0.09405279230145314
+    }
+  },
+  {
+    "engine": "original_bundled_AlphaPool",
+    "alpha": 0.005,
+    "components": [
+      {
+        "formula": "Resid5(Add(lowvolume3,Neg(vol252)),Mul(lowvolume20,vol252))",
+        "weight": 0.3251382205246983
+      },
+      {
+        "formula": "Add(Add(Resid5(Add(lowvolume3,Neg(vol252)),Mul(lowvolume20,vol252)),Sub(Grp5(Sub(lowvolume3,volshift20),Blend3(smoothvol20,vrel3)),vol120)),Add(Neg(Resid5(Blend3(smoothvol20,rev20),rev3)),lowvolume20))",
+        "weight": 0.0037742796979593493
+      },
+      {
+        "formula": "Add(Add(GZ5(Sub(lowvolume3,Grp3(vol120,rev10)),GZ5(smoothvstab20,smoothvstab20)),Add(Neg(Resid5(Blend3(smoothvol20,rev20),rev3)),lowvolume20)),Sub(vstab20,Sub(GZ3(Blend5(vol120,lowturn120),lowvolume3),pressure60)))",
+        "weight": 0.3132619298761185
+      },
+      {
+        "formula": "Add(Add(Resid5(Add(lowvolume3,Neg(vol252)),Mul(lowvolume20,vol252)),GZ5(Sub(lowvolume3,Grp3(vol120,rev10)),GZ5(smoothvstab20,smoothvstab20))),Neg(GZ5(vol252,Neg(Sub(GZ5(lowvolume60,vrel20long),trel20long)))))",
+        "weight": 0.0007884740711708506
+      },
+      {
+        "formula": "Add(Add(Sub(Grp5(Sub(lowvolume3,volshift20),Blend3(smoothvol20,vrel3)),vol120),GZ5(Sub(lowvolume3,Grp3(vol120,rev10)),GZ5(smoothvstab20,smoothvstab20))),Neg(Neg(Sub(volshift60,Blend3(Add(lowturn120,Rank(lowvolume20)),vol6)))))",
+        "weight": 0.03602321642446649
+      },
+      {
+        "formula": "Sub(Grp5(Sub(lowvolume3,volshift20),Blend3(smoothvol20,vrel3)),vol120)",
+        "weight": 0.32101387940558657
+      }
+    ],
+    "normalization": "same-date population zscore, vendor missing zero-fill, final intersection restored",
+    "training": {
+      "periods": 55,
+      "ic_mean": 0.06520111045458264,
+      "rank_ic": 0.11329784477655744,
+      "icir": 0.4761899917882996,
+      "ic_win": 0.6363636363636364,
+      "s_i_proxy": 0.03433264531058786,
+      "gross_excess": 0.14752140800662966,
+      "turnover": 0.2651185240611926,
+      "annual_cost": 0.04008592083805232,
+      "net_excess": 0.10743548716857734,
+      "corr_size": -0.22011818624292157,
+      "tied_fraction": 0.0,
+      "p_naive": 0.0008544268735399853,
+      "first_signal": "2021-09-07",
+      "last_signal": "2023-12-01",
+      "abs_size_corr": 0.22011818624292157,
+      "fitness": 0.03298367084845699
+    }
+  }
+]

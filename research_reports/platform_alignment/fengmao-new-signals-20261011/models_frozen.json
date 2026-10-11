@@ -1,0 +1,106 @@
+[
+  {
+    "engine": "AlphaGen_adapted_MaskablePPO_original_LSTM",
+    "formula": "Sub(Resid5(lowturn,Resid5(onvol20,Neg(Rank(downrisk60)))),onvol60)",
+    "training": {
+      "formula": "Sub(Resid5(lowturn,Resid5(onvol20,Neg(Rank(downrisk60)))),onvol60)",
+      "origin": "alphagen_ppo_20261201",
+      "status": "evaluated",
+      "fitness": 0.015494318932962199,
+      "periods": 55,
+      "ic_mean": 0.04604860980093849,
+      "rank_ic": 0.09432051446394665,
+      "icir": 0.3183984427298472,
+      "ic_win": 0.5636363636363636,
+      "s_i_proxy": 0.016926848229213778,
+      "gross_excess": 0.08198024075989628,
+      "turnover": 0.21344918743301966,
+      "annual_cost": 0.03227351713987257,
+      "net_excess": 0.04970672362002371,
+      "corr_size": 0.17879558275052063,
+      "tied_fraction": 0.0,
+      "p_naive": 0.02184861261419153,
+      "first_signal": "2021-09-07",
+      "last_signal": "2023-12-01",
+      "abs_size_corr": 0.1897996847526686,
+      "train_worst_third_rank_ic": 0.07582947966486399
+    }
+  },
+  {
+    "engine": "categorical_cross_entropy_conditional_trees",
+    "formula": "Blend3(Neg(onvol60),macdslowhist)",
+    "training": {
+      "formula": "Blend3(Neg(onvol60),macdslowhist)",
+      "origin": "CEM_conditional_formula",
+      "status": "evaluated",
+      "fitness": 0.015549232886684783,
+      "periods": 55,
+      "ic_mean": 0.041990202844057675,
+      "rank_ic": 0.08505068086291981,
+      "icir": 0.35197457585112707,
+      "ic_win": 0.5818181818181818,
+      "s_i_proxy": 0.01741712135131681,
+      "gross_excess": 0.08314852447499856,
+      "turnover": 0.2360230716311861,
+      "annual_cost": 0.03568668843063534,
+      "net_excess": 0.047461836044363215,
+      "corr_size": 0.05590038063694449,
+      "tied_fraction": 0.0,
+      "p_naive": 0.011682961234257211,
+      "first_signal": "2021-09-07",
+      "last_signal": "2023-12-01",
+      "abs_size_corr": 0.09027165135356181,
+      "train_worst_third_rank_ic": 0.08195663888826094
+    }
+  },
+  {
+    "engine": "original_bundled_AlphaPool",
+    "alpha": 0.02,
+    "components": [
+      {
+        "formula": "Neg(idvol60)",
+        "weight": 0.04738494046691626
+      },
+      {
+        "formula": "Neg(onvol60)",
+        "weight": 0.1664333564721645
+      },
+      {
+        "formula": "Sub(Resid5(lowturn,Resid5(onvol20,Neg(Rank(downrisk60)))),onvol60)",
+        "weight": 0.0026063038715688517
+      },
+      {
+        "formula": "Blend3(lowturn,Add(Resid5(lowturn,macd),Rank(Rank(lowturn))))",
+        "weight": 0.21935199390566207
+      },
+      {
+        "formula": "Neg(downrisk60)",
+        "weight": 0.006021382387058849
+      },
+      {
+        "formula": "Blend3(Sub(tug60,vol20),Resid5(Sub(idvol20,idrev20),asym60))",
+        "weight": 0.5582020228966295
+      }
+    ],
+    "normalization": "same-date population zscore, vendor missing zero-fill, final intersection restored",
+    "training": {
+      "periods": 55,
+      "ic_mean": 0.055216445801686595,
+      "rank_ic": 0.10667680668628442,
+      "icir": 0.38306426253793496,
+      "ic_win": 0.6363636363636364,
+      "s_i_proxy": 0.026004409634753065,
+      "gross_excess": 0.0788790015791342,
+      "turnover": 0.3184620285100139,
+      "annual_cost": 0.04815145871071409,
+      "net_excess": 0.03072754286842011,
+      "corr_size": 0.03514832492963743,
+      "tied_fraction": 0.0,
+      "p_naive": 0.006332851832578407,
+      "first_signal": "2021-09-07",
+      "last_signal": "2023-12-01",
+      "abs_size_corr": 0.09211312447048679,
+      "fitness": 0.018961156301766546
+    }
+  }
+]
