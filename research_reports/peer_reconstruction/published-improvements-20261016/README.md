@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|小马珍珠|verified_fit_improvement|109.301871|68.99%|False|
+|QMuant|verified_fit_improvement|532.194785|74.05%|False|
