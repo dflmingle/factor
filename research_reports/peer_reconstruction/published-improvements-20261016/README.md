@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|灵小犀|verified_fit_improvement|139.498470|62.87%|False|
+|大福|verified_fit_improvement|375.679679|26.68%|False|
