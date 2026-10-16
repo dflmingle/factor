@@ -10,5 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|筱幽梦|verified_fit_improvement|387.024612|66.11%|False|
-|西亚斯小牛|verified_fit_improvement|276.182515|46.01%|False|
+|灵小犀|verified_fit_improvement|139.498470|62.87%|False|
