@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|Sunny Yu|verified_fit_improvement|106.071099|52.30%|False|
+|新人报道|initial_verified_baseline|212.538130|44.51%|False|
