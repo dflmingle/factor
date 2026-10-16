@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|QMuant|verified_fit_improvement|532.194785|74.05%|False|
+|gjh|verified_fit_improvement|203.997214|41.35%|False|
