@@ -1,0 +1,15 @@
+[Unit]
+Description=Prevent automatic sleep during factor research weekend
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/data/games/factor_
+ExecStart=/usr/bin/sudo -n /usr/bin/systemd-inhibit --what=sleep:idle --who=FactorResearch --why=WeekendLocalResearch --mode=block /usr/bin/setpriv --reuid=1017 --regid=27 --init-groups /home/minkefu/.conda/envs/ktransformers/bin/python3.11 /data/games/factor_/scripts/research_watchdog.py --awake-until 2026-10-19T09:00:00+08:00
+Restart=on-failure
+RestartSec=60
+StandardOutput=append:/data/games/factor_/research_reports/operations/weekend-watchdog-20261016/awake.service.log
+StandardError=append:/data/games/factor_/research_reports/operations/weekend-watchdog-20261016/awake.service.log
+
+[Install]
+WantedBy=default.target

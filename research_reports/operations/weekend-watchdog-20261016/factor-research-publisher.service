@@ -1,0 +1,14 @@
+[Unit]
+Description=Publish verified reconstruction improvements to origin/main
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/data/games/factor_
+ExecStart=/home/minkefu/.conda/envs/ktransformers/bin/python3.11 /data/games/factor_/scripts/publish_peer_improvements.py
+TimeoutStartSec=600
+Nice=15
+MemoryMax=1G
+StandardOutput=journal
+StandardError=journal

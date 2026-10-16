@@ -1,0 +1,24 @@
+[Unit]
+Description=Factor research watchdog and stagnation scheduling
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+WorkingDirectory=/data/games/factor_
+ExecStart=/home/minkefu/.conda/envs/ktransformers/bin/python3.11 /data/games/factor_/scripts/research_watchdog.py --config /data/games/factor_/research_reports/operations/weekend-watchdog-20261016/config.json
+Restart=on-failure
+RestartSec=15
+WatchdogSec=180
+TimeoutStartSec=90
+TimeoutStopSec=20
+KillMode=process
+OOMPolicy=continue
+MemoryHigh=40G
+MemoryMax=48G
+TasksMax=1024
+StandardOutput=append:/data/games/factor_/research_reports/operations/weekend-watchdog-20261016/watchdog.service.log
+StandardError=append:/data/games/factor_/research_reports/operations/weekend-watchdog-20261016/watchdog.service.log
+
+[Install]
+WantedBy=default.target
