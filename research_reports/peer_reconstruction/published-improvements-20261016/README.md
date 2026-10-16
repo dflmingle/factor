@@ -10,6 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|dfkai|initial_verified_baseline|219.745278|81.55%|False|
-|虎墨666|initial_verified_baseline|221.827545|66.90%|False|
-|燕雀|initial_verified_baseline|7288.130161|46.59%|False|
+|Sunny Yu|verified_fit_improvement|106.071099|52.30%|False|
