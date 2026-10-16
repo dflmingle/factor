@@ -1,0 +1,97 @@
+quant/聚宽2025年精选/36快过年了。不想呆在小市值的，可以拿这个策略躲一躲.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    g.stock_pool = ['510300.XSHG', '510050.XSHG', '159949.XSHE', '159928.XSHE']
+    g.stock_num = 1
+    g.momentum_day = 20
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.K = 8
+    g.biasN = 90
+    g.lossN = 20
+    g.lossFactor = 1.005
+    g.SwitchFactor = 1.04
+    g.Motion_1diff = 19
+    g.raiser_thr = 4.8
+    g.hold_stock = 'null'
+    g.score_threshold = 0.68
+    g.slope_series, g.rsrs_score_history = initial_slope_series()
+    g.stock_motion = initial_stock_motion(g.stock_pool)
+    run_daily(my_trade_prepare, time='7:00', reference_security='000300.XSHG')
+    run_daily(my_trade, time='9:30', reference_security='000300.XSHG')
+    run_daily(my_sell2buy, time='9:35', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+    run_daily(hold_check, time='11:27')
+
+def initial_slope_series():
+    length = g.N + g.M + g.K
+    data = attribute_history(g.ref_stock, length, '1d', ['high', 'low'])
+    multe_data = [get_ols(data.low[i:i + g.N], data.high[i:i + g.N]) for i in range(length - g.N)]
+    slopes = [i[1] for i in multe_data]
+    r2s = [i[2] for i in multe_data]
+    zscores = [get_zscore(slopes[i + 1:i + 1 + g.M]) * r2s[i + g.M] for i in range(g.K)]
+    return (slopes, zscores)
+'EXACT_REVIEWED_FUNCTION initial_stock_motion sha256=e3a40d5d52633a2deff2c3be97980f81a948032f19d74eade7a5167bcf78b020 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+
+def hold_check(context):
+    current_data = get_current_data()
+    if context.portfolio.positions:
+        for stk in context.portfolio.positions:
+            yesterday_di = attribute_history(stk, 1, '1d', ['close'])
+            dt = attribute_history(stk, g.lossN + 2, '60m', ['close'])
+            dt['man'] = dt.close / dt.close.rolling(g.lossN).mean()
+            if dt.man[-1] < 1.0 and current_data[stk].last_price * g.lossFactor <= yesterday_di['close'][-1]:
+                g.loss_cnt = 0
+                stk_dict = context.portfolio.positions[stk]
+                if stk_dict.closeable_amount:
+                    order_target_value(stk, 0)
+
+def get_rank(context, stock_pool):
+    rank = []
+    for stock in stock_pool:
+        data = attribute_history(stock, g.biasN + g.momentum_day, '1d', ['close'])
+        bias = (data.close / data.close.rolling(g.biasN).mean())[-g.momentum_day:]
+        score = np.polyfit(np.arange(g.momentum_day), bias / bias[0], 1)[0].real * 10000
+        adr = 100 * (data.close[-1] - data.close[-2]) / data.close[-2]
+        if stock == g.hold_stock:
+            raise_x = g.SwitchFactor
+        else:
+            raise_x = 1
+        rank.append([stock, score * raise_x, adr])
+        g.stock_motion[stock].append(score)
+        if len(g.stock_motion[stock]) > 5:
+            g.stock_motion[stock].pop(0)
+    rank.sort(key=lambda x: x[1], reverse=True)
+    return rank[0]
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore_slope sha256=a6b6498e0215ac0ae8083756b04ab585308e300619c9a28bafc7453203f3e1b2 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+
+def get_timing_signal(context, stock):
+    data = attribute_history(g.ref_stock, g.N, '1d', ['high', 'low'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    g.rsrs_score_history.append(rsrs_score)
+    rsrs_slope = get_zscore_slope(g.rsrs_score_history[-g.K:])
+    g.slope_series.pop(0)
+    g.rsrs_score_history.pop(0)
+    if rsrs_slope < 0 and rsrs_score > 0:
+        return 'SELL'
+    if rsrs_score > -g.score_threshold:
+        return 'BUY'
+    else:
+        return 'SELL'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=ff389f7c66135b57bd0e3985861e520815f16bd818f86c6f3076a0e92260b0d2 source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=319c2100eb2de907722b10f6836cf09ad0f36004a3ff2338cbd4e014aede4fe4 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION buy_stocks sha256=6abebb4b13ffc0cd68c6ae658caa0043e210df0da0615721d801881871f96164 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION my_trade_prepare sha256=f159ac45c7c5a1982824450da50c42b7bafd97c5298c329958a5dd54bd1d6d09 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION my_trade sha256=5a1821aaf36cc5ba1d58f50cf8185e0609f5947f5948bf044aa315e18897e7d7 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION my_sell2buy sha256=f2de74facd43c1e838afda662f5d60239e794a318764fdd96af8c45331b6955f source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION check_lose sha256=0d7346eccaca9f820602108d5c5696978c4b85e4f24e7c8acce21bc4ac2ac806 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=73dd0b225b79125998a6988076a4218a550fa612b090a8db46acb6553a0986bb source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'

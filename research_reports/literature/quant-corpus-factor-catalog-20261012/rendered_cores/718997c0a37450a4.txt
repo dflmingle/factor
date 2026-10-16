@@ -1,0 +1,36 @@
+quant/2020年度精选策略/69 阻力支撑相对强度（RSRS）指标择时策略.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+from sklearn import linear_model
+from numpy import mean, std
+'EXACT_REVIEWED_FUNCTION initialize sha256=f94612c27c59f910f4bcbaf727aa27d74793e24e3e9a4d302c5ea713cb386305 source=quant/2020年度精选策略/27 RSRS指标择时（30分钟线）.txt'
+
+def before_trading_start(context):
+    advance_high_array = attribute_history(context.stock_id, 400, '60m', 'high')
+    advance_low_array = attribute_history(context.stock_id, 400, '60m', 'low')
+    for i in range(context.n_value, context.m_value):
+        sliding_windows_high_array = advance_high_array[i - 18:i]
+        sliding_windows_low_array = advance_low_array[i - 18:i]
+        reg = linear_model.LinearRegression()
+        reg.fit(sliding_windows_low_array, sliding_windows_high_array)
+        beat = reg.coef_
+        context.beat_list.append(beat)
+
+def handle_data(context, data):
+    context.count = context.count + 1
+    if context.count % 60 == 0:
+        high_array = attribute_history(context.stock_id, 18, '60m', 'high')
+        low_array = attribute_history(context.stock_id, 18, '60m', 'low')
+        reg = linear_model.LinearRegression()
+        reg.fit(low_array, high_array)
+        beat = reg.coef_
+        R_sq = reg.score(low_array, high_array)
+        beat_z = R_sq * (beat - mean(context.beat_list)) / std(context.beat_list)
+        context.z_beta_r2_list.append(beat_z)
+        cash = context.portfolio.available_cash
+        if len(context.z_beta_r2_list) > 2:
+            if context.z_beta_r2_list[-2] < 0.7 and context.z_beta_r2_list[-1] > 0.7:
+                order_value(context.stock_id, cash)
+            if context.z_beta_r2_list[-2] > -0.7 and context.z_beta_r2_list[-1] < -0.7:
+                order_target_value(context.stock_id, 0)

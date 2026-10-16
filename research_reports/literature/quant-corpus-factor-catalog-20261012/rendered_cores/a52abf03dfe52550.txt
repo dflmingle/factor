@@ -1,0 +1,310 @@
+quant/2022年度精选策略/41.【研报复现】一梦春秋.txt
+import pandas as pd
+import numpy as np
+from jqdata import *
+import math
+from pandas import *
+from datetime import date, timedelta
+N = 48
+n = 5
+
+def get_one_trade_day_data(cache={}, stocks=None, trade_date=None):
+    trade_days = get_trade_days(start_date=None, end_date=trade_date, count=n)
+    factor_df_index = []
+    factor_df_data = []
+    for security in stocks:
+        price_info = get_price(security, start_date=None, end_date=trade_date, frequency='daily', fields=['paused', 'close'], skip_paused=False, fq='pre', count=n)
+        t_close = price_info.iloc[-1]['close']
+        if len(price_info.T.replace(1.0, np.nan).dropna().index.values.tolist()) == 0:
+            continue
+        sum_rd_var = 0.0
+        sum_rd_skew = 0.0
+        sum_rd_kurt = 0.0
+        for trade_day in trade_days:
+            if trade_day in cache.keys() and security in cache[trade_day].keys():
+                bars = cache[trade_day][security]
+            else:
+                bars = get_bars(security, N, unit='5m', fields=['date', 'open', 'high', 'low', 'close'], include_now=False, end_dt=trade_day + timedelta(days=1), fq_ref_date=None)
+                if trade_day not in cache.keys():
+                    cache[trade_day] = {}
+                cache[trade_day][security] = bars
+            sum_rt2 = 0.0
+            sum_rt3 = 0.0
+            sum_rt4 = 0.0
+            for i in range(1, N):
+                pi = math.log(bars[i]['close'])
+                pi_1 = math.log(bars[i - 1]['close'])
+                rt = pi - pi_1
+                sum_rt2 += math.pow(rt, 2)
+                sum_rt3 += math.pow(rt, 3)
+                sum_rt4 += math.pow(rt, 4)
+            rd_var = sum_rt2
+            if sum_rt3 == 0:
+                rd_skew = 0
+            else:
+                rd_skew = math.sqrt(N) * sum_rt3 / math.pow(rd_var, 3 / 2)
+            if sum_rt4 == 0:
+                rd_kurt = 0
+            else:
+                rd_kurt = N * sum_rt4 / math.pow(rd_var, 2)
+            sum_rd_var += rd_var
+            sum_rd_skew += rd_skew
+            sum_rd_kurt += rd_kurt
+        r_vol = math.sqrt(242.0 / n * sum_rd_var)
+        r_skew = 1.0 / n * sum_rd_skew
+        r_kurt = 1.0 / n * sum_rd_kurt
+        factor_df_index.append(security)
+        factor_df_data.append([t_close, r_vol, r_skew, r_kurt])
+    factor_df = pd.DataFrame(data=factor_df_data, index=factor_df_index, columns=['close', 'r_vol', 'r_skew', 'r_kurt'])
+    return factor_df
+
+def filter_stock(stocks, date):
+    stock_list = []
+    for stock in stocks:
+        start_date = get_security_info(stock).start_date
+        if start_date < date - timedelta(days=365):
+            stock_list.append(stock)
+    st_data = get_extras('is_st', stock_list, count=1, end_date=date)
+    stock_list = [stock for stock in stock_list if not st_data[stock][0]]
+    return stock_list
+start_date = date(2013, 1, 1)
+end_date = date(2019, 3, 27)
+trade_days = get_trade_days(start_date=start_date, end_date=end_date, count=None)
+cache = {}
+factor_dict = {}
+for i in range(0, len(trade_days)):
+    if i % n != 0:
+        continue
+    trade_day = trade_days[i]
+    stocks = get_index_stocks('000905.XSHG', trade_day)
+    stocks = filter_stock(stocks, trade_day)
+    factor_df = get_one_trade_day_data(cache=cache, stocks=stocks, trade_date=trade_day)
+    factor_dict[trade_day] = factor_df
+    if len(cache) > 5:
+        to_del_key_list = []
+        for key in cache.keys():
+            if key not in trade_days[i - 5:i]:
+                to_del_key_list.append(key)
+        for key in to_del_key_list:
+            del cache[key]
+import pickle
+pkl_file = open('factor_dict.pkl', 'wb')
+pickle.dump(factor_dict, pkl_file, 0)
+pkl_file.close()
+import pickle
+import matplotlib.pyplot as plt
+import numpy as np
+pkl_file = open('factor_dict.pkl', 'rb')
+factor_dict = pickle.load(pkl_file)
+pkl_file.close()
+import matplotlib.dates as mdate
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+market_vol = []
+market_skew = []
+market_kurt = []
+for date in factor_dict:
+    factor_df = factor_dict[date]
+    for i in range(0, len(factor_df)):
+        factor = factor_df.iloc[i]
+        market_vol.append(factor['r_vol'])
+        market_skew.append(factor['r_skew'])
+        market_kurt.append(factor['r_kurt'])
+color = '#1F77B4'
+
+def show_percent_factor_value(factor_dict, factor_name, legend_loc):
+    color_list = ['#5698c6', '#ff9e4a', '#60b760', '#e05c5d', '#ae8ccd']
+    label_list = ['10', '25', 'median', '75', '90']
+    y_list = [[], [], [], [], []]
+    for date in factor_dict:
+        factor_df = factor_dict[date]
+        day_factor_values = []
+        for i in range(0, len(factor_df)):
+            factor = factor_df.iloc[i]
+            day_factor_values.append(factor[factor_name])
+        day_factor_values = np.array(day_factor_values)
+        day_factor_values.sort()
+        q_list = [0.1, 0.25, 0.5, 0.75, 0.9]
+        for i in range(0, len(q_list)):
+            q_index = int(q_list[i] * len(day_factor_values))
+            factor_value = day_factor_values[q_index]
+            y_list[i].append(factor_value)
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.xaxis.set_major_formatter(mdate.DateFormatter('%Y%m%d'))
+    ax.xaxis.set_major_locator(mdate.DayLocator())
+    for i in range(0, len(y_list)):
+        yi = y_list[i]
+    x = np.arange(0, len(factor_dict), 50)
+    x_label = []
+    for i in range(0, len(factor_dict)):
+        if i in x:
+            date = list(factor_dict.keys())[i]
+            x_label.append(date)
+    legend = ax.legend(loc=legend_loc, shadow=False)
+show_percent_factor_value(factor_dict, 'r_vol', 'upper left')
+show_percent_factor_value(factor_dict, 'r_skew', 'lower left')
+show_percent_factor_value(factor_dict, 'r_kurt', 'upper left')
+
+def group_df(df, count):
+    length = int(len(df) / count)
+    groups = []
+    for i in range(0, count - 1):
+        groups.append(df[length * i:length * (i + 1)])
+    groups.append(df[length * (count - 1):])
+    return groups
+
+def show_factor_level_return_rate(ret_df, factor_dict, factor_name):
+    color_list = ['#5698c6', '#ff9e4a', '#60b760', '#e05c5d', '#ae8ccd']
+    label_list = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5']
+    y_list = [[], [], [], [], []]
+    for i in range(0, 5):
+        yi = y_list[i]
+        yi.append(0)
+    pre_date = None
+    for date in factor_dict:
+        if type(pre_date) == type(None):
+            pre_date = date
+            continue
+        factor_df = factor_dict[pre_date].dropna()
+        factor_df = factor_df.sort_values(by=factor_name)
+        ret = ret_df.loc[pre_date]
+        factor_df['ret'] = ret
+        groups = group_df(factor_df, 5)
+        for i in range(0, len(groups)):
+            yi = y_list[i]
+            current_ret = groups[i]['ret'].mean()
+            sum_ret = yi[len(yi) - 1] + current_ret
+            yi.append(sum_ret)
+        pre_date = date
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    for i in range(0, len(y_list)):
+        yi = y_list[i]
+    x = np.arange(0, len(factor_dict), 50)
+    x_label = []
+    for i in range(0, len(factor_dict)):
+        if i in x:
+            date = list(factor_dict.keys())[i]
+            x_label.append(date)
+    legend = ax.legend(loc='upper left', shadow=False)
+import pandas as pd
+ret_df_index = []
+ret_df_data = []
+for date in factor_dict:
+    ret_df_index.append(date)
+    factor_df = factor_dict[date]
+    close_df = factor_df.T
+    close_series = close_df.loc['close']
+    ret_df_data.append(close_series)
+ret_df = pd.DataFrame(data=ret_df_data, index=ret_df_index)
+ret_df = ret_df.pct_change()
+ret_df = ret_df.shift(-1)
+ret_df = ret_df.fillna(0)
+show_factor_level_return_rate(ret_df, factor_dict, 'r_vol')
+show_factor_level_return_rate(ret_df, factor_dict, 'r_skew')
+show_factor_level_return_rate(ret_df, factor_dict, 'r_kurt')
+
+def show_factor_bb_return_rate(ret_df, factor_dict, factor_name):
+    color = 'red'
+    label = '多空累计收益'
+    y_list = []
+    y_list.append(0)
+    pre_date = None
+    for date in factor_dict:
+        if type(pre_date) == type(None):
+            pre_date = date
+            continue
+        factor_df = factor_dict[pre_date].dropna()
+        factor_df = factor_df.sort_values(by=factor_name)
+        ret = ret_df.loc[pre_date]
+        factor_df['ret'] = ret
+        groups = group_df(factor_df, 5)
+        current_bb_ret = groups[0]['ret'].mean() - groups[4]['ret'].mean()
+        sum_bb_ret = y_list[len(y_list) - 1] + current_bb_ret
+        y_list.append(sum_bb_ret)
+        pre_date = date
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    x = np.arange(0, len(factor_dict), 50)
+    x_label = []
+    for i in range(0, len(factor_dict)):
+        if i in x:
+            date = list(factor_dict.keys())[i]
+            x_label.append(date)
+    legend = ax.legend(loc='upper left', shadow=False)
+show_factor_bb_return_rate(ret_df, factor_dict, 'r_vol')
+show_factor_bb_return_rate(ret_df, factor_dict, 'r_skew')
+show_factor_bb_return_rate(ret_df, factor_dict, 'r_kurt')
+import scipy.stats as st
+
+def show_factor_ic(ret_df, factor_dict, factor_name):
+    color_list = ['#2B4C80', '#B00004']
+    label_list = ['IC', 'IC均值(12期)']
+    ic_list = []
+    ic_ma_list = []
+    y_list = [ic_list, ic_ma_list]
+    for date in factor_dict:
+        factor_list = factor_dict[date][factor_name]
+        ret_list = ret_df.loc[date]
+        new_ret_list = []
+        for i, v in factor_list.items():
+            ret = ret_list[i]
+            new_ret_list.append(ret)
+        ic = st.pearsonr(new_ret_list, factor_list)[0]
+        ic_list.append(ic)
+    ic_list = np.array(ic_list)
+    for i in range(0, len(ic_list)):
+        if i < 12:
+            ic_ma_list.append(np.nan)
+            continue
+        ic_ma = np.array(ic_list[i - 12:i]).mean()
+        ic_ma_list.append(ic_ma)
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    for i in range(0, len(y_list)):
+        yi = y_list[i]
+    x = np.arange(0, len(factor_dict), 50)
+    x_label = []
+    for i in range(0, len(factor_dict)):
+        if i in x:
+            date = list(factor_dict.keys())[i]
+            x_label.append(date)
+    legend = ax.legend(loc='lower center', shadow=False)
+show_factor_ic(ret_df, factor_dict, 'r_vol')
+show_factor_ic(ret_df, factor_dict, 'r_skew')
+show_factor_ic(ret_df, factor_dict, 'r_kurt')
+
+def show_factor_turnover_rate(factor_dict, factor_name):
+    y_list = [[], []]
+    y_list[0].append(np.nan)
+    y_list[1].append(np.nan)
+    pre_date = None
+    for date in factor_dict:
+        if type(pre_date) == type(None):
+            pre_date = date
+            continue
+        pre_factor_df = factor_dict[pre_date].dropna()
+        pre_factor_df = pre_factor_df.sort_values(by=factor_name)
+        pre_groups = group_df(pre_factor_df, 5)
+        cur_factor_df = factor_dict[date].dropna()
+        cur_factor_df = cur_factor_df.sort_values(by=factor_name)
+        cur_groups = group_df(cur_factor_df, 5)
+        g1_merge = pd.merge(pre_groups[0], cur_groups[0], on=[factor_name])
+        y_list[0].append(1 - len(g1_merge) / len(pre_groups[0]))
+        g5_merge = pd.merge(pre_groups[4], cur_groups[4], on=[factor_name])
+        y_list[1].append(1 - len(g5_merge) / len(pre_groups[4]))
+        pre_date = date
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    x = np.arange(0, len(factor_dict))
+    x = np.arange(0, len(factor_dict), 50)
+    x_label = []
+    for i in range(0, len(factor_dict)):
+        if i in x:
+            date = list(factor_dict.keys())[i]
+            x_label.append(date)
+    legend = ax.legend(loc='lower left', shadow=False)
+show_factor_turnover_rate(factor_dict, 'r_vol')
+show_factor_turnover_rate(factor_dict, 'r_skew')
+show_factor_turnover_rate(factor_dict, 'r_kurt')

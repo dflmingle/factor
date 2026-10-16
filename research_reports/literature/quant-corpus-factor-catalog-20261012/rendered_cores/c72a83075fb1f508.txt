@@ -1,0 +1,83 @@
+quant/聚宽2025年精选/5四大搅屎棍策略.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+from six import StringIO, BytesIO
+import talib
+
+def initialize(context):
+    g.stock_num = 10
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.num = 1
+    run_daily(prepare_stock_list, '9:05')
+    run_weekly(weekly_adjustment, 1, '9:30')
+    run_daily(check_limit_up, '14:00')
+SW1 = {'801010': '农林牧渔I', '801020': '采掘I', '801030': '化工I', '801040': '钢铁I', '801050': '有色金属I', '801060': '建筑建材I', '801070': '机械设备I', '801080': '电子I', '801090': '交运设备I', '801100': '信息设备I', '801110': '家用电器I', '801120': '食品饮料I', '801130': '纺织服装I', '801140': '轻工制造I', '801150': '医药生物I', '801160': '公用事业I', '801170': '交通运输I', '801180': '房地产I', '801190': '金融服务I', '801200': '商业贸易I', '801210': '休闲服务I', '801220': '信息服务I', '801230': '综合I', '801710': '建筑材料I', '801720': '建筑装饰I', '801730': '电气设备I', '801740': '国防军工I', '801750': '计算机I', '801760': '传媒I', '801770': '通信I', '801780': '银行I', '801790': '非银金融I', '801880': '汽车I', '801890': '机械设备I', '801950': '煤炭I', '801960': '石油石化I', '801970': '环保I', '801980': '美容护理I'}
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+industry_code = ['801010', '801020', '801030', '801040', '801050', '801080', '801110', '801120', '801130', '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', '801790', '801880', '801890']
+'EXACT_REVIEWED_FUNCTION industry sha256=96bd3dcbe7a4f0b09a4d732f3ecb9dfed427881511a9559d9b56cdb1d05a5c38 source=quant/聚宽2025年精选/51“四大搅屎棍策略”学习笔记-有魔改.txt'
+'EXACT_REVIEWED_FUNCTION getStockIndustry sha256=b46466e2d19190b26e4a96ddde775c88cb120b9d4be3e6e9da8b2a13b303d04b source=quant/2023年度精选策略/96.市场宽度20210622.txt'
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    today = context.current_dt
+    final_list = []
+    initial_list = get_index_stocks('000985.XSHG', today)
+    p_count = 1
+    p_industries_type = 'sw_l1'
+    h = get_price(initial_list, end_date=yesterday, frequency='1d', fields=['close'], count=p_count + 20, panel=False)
+    h['date'] = pd.DatetimeIndex(h.time).date
+    df_close = h.pivot(index='code', columns='date', values='close').dropna(axis=0)
+    df_ma20 = df_close.rolling(window=20, axis=1).mean().iloc[:, -p_count:]
+    df_bias = df_close.iloc[:, -p_count:] > df_ma20
+    s_stk_2_ind = getStockIndustry(p_stocks=initial_list, p_industries_type=p_industries_type, p_day=yesterday)
+    df_bias['industry_code'] = s_stk_2_ind
+    df_ratio = (df_bias.groupby('industry_code').sum() * 100.0 / df_bias.groupby('industry_code').count()).round()
+    column_names = df_ratio.columns.tolist()
+    top_values = df_ratio[datetime.date(yesterday.year, yesterday.month, yesterday.day)].nlargest(g.num)
+    I = top_values.index.tolist()
+    sum_of_top_values = df_ratio.sum()
+    TT = sum_of_top_values[datetime.date(yesterday.year, yesterday.month, yesterday.day)]
+    name_list = [SW1[code] for code in I]
+    if '801780' not in I and '801050' not in I and ('801950' not in I) and ('801040' not in I):
+        S_stocks = get_index_stocks('399101.XSHE', today)
+        stocks = filter_kcbj_stock(S_stocks)
+        choice = filter_st_stock(stocks)
+        choice = filter_new_stock(context, choice)
+        BIG_stock_list = get_fundamentals(query(valuation.code).filter(valuation.code.in_(choice), indicator.roe > 0.15, indicator.roa > 0.1).order_by(valuation.market_cap.asc()).limit(g.stock_num)).set_index('code').index.tolist()
+        BIG_stock_list = filter_paused_stock(BIG_stock_list)
+        BIG_stock_list = filter_limitup_stock(context, BIG_stock_list)
+        L = filter_limitdown_stock(context, BIG_stock_list)
+    else:
+        L = []
+    return L
+
+def weekly_adjustment(context):
+    target_B = get_stock_list(context)
+    for stock in g.hold_list:
+        if stock not in target_B and stock not in g.yesterday_HL_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_B)
+    if target_num > position_count:
+        buy_num = min(len(target_B), g.stock_num * g.num - position_count)
+        value = context.portfolio.cash / buy_num
+        for stock in target_B:
+            if stock not in list(context.portfolio.positions.keys()):
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=5e68dad3789f3dcd9dbc75f23be4ae635975bea8cb208d7f9640cf85a81be542 source=quant/2024年度精选策略1/23.wywy1995大神机器学习策略年化提升35pt.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'

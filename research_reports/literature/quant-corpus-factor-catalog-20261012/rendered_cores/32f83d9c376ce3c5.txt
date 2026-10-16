@@ -1,0 +1,66 @@
+quant/2024年度精选策略2/62.【重构】C-VIX 中国版 VIX 编制手册.txt
+from typing import Dict, List, Tuple, Union
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import empyrical as ep
+from data_service import get_interpld_shibor, get_shibor_data, prepare_data, query_china_shibor_all
+from jqdata import *
+from scr.calc_func import CVIX, prepare_data2calc, get_n_next_ret, get_quantreg_res, create_quantile_bound
+from scr.plotting import plot_group_ret, plot_hist2d, plot_indicator, plot_quantreg_res
+from scr.utils import load_csv
+mpl.rcParams['font.sans-serif'] = ['SimHei']
+mpl.rcParams['axes.unicode_minus'] = False
+start, end = ('2015-02-09', '2022-05-27')
+opt_data = prepare_data('510050.XSHG', start, end)
+shibor_df = get_shibor_data(start, end)
+interpld_shibor = get_interpld_shibor(shibor_df)
+opt_data.to_csv('../Data/opt_data.csv')
+interpld_shibor.to_csv('../Data/interpld_shibor.csv')
+opt_data: pd.DataFrame = pd.read_csv('Data/opt_data.csv', index_col=[0], parse_dates=['date'])
+interpld_shibor: pd.DataFrame = pd.read_csv('Data/interpld_shibor.csv', index_col=[0], parse_dates=True)
+interpld_shibor.columns = list(map(int, interpld_shibor.columns))
+price: pd.DataFrame = load_csv('.\\Data\\price.csv')
+sz50: pd.DataFrame = price.query('code == "000016.XSHG"').copy()
+sz50: pd.DataFrame = sz50.set_index('datetime').drop(columns=['code'])
+hs300: pd.DataFrame = price.query('code == "000300.XSHG"').copy()
+hs300: pd.DataFrame = hs300.set_index('datetime').drop(columns=['code'])
+data_all = prepare_data2calc(opt_data, interpld_shibor)
+vix_func = CVIX(data_all)
+vix: pd.Series = vix_func.vix()
+skew: pd.Series = vix_func.skew()
+fig, axes = plt.subplots(2, figsize=(18, 12), sharex=False)
+plot_indicator(sz50['close'], vix, ['上证50', 'VIX'], ['上证50', 'VIX'], 'VIX与上证50', ax=axes[0])
+plot_indicator(sz50['close'], skew, ['上证50', 'STEW'], ['上证50', 'STEW'], 'STEW与上证50', ax=axes[1])
+fig, axes = plt.subplots(2, figsize=(18, 12), sharex=False)
+plot_indicator(hs300['close'], vix, ['沪深300', 'VIX'], ['沪深300', 'VIX'], 'VIX与沪深300', ax=axes[0])
+plot_indicator(hs300['close'], skew, ['沪深300', 'STEW'], ['沪深300', 'STEW'], 'STEW与沪深300', ax=axes[1])
+algin_next_chg, algin_vix = get_n_next_ret(sz50['close'], vix)
+models_dic: Dict = {name: get_quantreg_res(algin_vix, ser) for name, ser in algin_next_chg.items()}
+fig, axes = plt.subplots(3, 3, figsize=(18, 15))
+for (k, v), ax in zip(models_dic.items(), axes):
+    plot_quantreg_res(v, title=k, ax=ax[0])
+    plot_group_ret(algin_vix, algin_next_chg[k], title=k, ax=ax[1])
+    plot_hist2d(algin_vix, algin_next_chg[k], title=k, ax=ax[2])
+algin_next_chg, algin_vix = get_n_next_ret(hs300['close'], vix)
+models_dic: Dict = {name: get_quantreg_res(algin_vix, ser) for name, ser in algin_next_chg.items()}
+fig, axes = plt.subplots(3, 3, figsize=(18, 15))
+for (k, v), ax in zip(models_dic.items(), axes):
+    plot_quantreg_res(v, title=k, ax=ax[0])
+    plot_group_ret(algin_vix, algin_next_chg[k], title=k, ax=ax[1])
+    plot_hist2d(algin_vix, algin_next_chg[k], title=k, ax=ax[2])
+from scr.bt_func import get_backtesting, vix_over_quantile_bound_strategy, analysis_trade, analysis_rets
+from scr.plotting import plot_algorithm_nav, plot_qunatile_signal
+plot_qunatile_signal(sz50['close'], vix, 60, (85, 20), '上证50指数走势与信号的关系')
+quantile_bound: pd.DataFrame = create_quantile_bound(vix, 60, (85, 20))
+data_all: pd.DataFrame = pd.concat((sz50, quantile_bound), axis=1).dropna()
+res = get_backtesting(data_all, '000016.SH', vix_over_quantile_bound_strategy)
+analysis_rets(sz50['close'], res.result)
+analysis_trade(sz50, res.result)
+plot_qunatile_signal(hs300['close'], vix, 60, (85, 20), '沪深300指数走势与信号的关系')
+data_all: pd.DataFrame = pd.concat((hs300, quantile_bound), axis=1).dropna()
+res1 = get_backtesting(data_all, '000300.SH', vix_over_quantile_bound_strategy)
+analysis_rets(hs300['close'], res1.result)
+analysis_trade(hs300, res1.result)

@@ -1,0 +1,98 @@
+quant/2022年度精选策略/33.ETF单均线跟踪轮动.txt
+"""EXACT_REVIEWED_FUNCTION initialize sha256=507bbc3c7a2e4f1e57807f9c530a607b5733d4e37a9f594d7ecae19d990d4ec8 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt"""
+
+def set_params():
+    g.lag = 13
+    g.hour = 14
+    g.minute = 25
+    g.hs = '000300.XSHG'
+    g.zz = '399006.XSHE'
+    g.sz = '000016.XSHG'
+    g.ETF300 = '000300.XSHG'
+    g.ETF500 = '399006.XSHE'
+    g.ETF50 = '000016.XSHG'
+    g.ETFrili = '511880.XSHG'
+'EXACT_REVIEWED_FUNCTION set_variables sha256=843c5fa84b9901b61fbf4adfb6db797966af6962bd57c583c4c901ca17348ef5 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=fb674383d7b825a635aaa8059d4d2564e67dec1c38c6c005542d4e5f978bf5e8 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+
+def handle_data(context, data):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == g.hour and minute == g.minute:
+        signal = get_signal(context)
+        if signal == 'sell_the_stocks':
+            sell_the_stocks(context)
+        elif signal == 'ETF300' or signal == 'ETF500':
+            buy_the_stocks(context, signal)
+        elif signal == 's500b300':
+            sell_the_stocks(context)
+            buy_the_stocks(context, 'ETF300')
+        elif signal == 'sell_the_stocks':
+            sell_the_stocks(context)
+            buy_the_stocks(context, 'ETF500')
+        elif signal == 's500b50':
+            sell_the_stocks(context)
+            buy_the_stocks(context, 'ETF50')
+        elif signal == 's300b50':
+            sell_the_stocks(context)
+            buy_the_stocks(context, 'ETF50')
+        elif signal == 's50b300':
+            sell_the_stocks(context)
+            buy_the_stocks(context, 'ETF300')
+        elif signal == 's50b500':
+            sell_the_stocks(context)
+            buy_the_stocks(context, 'ETF500')
+
+def get_signal(context):
+    hs300, cp300, av300 = getStockPrice(g.hs, g.lag)
+    zz500, cp500, av500 = getStockPrice(g.zz, g.lag)
+    sz50, cp50, av50 = getStockPrice(g.sz, g.lag)
+    hs300increase = (cp300 - hs300) / hs300
+    zz500increase = (cp500 - zz500) / zz500
+    sz50increase = (cp50 - sz50) / sz50
+    hold300 = context.portfolio.positions[g.ETF300].total_amount
+    hold500 = context.portfolio.positions[g.ETF500].total_amount
+    hold50 = context.portfolio.positions[g.ETF50].total_amount
+    if hold300 > 0 and cp300 < av300 and (cp500 < av500) and (cp50 < av50) or (hold500 > 0 and cp300 < av300 and (cp500 < av500) and (cp50 < av50)) or (hold50 > 0 and cp300 < av300 and (cp500 < av500) and (cp50 < av50)):
+        return 'sell_the_stocks'
+    elif hs300increase > zz500increase and hs300increase > sz50increase and (hold300 == 0 and hold500 == 0 and (hold50 == 0)) and (cp300 > av300):
+        return 'ETF300'
+    elif zz500increase > hs300increase and zz500increase > sz50increase and (hold50 == 0 and hold300 == 0 and (hold500 == 0)) and (cp500 > av500):
+        return 'ETF500'
+    elif sz50increase > hs300increase and sz50increase > zz500increase and (hold50 == 0 and hold300 == 0 and (hold500 == 0)) and (cp500 > av500):
+        return 'ETF50'
+    elif hold500 > 0 and zz500increase < hs300increase and (hs300increase > sz50increase) and (cp300 > av300):
+        return 's500b300'
+    elif hold500 > 0 and zz500increase < sz50increase and (hs300increase < sz50increase) and (cp50 > av50):
+        return 's500b50'
+    elif hold300 > 0 and zz500increase > hs300increase and (zz500increase > sz50increase) and (cp500 > av500):
+        return 's300b500'
+    elif hold300 > 0 and sz50increase > hs300increase and (sz50increase > zz500increase) and (cp50 > av50):
+        return 's300b50'
+    elif hold50 > 0 and hs300increase > sz50increase and (hs300increase > zz500increase) and (cp300 > av300):
+        return 's50b300'
+    elif hold50 > 0 and zz500increase > sz50increase and (zz500increase > hs300increase) and (cp500 > av500):
+        return 's50b500'
+
+def getStockPrice(stock, interval):
+    h = attribute_history(stock, interval * 240, unit='1m', fields='close', skip_paused=True)
+    return (h['close'].values[0], h['close'].values[-1], h['close'].mean())
+
+def getCurrentPrice(stock):
+    h = attribute_history(stock, 1, unit='1m', fields='close', skip_paused=True)
+    return h['close'].values[-1]
+
+def sell_the_stocks(context):
+    for stock in context.portfolio.positions.keys():
+        return (log.info('Selling %s' % stock), order_target_value(stock, 0), order_value('511880.XSHG', context.portfolio.cash))
+
+def buy_the_stocks(context, signal):
+    holdrili = context.portfolio.positions[g.ETFrili].total_amount
+    prili = getCurrentPrice(g.ETFrili)
+    if holdrili == 0:
+        return (log.info('Buying %s' % signal), order_value(eval('g.%s' % signal), context.portfolio.cash))
+    elif holdrili != 0:
+        return (log.info('Buying %s' % signal), order_target_value(g.ETFrili, 0), order_value(eval('g.%s' % signal), holdrili * prili))
+'EXACT_REVIEWED_FUNCTION after_trading_end sha256=748f31e4628f9b9d6e2b8cdf801a53cb2b99bb3dfe04a3a125ef8eac67247776 source=quant/2020年度精选策略/92 多因子选股策略.txt'

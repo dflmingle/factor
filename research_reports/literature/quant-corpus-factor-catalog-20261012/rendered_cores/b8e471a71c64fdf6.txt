@@ -1,0 +1,225 @@
+quant/2021年度精选策略/90.超稳+翻倍，贝塔值只有0.048的期指策略.txt
+from jqdata import *
+import talib as tl
+import datetime as dt, numpy as np, pandas as pd
+
+def initialize(context):
+    g.leverage = 5
+    g.max_net = context.portfolio.total_value
+    g.pcr_list = []
+    g.pcr_list_ = []
+    g.multiplier = 300
+    g.max_hold_days = 3
+    g.margin = 0.1
+    g.pcr_flag = 0
+    g.hold_days = 0
+    g.volume_thresh = False
+    g.corr = np.nan
+    g.corr_ = np.nan
+    g.ind = np.nan
+    g.ind_ = np.nan
+    g.hold_ins = ''
+    g.code = '510050.XSHG'
+    g.d = 20
+    g.corr = False
+    g.corr_ = False
+    g.trade_days = list(get_all_trade_days())
+    g.thresh = 2
+    run_daily(before_market_open, time='09:00', reference_security='IH8888.CCFX')
+    run_daily(discount_close, time='09:40', reference_security='IH8888.CCFX')
+    run_daily(market_open, time='14:30', reference_security='IH8888.CCFX')
+    run_daily(discount, time='14:56', reference_security='IH8888.CCFX')
+    run_daily(after_market_close, time='15:30', reference_security='IH8888.CCFX')
+
+def before_market_open(context):
+    g.ih = get_future_contracts('IH')[0]
+    g.main = get_dominant_future('IF')
+    g.hands = min(calc_hands(context), 20)
+    today = context.current_dt.date()
+    nextday = g.trade_days[g.trade_days.index(today) + 1]
+    g.skip = True if (nextday - today).days > 5 else False
+    g.lc = False
+    if g.pcr_flag != 0:
+        g.hold_days += 1
+
+def market_open(context):
+    lostControl(context)
+    if g.hold_ins:
+        end = get_security_info(g.hold_ins).end_date
+        today = context.current_dt.date()
+        if (pd.to_datetime(end) - pd.to_datetime(today)).days < 2:
+            g.pcr_flag = 0
+            g.hold_ins = ''
+            g.hold_days = 0
+            closePosition(context)
+    if g.lc or g.ind == -1:
+        return
+    if g.volume_thresh and g.pcr_flag != -1 and (g.ind > 17 or g.ind_ > 17) and (g.corr or g.corr_):
+        if g.pcr_flag == 0:
+            g.pcr_flag = 1
+        g.hold_days += 1
+        order(g.ih, g.hands, None, 'long')
+        g.hold_ins = g.ih
+    elif g.volume_thresh and g.pcr_flag != 1 and (g.ind < 2 or g.ind_ < 2) and (g.corr or g.corr_):
+        if g.pcr_flag == 0:
+            g.pcr_flag = -1
+        g.hold_days += 1
+        order(g.ih, g.hands, None, 'short')
+        g.hold_ins = g.ih
+
+def discount(context):
+    if g.pcr_flag != 0 or g.skip:
+        return
+    cash = context.portfolio.available_cash
+    leverage = 2
+    df = attribute_history(g.main, 60, '1m', ['close', 'volume'])
+    df.volume /= df.volume.sum()
+    settle = (df.close * df.volume).sum()
+    close = df.close[-1]
+    qty = min(int(cash / close / g.multiplier * leverage), 20)
+    date = str(context.current_dt.date())
+    start = date + ' 14:00:00'
+    end = date + ' 14:56:00'
+    t = get_ticks(g.main, start_dt=start, end_dt=end, fields=['a1_v', 'b1_v'])
+    buy = t['b1_v'].sum()
+    sell = t['a1_v'].sum()
+    imba = 2 * (buy - sell) / (buy + sell)
+    mul = 1
+    if close > settle * (1 + g.thresh / 1000):
+        mul += 1 / leverage
+    if abs(imba) > 0.5:
+        mul += 1 / leverage
+    if -0.5 < imba < -0.2:
+        return
+    macd_dirc = get_macd_direct(g.code, context.current_dt, '1d')
+    if macd_dirc > 0:
+        order(g.main, int(qty * mul))
+
+def discount_close(context):
+    if g.pcr_flag == 0:
+        code = context.portfolio.positions.keys()
+        for c in code:
+            order_target(c, 0)
+
+def after_market_close(context):
+    g.max_net = max(g.max_net, context.portfolio.total_value)
+    today = context.current_dt.date()
+    df = opt.run_query(query(opt.OPT_CONTRACT_INFO).filter(opt.OPT_CONTRACT_INFO.underlying_symbol == g.code, opt.OPT_CONTRACT_INFO.list_date < today, opt.OPT_CONTRACT_INFO.expire_date > today))
+    call = df[df['contract_type'] == 'CO'].code.tolist()
+    put = df[df['contract_type'] == 'PO'].code.tolist()
+    call_money = get_price(call, end_date=today, fields='money', count=1, panel=False)
+    call_volume = get_price(call, end_date=today, fields='volume', count=1, panel=False)
+    put_money = get_price(put, end_date=today, fields='money', count=1, panel=False)
+    put_volume = get_price(put, end_date=today, fields='volume', count=1, panel=False)
+    pcr = round(put_money.money.sum() / call_money.money.sum(), 4)
+    pcr_ = round(put_volume.volume.sum() / call_volume.volume.sum(), 4)
+    g.pcr_list.append(pcr)
+    g.pcr_list_.append(pcr_)
+    etf_return = get_price(g.code, end_date=today, fields='close', count=21, panel=False).close.pct_change().dropna().tolist()
+    if len(g.pcr_list) > 20:
+        g.pcr_list = g.pcr_list[-20:]
+        g.pcr_list_ = g.pcr_list_[-20:]
+        a = pd.Series(etf_return[-10:])
+        b = pd.Series(g.pcr_list[-10:])
+        b_ = pd.Series(g.pcr_list_[-10:])
+        g.corr = a.corr(b) < -0.65
+        g.corr_ = a.corr(b_) < -0.65
+        g.spread = pd.Series(etf_return) * 100 - pd.Series(g.pcr_list)
+        g.spread_ = pd.Series(etf_return) * 100 - pd.Series(g.pcr_list_)
+        try:
+            g.ind = sorted(g.spread).index(g.spread.values[-1])
+            g.ind_ = sorted(g.spread_).index(g.spread_.values[-1])
+        except:
+            g.ind = np.nan
+            g.ind_ = np.nan
+    szcz = get_price('399001.XSHE', end_date=today, fields='money', count=10, panel=False) / 100000000.0
+    szzz = get_price('000001.XSHG', end_date=today, fields='money', count=10, panel=False) / 100000000.0
+    vol = (szcz + szzz).money.astype(int).values.tolist()
+    g.volume_thresh = True if sorted(vol, reverse=True).index(vol[-1]) < 2 else False
+
+def calc_hands(context):
+    money = context.portfolio.total_value
+    price = attribute_history(g.ih, 1, '1d', 'close').close.values[0]
+    hands = int(money / price / g.multiplier * g.leverage)
+    return hands
+
+def lostControl(context):
+    profit = np.nan
+    net = context.portfolio.total_value
+    if g.pcr_flag == 1:
+        posi = context.portfolio.long_positions
+        for p in posi.values():
+            cost = p.avg_cost
+            now = p.price
+            profit = (now - cost) * g.multiplier * g.hands
+    elif g.pcr_flag == -1:
+        posi = context.portfolio.short_positions
+        for p in posi.values():
+            cost = p.avg_cost
+            now = p.price
+            profit = (cost - now) * g.multiplier * g.hands
+    if net < 0.9 * g.max_net:
+        g.hold_days = 0
+        g.max_net = context.portfolio.total_value
+        g.pcr_flag = 0
+        g.hold_ins = ''
+        g.lc = True
+        closePosition(context)
+    elif profit / net > 0.2:
+        g.hold_days = 0
+        g.pcr_flag = 0
+        g.hold_ins = ''
+        g.lc = True
+        closePosition(context)
+    elif g.hold_days >= g.max_hold_days:
+        g.hold_days = 0
+        g.pcr_flag = 0
+        g.hold_ins = ''
+        g.lc = True
+        closePosition(context)
+
+def closePosition(context):
+    if g.pcr_flag == 1:
+        long_posi = context.portfolio.long_positions
+        for p in long_posi.values():
+            s = p.security
+            order_target(s, 0, None, 'long')
+    elif g.pcr_flag == -1:
+        short_posi = context.portfolio.short_positions
+        for p in short_posi.values():
+            s = p.security
+            order_target(s, 0, None, 'short')
+    elif g.pcr_flag == 0:
+        long_posi = context.portfolio.long_positions
+        for p in long_posi.values():
+            s = p.security
+            order_target(s, 0, None, 'long')
+        short_posi = context.portfolio.short_positions
+        for p in short_posi.values():
+            s = p.security
+            order_target(s, 0, None, 'short')
+'EXACT_REVIEWED_FUNCTION cancelOrder sha256=2ee1efd789853913b3c15f64670d7327def866f2769579d35a1bfafc995beb53 source=quant/2021年度精选策略/73.基于期权PCR与标的波动率价差的股指期货套利.txt'
+'EXACT_REVIEWED_FUNCTION get_CCFX_end_date sha256=68d1d2166c7739a5ca3c5864963df9cb1f5edf8d1c2a50befec1cd4ecc85544e source=quant/2021年度精选策略/71.【股指策略】【研报复现】周内与日内结合CTA.txt'
+
+def MACD(close, fastperiod, slowperiod, signalperiod):
+    macd_diff, macd_dea, macd = tl.MACDEXT(close, fastperiod=fastperiod, fastmatype=1, slowperiod=slowperiod, slowmatype=1, signalperiod=signalperiod, signalmatype=1)
+    macd = macd * 2
+    return (macd_diff, macd_dea, macd)
+
+def get_macd(stock, count, end_date, unit):
+    data = get_bars(security=stock, count=count, unit=unit, include_now=True, end_dt=end_date, fq_ref_date=None)
+    close = data['close']
+    return MACD(close, 12, 26, 9)
+
+def get_macd_direct(stock, end_date, unit):
+    macd_diff, macd_dea, macd_list = get_macd(stock, 100, end_date, unit)
+    if macd_list[-1] >= macd_list[-2]:
+        if macd_list[-1] > 0:
+            return 2
+        else:
+            return 1
+    elif macd_list[-1] > 0:
+        return -1
+    else:
+        return -2
+'EXACT_REVIEWED_FUNCTION position_auto_switch sha256=06d6c5818b529b5424930bf0ca28dac0c4d81c14a600e4213714892d4bb9a17b source=quant/2021年度精选策略/72.【股指期货】收盘折溢价策略.txt'

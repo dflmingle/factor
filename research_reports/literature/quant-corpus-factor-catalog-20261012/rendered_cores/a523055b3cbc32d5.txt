@@ -1,0 +1,37 @@
+quant/2022年度精选策略/84.MACD新研究，配合ETF十年稳稳的幸福.txt
+import numpy as np
+from jqdata import *
+import talib
+
+def initialize(context):
+    g.buylist = ['510300.XSHG']
+    g.idxwarn = nan
+    g.runtime = '9:30'
+    run_daily(deal, time=g.runtime, reference_security='000300.XSHG')
+
+def kData(context, stock, countNum):
+    return attribute_history(stock, count=countNum, unit='1d', fields=['open', 'close', 'high', 'low', 'volume', 'money', 'high_limit', 'low_limit'], skip_paused=True, df=False, fq='pre')
+
+def macdSignal(context, idx='000300.XSHG'):
+    pdata = kData(context, idx, 60)
+    idxc = pdata['close']
+    price = array(idxc)
+    macd = talib.MACD(price, fastperiod=5, slowperiod=15, signalperiod=7)[-1]
+    if sum(macd[-20:-5]) > 0:
+        if macd[-1] > 0:
+            return 0
+        elif sum(macd[-5:]) > 0:
+            return 1
+    return 2
+
+def deal(context):
+    g.idxwarn = macdSignal(context)
+    stock_count = len(list(context.portfolio.positions.keys()))
+    if stock_count > 0 and g.idxwarn == 1:
+        for stock in context.portfolio.positions:
+            order_target_value(stock, 0)
+    if g.idxwarn != 0 or stock_count > 0:
+        return
+    cash = context.portfolio.available_cash / len(g.buylist)
+    for stock in g.buylist:
+        order_value(stock, cash)

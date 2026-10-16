@@ -1,0 +1,62 @@
+quant/2024年度精选策略1/20.有赚就好-小市值剥头皮改进 2年3.86%回撤.txt
+import talib
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.choice = 500
+    g.amount = 7
+    g.muster = []
+    g.bucket = []
+    g.summit = {}
+    run_daily(buy, time='9:30', reference_security='399303.XSHE')
+    run_daily(sell, time='10:30', reference_security='399303.XSHE')
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_kcbj_stock(stock_list):
+    for stock in stock_list[:]:
+        if stock[0] == '4' or stock[0] == '8' or stock[:2] == '68' or (stock[:2] == '30'):
+            stock_list.remove(stock)
+    return stock_list
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'
+
+def before_trading_start(context):
+    fundamentals_data = get_fundamentals(query(valuation.code, valuation.market_cap).order_by(valuation.market_cap.asc()).limit(g.choice))
+    stocks = list(fundamentals_data['code'])
+    current_data = get_current_data()
+    g.muster = [s for s in stocks if not current_data[s].paused and (not current_data[s].is_st) and ('ST' not in current_data[s].name) and ('*' not in current_data[s].name) and ('退' not in current_data[s].name) and (current_data[s].low_limit < current_data[s].day_open < current_data[s].high_limit)]
+    g.muster = filter_paused_stock(g.muster)
+    g.muster = filter_st_stock(g.muster)
+    g.muster = filter_kcbj_stock(g.muster)
+    g.muster = filter_limitup_stock(context, g.muster)
+    g.muster = filter_limitdown_stock(context, g.muster)
+
+def sell(context):
+    data_today = get_current_data()
+    for s in context.portfolio.positions:
+        order_target(s, 0)
+
+def buy(context):
+    data_today = get_current_data()
+    available_slots = g.amount - len(context.portfolio.positions)
+    if available_slots <= 0:
+        return
+    allocation = context.portfolio.cash / available_slots
+    for s in g.muster:
+        if len(context.portfolio.positions) == g.amount:
+            break
+        if history(5, '1d', 'paused', s).max().values[0] == 0:
+            low = history(4, '1d', 'low', s).min().values[0]
+            high = history(4, '1d', 'high', s).max().values[0]
+            precent = (high - low) / low * 100
+            if precent <= 10:
+                open_price_today = data_today[s].day_open
+                prev_close = get_price(s, count=1, end_date=context.previous_date).iloc[-1]['close']
+                his = history(60, '1d', 'close', s)
+                ema = talib.EMA(his.values.flatten(), timeperiod=5)[-1]
+                if prev_close > ema:
+                    if get_price(s, count=1, end_date=context.previous_date).iloc[-1]['low'] > open_price_today:
+                        order(s, int(allocation / open_price_today))

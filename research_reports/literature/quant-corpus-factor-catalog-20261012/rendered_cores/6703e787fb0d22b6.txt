@@ -1,0 +1,33 @@
+quant/聚宽2025年精选/19机器学习线性回归小市值.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 1
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.factor_list = [(['ARBR', 'SGAI', 'net_profit_to_total_operate_revenue_ttm', 'retained_profit_per_share'], [-3.894481386287797e-19, 6.051549381361553e-05, -0.00013489470173496827, -0.0006228721291235472]), (['Price1Y', 'total_profit_to_cost_ratio', 'VOL120'], [-0.007686604605324844, -0.001064082235156668, -0.0006372186835828526]), (['price_no_fq', 'total_profit_to_cost_ratio', 'inventory_turnover_rate'], [-0.00022239096483198066, -0.0003400190412564607, -1.2360751761544718e-08]), (['debt_to_assets', 'operating_cost_to_operating_revenue_ratio', 'DAVOL20', 'price_no_fq', 'sales_growth'], [-0.0013461722141220884, 0.001285717224773847, -0.003021350121015241, -0.00023334854089909846, 0.0002343967416749908]), (['TVSTD6', 'cashflow_per_share_ttm', 'sharpe_ratio_120', 'non_operating_net_profit_ttm'], [-6.694922635779981e-11, -0.00016142377647805555, -0.0005529870175398643, 9.167393894186556e-12])]
+    run_daily(prepare_stock_list, '9:05')
+    run_weekly(weekly_adjustment, 1, '9:30')
+    run_daily(check_limit_up, '14:00')
+    run_daily(close_account, '14:30')
+    run_daily(print_position_info, '15:10')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=7a417303711b9e5e1be220029d9ba4a9226f4bbdca440e6b7dd7be224580e456 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_list sha256=df890f6d0e7f50b60a82c9ae3f31bd108384bf0521b4b879df65d1ade442ecbf source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=a1df4d22629f85082f6938646725ae0af4cf6af55d2ed3c1cfcb9fc9e3e100b7 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=9620ae3faed8afa4b71539979a57528fb20f48a987e5fb89d6dd0871ab934580 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=a33a2c2079f46745447693f0d71254e014ee7cb801035eed7930ea353f54bd83 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=c55d81f9ae93e9528bed6bbf6d7d9504dd411d50e2d5fd0c8e639642b4fd584e source=quant/2023年度精选策略/21.截止到21年12月依然有效的小市值适配因子.txt'

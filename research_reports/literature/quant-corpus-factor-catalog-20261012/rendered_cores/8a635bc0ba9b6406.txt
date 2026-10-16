@@ -1,0 +1,140 @@
+quant/聚宽2025年精选/96首版+2版龙虎榜挖掘V2.0，年化1400.txt
+from jqdata import *
+from collections import OrderedDict
+
+def initialize(context):
+    g.muster = []
+    g.amount = 1
+    g.isbull = False
+    run_daily(prepare, time='9:15')
+    run_daily(buy, time='9:26')
+    run_daily(sell, time='11:00')
+    run_daily(sell, time='11:29')
+    run_daily(sell, time='13:00')
+    run_daily(sell, time='13:30')
+    run_daily(sell, time='14:00')
+    run_daily(sell, time='14:30')
+    run_daily(sell, time='14:45')
+    run_daily(sell, time='14:55')
+
+def sell(context):
+    current_data = get_current_data()
+    for position in list(context.portfolio.positions.values()):
+        code = position.security
+        name = get_security_info(code).display_name
+        cost = position.avg_cost
+        nowprice = current_data[code].last_price
+        closeable_amount = position.closeable_amount
+        high_limit = current_data[code].high_limit
+        target_price = high_limit * 0.99
+        if nowprice != high_limit and closeable_amount > 0:
+            order_target_value(code, 0)
+
+def buy_prepare(context):
+    result_stocks = []
+    if g.muster is not None and len(g.muster) > 0:
+        current_data = get_current_data()
+        for stock in g.muster:
+            price_data = get_price(stock, count=1, panel=False, end_date=context.previous_date, frequency='daily', fields=['open', 'close', 'high_limit', 'low_limit', 'volume'])
+            day_open = current_data[stock].day_open
+            yesterday_high_limit = price_data['high_limit'][-1]
+            high_limit = current_data[stock].high_limit
+            if yesterday_high_limit * 1.04 <= day_open and day_open < high_limit:
+                result_stocks.append(stock)
+    return result_stocks
+
+def buy(context):
+    available_slots = g.amount - len(context.portfolio.positions)
+    if available_slots <= 0:
+        return
+    allocation = context.portfolio.cash / available_slots
+    g.muster = buy_prepare(context)
+    if g.muster is not None and len(g.muster) > 0:
+        for s in g.muster:
+            if len(context.portfolio.positions) == g.amount:
+                break
+            name = get_security_info(s).display_name
+            current_data = get_current_data()
+            last_price = current_data[s].last_price
+            nums = math.floor(int(allocation / last_price))
+            int_nums = int(nums // 100) * 100
+            order(s, int_nums)
+
+def turnover_ratio(context, stock_list):
+    result_stocks = []
+    for stock in stock_list:
+        turnover_ratio = get_valuation(stock, end_date=context.previous_date, count=1, fields=['turnover_ratio']).iloc[0]['turnover_ratio']
+        if turnover_ratio < 50:
+            result_stocks.append(stock)
+    if len(result_stocks) > 0:
+        turnover_data = get_valuation(result_stocks, end_date=context.previous_date, count=1, fields=['circulating_market_cap'])
+        sorted_turnover_data = turnover_data.sort_values('circulating_market_cap', ascending=False)
+        result_stocks = sorted_turnover_data['code'].tolist()
+    return result_stocks
+
+def HY_sum(stock_list, context):
+    result_stocks = []
+    industry_count = {}
+    current_data = get_current_data()
+    for stock in stock_list:
+        res = get_concept(security=[stock], date=context.previous_date)
+        concept_names = [concept['concept_name'] for concept in res[stock]['jq_concept']]
+        for industry_code in concept_names:
+            if industry_code in industry_count:
+                industry_count[industry_code] += 1
+            else:
+                industry_count[industry_code] = 1
+    for stock_code in stock_list:
+        res = get_concept(security=[stock], date=context.previous_date)
+        concept_names = [concept['concept_name'] for concept in res[stock]['jq_concept']]
+        cont_num = 0
+        for industry_code in concept_names:
+            if industry_count[industry_code] >= 2:
+                cont_num = cont_num + 1
+                if cont_num >= 1:
+                    result_stocks.append(stock_code)
+                    break
+    return result_stocks
+
+def prepare(context):
+    g.muster = get_billboard_list(stock_list=None, end_date=context.previous_date, count=1)
+    g.muster = g.muster[g.muster['net_value'] > 0]
+    g.muster = pd.DataFrame(g.muster).sort_values('net_value', ascending=False)
+    g.muster = g.muster[g.muster['buy_rate'] > 4]
+    g.muster = pd.DataFrame(g.muster).sort_values('buy_rate', ascending=False)
+    g.muster = list(g.muster['code'])
+    g.muster = list(OrderedDict.fromkeys(g.muster))
+    g.muster = filter_kcbj_stock(g.muster)
+    g.muster = HY_sum(g.muster, context)
+    g.muster = filter_paused_stock(g.muster)
+    g.muster = filter_st_stock(g.muster)
+    g.muster = filter_limitup_stock(context, g.muster)
+    g.muster = filter_limitdown_stock(context, g.muster)
+    g.muster = find_stock_with_criteria(context, g.muster)
+    g.muster = turnover_ratio(context, g.muster)
+
+def find_stock_with_criteria(context, rankList_jk, days=18):
+    result_stocks = []
+    current_data = get_current_data()
+    for stock_code in rankList_jk:
+        price_data = get_price(stock_code, count=days, panel=False, end_date=context.previous_date, frequency='daily', fields=['open', 'close', 'high_limit', 'low_limit', 'volume'])
+        if price_data['close'].iloc[-1] == price_data['high_limit'].iloc[-1]:
+            limit_up_count = sum(price_data['high_limit'] == price_data['close'])
+            if limit_up_count == 1 or limit_up_count == 2:
+                volume_data = price_data['volume']
+                avg_volume_20_days = np.mean(volume_data[:-3])
+                avg_volume_3_days = np.mean(volume_data[-3:])
+                if avg_volume_20_days * 4 < avg_volume_3_days < avg_volume_20_days * 6:
+                    result_stocks.append(stock_code)
+    return result_stocks
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_kcbj_stock(stock_list):
+    for stock in stock_list[:]:
+        if stock[0] == '4' or stock[0] == '8' or stock[:2] == '68' or (stock[0] == '9') or (stock[0] == '2'):
+            stock_list.remove(stock)
+    return stock_list
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=b478680d21ecf1c69fd33ea3e12365521f1d5718a01c78b4fe2212242fe0000c source=quant/聚宽2025年精选/54发一个学习策略5年70倍，思路可以学习.txt'

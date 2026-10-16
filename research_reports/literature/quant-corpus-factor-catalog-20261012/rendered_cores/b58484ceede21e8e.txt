@@ -1,0 +1,153 @@
+quant/2024年度精选策略1/66.SVR机器学习上证综指择时中小板财务选股策略.txt
+from jqdata import *
+import numpy as np
+from sklearn.svm import SVR
+import pandas as pd
+
+def initialize(context):
+    g.stock_num = 10
+    g.curstaut = 0
+    g.ref_stock = '000001.XSHG'
+    g.N = 18
+    g.M = 600
+    g.K = 8
+    g.hold_stock = 'null'
+    g.score_thr = -1
+    g.score_fall_thr = -0.5
+    g.idex_slope_raise_thr = 10
+    g.slope_series, g.rsrs_score_history = initial_slope_series()
+    run_daily(my_trade_prepare, time='9:00', reference_security='000300.XSHG')
+    run_daily(my_trade, time='9:30', reference_security='000300.XSHG')
+'EXACT_REVIEWED_FUNCTION initial_slope_series sha256=5106149a59c69c95cb1d2334b98b0732ba4a85459c3e854c5bff8c69f380666a source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore_slope sha256=a6b6498e0215ac0ae8083756b04ab585308e300619c9a28bafc7453203f3e1b2 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+
+def get_timing_signal(context, stock):
+    data = attribute_history(g.ref_stock, g.N, '1d', ['high', 'low', 'close'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    g.rsrs_score_history.append(rsrs_score)
+    rsrs_slope = get_zscore_slope(g.rsrs_score_history[-g.K:])
+    idex_slope = np.polyfit(np.arange(8), data.close[-8:], 1)[0].real
+    g.slope_series.pop(0)
+    g.rsrs_score_history.pop(0)
+    if rsrs_slope < 0 and rsrs_score > 0:
+        return 'SELL'
+    if idex_slope < 0 and rsrs_slope > 0 and (rsrs_score < g.score_fall_thr):
+        return 'SELL'
+    if idex_slope > g.idex_slope_raise_thr and rsrs_slope > 0:
+        return 'BUY'
+    if rsrs_score > g.score_thr:
+        return 'BUY'
+    else:
+        return 'SELL'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a4934101d0b7562828ab21d381ff1c3f43b5a6f8d416ad8579724b8a4900c5cc source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=4533284c0543062783fbbfc06accc1a378cdb1f73d7cdfd719ba9a3d83753496 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=9620ae3faed8afa4b71539979a57528fb20f48a987e5fb89d6dd0871ab934580 source=quant/2024年度精选策略1/1.差不多得了.txt'
+
+def adjust_position(context, buy_stocks):
+    for stock in context.portfolio.positions:
+        if stock not in buy_stocks:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+            g.hold_stock = 'null'
+        else:
+            pass
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        value = context.portfolio.cash / (g.stock_num - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == g.stock_num:
+                        g.hold_stock = stock
+                        break
+
+def tobuy_stocks(context, buy_stocks):
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        value = context.portfolio.cash / (g.stock_num - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == g.stock_num:
+                        g.hold_stock = stock
+                        break
+
+def my_trade_prepare(context):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    g.timing_signal = get_timing_signal(context, g.ref_stock)
+    if today_is_between(context, '04-05', '04-30'):
+        g.timing_signal = 'SELL'
+    today_prepare(context)
+
+def my_trade(context):
+    adjust_position(context, g.check_out_list)
+
+def _get_stocks(index_list, dt_date):
+    stocks = []
+    for index in index_list:
+        stocks = stocks + get_index_stocks(index, dt_date)
+    stocks = sorted(list(set(stocks)))
+    return stocks
+
+def today_prepare(context):
+    n_position = g.stock_num
+    n_choice = int(1.2 * n_position)
+    cdata = get_current_data()
+    dt_last = context.previous_date
+    index_list = ['399101.XSHE']
+    stocks = _get_stocks(index_list, dt_last)
+    q = query(valuation.code, valuation.market_cap, valuation.pb_ratio > 0, indicator.inc_return > 0, indicator.inc_total_revenue_year_on_year > 0, indicator.inc_net_profit_year_on_year > 0, indicator.ocf_to_operating_profit > 5).filter(valuation.code.in_(stocks), balance.total_assets > balance.total_liability, income.net_profit > 0)
+    df = get_fundamentals(q, dt_last).fillna(0).set_index('code')
+    df = df.fillna(0)
+    df.columns = ['log_mc', 'log_NC', 'log_NI', 'log_RD', 'PE', 'OCF']
+    'EXACT_REVIEWED_FUNCTION _sign_ln sha256=d5a52636ff34d9ec3885bf0e5c46dd25a0c06cefb9450f3616712c31e48f6ea4 source=quant/2024年度精选策略1/12.致敬聚宽机器学习多因子50只持仓14年37倍.txt'
+    df['log_mc'] = _sign_ln(df['log_mc'])
+    df['log_NC'] = _sign_ln(df['log_NC'])
+    df['log_NI'] = _sign_ln(df['log_NI'])
+    df['log_RD'] = _sign_ln(df['log_RD'])
+    df['PE'] = _sign_ln(df['PE'])
+    df['OCF'] = _sign_ln(df['OCF'])
+    industry_list = get_industries('sw_l1', dt_last).index.tolist()
+    for sector in industry_list:
+        istocks = get_industry_stocks(sector, dt_last)
+        s = pd.Series(0, index=df.index)
+        s[set(istocks) & set(df.index)] = 1
+        df[sector] = s
+    svr = SVR(kernel='rbf')
+    Y = df['log_mc']
+    X = df.drop('log_mc', axis=1)
+    model = svr.fit(X, Y)
+    r = Y - pd.Series(svr.predict(X), Y.index)
+    r = r[r < 0].sort_values().head(n_choice)
+    choice = r.index.tolist()
+    mesg_check = '今日盘前操作提示:\n卖出:VVVVV\n'
+    for s in context.portfolio.positions:
+        if s not in choice:
+            mesg_check += '%s %s\n' % (s, cdata[s].name)
+    mesg_check += '买进:VVVVV\n'
+    for s in choice:
+        if s not in context.portfolio.positions:
+            mesg_check += '%s %s\n' % (s, cdata[s].name)
+    if g.curstaut == 0:
+        if g.timing_signal == 'BUY':
+            g.check_out_list = choice
+            g.curstaut = 1
+        else:
+            g.check_out_list = []
+    elif g.timing_signal == 'SELL':
+        g.check_out_list = []
+        g.curstaut = 0
+    else:
+        g.check_out_list = choice
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=c8229093b9ca4e7aafa45470f93924c19038e4a06a7d0aa1879e8dc6bacdc223 source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_gem_stock(context, stock_list):
+    return [stock for stock in stock_list if stock[0:3] != '300' and stock[0:3] != '688']
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=a55c600f82d9abb72d1e9c2e91ca6e76217875e8ed56e22a107be4d40605b079 source=quant/2024年度精选策略1/19.高股息低市盈率高增长的价投策略.txt'

@@ -1,0 +1,60 @@
+quant/2021年度精选策略/49.根据北上资金买股票的最佳持股时间探讨.txt
+import talib
+from prettytable import PrettyTable
+import pandas
+import datetime
+import time
+from jqdata import *
+
+def initialize(context):
+    g.buy_stock_count = 3
+    g.hour = 9
+    g.minute = 30
+    g.days = 0
+    g.refresh_rate = 23
+    g.nday = 2
+
+def handle_data(context, data):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    today = context.current_dt.day
+    buy_stocks = []
+    if g.days % g.refresh_rate == 0:
+        if hour == g.hour and minute == g.minute:
+            buy_stocks = select_stocks(context, data)
+            for stock in buy_stocks:
+                pass
+            adjust_position(context, buy_stocks)
+    g.days += 1
+
+def select_stocks(context, data):
+    date = context.previous_date
+    startdate = date - datetime.timedelta(g.nday)
+    trade_days = get_trade_days(startdate, date)
+    total_df = pd.DataFrame()
+    for day in trade_days:
+        q = query(finance.STK_EL_TOP_ACTIVATE).filter(finance.STK_EL_TOP_ACTIVATE.day == day)
+        df = finance.run_query(q)
+        df['net'] = df.buy - df.sell
+        df = df.sort(columns=['net'], axis=0, ascending=False)
+        df = df[(df.link_id != 310003) & (df.link_id != 310004)]
+        total_df = pd.concat((total_df, df))
+    stock_net = total_df.groupby(total_df['code'])['net'].sum()
+    stock_net = pd.DataFrame(stock_net)
+    stock_list = list(stock_net.index)
+    df_cap = get_fundamentals(query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(stock_list)), date=date)
+    df_cap.index = df_cap.code
+    df_cap = pd.concat((df_cap, stock_net), axis=1)
+    df_cap['rate'] = df_cap['net'] / 100000000 / df_cap['circulating_market_cap']
+    df_cap = df_cap.sort('rate', ascending=False)
+    stock_list = list(df_cap['code'])
+    stock_list = stock_list[:g.buy_stock_count]
+    return stock_list
+'EXACT_REVIEWED_FUNCTION filter_paused_and_st_stock sha256=6137617a27a73c8f2a84bb2011210e45eac77405db4216f9e39bd1613e4246fc source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=4816bfed9587e210ded81c6e288a6b9d00544cc261697b889abe16b77ed6ed1b source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_old_stock sha256=1b6e00a52d3b10f52589f0836b0c847ab0bae2f7eb1ed42dfb5fc6f421f2cb87 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION filter_limit_stock sha256=1459bb541281e4e532a1be1075f579a70992cf01e2536be823fcc2443828ce09 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=c5e4f99829775f2832937131aec12d8a9c6176b758ffad4738bd0a542943feb5 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION shifttradingday sha256=824c8684fa07f5fc745a32e8804edb67ed6c17444baba26c7b0200690cb3efc3 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION show_stock sha256=9f7f26d6eef2b68d939d59fe5127260b262f53ff458bd71783d7c20e4ff0dfa2 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION get_portfolio_info_text sha256=6e7ff51d68dc2357f43a03df646a3f737728b855f3407fa0fb2112ed35b7f184 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'

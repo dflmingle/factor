@@ -1,0 +1,20 @@
+quant/2024年度精选策略2/92.利用myTT库整合通达信公式——以“飞鹰优选”选股公式为例.txt
+from myTT import *
+from jqdata import *
+olderr = np.seterr(all='ignore')
+h = attribute_history('688286.XSHG', 150, '1d', ['close', 'high', 'low'])
+CLOSE = h['close'].values
+HIGH = h['high'].values
+LOW = h['low'].values
+VAR1 = CLOSE / MA(CLOSE, 40) * 100 < 78
+VAR2 = CLOSE / MA(CLOSE, 60) * 100 < 74
+VAR3 = HIGH > LOW * 1.051
+VAR4 = VAR3 & (COUNT(VAR3, 5) > 1)
+TYP = (HIGH + LOW + CLOSE) / 3
+CCI = (TYP - MA(TYP, 14)) / (0.015 * AVEDEV(TYP, 14))
+T1 = (MA(CLOSE, 27) > 1.169 * CLOSE) & (MA(CLOSE, 17) > 1.158 * CLOSE)
+T2 = (CLOSE < MA(CLOSE, 120)) & (MA(CLOSE, 60) < MA(CLOSE, 120)) & (MA(CLOSE, 60) > MA(CLOSE, 30)) & (CCI > -210)
+FYYH = VAR4 & (VAR1 | VAR2) & T1 & T2
+XG = BARSLASTCOUNT(FYYH) == 1
+h['xg'] = XG
+h[h['xg']]

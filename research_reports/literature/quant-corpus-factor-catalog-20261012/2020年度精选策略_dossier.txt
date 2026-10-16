@@ -1,0 +1,746 @@
+quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/03 机器学习多因子策略.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: inc_revenue_year_on_year -> growth_sales | market_cap -> small_size
+Recipes: rd_assets;rd_market
+37: q = query(valuation.code, valuation.market_cap, balance.total_assets - balance.total_liability,
+38: balance.total_assets / balance.total_liability, income.net_profit, income.net_profit + 1,
+39: indicator.inc_revenue_year_on_year, balance.development_expenditure).filter(valuation.code.in_(sample))
+
+quant/2020年度精选策略/04 趋势交易能赚钱吗？商品期货动量效应挖掘初探.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/05 兄台且慢，去天台排队不如看看这个策略先.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market | roe -> roe
+Recipes: 
+139: df = get_fundamentals(query(valuation.code,valuation.pb_ratio,indicator.roe))
+147: df['point'] = df[['pb_ratio','1/roe']].rank().T.apply(f_sum)
+
+quant/2020年度精选策略/06 为什么股票市值是当前的样子？.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: inc_revenue_year_on_year -> growth_sales | market_cap -> small_size
+Recipes: 
+49: q = query(valuation.code, valuation.market_cap, balance.total_assets - balance.total_liability,
+50: balance.total_assets / balance.total_liability, income.net_profit, income.net_profit + 1,
+51: indicator.inc_revenue_year_on_year, balance.development_expenditure).filter(valuation.code.in_(sample))
+
+quant/2020年度精选策略/07 穿越牛熊基业长青的价值精选策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_revenue_year_on_year -> growth_sales | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+87: df = get_fundamentals(query(valuation.circulating_cap,valuation.pe_ratio,valuation.code).filter(valuation.code.in_(check_out_lists)),date=context.previous_date)
+98: 5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+152: #5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+188: q = query(valuation.code, income.statDate, income.pubDate).filter(valuation.code.in_(pool))
+200: q = query(valuation.code,valuation.code,valuation.circulating_market_cap,balance.total_current_assets,balance.total_current_liability,\
+201: indicator.roe,cash_flow.net_operate_cash_flow,cash_flow.net_invest_cash_flow,indicator.inc_revenue_year_on_year,indicator.eps
+210: nq = q.filter(valuation.code.in_(stat_date_stocks[sd]))
+
+quant/2020年度精选策略/08 MACD单因子多头策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/09 商品期货 多品种日频双均线模型 作为给入门者的小礼物.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/10 追三板策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+46: valuation.code,
+47: valuation.circulating_market_cap,
+48: valuation.circulating_cap
+50: valuation.circulating_market_cap.between(8,50)
+51: ).order_by(
+52: valuation.circulating_market_cap.asc()
+
+quant/2020年度精选策略/11 酒股地中短线策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+14: q=query(valuation.code).filter(valuation.code.in_(scu)).order_by(valuation.market_cap.asc()).limit(g.stocksnum)
+
+quant/2020年度精选策略/12 【均值回归】基于zscore的均值回归策略（胜率100%）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/13 招行_海天配对策略-改进版.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/14 抗击熊市的中短期低市值策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+14: q=query(valuation.code).filter(valuation.code.in_(scu)).order_by(valuation.market_cap.asc()).limit(g.stocksnum)
+
+quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/16 投资学作业.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market | roe -> roe
+Recipes: 
+231: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio_lyr, 20)
+232: security_list = financial_data_filter_qujian(security_list, indicator.roe, (3,40))
+233: security_list = financial_data_filter_qujian(security_list, valuation.pb_ratio, (3,14))
+
+quant/2020年度精选策略/17 商品期货截面动量模型，真的靠谱吗？.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/18 均值回归策略分享.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/19 招行_海天配对策略（学习招行伊利配对）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/20 分钟K线数据重构 ATR自适应通道 请高手来迭代.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/21 果核量化出品 -- BIAS_QL乖离率策略指数择时1.0.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/22 海龟交易法则升级版---（分钟级回测+合约变更移仓）.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/23 Principle by Jim Slater 祖鲁法则在A股的实现与改进.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | gross_profit_margin -> gross_margin | pb_ratio -> book_market | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa
+Recipes: 
+180: df=get_fundamentals(query(valuation.code,valuation.circulating_market_cap,valuation.pe_ratio,valuation.pb_ratio,valuation.ps_ratio,indicator.roa,indicator.gross_profit_margin).filter(valuation.code.in_(list_)))
+194: df_eps=get_fundamentals(query(indicator.code,indicator.eps).filter(indicator.code.in_(list1)),statDate=str(startdate-1))
+197: df_pe=get_fundamentals(query(valuation.code,valuation.pe_ratio).filter(valuation.code.in_(list1)),statDate=str(startdate-1))
+203: df_new_pe=get_fundamentals(query(valuation.code,valuation.pe_ratio).filter(valuation.code.in_(list1)),statDate=year_date)
+206: df_new_eps=get_fundamentals(query(indicator.code,indicator.eps).filter(indicator.code.in_(list1)),statDate=str(year_date))
+244: df_new_eps=get_fundamentals(query(indicator.code,indicator.eps).filter(indicator.code.in_(list1)),statDate=str(year_date))
+258: dynamic_pe=get_fundamentals(query(valuation.code,valuation.pe_ratio).filter(valuation.code.in_(namelist)))
+332: cov=returndict.corr()
+
+quant/2020年度精选策略/24 自选策略1.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 10)
+231: security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 10)
+
+quant/2020年度精选策略/25 简单市值轮动策略-学习.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+39: valuation.code,
+40: valuation.market_cap
+42: valuation.code.in_(scu)
+43: ).order_by(
+44: valuation.market_cap.asc()
+
+quant/2020年度精选策略/26 向导式-1.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_net_profit_year_on_year -> growth_profit
+Recipes: 
+228: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 20)
+270: valuation.circulating_market_cap:('desc',1),
+
+quant/2020年度精选策略/27 RSRS指标择时（30分钟线）.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/28 收益策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: gross_profit_margin -> gross_margin | inc_net_profit_year_on_year -> growth_profit | market_cap -> small_size
+Recipes: 
+232: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 15)
+233: security_list = financial_data_filter_dayu(security_list, indicator.gross_profit_margin, 20)
+234: security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 10)
+235: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 200)
+
+quant/2020年度精选策略/29 KD指标量化交易策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/30 基于LSTM模型预测股票价格走势.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/31 低PB价值投资策略分享.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | pb_ratio -> book_market | roe -> roe
+Recipes: 
+145: valuation.code, valuation.pb_ratio
+148: valuation.code.in_(g.check_out_lists)
+149: ).order_by(
+151: valuation.pb_ratio.asc()
+242: security_list = financial_data_filter_xiaoyu(security_list, valuation.circulating_cap, 250000)
+244: security_list = financial_data_filter_xiaoyu(security_list, valuation.pb_ratio, 0.85)
+246: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 0)
+248: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 0)
+250: security_list = financial_data_filter_dayu(security_list, indicator.roe, 0)
+258: indicator.roe:('desc',0.7), #净资产收益率ROE，从大到小，权重0.7
+259: valuation.pb_ratio:('asc',0.05), #市净率，从小到大，权重0.05
+260: indicator.inc_net_profit_year_on_year:('desc',0.2), #净利润同比增长率，从大到小，权重0.2
+261: valuation.market_cap:('desc',0.05), #总市值，从大到小，权重0.05
+
+quant/2020年度精选策略/32 测试策略1.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_revenue_year_on_year -> growth_sales
+Recipes: 
+231: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 3)
+232: security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 3)
+233: security_list = financial_data_filter_dayu(security_list, valuation.circulating_market_cap, 3)
+234: security_list = financial_data_filter_dayu(security_list, valuation.capitalization, 5)
+
+quant/2020年度精选策略/33 买入每个行业市值最大的股票.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+186: df = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stock_list)).order_by(valuation.market_cap.desc()).limit(1), date = statsDate)
+193: q = query(indicator.code).filter(indicator.code.in_(max_stock)).order_by(indicator.roe.desc())
+225: def get_fundamentals_sum(self, table_name=indicator, search=indicator.adjusted_profit, statsDate=None):
+234: q = query(indicator.code, indicator.statDate)
+240: q = query(balance.code, balance.statDate)
+293: q = query(indicator.code, search, indicator.statDate)
+299: q = query(balance.code, search, balance.statDate)
+449: q = query(valuation.code, valuation.pe_ratio)
+824: q = query(valuation.code, valuation.capitalization
+825: ).filter(valuation.code.in_(list(df.index)))
+954: query(valuation.code, balance.good_will, balance.equities_parent_company_owners),
+
+quant/2020年度精选策略/34 成长策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | gross_profit_margin -> gross_margin | inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | pe_ratio -> earnings_yield
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 10)
+231: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 10)
+232: security_list = financial_data_filter_dayu(security_list, indicator.gross_profit_margin, 20)
+233: security_list = financial_data_filter_xiaoyu(security_list, valuation.circulating_market_cap, 500)
+234: security_list = financial_data_filter_dayu(security_list, valuation.pe_ratio, 40)
+
+quant/2020年度精选策略/35 投资学作业——简单多因子选股策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 5)
+231: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 30)
+232: security_list = financial_data_filter_dayu(security_list, indicator.roe, 4)
+233: security_list = financial_data_filter_dayu(security_list, valuation.pe_ratio, 3)
+
+quant/2020年度精选策略/36 投资学作业——简单多因子选股策略改进.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 5)
+231: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 30)
+232: security_list = financial_data_filter_dayu(security_list, valuation.pe_ratio, 3)
+233: security_list = financial_data_filter_dayu(security_list, indicator.roe, 4)
+274: indicator.inc_net_profit_year_on_year:('desc',30),
+275: valuation.market_cap:('desc',20),
+276: valuation.pe_ratio:('desc',25),
+277: indicator.roe:('desc',25),
+
+quant/2020年度精选策略/37 个股止损.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/38 一个简单的跟踪聪明钱策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/39 因子分析——利用JoinQuant因子分析模块选取因子并封装为策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/40 kdj指标配合accer过滤.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/41 多因子模型（三）-交易回测.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/42 低估值+TRIX+RSI 低回撤策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market
+Recipes: 
+119: valuation.code,
+120: valuation.pb_ratio,
+121: balance.total_assets,
+122: balance.total_liability,
+123: balance.total_current_assets,
+124: balance.total_current_liability
+126: valuation.code.in_(security),
+127: valuation.pb_ratio < 2,
+128: valuation.pb_ratio > 0,
+129: balance.total_current_assets/balance.total_current_liability > 1.2
+
+quant/2020年度精选策略/43 无模型评估的多因子模型.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: inc_revenue_year_on_year -> growth_sales | market_cap -> small_size
+Recipes: 
+41: q = query(valuation.code, valuation.market_cap, balance.total_assets - balance.total_liability,
+42: balance.total_assets / balance.total_liability, income.net_profit, income.net_profit + 1,
+43: indicator.inc_revenue_year_on_year, balance.development_expenditure).filter(valuation.code.in_(sample))
+
+quant/2020年度精选策略/44 新手初来，写了一个价值投资策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | pb_ratio -> book_market | pe_ratio -> earnings_yield | roa -> roa
+Recipes: 
+236: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 15)
+237: security_list = financial_data_filter_qujian(security_list, valuation.pb_ratio, (0,2))
+238: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio, 40)
+239: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 10)
+240: security_list = financial_data_filter_dayu(security_list, indicator.roa, 4)
+364: a = a.sort_values(['score'],ascending = True)
+369: a = a.sort_values(['score'],ascending = False)
+
+quant/2020年度精选策略/45 布林带策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/47 次新小盘策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_net_profit_year_on_year -> growth_profit | roe -> roe
+Recipes: 
+231: security_list = financial_data_filter_xiaoyu(security_list, valuation.circulating_market_cap, 100)
+232: security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 20)
+274: indicator.inc_net_profit_year_on_year:('desc',50),
+275: indicator.roe:('desc',50),
+
+quant/2020年度精选策略/48 再测一支.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/49 海龟克隆优化.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/50 简单配对交易.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+734: q = query(valuation.code)
+737: valuation.pe_ratio > g.min_pe,
+738: valuation.pe_ratio < g.max_pe
+743: indicator.eps > g.min_eps,
+744: #valuation.turnover_ratio > 3
+747: q = q.order_by(
+748: valuation.market_cap.asc()
+
+quant/2020年度精选策略/52 布林带1.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/53 小市值策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+270: valuation.market_cap:('asc',50),
+
+quant/2020年度精选策略/54 中长线买入卖出点选择.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | pb_ratio -> book_market
+Recipes: 
+360: valuation.code == stock,
+361: valuation.turnover_ratio > 15
+417: q = query(valuation).filter(valuation.code == stock)
+
+quant/2020年度精选策略/55 中小板-中证500配对交易.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/56 爱神的箭放声大哭.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 10)
+
+quant/2020年度精选策略/57 黄泽森策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.roe, 8)
+231: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 7)
+232: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio_lyr, 30)
+
+quant/2020年度精选策略/58 MACD金叉买入，死叉卖出.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pe_ratio -> earnings_yield
+Recipes: 
+233: security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio, (0,30))
+355: a = a.sort_values(['score'],ascending = True)
+360: a = a.sort_values(['score'],ascending = False)
+
+quant/2020年度精选策略/59 小市值轮动，修改了内容，剔除了停牌股，同时PE要求为正的股票。.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+35: valuation.code,valuation.market_cap,valuation.pe_ratio
+37: valuation.code.in_(unsuspened_stocks), valuation.pe_ratio>1
+38: ).order_by(
+39: valuation.market_cap.asc()
+
+quant/2020年度精选策略/60 投资期末作业.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio, (0,25))
+231: security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio_lyr, (0,25))
+232: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 0)
+233: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_annual, 0)
+234: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_annual, 0)
+235: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 0)
+236: security_list = financial_data_filter_dayu(security_list, valuation.circulating_cap, 1000)
+237: security_list = financial_data_filter_dayu(security_list, indicator.roe, 5)
+358: a = a.sort_values(['score'],ascending = True)
+363: a = a.sort_values(['score'],ascending = False)
+
+quant/2020年度精选策略/61 向导式策略生成器生成的成长股精选策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 20)
+231: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 30)
+232: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio, 30)
+233: security_list = financial_data_filter_dayu(security_list, indicator.roe, 5)
+
+quant/2020年度精选策略/62 选股策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | net_profit_margin -> net_margin | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 15)
+231: security_list = financial_data_filter_dayu(security_list, indicator.net_profit_margin, 15)
+232: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio, 10)
+233: security_list = financial_data_filter_dayu(security_list, indicator.roe, 15)
+234: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 50)
+355: a = a.sort_values(['score'],ascending = True)
+360: a = a.sort_values(['score'],ascending = False)
+
+quant/2020年度精选策略/63 向导式.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | pb_ratio -> book_market
+Recipes: 
+228: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 10)
+229: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 10)
+230: security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 10)
+231: security_list = financial_data_filter_dayu(security_list, valuation.pb_ratio, 2)
+
+quant/2020年度精选策略/64 12年年化34%，Sharpe1.2，银行股轮动.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio, (4,5.5))
+271: valuation.pe_ratio:('asc',0.1),
+272: indicator.roe:('desc',0.1),
+273: valuation.market_cap:('asc',0.1),
+354: a = a.sort_values(['score'],ascending = True)
+359: a = a.sort_values(['score'],ascending = False)
+
+quant/2020年度精选策略/65 8只基金按PE调仓.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+88: q = query(valuation).filter(valuation.code.in_(stocks))
+
+quant/2020年度精选策略/66 高于MA10买入低于MA20卖出回测半年收益率20.4%.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/67 多因子回测完整模板（筛选和买卖条件强于‘策略生成器’）.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+34: g.factors_PTC = [[valuation.market_cap, 'market_cap', 0.8, False]]
+35: g.factors_industries_PTC = [[cash_flow.cash_equivalent_increase/valuation.market_cap, 'NCFP', 0.4, False], [valuation.pe_ratio, 'pe', 0.10, True]]
+129: factors = query(valuation.code, valuation.pe_ratio)
+130: factors = factors.filter(valuation.code.in_(g.all_stocks),
+131: indicator.inc_net_profit_annual>0,
+132: indicator.inc_net_profit_year_on_year>5, cash_flow.cash_equivalent_increase>0)
+142: q = query(valuation.code, factor).order_by(factor.asc() if ascending==True else factor.desc())
+167: q = query(valuation.code, factor).filter(valuation.code.in_(industries_stock_list),factor>0).order_by(factor.asc() if ascending==True else factor.desc())
+227: ).order_by(gta.STK_MKT_DIVIDENT.PAYMENTDATE))
+242: df_rank = df_factors.rank(ascending=False)
+
+quant/2020年度精选策略/68 板块轮动不动？.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+116: query(valuation.code,
+117: valuation.circulating_market_cap
+118: ).filter(valuation.code.in_(oriStocks)
+119: ).order_by(valuation.circulating_market_cap.desc()), date = context.current_dt)
+
+quant/2020年度精选策略/69 阻力支撑相对强度（RSRS）指标择时策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/70 蓝筹&均线.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+228: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 200)
+229: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio, 35)
+230: security_list = financial_data_filter_dayu(security_list, indicator.roe, 10)
+
+quant/2020年度精选策略/71 【投资学】CAPM单因子回归模型+ROE股票池（含止损）.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: roe -> roe
+Recipes: capm_alpha120
+65: a=query(indicator.code,indicator.roe
+67: ).filter(indicator.roe > g.ROE_requirement
+69: ).order_by(indicator.roe.desc()
+151: beta, stockalpha, r_value, p_value, slope_std_error = stats.linregress(marketreturn, stockreturn)
+
+quant/2020年度精选策略/72 基金定投-沪深300-5年回测.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+102: q = query(valuation).filter(valuation.code.in_(stocks))
+
+quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/74 基于沪深300的增强.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: gross_profit_margin -> gross_margin | net_profit_margin -> net_margin | pb_ratio -> book_market | roa -> roa
+Recipes: 
+231: security_list = financial_data_filter_xiaoyu(security_list, valuation.pb_ratio, 2)
+232: security_list = financial_data_filter_dayu(security_list, indicator.roa, 1)
+233: security_list = financial_data_filter_dayu(security_list, indicator.net_profit_margin, 10)
+234: security_list = financial_data_filter_dayu(security_list, indicator.gross_profit_margin, 10)
+276: indicator.gross_profit_margin:('desc',1),
+
+quant/2020年度精选策略/75 财务因子策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 7)
+231: security_list = financial_data_filter_dayu(security_list, valuation.capitalization, 200000)
+232: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio_lyr, 20)
+233: security_list = financial_data_filter_dayu(security_list, indicator.roe, 3)
+
+quant/2020年度精选策略/76 MACD——大盘择时.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/77 RSRS大盘择时优化.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/78 GFTD第二版.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/79 DMI——大盘择时.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/80 向导式 价值分析(一),成功避开股灾,大盘震荡跌时小涨.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market | pe_ratio -> earnings_yield | roa -> roa | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio, (5.5,11.5))
+231: security_list = financial_data_filter_dayu(security_list, indicator.roe, 5)
+232: security_list = financial_data_filter_dayu(security_list, indicator.roa, 0.5)
+233: security_list = financial_data_filter_qujian(security_list, valuation.pb_ratio, (0.7,5.4))
+
+quant/2020年度精选策略/81 申万行业轮动策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+102: df = get_fundamentals(query(valuation.circulating_cap,valuation.code).filter(valuation.code.in_(check_out_lists)),date=context.previous_date)
+
+quant/2020年度精选策略/82 次新+小市值+KAMA择时 轮动.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+59: q = query(valuation.code,
+60: valuation.circulating_market_cap
+61: ).order_by(
+62: valuation.circulating_market_cap.asc()
+64: valuation.circulating_market_cap <= 99
+
+quant/2020年度精选策略/83 沪深300ETF-1060双均线.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/84 投资策略说明.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | net_profit_margin -> net_margin
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 5)
+231: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 8)
+232: security_list = financial_data_filter_dayu(security_list, indicator.net_profit_margin, 4)
+233: security_list = financial_data_filter_dayu(security_list, valuation.circulating_market_cap, 2)
+
+quant/2020年度精选策略/85 【第一次玩】我就是要买便宜股系列.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+88: valuation.code,
+89: valuation.pe_ratio,
+90: valuation.pb_ratio
+113: jy.SecuMain.SecuCode.in_(secu_list),jy.SecuMain.SecuCategory==1).order_by(jy.SecuMain.SecuCode))
+117: jy.LC_DIndicesForValuation.InnerCode,
+118: jy.LC_DIndicesForValuation.TradingDay,
+119: jy.LC_DIndicesForValuation.DividendRatio,
+120: ).filter(jy.LC_DIndicesForValuation.InnerCode.in_(code_df.InnerCode),
+121: jy.LC_DIndicesForValuation.TradingDay.in_(trade_days)
+
+quant/2020年度精选策略/86 5日线穿十日线策略（供初学）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/87 选股策略说明——张燕兰 16318320.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | roe -> roe
+Recipes: 
+230: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 25)
+231: security_list = financial_data_filter_dayu(security_list, indicator.roe, 20)
+232: security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 4)
+353: a = a.sort_values(['score'],ascending = True)
+358: a = a.sort_values(['score'],ascending = False)
+
+quant/2020年度精选策略/88 一位小白编辑的多因子选股策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | market_cap -> small_size | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+232: security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 18)
+233: security_list = financial_data_filter_dayu(security_list, valuation.pe_ratio, 15)
+234: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 100)
+235: security_list = financial_data_filter_dayu(security_list, indicator.roe, 4)
+
+quant/2020年度精选策略/89 test1：简单的多均线择时.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/90 MA均线金叉买入，死叉卖出.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/91 Stoch（KDJ）——大盘择时.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/92 多因子选股策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size | net_profit_to_total_revenue -> net_margin | pcf_ratio -> cf_yield | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roe -> roe
+Recipes: 
+35: #g.factors=["market_cap","roe","pe_ratio","eps"] # 选出来的可用因子
+36: #g.factors=["market_cap","roe","pe_ratio","ps_ratio"] # 用户选出来的因子
+37: #g.factors=["circulating_market_cap","eps","net_profit_to_total_revenue","roe","pcf_ratio","ps_ratio","pe_ratio","turnover_ratio"] # 用户选出来的因子
+38: g.factors=["circulating_market_cap","ps_ratio","eps","net_profit_to_total_revenue","roe","pcf_ratio","pe_ratio","turnover_ratio"] # 用户选出来的因子
+70: #g.q = query(valuation,balance,cash_flow,income,indicator).filter(valuation.code.in_(g.all_stocks))
+159: q = query(valuation,balance,cash_flow,income,indicator).filter(valuation.code.in_(all_stocks))
+166: df1=df1.rank(axis=0, method='average', ascending=True)
+
+quant/2020年度精选策略/93 RSRS——大盘择时.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/94 PE和PB策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market
+Recipes: 
+230: security_list = financial_data_filter_qujian(security_list, valuation.pb_ratio, (3,10))
+231: security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio_lyr, (10,20))
+
+quant/2020年度精选策略/95 资金流策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+273: valuation.circulating_market_cap:('asc',0),
+274: valuation.pe_ratio:('asc',0),
+275: indicator.roe:('desc',0),
+
+quant/2020年度精选策略/96 沪港两地上市的银行股翻倍策略报告.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/97 银行翻倍策略.txt
+causal250-day PIT mean(PB/ROE); fixed-bank universe transferred to fullA
+Related atoms: pb_ratio -> book_market | roe -> roe
+Recipes: bank_doubletime250
+47: P = get_fundamentals_continuously(query(indicator.code, valuation.pb_ratio).filter(valuation.code==stk1),count=250)
+48: RO = get_fundamentals_continuously(query(indicator.code, indicator.roe).filter(valuation.code==stk1),count=250)
+
+quant/2020年度精选策略/98 机器学习SVM用法示例策略.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: 
+Recipes: 
+
+quant/2020年度精选策略/99 一个中信证券的向导策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pb_ratio -> book_market
+Recipes: 
+231: security_list = financial_data_filter_dayu(security_list, valuation.market_cap, 0)
+232: security_list = financial_data_filter_xiaoyu(security_list, valuation.pb_ratio, 1.5)
+354: a = a.sort_values(['score'],ascending = True)
+359: a = a.sort_values(['score'],ascending = False)
+

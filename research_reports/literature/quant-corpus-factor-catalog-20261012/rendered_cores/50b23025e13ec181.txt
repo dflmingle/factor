@@ -1,0 +1,25 @@
+quant/2020年度精选策略/59 小市值轮动，修改了内容，剔除了停牌股，同时PE要求为正的股票。.txt
+def initialize(context):
+    g.stocksnum = 10
+    g.period = 10
+    run_daily(daily, time='every_bar')
+    g.days = 1
+
+def daily(context):
+    if g.days % g.period == 1:
+        date = context.current_dt.strftime('%Y-%m-%d')
+        scu = get_index_stocks('000001.XSHG') + get_index_stocks('399106.XSHE')
+        suspened_info_df = get_price(list(scu), start_date=context.current_dt, end_date=context.current_dt, frequency='daily', fields='paused')['paused'].T
+        unsuspened_index = suspened_info_df.iloc[:, 0] < 1
+        unsuspened_stocks = suspened_info_df[unsuspened_index].index
+        df = get_fundamentals(query(valuation.code, valuation.market_cap, valuation.pe_ratio).filter(valuation.code.in_(unsuspened_stocks), valuation.pe_ratio > 1).order_by(valuation.market_cap.asc()), date=date)
+        buylist = list(df['code'][:g.stocksnum])
+        for stock in context.portfolio.positions:
+            if stock not in buylist:
+                order_target(stock, 0)
+        position_per_stk = context.portfolio.cash / g.stocksnum
+        for stock in buylist:
+            order_value(stock, position_per_stk)
+    else:
+        pass
+    g.days = g.days + 1

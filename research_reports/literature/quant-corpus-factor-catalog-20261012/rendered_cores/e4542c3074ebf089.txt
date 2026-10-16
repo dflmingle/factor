@@ -1,0 +1,103 @@
+quant/2021年度精选策略/72.【股指期货】收盘折溢价策略.txt
+from jqdata import *
+
+def initialize(context):
+    g.thresh = 0
+    g.flag = ''
+    run_daily(before_market_open, time='09:00', reference_security='IF8888.CCFX')
+    run_daily(close_position, time='10:00', reference_security='IF8888.CCFX')
+    run_daily(open_position, time='14:59', reference_security='IF8888.CCFX')
+    run_daily(after_market_close, time='15:30', reference_security='IF8888.CCFX')
+
+def before_market_open(context):
+    g.main = get_dominant_future('IF')
+
+def close_position(context):
+    code = context.portfolio.positions.keys()
+    for c in code:
+        order_target(c, 0, None, g.flag)
+        g.flag = ''
+
+def open_position(context):
+    cash = context.portfolio.available_cash
+    qty = int(cash / 400000)
+    df = attribute_history(g.main, 59, '1m', ['close', 'volume'])
+    df.volume /= df.volume.sum()
+    settle = (df.close * df.volume).sum()
+    close = df.close[-1]
+    if close < settle * (1 - g.thresh / 1000):
+        order(g.main, qty)
+        g.flag = 'long'
+
+def market_open(context):
+    return
+    IF_current_month = g.IF_current_month
+    IF_next_quarter = g.IF_next_quarter
+    IF_current_month_close = get_bars(IF_current_month, count=1, unit='1d', fields=['close'])['close']
+    IF_next_quarter_close = get_bars(IF_next_quarter, count=1, unit='1d', fields=['close'])['close']
+    CZ = IF_current_month_close - IF_next_quarter_close
+    end_data = get_CCFX_end_date(IF_current_month)
+    if CZ > 80:
+        if context.current_dt.date() == end_data:
+            pass
+        elif len(context.portfolio.short_positions) == 0 and len(context.portfolio.long_positions) == 0:
+            order(IF_current_month, 1, side='short')
+            order(IF_next_quarter, 1, side='long')
+    if CZ < 70:
+        if len(context.portfolio.short_positions) > 0 and len(context.portfolio.long_positions) > 0:
+            order_target(IF_current_month, 0, side='short')
+            order_target(IF_next_quarter, 0, side='long')
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+
+def get_CCFX_end_date(future_code):
+    return get_security_info(future_code).end_date
+
+def position_auto_switch(context, pindex=0, switch_func=None, callback=None):
+    import re
+    subportfolio = context.subportfolios[pindex]
+    symbols = set(subportfolio.long_positions.keys()) | set(subportfolio.short_positions.keys())
+    switch_result = []
+    for symbol in symbols:
+        match = re.match('(?P<underlying_symbol>[A-Z]{1,})', symbol)
+        if not match:
+            raise ValueError('未知期货标的：{}'.format(symbol))
+        else:
+            dominant = get_dominant_future(match.groupdict()['underlying_symbol'])
+            cur = get_current_data()
+            symbol_last_price = cur[symbol].last_price
+            dominant_last_price = cur[dominant].last_price
+            if dominant > symbol:
+                for p in (subportfolio.long_positions.get(symbol, None), subportfolio.short_positions.get(symbol, None)):
+                    if p is None:
+                        continue
+                    if switch_func is not None:
+                        switch_func(context, pindex, p, dominant)
+                    else:
+                        amount = p.total_amount
+                        if p.side == 'long':
+                            symbol_low_limit = cur[symbol].low_limit
+                            dominant_high_limit = cur[dominant].high_limit
+                            if symbol_last_price <= symbol_low_limit:
+                                continue
+                            elif dominant_last_price >= dominant_high_limit:
+                                continue
+                            else:
+                                order_target(symbol, 0, side='long')
+                                order_target(dominant, amount, side='long')
+                                switch_result.append({'before': symbol, 'after': dominant, 'side': 'long'})
+                            if callback:
+                                callback(context, pindex, p, dominant)
+                        if p.side == 'short':
+                            symbol_high_limit = cur[symbol].high_limit
+                            dominant_low_limit = cur[dominant].low_limit
+                            if symbol_last_price >= symbol_high_limit:
+                                continue
+                            elif dominant_last_price <= dominant_low_limit:
+                                continue
+                            else:
+                                order_target(symbol, 0, side='short')
+                                order_target(dominant, amount, side='short')
+                                switch_result.append({'before': symbol, 'after': dominant, 'side': 'short'})
+                                if callback:
+                                    callback(context, pindex, p, dominant)
+    return switch_result

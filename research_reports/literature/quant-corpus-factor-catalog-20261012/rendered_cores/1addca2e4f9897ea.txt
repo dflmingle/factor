@@ -1,0 +1,194 @@
+quant/2021年度精选策略/31.RSRS择时+货币基金--6年8倍行业周期股策略.txt
+import statsmodels.api as sm
+from pandas.stats.api import ols
+from jqdata import *
+import pandas as pd
+import numpy as np
+import datetime
+
+def initialize(context):
+    set_param()
+    set_parameter(context)
+    run_monthly(main, 1, time='9:30')
+
+def handle_data(context, data):
+    security = g.security
+    beta = 0
+    r2 = 0
+    if g.init:
+        g.init = False
+    else:
+        prices = attribute_history(security, g.N, '1d', ['high', 'low'])
+        highs = prices.high
+        lows = prices.low
+        X = sm.add_constant(lows)
+        model = sm.OLS(highs, X)
+        beta = model.fit().params[1]
+        g.ans.append(beta)
+        r2 = model.fit().rsquared
+        g.ans_rightdev.append(r2)
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    zscore_rightdev = zscore * beta * r2
+    if zscore_rightdev > g.buy:
+        if '511880.XSHG' in context.portfolio.positions.keys():
+            order_target('511880.XSHG', 0)
+        orderStock(context)
+    elif zscore_rightdev < g.sell and len(context.portfolio.positions.keys()) > 0:
+        sell_list = set(context.portfolio.positions.keys()) - set(g.etf_list)
+        for sell_code in sell_list:
+            order_target(sell_code, 0)
+        cash_value = context.portfolio.available_cash
+        order_target('511880.XSHG', cash_value)
+
+def main(context):
+    df = getBigStocks()
+    df = controlReport(df, context)
+    setSmallStocks(df)
+
+def getBigStocks():
+    notcall = finance.run_query(query(finance.STK_COMPANY_INFO.code).filter(finance.STK_COMPANY_INFO.industry_id.in_(['J66', 'J67', 'J68', 'J69', 'K70'])))
+    q = query(income.statDate, income.code).filter(income.net_profit > 0, ~income.code.in_(list(notcall['code'])))
+    rets = get_fundamentals(q)
+    rets.index = rets.code
+    del rets['code']
+    return rets
+
+def controlReport(df, context):
+    s = df.statDate
+    df_return = pd.DataFrame()
+    q_cap = query(valuation.code, valuation.pe_ratio, valuation.market_cap).filter(valuation.code.in_(list(df.index)))
+    df_cap = get_fundamentals(q_cap)
+    df_cap = df_cap[(df_cap['pe_ratio'] < 25) & (df_cap['pe_ratio'] > 0)]
+    ll = list(df_cap.code)
+    s = s[ll]
+    compinfo = finance.run_query(query(finance.STK_LIST.code, finance.STK_LIST.name, finance.STK_LIST.start_date).filter(finance.STK_LIST.code.in_(ll)))
+    td = datetime.date(context.current_dt.year, context.current_dt.month, context.current_dt.day)
+    compinfo.index = compinfo.code
+    s_com = compinfo.start_date
+    ll = [code for code in s.index if (td - s_com[code]).days > 500]
+    q_profit = query(balance.code, balance.statDate, balance.total_liability, balance.total_assets).filter(balance.code.in_(ll))
+    df_profit = get_fundamentals(q_profit)
+    df_profit = df_profit[df_profit['total_liability'] / df_profit['total_assets'] < 0.9]
+    ll = list(df_profit.code)
+    s = s[ll]
+    fin_data = get_fin_data(s, 6)
+    df_fin = pd.concat(fin_data)
+    for code in list(s.index):
+        rets = df_fin[df_fin['code'] == code].sort(['statDate'], ascending=False).reset_index(drop=True)
+        if len(rets) < 6:
+            continue
+        if min(rets.adjusted_profit) <= 0 or min(rets.operating_revenue) <= 0:
+            continue
+        year_operating_revenue = sum(rets.operating_revenue[0:4])
+        bill_receivable = np.mean(rets.bill_receivable[0:4])
+        account_receivable = np.mean(rets.account_receivable[0:4])
+        advance_peceipts = np.mean(rets.advance_peceipts[0:4])
+        receivable = bill_receivable + account_receivable - advance_peceipts
+        if receivable <= 0:
+            yszkzzl = 100
+        else:
+            yszkzzl = year_operating_revenue / receivable
+        if yszkzzl <= 6:
+            continue
+        ejd = rets.loc[0, 'adjusted_profit'] + rets.loc[1, 'adjusted_profit']
+        hb = ejd / (rets.loc[2, 'adjusted_profit'] + rets.loc[3, 'adjusted_profit'])
+        tb = ejd / (rets.loc[4, 'adjusted_profit'] + rets.loc[5, 'adjusted_profit'])
+        profit = sum(rets.adjusted_profit[0:4])
+        cc = pd.DataFrame([[code, hb, tb, profit]], columns=('code', 'hb', 'tb', 'profit'))
+        df_return = df_return.append(cc)
+    return df_return
+
+def setSmallStocks(df_pe):
+    if len(df_pe) <= 0:
+        return
+    q_cap = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(list(df_pe.code)))
+    df_cap = get_fundamentals(q_cap)
+    df_pe = df_pe.merge(df_cap)
+    df_pe['pe'] = df_pe['market_cap'] * 100000000 / df_pe['profit']
+    df_pe = df_pe[(df_pe['pe'] < 20) & (df_pe['pe'] > 0)]
+    df_pe = df_pe.sort(['pe'], ascending=True).reset_index(drop=True)
+    df_pe['pes'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe = df_pe.sort(['hb'], ascending=False).reset_index(drop=True)
+    df_pe['hbs'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe = df_pe.sort(['tb'], ascending=False).reset_index(drop=True)
+    df_pe['tbs'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe['s'] = df_pe['pes'] * 1.0 + df_pe['hbs'] * 0.5 + df_pe['tbs'] * 0.4
+    df_pe = df_pe.sort(['s'], ascending=False).reset_index(drop=True)
+    df_pe = df_pe[['code', 'hb', 'tb', 'pe']]
+    g.bten = list(df_pe.head(g.stock_num * 2)['code'])
+    g.bfive = list(df_pe.head(g.stock_num)['code'])
+
+def orderStock(context):
+    bfive = g.bfive
+    bten = g.bten
+    all_value = context.portfolio.total_value
+    for sell_code in context.portfolio.long_positions.keys():
+        if sell_code not in bten:
+            order_target_value(sell_code, 0)
+    for buy_code in bten:
+        if buy_code not in context.portfolio.long_positions.keys():
+            cash_value = context.portfolio.available_cash
+            buy_value = all_value / g.stock_num
+            if cash_value > buy_value / 3:
+                order_target_value(buy_code, buy_value)
+'EXACT_REVIEWED_FUNCTION set_param sha256=610591fb4072bfcf235e86291f5e61e6c5afcc3f9a448461d76ac259c14ee962 source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+
+def set_parameter(context):
+    g.N = 18
+    g.M = 1100
+    g.init = False
+    g.etf_list = ['511880.XSHG']
+    g.security = '000300.XSHG'
+    g.days = 0
+    g.buy = 0.7
+    g.sell = -0.7
+    g.ans = []
+    g.ans_rightdev = []
+    g.blacklist = ['002807.XSHE', '600036.XSHG', '600908.XSHG', '601229.XSHG', '002142.XSHE', '600000.XSHG', '600016.XSHG', '601166.XSHG', '600926.XSHG', '601128.XSHG', '002839.XSHE', '600919.XSHG', '600015.XSHG', '601988.XSHG', '601998.XSHG', '601939.XSHG', '601997.XSHG', '601169.XSHG', '000001.XSHE', '601818.XSHG', '601328.XSHG', '601398.XSHG', '601288.XSHG', '601009.XSHG', '603323.XSHG']
+    previous_date = context.current_dt - datetime.timedelta(days=2)
+    prices = get_price(g.security, '2005-01-05', previous_date, '1d', ['high', 'low'])
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+
+def moreinfo(df):
+    codes = list(df.code)
+    compinfo = finance.run_query(query(finance.STK_LIST.code, finance.STK_LIST.name, finance.STK_LIST.start_date).filter(finance.STK_LIST.code.in_(codes)))
+    stock_score = pd.merge(df, compinfo)
+
+def get_fin_data(s, period):
+    stat_date_stocks = {sd: [stock for stock in s.index if s[stock] == sd] for sd in set(s.values)}
+    qt = query(income.statDate, income.code, income.operating_revenue, indicator.adjusted_profit, balance.bill_receivable, balance.account_receivable, balance.advance_peceipts, cash_flow.net_operate_cash_flow, cash_flow.fix_intan_other_asset_acqui_cash, balance.total_assets, balance.total_liability, balance.shortterm_loan, balance.longterm_loan, balance.non_current_liability_in_one_year, balance.bonds_payable)
+    ret_data = []
+    for i in range(0, period):
+        one_period = pd.DataFrame()
+        for stat_date in stat_date_stocks.keys():
+            statq = popStatQ(stat_date, i)
+            lqt = qt.filter(balance.code.in_(stat_date_stocks[stat_date]))
+            oneData = get_fundamentals(lqt, statDate=statq)
+            if len(oneData) > 0:
+                one_period = one_period.append(oneData)
+        one_period = one_period.fillna(0)
+        if len(one_period) > 0:
+            ret_data.append(one_period)
+    return ret_data
+
+def popStatQ(stat_date, num):
+    year = int(stat_date[:4])
+    q = int(stat_date[5:7]) // 3
+    q -= num
+    while q <= 0:
+        q += 4
+        year -= 1
+    return str(year) + 'q' + str(q)

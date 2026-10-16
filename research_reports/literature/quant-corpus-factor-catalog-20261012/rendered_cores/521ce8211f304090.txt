@@ -1,0 +1,188 @@
+quant/量化策略/量化策略/龙头追涨策略2026/04龙头弱转强战法-优化版-25年51.txt
+from jqdata import *
+import math
+import pandas as pd
+
+def initialize(context):
+    g.buy_limit_discount = 0.98
+    g.max_stock_count = 3
+    g.max_buy_per_day = 2
+    g.top_n = 5
+    g.rise_threshold = 1.2
+    g.buy_open_ratio = 1.05
+    g.volume_ratio = 0.8
+    g.pullback_min = 0.3
+    g.pullback_max = 0.45
+    g.hard_stop_ratio = 0.08
+    g.target_profit_ratio = 0.2
+    g.trailing_stop_ratio = 0.5
+    g.panic_threshold = -0.05
+    g.panic_mode = False
+    g.panic_base_price = None
+    run_daily(before_market_open, time='before_open')
+    run_daily(market_open, time='9:32')
+    run_daily(sell_in_day, time='11:00')
+    run_daily(sell_in_day, time='13:30')
+    run_daily(sell_in_day, time='14:00')
+    run_daily(sell_in_day, time='14:30')
+    run_daily(sell_at_close, time='14:57')
+
+def before_market_open(context):
+    current_dt = context.current_dt
+    stocks_all = get_all_securities(['stock'], date=current_dt).index.tolist()
+    current_data = get_current_data()
+    stocks = filter_stocks(context, stocks_all, current_data)
+    stock_score = {}
+    for stock in stocks:
+        df = attribute_history(stock, 30, '1d', ['close', 'high'], df=True)
+        if df is None or len(df) < 30:
+            continue
+        high_series = df['high']
+        max_high = high_series.max()
+        max_pos = high_series.values.argmax()
+        if max_pos < 20:
+            continue
+        start_close = df['close'].iloc[max_pos - 20]
+        rise = max_high / start_close - 1
+        if rise < g.rise_threshold - 1:
+            continue
+        last_close = df['close'].iloc[-1]
+        pullback = (max_high - last_close) / max_high
+        if not g.pullback_min <= pullback <= g.pullback_max:
+            continue
+        df2 = attribute_history(stock, 2, '1d', ['close', 'high', 'low', 'volume'], df=True)
+        if len(df2) < 2:
+            continue
+        ratio = df2['close'].iloc[-1] / df2['close'].iloc[-2]
+        df_vol = attribute_history(stock, 6, '1d', ['volume'], df=True)
+        if len(df_vol) >= 6:
+            vol_ma5 = df_vol['volume'].iloc[-6:-1].mean()
+            if df2['volume'].iloc[-1] > vol_ma5 * g.volume_ratio:
+                continue
+        stock_score[stock] = rise
+    sorted_stocks = sorted(stock_score.items(), key=lambda x: x[1], reverse=True)[:g.top_n]
+    g.buy_candidates = [s[0] for s in sorted_stocks]
+
+def market_open(context):
+    if not g.buy_candidates:
+        return
+    last_close = history(1, '1d', 'close', g.buy_candidates, df=False, skip_paused=True)
+    current_data = get_current_data()
+    to_buy = []
+    for stock in g.buy_candidates:
+        if stock not in last_close:
+            continue
+        yc = last_close[stock][0]
+        open_price = current_data[stock].day_open
+        last_price = current_data[stock].last_price
+        high_limit = current_data[stock].high_limit
+        if yc < open_price < yc * g.buy_open_ratio and last_price < high_limit:
+            to_buy.append((stock, yc))
+    if not to_buy:
+        return
+    current_positions = len(context.portfolio.positions)
+    can_buy_num = g.max_stock_count - current_positions
+    if can_buy_num <= 0:
+        return
+    buy_num = min(can_buy_num, g.max_buy_per_day, len(to_buy))
+    cash_per_stock = context.portfolio.available_cash / buy_num
+    for stock, yc in to_buy[:buy_num]:
+        current_price = current_data[stock].last_price
+        high_limit = current_data[stock].high_limit
+        low_limit = current_data[stock].low_limit
+        if current_price >= high_limit:
+            continue
+        limit_price = round(current_price * g.buy_limit_discount, 2)
+        if limit_price < low_limit:
+            limit_price = low_limit
+        shares = math.floor(cash_per_stock / (current_price * 100)) * 100
+        if shares < 100:
+            continue
+        stock_name = get_security_info(stock).display_name
+        order(stock, shares, LimitOrderStyle(limit_price))
+    g.buy_candidates = []
+
+def sell_in_day(context):
+    _sell_by_condition(context, condition='break_yc')
+
+def sell_at_close(context):
+    _sell_by_condition(context, condition='close_check')
+
+def _sell_by_condition(context, condition):
+    positions = context.portfolio.positions
+    if not positions:
+        return
+    current_data = get_current_data()
+    stock_list = list(positions.keys())
+    benchmark_code = '000300.XSHG'
+    try:
+        bench = current_data[benchmark_code]
+        last_price = bench.last_price
+        if last_price > 0:
+            df_bench = attribute_history(benchmark_code, 1, '1d', ['close'], df=True)
+            if len(df_bench) > 0:
+                prev_close = df_bench['close'].iloc[-1]
+                daily_return = (last_price - prev_close) / prev_close
+                if not g.panic_mode:
+                    if daily_return <= g.panic_threshold:
+                        g.panic_mode = True
+                        g.panic_base_price = prev_close
+                elif last_price >= g.panic_base_price:
+                    g.panic_mode = False
+                    g.panic_base_price = None
+    except Exception as e:
+        pass
+    yc_dict = {}
+    for stock in stock_list:
+        df = attribute_history(stock, 1, '1d', ['close'], df=True)
+        yc_dict[stock] = df['close'].iloc[-1] if len(df) > 0 else None
+    if not hasattr(g, 'high_prices'):
+        g.high_prices = {}
+    for stock in stock_list:
+        if current_data[stock].paused:
+            continue
+        last_price = current_data[stock].last_price
+        high_limit = current_data[stock].high_limit
+        yc = yc_dict.get(stock)
+        position = positions[stock]
+        cost = position.avg_cost
+        amount = position.closeable_amount
+        if amount <= 0:
+            continue
+        stock_name = get_security_info(stock).display_name
+        profit_rate = (last_price - cost) / cost if cost > 0 else 0
+        if not g.panic_mode and profit_rate <= -g.hard_stop_ratio:
+            _execute_sell(stock, stock_name, amount, last_price, profit_rate * 100, '硬止损')
+            continue
+        if profit_rate >= g.target_profit_ratio:
+            _execute_sell(stock, stock_name, amount, last_price, profit_rate * 100, '硬止盈(目标{:.0f}%)'.format(g.target_profit_ratio * 100))
+            continue
+        if stock not in g.high_prices:
+            g.high_prices[stock] = cost
+        g.high_prices[stock] = max(g.high_prices[stock], last_price)
+        trailing_stop_ratio = g.trailing_stop_ratio
+        highest = g.high_prices[stock]
+        if last_price < highest * (1 - trailing_stop_ratio):
+            _execute_sell(stock, stock_name, amount, last_price, profit_rate * 100, '移动止盈(从高点{:.2f}回撤{:.0f}%)'.format(highest, trailing_stop_ratio * 100))
+            continue
+
+def _execute_sell(stock, stock_name, amount, price, profit_rate, reason):
+    if stock.startswith('688'):
+        limit_price = round(price * 0.998, 2)
+        order(stock, -amount, LimitOrderStyle(limit_price))
+    else:
+        order_target(stock, 0)
+
+def filter_stocks(context, stock_list, current_data):
+    dt = context.current_dt
+    valid_stocks = []
+    for stock in stock_list:
+        if current_data[stock].paused:
+            continue
+        name = current_data[stock].name
+        if name and ('退' in name or '*' in name or 'ST' in name):
+            continue
+        if (dt.date() - get_security_info(stock).start_date).days < 180:
+            continue
+        valid_stocks.append(stock)
+    return valid_stocks

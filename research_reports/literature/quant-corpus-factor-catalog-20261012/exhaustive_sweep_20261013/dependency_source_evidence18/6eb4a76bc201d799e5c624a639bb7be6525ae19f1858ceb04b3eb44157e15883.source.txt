@@ -1,0 +1,508 @@
+"""
+回测收益汇总：
+2025年 206.7%
+2024年 838.99%
+2023年负-2.94%
+2022年 435.20%
+2021年 60.83%
+"""
+"""
+选股逻辑（get_stock_list）
+这是策略的核心，分为三类股票筛选：
+A. 首板低开（sbdk_stocks）
+条件：
+位置条件：60日相对位置≤50%（处于中低位）
+成交额：昨日成交额≥1亿
+低开幅度：集合竞价低开3-4.5%（0.955-0.97）
+量能放大：集合竞价成交量≥昨日成交量3%
+B. 首板高开（sbgk_stocks）
+条件：
+均价获利：昨日均价涨幅<7%（追涨盘不多）
+成交额：5.5亿≤昨日成交额≤20亿
+市值：70亿≤流通市值≤520亿
+高开幅度：高开0-6%（1.00-1.06）
+左压突破：突破近期高点的量能放大
+集合竞价：量比≥3%
+C. 弱转强（rzq_stocks）
+条件：
+近期涨幅：4日涨幅≤28%（防止过度炒作）
+昨日表现：收盘价不低于开盘价5%（非大阴线）
+均价亏损：昨日均价跌幅<4%（套牢盘有限）
+成交额：3亿≤昨日成交额≤19亿
+高开幅度：相对于昨日涨停价高开-2%到+9%
+量能放大：突破左压时量能放大
+
+开始
+├─ 9:26 买入检查
+│   ├─ 获取股票池：昨日涨停/烂板股
+│   ├─ 筛选三种模式：
+│   │   ├─ 首板低开：低开3-4.5%，位置中低
+│   │   ├─ 首板高开：高开0-6%，量价配合
+│   │   └─ 弱转强：昨日炸板，今日转强
+│   └─ 等分资金买入符合条件的股票
+├─ 11:25 卖出检查
+│   ├─ 止盈：非涨停且盈利
+│   └─ 止损：跌破动态5日线
+├─ 14:50 卖出检查（同11:25）
+└─ 收盘后：输出总结
+
+交易哲学
+涨停板效应：利用涨停后的惯性
+集合竞价战法：通过开盘价判断强弱
+弱转强模式：关注烂板后的修复机会
+量价配合：强调突破时的量能放大
+"""
+# 导入必要的库
+from jqdata import *        # 聚宽数据API，提供股票数据获取等功能
+from jqfactor import *      # 聚宽因子库（虽然代码中未使用，但导入备用）
+import pandas as pd         # 数据处理库
+from datetime import datetime, timedelta, date  # 日期时间处理库
+
+################################### 初始化设置 #############################################
+def initialize(context):
+    """
+    初始化函数 - 策略启动时执行一次
+    context: 策略上下文，包含账户、持仓等信息
+    """
+    set_option('use_real_price', True)       # 使用真实价格，避免使用涨停跌停价
+    log.set_level('system', 'error')         # 设置系统日志级别为error，减少日志输出
+    set_option('avoid_future_data', True)    # 避免未来函数，确保回测准确性
+
+    # 将滑点设置为0
+    set_slippage(FixedSlippage(3/10000))
+    # 设置交易成本万分之三，不同滑点影响可在归因分析中查看
+    set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=3/10000, close_commission=3/10000, close_today_commission=0, min_commission=5),type='stock')
+    
+
+def after_code_changed(context):
+    """
+    代码变更后执行的函数 - 当代码修改后重新运行时执行
+    用于重置策略状态和重新安排定时任务
+    """
+    # 重新初始化涨停股票列表（存储近期涨停股票）
+    g.n_days_limit_up_list = []   
+    
+    # 取消所有已安排的定时任务（避免重复调度）
+    unschedule_all() 
+    
+    # 重新安排每日定时任务
+    # run_daily(get_stock_list, '9:05')  # 原注释掉的选股任务
+    run_daily(buy, '09:26')                # 9:26执行买入（集合竞价结束后）
+    run_daily(sell, time='11:25', reference_security='000300.XSHG')  # 11:25执行卖出检查
+    run_daily(sell, time='14:50', reference_security='000300.XSHG')  # 14:50执行卖出检查
+
+
+def after_trading_end(context):
+    """
+    交易结束后执行的函数 - 每日收盘后执行
+    用于输出当日总结信息
+    """
+    print('———————————————————————————————————')  # 分隔线，便于日志阅读
+
+## 定义股票池     
+def set_stockpool(context):
+    """
+    设置基础股票池 - 获取所有A股股票
+    context: 策略上下文
+    返回: 所有A股股票代码列表
+    """
+    yesterday = context.previous_date  # 获取上一个交易日
+    # 获取指定日期所有股票（包括已退市的）
+    initial_list = get_all_securities('stock', yesterday).index.tolist()
+    return initial_list
+
+##################################  交易函数群 ##################################
+def buy(context):
+    """
+    买入函数 - 在9:26执行，进行股票买入操作
+    context: 策略上下文
+    """
+    current_data = get_current_data()  # 获取当前股票数据（价格、状态等）
+    
+    # 获取符合条件的股票列表
+    qualified_stocks = get_stock_list(context)
+    
+    if qualified_stocks:  # 如果有符合条件的股票
+        # 等分可用资金给每只股票
+        value = context.portfolio.available_cash / len(qualified_stocks)
+        
+        # 遍历每只符合条件的股票
+        for s in qualified_stocks:
+            # 检查是否至少有足够现金买入100股（最小交易单位）
+            if context.portfolio.available_cash / current_data[s].last_price > 100: 
+                # 以市价单（按开盘价）买入指定金额的股票
+                order_value(s, value, MarketOrderStyle(current_data[s].day_open))
+                print('买入' + s)  # 记录买入操作
+
+def sell(context):
+    """
+    卖出函数 - 在11:25和14:50执行，进行卖出检查
+    context: 策略上下文
+    """
+    # 获取当前时间（格式：HHMM）
+    stime = context.current_dt.strftime("%H%M")
+    current_data = get_current_data()  # 获取当前股票数据
+    
+    # 遍历所有持仓股票（转换为列表避免迭代时修改问题）
+    for s in list(context.portfolio.positions):
+        # 获取前4天的收盘价数据，用于计算移动平均线
+        close_data = attribute_history(s, 4, '1d', ['close'])
+        M4 = close_data['close'].mean()  # 计算4日收盘均价
+        
+        # 计算动态5日移动平均线（包含当日价格）
+        # (前4日均价*4 + 当前价格) / 5 = 动态5日均线
+        MA5 = (M4 * 4 + current_data[s].last_price) / 5
+        
+        # 获取该股票的持仓信息
+        position = context.portfolio.positions[s]
+        
+        # ---------- 条件1：止盈卖出 ----------
+        # 条件：有可卖数量 + 当前未涨停 + 当前价格高于持仓成本
+        if ((position.closeable_amount != 0) and  # 有可卖数量（非当日买入）
+            (current_data[s].last_price < current_data[s].high_limit) and  # 当前未涨停
+            (current_data[s].last_price > 1 * position.avg_cost)):  # 当前价高于成本价
+            # 清仓卖出
+            order_target_value(s, 0)
+            # 计算收益率
+            ret = 100 * (position.price / position.avg_cost - 1)
+            print('止盈卖出 ' + get_security_info(s).display_name + s + ' 收益率:{:.2f}%'.format(ret, '.2f'))
+        
+        # ---------- 条件2：止损卖出（跌破5日线） ----------
+        # 条件：有可卖数量 + 当前价格跌破5日移动平均线
+        if ((position.closeable_amount != 0) and  # 有可卖数量
+            (current_data[s].last_price < MA5)):  # 当前价跌破5日线
+            # 清仓卖出
+            order_target_value(s, 0)
+            # 计算收益率
+            ret = 100 * (position.price / position.avg_cost - 1)
+            print('止损卖出 ' + get_security_info(s).display_name + s + ' 收益率:{:.2f}%'.format(ret, '.2f'))
+
+##################################  选股函数群 ##################################   
+# 选股
+def get_stock_list(context): 
+    """
+    核心选股函数 - 筛选符合三种模式的股票
+    context: 策略上下文
+    返回: 符合条件的股票代码列表
+    """
+    # 准备基础股票池（昨日涨停和曾涨停的股票）
+    target_list, target_list2 = prepare_stock_list(context)
+    
+    # 初始化各类股票列表
+    qualified_stocks = []    # 最终符合条件的股票
+    sbdk_stocks = []         # 首板低开股票（昨日首板，今日低开）
+    sbgk_stocks = []         # 首板高开股票（昨日首板，今日高开）
+    rzq_stocks = []          # 弱转强股票（昨日烂板，今日转强）
+    
+    current_data = get_current_data()  # 获取当前股票数据
+    
+    # 构建集合竞价查询时间范围（09:15:00 - 09:26:00）
+    date_now = context.current_dt.strftime("%Y-%m-%d")
+    mid_time1 = ' 09:15:00'
+    end_times1 = ' 09:26:00'
+    start = date_now + mid_time1
+    end = date_now + end_times1
+
+    # ========== 模式1：筛选首板低开股票（sbdk_stocks） ==========
+    for s in target_list:
+        # ----- 条件A：股票位置和成交额筛选 -----
+        # 获取60天的历史数据，用于计算相对位置
+        history_data = attribute_history(s, 60, '1d', fields=['close', 'high', 'low', 'money'], skip_paused=True)
+        close = history_data['close'][-1]        # 昨日收盘价
+        high = history_data['high'].max()        # 60日内最高价
+        low = history_data['low'].min()          # 60日内最低价
+        
+        # 计算相对位置：(当前收盘价-最低价)/(最高价-最低价)，0-1之间
+        rp = (close - low) / (high - low)
+        
+        money = history_data['money'][-1]        # 昨日成交额
+        
+        # 筛选条件：相对位置≤50%（中低位）且昨日成交额≥1亿
+        if rp <= 0.5 and money >= 1e8:
+            # 获取该股票的集合竞价数据
+            auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'current'])
+            
+            if not auction_data.empty:  # 如果有集合竞价数据
+                # 计算集合竞价价格相对于昨日收盘价的比例
+                current_ratio = auction_data['current'][0] / close
+                
+                # 筛选条件：低开3-4.5%（0.955-0.97）
+                if current_ratio <= 0.97 and current_ratio >= 0.955:
+                    sbdk_stocks.append(s)
+                    continue  # 已归入首板低开，不再检查其他条件
+
+        # ========== 模式2：筛选首板高开股票（sbgk_stocks） ==========
+        # ----- 条件1：均价、成交额、市值筛选 -----
+        # 获取前1天数据
+        prev_day_data = attribute_history(s, 1, '1d', fields=['close', 'volume', 'money'], skip_paused=True)
+        
+        # 计算昨日均价涨幅：(成交额/成交量)/收盘价 *1.1 - 1
+        # 1.1是近似调整系数，因为均价通常略低于收盘价
+        avg_price_increase_value = prev_day_data['money'][0] / prev_day_data['volume'][0] / prev_day_data['close'][0] * 1.1 - 1
+        
+        # 筛选条件：均价涨幅<7% 且 成交额在5.5亿-20亿之间
+        if avg_price_increase_value < 0.07 or prev_day_data['money'][0] < 5.5e8 or prev_day_data['money'][0] > 20e8:
+            continue  # 不符合条件，跳过
+        
+        # 获取估值数据（换手率、市值等）
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date, 
+                                          fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+        
+        # 筛选条件：市值在70亿-520亿之间
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < 70 or turnover_ratio_data['circulating_market_cap'][0] > 520:
+            continue  # 不符合条件，跳过
+        
+        # ----- 条件2：集合竞价高开筛选 -----
+        # 获取集合竞价数据（成交量、当前价）
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        
+        # 筛选条件：集合竞价成交量≥昨日成交量3%（量比要求）
+        if auction_data.empty or auction_data['volume'][0] / prev_day_data['volume'][-1] < 0.03:
+            continue  # 不符合条件，跳过
+        
+        # 计算开盘价相对于昨日收盘价的比例
+        current_ratio = auction_data['current'][0] / prev_day_data['close'][-1]
+        
+        # 筛选条件：高开0-6%（1.00-1.06）
+        if current_ratio <= 1 or current_ratio >= 1.06:
+            continue  # 不符合条件，跳过
+        
+        # ----- 条件3：左压突破筛选 -----
+        # 获取101天历史数据，用于计算左压
+        hst = attribute_history(s, 101, '1d', fields=['high', 'volume'], skip_paused=True)
+        prev_high = hst['high'].iloc[-1]  # 昨日最高价
+        
+        # 计算左压天数：从昨天向前找，第一个不低于昨日最高价的高点
+        # zyts_0 = 距离最近的高点的天数
+        zyts_0 = next((i - 1 for i, high in enumerate(hst['high'][-3::-1], 2) if high >= prev_high), 100)
+        zyts = zyts_0 + 5  # 增加5天缓冲期
+        
+        # 获取左压期间（从高点至今）的成交量数据
+        volume_data = hst['volume'][-zyts:]
+        
+        # 筛选条件：今日成交量同步放大（≥左压期间最大成交量的90%）
+        if len(volume_data) < 2 or volume_data[-1] <= max(volume_data[:-1]) * 0.9:
+            continue  # 不符合条件，跳过
+        
+        # 如果股票满足所有条件，则添加到首板高开列表
+        sbgk_stocks.append(s)
+    
+    # ========== 模式3：筛选弱转强股票（rzq_stocks） ==========
+    for s in target_list2:  # target_list2是昨日曾涨停但未封板的股票
+        # ----- 前置过滤条件 -----
+        # 获取前4天数据，检查近期涨幅
+        prev_day_data = attribute_history(s, 4, '1d', fields=['open', 'close', 'volume', 'money'], skip_paused=True)
+        
+        # 计算4日累计涨幅
+        increase_ratio = (prev_day_data['close'][-1] - prev_day_data['close'][0]) / prev_day_data['close'][0]
+        
+        # 过滤条件：4日涨幅≤28%（防止过度炒作）
+        if increase_ratio > 0.28:
+            continue  # 不符合条件，跳过
+        
+        # 计算昨日开盘收盘关系
+        open_close_ratio = (prev_day_data['close'][-1] - prev_day_data['open'][-1]) / prev_day_data['open'][-1]
+        
+        # 过滤条件：昨日收盘价不低于开盘价5%（非大阴线）
+        if open_close_ratio < -0.05:
+            continue  # 不符合条件，跳过
+        
+        # ----- 条件1：均价、成交额、市值筛选 -----
+        # 计算昨日均价亏损程度
+        avg_price_increase_value = prev_day_data['money'][-1] / prev_day_data['volume'][-1] / prev_day_data['close'][-1] - 1
+        
+        # 筛选条件：均价亏损<4% 且 成交额在3亿-19亿之间
+        if avg_price_increase_value < -0.04 or prev_day_data['money'][-1] < 3e8 or prev_day_data['money'][-1] > 19e8:
+            continue  # 不符合条件，跳过
+        
+        # 获取估值数据
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date,
+                                          fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+        
+        # 筛选条件：市值在70亿-520亿之间
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < 70 or turnover_ratio_data['circulating_market_cap'][0] > 520:
+            continue  # 不符合条件，跳过
+        
+        # ----- 条件2：集合竞价表现筛选 -----
+        # 获取集合竞价数据
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        
+        # 筛选条件：集合竞价成交量≥昨日成交量3%
+        if auction_data.empty or auction_data['volume'][0] / prev_day_data['volume'][-1] < 0.03:
+            continue  # 不符合条件，跳过
+        
+        # 计算相对于昨日涨停价的开盘比例（昨日涨停价 = 昨日收盘价 * 1.1）
+        current_ratio = auction_data['current'][0] / (current_data[s].high_limit / 1.1)
+        
+        # 筛选条件：相对于涨停价高开-2%到+9%（0.98-1.09）
+        if current_ratio <= 0.98 or current_ratio >= 1.09:
+            continue  # 不符合条件，跳过
+        
+        # ----- 条件3：左压突破筛选（同首板高开） -----
+        hst = attribute_history(s, 101, '1d', fields=['high', 'volume'], skip_paused=True)
+        prev_high = hst['high'].iloc[-1]
+        zyts_0 = next((i - 1 for i, high in enumerate(hst['high'][-3::-1], 2) if high >= prev_high), 100)
+        zyts = zyts_0 + 5
+        volume_data = hst['volume'][-zyts:]
+        
+        if len(volume_data) < 2 or volume_data[-1] <= max(volume_data[:-1]) * 0.9:
+            continue  # 不符合条件，跳过
+        
+        # 如果股票满足所有条件，则添加到弱转强列表
+        rzq_stocks.append(s)
+    
+    # 合并所有符合条件的股票
+    qualified_stocks = sbgk_stocks + sbdk_stocks + rzq_stocks
+    
+    # 输出选股结果（调试信息）
+    if qualified_stocks:
+        print('今日选股：' + str(qualified_stocks))
+        print('首板高开：' + str(sbgk_stocks))
+        print('首板低开：' + str(sbdk_stocks))
+        print('弱转强：' + str(rzq_stocks))
+        
+    return qualified_stocks
+
+# 每日初始股票池
+def prepare_stock_list(context):
+    """
+    准备每日股票池 - 筛选昨日涨停和曾涨停的股票
+    context: 策略上下文
+    返回: (首板股票列表, 烂板股票列表)
+    """
+    today = context.current_dt.date()      # 当前日期
+    yesterday = context.previous_date      # 上一个交易日
+    
+    # 获取基础股票池
+    initial_list = set_stockpool(context)
+    
+    # 逐步过滤股票
+    initial_list = filter_kcbj_stock(initial_list)           # 过滤科创板、北交所
+    initial_list = filter_st_paused_stock(initial_list, today)  # 过滤ST、停牌、退市
+    initial_list = filter_new_stock(initial_list, today)     # 过滤次新股（上市<50天）
+    
+    # 初始化涨停股票历史列表（首次运行）
+    if not g.n_days_limit_up_list:
+        # 获取最近3个交易日（不包括今天）
+        days = get_trade_days(end_date=yesterday, count=3)[:-1]
+        for day in days:
+            # 获取每个交易日涨停的股票并添加到列表
+            g.n_days_limit_up_list.append(get_hl_stock(initial_list, day, 1))
+
+    # 获取昨日涨停股票
+    hl_list = get_hl_stock(initial_list, yesterday, 1)
+    g.n_days_limit_up_list.append(hl_list)  # 添加到历史列表
+
+    # 获取前1日曾涨停的股票（去重）
+    hl1_list = set(g.n_days_limit_up_list[-2])
+    
+    # 从昨日涨停中排除前1日已涨停的，得到真正的"首板"
+    hl_list = [stock for stock in hl_list if stock not in hl1_list]
+
+    # 获取昨日曾涨停但未封板的股票（烂板）
+    hl_list2 = get_ever_hl_stock2(initial_list, yesterday)
+    # 排除前1日已涨停的
+    hl_list2 = [stock for stock in hl_list2 if stock not in hl1_list]
+    
+    # 移除最早一日的涨停数据，保持列表长度
+    g.n_days_limit_up_list.pop(0)
+    
+    # 返回：首板股票列表, 烂板股票列表
+    return hl_list, hl_list2
+
+###################################  其它函数群 ##################################
+
+# 筛选出某一日涨停的股票
+def get_hl_stock(stock_list, date1, days=1):
+    """
+    获取指定日期涨停的股票
+    stock_list: 待筛选股票列表
+    date1: 指定日期
+    days: 回溯天数
+    返回: 涨停股票代码列表
+    """
+    if not stock_list:  # 如果股票列表为空，直接返回空列表
+        return []
+    
+    # 获取指定日期的价格数据
+    h_s = get_price(stock_list, end_date=date1, frequency='daily', 
+                  fields=['close', 'high_limit', 'paused'],
+                  count=days, panel=False, fill_paused=False, skip_paused=False
+                  ).query('close==high_limit and paused==0'  # 筛选条件：收盘价等于涨停价且未停牌
+                          ).groupby('code').size()  # 按股票代码分组统计
+    
+    return h_s.index.tolist()  # 返回涨停股票代码列表
+
+# 筛选出某一日曾经涨停的股票，含炸板的
+def get_ever_hl_stock(stock_list, date1):
+    """
+    获取指定日期曾涨停（含炸板）的股票
+    返回: 曾触及涨停价的股票代码列表
+    """
+    if not stock_list:
+        return []
+    
+    h_s = get_price(stock_list, end_date=date1, frequency='daily',
+                  fields=['high', 'high_limit', 'paused'],
+                  count=1, panel=False, fill_paused=False, skip_paused=False
+                  ).query('high==high_limit and paused==0'  # 筛选条件：最高价触及涨停价
+                          ).groupby('code').size()
+    
+    return h_s.index.tolist()
+
+# 筛选出某一日曾经涨停但未封板的股票
+def get_ever_hl_stock2(stock_list, date1):
+    """
+    获取指定日期曾涨停但未封板（炸板）的股票
+    返回: 炸板股票代码列表
+    """
+    if not stock_list:
+        return []
+    
+    h_s = get_price(stock_list, end_date=date1, frequency='daily',
+                  fields=['close', 'high', 'high_limit', 'paused'],
+                  count=1, panel=False, fill_paused=False, skip_paused=False
+                  ).query('close!=high_limit and high==high_limit and paused==0'  # 筛选条件：触及涨停但未封板
+                          ).groupby('code').size()
+    
+    return h_s.index.tolist()
+
+# 过滤函数
+def filter_new_stock(initial_list, date, days=50):
+    """
+    过滤次新股（上市时间小于指定天数）
+    initial_list: 初始股票列表
+    date: 当前日期
+    days: 上市天数阈值（默认50天）
+    返回: 过滤后的股票列表
+    """
+    return [stock for stock in initial_list 
+            if get_security_info(stock).start_date < date - timedelta(days=days)]
+
+def filter_st_paused_stock(initial_list, date):
+    """
+    过滤ST股票、停牌股票和退市股票
+    initial_list: 初始股票列表
+    date: 当前日期
+    返回: 过滤后的股票列表
+    """
+    current_data = get_current_data()  # 获取当前股票状态数据
+    
+    return [stock for stock in initial_list 
+            if not (current_data[stock].is_st or           # 非ST股票
+                    current_data[stock].paused or          # 非停牌股票
+                    '退' in current_data[stock].name)]     # 非退市股票（名称含"退"）
+
+
+def filter_kcbj_stock(initial_list):
+    """
+    过滤科创板、北交所股票
+    initial_list: 初始股票列表
+    返回: 过滤后的股票列表
+    """
+    return [stock for stock in initial_list 
+            if stock[0] != '4' and          # 过滤北交所（4开头）
+               stock[0] != '8' and          # 过滤北交所（8开头）
+               stock[:2] != '68']           # 过滤科创板（68开头）
+
+### end ###

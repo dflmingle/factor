@@ -1,0 +1,38 @@
+quant/2024年度精选策略1/3.【回顾3】ETF策略之核心资产轮动.txt
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.etf_pool = ['518880.XSHG', '513100.XSHG', '159915.XSHE', '510180.XSHG']
+    g.m_days = 25
+    run_daily(trade, '9:30')
+
+def get_rank(etf_pool):
+    score_list = []
+    for etf in etf_pool:
+        df = attribute_history(etf, g.m_days, '1d', ['close'])
+        y = df['log'] = np.log(df.close)
+        x = df['num'] = np.arange(df.log.size)
+        slope, intercept = np.polyfit(x, y, 1)
+        annualized_returns = math.pow(math.exp(slope), 250) - 1
+        r_squared = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+        score = annualized_returns * r_squared
+        score_list.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': score_list})
+    df = df.sort_values(by='score', ascending=False)
+    rank_list = list(df.index)
+    return rank_list
+
+def trade(context):
+    target_num = 1
+    target_list = get_rank(g.etf_pool)[:target_num]
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+    hold_list = list(context.portfolio.positions)
+    if len(hold_list) < target_num:
+        value = context.portfolio.available_cash / (target_num - len(hold_list))
+        for etf in target_list:
+            if context.portfolio.positions[etf].total_amount == 0:
+                order_target_value(etf, value)

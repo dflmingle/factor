@@ -1,0 +1,34 @@
+quant/2021年度精选策略/85.易方达中小盘（魔改版）.txt
+from jqdata import *
+from jqdata import finance
+
+def initialize(context):
+    set_redeem_latency(3, 'open_fund')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    g.day = 0
+    g.BuyGold = False
+    g.s = '110011.OF'
+    o = purchase(g.s, 100000)
+
+def market_open(context):
+    s = g.s
+    s1 = '000217.OF'
+    weekday = context.current_dt.date()
+    df = get_extras('acc_net_value', s, count=60, end_date=context.current_dt.date())
+    MA22 = np.array(df).mean()
+    if g.BuyGold == True:
+        g.day = g.day + 1
+    if g.BuyGold == False:
+        g.day = 0
+    if df.iloc[-1].values < MA22:
+        if abs(df.iloc[-1].values / MA22 - 1) > 0.03:
+            o1 = redeem(s, context.portfolio.subportfolios[0].long_positions['110011.OF'].closeable_amount)
+            o = purchase(s1, 100000)
+            g.BuyGold = True
+    else:
+        if g.day >= 7:
+            o1 = redeem(s1, context.portfolio.subportfolios[0].long_positions['000217.OF'].closeable_amount)
+            g.BuyGold = False
+        o = purchase(s, 100000)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=d175d7508c33210f4cd6f63757d79c8189e46dc20fb6044c8ebef7b6b5b48863 source=quant/2020年度精选策略/50 简单配对交易.txt'

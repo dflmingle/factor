@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "_id": "6acf40b42d2f6998fc1c331f",
+  "name": "F-Q141014-03",
+  "create_at": 1791967412226,
+  "last_run_id": "6acf410c6ee632ca3f97cf6c",
+  "mode": "code",
+  "content": "class SeasonalRevenueSurprise(Factor):\n    def calculate(self, factors):\n        # Platform PIT native statement-period values; single-quarter/YTD\n        # vendor semantics are unverified. Not a claim of local byte parity.\n        current = factors['operating_revenue'].astype(float)\n        prior4 = factors['operating_revenue_mrq_4'].reindex(current.index).astype(float)\n        prior8 = factors['operating_revenue_mrq_8'].reindex(current.index).astype(float)\n        prior12 = factors['operating_revenue_mrq_12'].reindex(current.index).astype(float)\n        # Scaling before squaring avoids overflow and preserves the score.\n        scale = (prior4.abs() + prior8.abs() + prior12.abs()) / 3.0\n        scale = scale.where(scale > 0)\n        a = prior4 / scale\n        b = prior8 / scale\n        c = prior12 / scale\n        normalized_mean = (a + b + c) / 3.0\n        variance = ((a - normalized_mean) ** 2 +\n                    (b - normalized_mean) ** 2 +\n                    (c - normalized_mean) ** 2) / 2.0\n        std = np.sqrt(variance).where(variance > 1e-24)\n        result = (current / scale - normalized_mean) / std\n        return result.where(np.isfinite(result)).rename('value')\n",
+  "start_date": "20210907",
+  "end_date": "20260907",
+  "market": "股票",
+  "adjustment_cycle": "10",
+  "group_number": "10",
+  "factor_direction": "1",
+  "stock_pool": "沪深全A"
+}

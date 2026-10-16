@@ -1,0 +1,71 @@
+quant/2024年度精选策略1/31.动量因子加RSRS择时和ETF轮动每日调仓.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    g.index_pool = ['518880.XSHG', '513100.XSHG', '159915.XSHE', '510180.XSHG']
+    g.stock_num = 1
+    g.momentum_day = 25
+    g.stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.mean_day = 20
+    g.mean_diff_day = 3
+    g.score_threshold = 0.7
+    g.slope_series = initial_slope_series()[:-1]
+    run_daily(trade, time='9:45')
+
+def trade(context):
+    stock_hold = set(context.portfolio.positions.keys())
+    stock_pool = get_stock_pool()
+    g.stock_number = g.stock_num if len(stock_pool) > g.stock_num else len(stock_pool)
+    set_stock_pool = set(stock_pool[:g.stock_num])
+    signal = get_signal()
+    if stock_pool and signal != 'SELL':
+        if stock_hold == set_stock_pool and len(set_stock_pool) != 0:
+            pass
+        else:
+            change_position(context, set_stock_pool)
+    else:
+        if signal == 'SELL':
+            pass
+        for stock in stock_hold:
+            order_target_value(stock, 0)
+
+def get_stock_pool():
+    index_rank = []
+    for index in g.index_pool:
+        score = get_socre(index)
+        index_rank.append((index, score))
+    index_rank = sorted(index_rank, key=lambda x: x[1], reverse=True)
+    index_dict = dict(index_rank)
+    return tuple((index[0] for index in index_rank))
+'EXACT_REVIEWED_FUNCTION get_socre sha256=66b949e23e258d2ae846e67fc5cc74f407442b928b5ec08fa6a43589ba860715 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+
+def change_position(context, target_list):
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        order_target_value(etf, 0)
+    if g.stock_number > 0:
+        value = context.portfolio.available_cash / g.stock_number
+        for etf in target_list:
+            if context.portfolio.positions[etf].total_amount == 0:
+                order_target_value(etf, value)
+
+def get_signal():
+    close_data = attribute_history(g.stock, g.mean_day + g.mean_diff_day, '1d', ['close'])
+    today_MA = close_data.close[g.mean_diff_day:].mean()
+    before_MA = close_data.close[:-g.mean_diff_day].mean()
+    data = attribute_history(g.stock, g.N, '1d', ['high', 'low'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    if rsrs_score > g.score_threshold and today_MA > before_MA:
+        return 'BUY'
+    elif rsrs_score < -g.score_threshold and today_MA < before_MA:
+        return 'SELL'
+    else:
+        return 'KEEP'
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION initial_slope_series sha256=c9f925c646c805b73574ef724a33e2c5c79ca848e7991b732cc190fb8632cd50 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'

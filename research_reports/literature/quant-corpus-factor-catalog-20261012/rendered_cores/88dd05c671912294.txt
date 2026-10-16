@@ -1,0 +1,30 @@
+quant/2020年度精选策略/39 因子分析——利用JoinQuant因子分析模块选取因子并封装为策略.txt
+import pandas as pd
+import jqdata
+
+def initialize(context):
+    g.index = '000300.XSHG'
+
+def calalpha(context):
+    stock_list = get_index_stocks(g.index)
+    dt = context.previous_date
+    df = get_price(stock_list, end_date=dt, count=1, fields=['money'])
+    df = df['money'].T
+    df.columns = ['alpha']
+    result = df.sort(['alpha'], ascending=False)
+    return result
+
+def before_trading_start(context):
+    result = list(calalpha(context)['alpha'].iloc[0:40].keys())
+    g.result = result
+
+def handle_data(context, data):
+    tobuy_list = g.result
+    holdings = context.portfolio.positions.keys()
+    for stock in holdings:
+        if stock not in tobuy_list:
+            order_target_value(stock, 0)
+    cash = context.portfolio.cash
+    num = len(tobuy_list)
+    for eachsec in tobuy_list:
+        order_value(eachsec, int(cash / num))

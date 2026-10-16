@@ -1,0 +1,3003 @@
+{
+  "status": "UNVERIFIED; excluded from completion counts and candidate queue",
+  "reason": "Generated classifications and approximate formulas were incorrectly counted as source-level semantic review; retained only as an audit record.",
+  "notes": {
+    "quant/2022年度精选策略/31.再次抛砖.txt": {
+      "sha256": "b853d47a00c90780501aeb32c1bd112374628c830e0ca70a16cdbbf6058aa582",
+      "logic": "IF股指期货下季合约日内多空信号；源码的核心是期货价格/均线斜率阈值，09:31、10:31、11:01、13:31、14:31重复检查，信号1做多、-1做空、0平仓。",
+      "factor_recipes": "期货价格相对均线/斜率阈值信号；股票适配只能保留MA斜率或趋势强度，不等价于原策略。",
+      "data_requirements": "期货主力/移仓与日内执行；全A日频没有对应合约和交易时点。",
+      "status": "futures_timing_blocked",
+      "warnings": "不能作为全A横截面因子，日线趋势原子与已有RSRS/均线类高度重叠。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/32.行业指数轮动.txt": {
+      "sha256": "eee496f1bc636b0372ba32153596d3bb72c9d4f73e2c3520a16c35da532f0e76",
+      "logic": "固定7个行业指数按13日涨幅排序，要求冠军价格高于20日分钟均价，否则切换银华日利；用1分钟数据每240根近似一天。",
+      "factor_recipes": "行业指数13日动量；冠军相对20日均线过滤。",
+      "data_requirements": "固定行业指数/ETF映射与分钟数据；不是个股全A因子。",
+      "status": "index_etf_rotation_blocked",
+      "warnings": "源码实际用1分钟close构造日内均价，且股票池固定。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/33.ETF单均线跟踪轮动.txt": {
+      "sha256": "e77f89889543affd2b5aec433c90c9df9ed74e6bb7b16d78c120c3bd2c6c21bd",
+      "logic": "沪深300、创业板、上证50三指数比较13日涨幅，结合各自价格是否高于13日均线，在ETF之间切换并以银华日利防守。",
+      "factor_recipes": "13日指数动量；价格/13日均线趋势过滤。",
+      "data_requirements": "固定指数/ETF与日内收盘执行；非全A横截面。",
+      "status": "index_etf_rotation_blocked",
+      "warnings": "属于资产轮动择时，不应进入股票因子池。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/37.Barra模型初探，A股市场风格解析.txt": {
+      "sha256": "5e8a19f38e28bec1f5d69bcd25b4757351086728547f5c61afef9b74732ef006",
+      "logic": "在中证500样本上用size、beta、momentum、residual_volatility、non_linear_size、book_to_price_ratio、liquidity、earnings_yield、growth、leverage和申万行业哑变量构造Barra风险收益模型；市值平方根加权约束回归并做风格收益归因。",
+      "factor_recipes": "Barra风格暴露：size、beta、momentum、residual_volatility、non_linear_size、BP、liquidity、earnings_yield、growth、leverage；横截面MAD去极值/标准化；WLS风险暴露。",
+      "data_requirements": "聚宽风格因子、行业映射和约束WLS；源码是风险归因而非直接选股收益因子。",
+      "status": "barra_risk_model_pending",
+      "warnings": "可借鉴风险中性化/暴露控制；不能把风格收益归因结果直接当alpha。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/38.【期货策略】钢厂利润模型-螺纹钢铁矿石焦炭套利.txt": {
+      "sha256": "f2b21c220f62a9456061ec5aea2724061e799fcd0c8b44930b1893e9061b3d14",
+      "logic": "用螺纹钢、铁矿石、焦炭主力合约构造钢厂利润价差，滚动回归/上下轨超过阈值时做RB与I/J的配对套利，并按滚动风险控制。",
+      "factor_recipes": "钢厂利润价差及其滚动标准化/上下轨偏离。",
+      "data_requirements": "期货主力合约、合约切换、跨品种保证金与套利执行。",
+      "status": "futures_spread_blocked",
+      "warnings": "仅作商品价差研究，不能映射为全A个股因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/42.【研报复现】再论动量因子Ian666.txt": {
+      "sha256": "80cdb914219c4be2ee3796f88f0650f78f06beff0cb94152a90b458d09173bfe",
+      "logic": "系统测试20/60/120/240/480日价格动量、20日收益最大值、MA20/60/120/240与收盘价比值、流动性/自由流通市值中性化动量、按市值/BP构造SMB/HML后取动量残差；另用成交量/成交额等量切分分钟K线构造60/120根改造K线动量。",
+      "factor_recipes": "mom20=CLOSE/DELAY(CLOSE,20)-1；mom60/120/240/480同理；mom20_max=TS_MAX(RET1,20)；trend20=MA(CLOSE,20)/CLOSE（及60/120/240）；resid_mom20为对市场、SMB、HML时间序列回归残差；mom20中性化于liquidity与free_float_mv/total_mv；volume_bar_mom60/120与money_bar_mom60/120为等成交量/额改造K线动量。",
+      "data_requirements": "日线OHLCV和市值/BP/流动性可做日频变体；改造K线需要分钟成交量/成交额，原文仅2009–2017分钟样本。",
+      "status": "momentum_variants_pending",
+      "warnings": "改造K线部分方向与研报相反但多头表现较好；日频动量/趋势变体需与已有动量簇去相关后再测。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/5.高频策略研究（一）——基于开盘情况预测走势-Copy1.txt": {
+      "sha256": "fb5f244e85b5f28fcd4d3e47d1b30b16884f27483d75f19fa6ce643872c5d56b",
+      "logic": "在沪深300中用前一日尾盘/开盘前5分钟收益、开盘后60/120分钟收益与过去3日收益做截面相关和分层，寻找开盘动量预测后续收益的关系，再按分位数选股。",
+      "factor_recipes": "open_profit=close(t-1尾盘)/close(t-1更早)-1；next_profit=close(t开盘后N分钟)/open-1；back_profit=过去3日收益；基于open_profit分层预测next_profit。",
+      "data_requirements": "1分钟/开盘竞价数据和日内执行。",
+      "status": "intraday_open_prediction_blocked",
+      "warnings": "日频数据不能复现；只保留研究假设，暂不纳入正式全A因子池。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/52.用指数战胜指数，ETF二八轮动对冲模型.txt": {
+      "sha256": "b9965d411543db3075a4fa46dddd96e6b13398f6395fab9c90eb838f56681068",
+      "logic": "在沪深300与中证500ETF之间比较20日收益，若均为负切换负相关债券品种，否则持有正动量更高者；持仓标的动量转负先清仓。",
+      "factor_recipes": "momentum20=close/DELAY(close,20)-1；正动量择优与全负防守。",
+      "data_requirements": "固定ETF/债券标的；非个股截面。",
+      "status": "index_etf_rotation_blocked",
+      "warnings": "与股票因子池无直接关系。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/53.【指标研究】MACD日、周、月以及分别级别研究（包含低位二次金叉算法）.txt": {
+      "sha256": "cb4caae4aa2d1f8609d7e872e9d413b650eb6b26935c66433a75477ffb5a785c",
+      "logic": "实现标准12/26/9 MACD并在日、周、月、60分钟级别展示DIF/DEA/MACD，额外检测零轴下两次低位金叉形态。",
+      "factor_recipes": "MACD(CLOSE,12,26,9)；second_low_gold_cross为DIF/DEA零轴下两次金叉及低点抬升条件。",
+      "data_requirements": "OHLC时间序列与TA-Lib；源码没有横截面选股或全A组合。",
+      "status": "macd_timing_blocked",
+      "warnings": "只能作为个股/指数择时信号，不能标记为新横截面alpha。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/54.指数估值自动报表系统——源代码.txt": {
+      "sha256": "98078e24e9fadf32602962ab4883e52ffb11efc58cd8982c5be3bd249fd4674a",
+      "logic": "定期读取指数估值并生成报表/提醒，主要是数据查询、格式化与展示。",
+      "factor_recipes": "PE/PB及历史分位数报表字段。",
+      "data_requirements": "指数估值接口、报表运行环境。",
+      "status": "valuation_report_blocked",
+      "warnings": "无明确买卖因子或横截面排序逻辑。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/55.【策略研发】三进兵策略（变形版）.txt": {
+      "sha256": "2ecc7295bec6f264228985e5f08a1dac2f5621e51ff3ecd0234473a4cea9b507",
+      "logic": "固定8只股票池，2/25/60日均线多头排列后短均线回调再上穿中均线买入；跌破中长期均线卖出，另有固定止损。",
+      "factor_recipes": "EMA/CLOSE的2、25、60日趋势排列与短均线交叉。",
+      "data_requirements": "固定股票池和逐股日内交易。",
+      "status": "fixed_universe_timing_blocked",
+      "warnings": "逻辑是趋势择时，不是可泛化全A因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/56.胜率为100%，盈亏比90000+的单品种倍投策略.txt": {
+      "sha256": "1ab46e0cfd73c1654cdb8b4d66c349ffd273a3c530405ba5dff486cda9221292",
+      "logic": "单品种期货/证券的方向信号配合连续加仓/倍投和止盈止损，收益统计存在明显路径依赖。",
+      "factor_recipes": "单品种价格趋势/倍投仓位规则。",
+      "data_requirements": "单品种交易、杠杆和仓位管理。",
+      "status": "single_asset_martingale_blocked",
+      "warnings": "不提取为横截面因子，且倍投风险不可接受。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/57.宏观指标择时检测.txt": {
+      "sha256": "4165bfdabda3863180f3c2bc354dd7fe986f8ea4724eeaf2fb62311edf745aad",
+      "logic": "将M1/M2、PMI、进出口/生产、工业景气、居民满意度/信心、PPI-CPI等宏观序列分别用连续上升、长短均线和布林带转成0/0.5/1信号，加权阈值决定沪深300仓位。",
+      "factor_recipes": "宏观序列变化率、滚动均线方向、BBANDS下/上轨状态的加权投票。",
+      "data_requirements": "Tushare宏观数据、外部发布时间和月频时序。",
+      "status": "macro_external_blocked",
+      "warnings": "宏观数据无法按当前全A日频字段直接复现。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/58.100%胜率！历史PE估值价值投资择时交易.txt": {
+      "sha256": "a06f2a63fdb07976b913067d51dedaf0617bd5a55e2e6335ac74bc36a669bb0e",
+      "logic": "对沪深300指数PE历史序列计算中位数+0.25σ上阈、 中位数−0.5σ下阈，并用近期5日均线/前10日均线比值确认；低PE且MA比值>1.01买入，高PE且MA比值<1清仓。",
+      "factor_recipes": "PE历史分位/阈值择时；MA5/MA10趋势确认。",
+      "data_requirements": "指数PE历史序列与报告期口径。",
+      "status": "index_valuation_timing_blocked",
+      "warnings": "是单指数估值择时，不是横截面个股因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/59.【策略】夏普超过2.0，后市靠定增一步步往上爬.txt": {
+      "sha256": "253044f7640e315edeae7c2536fbc3efb436e4d188f38ecd2cd69755007d3832",
+      "logic": "每期先按上证综指成分的总市值取最小50只，再计算126日个股相对指数收益；筛选相对超跌且当日开盘未偏离昨收±9.5%的股票，按超跌程度分配最多30%权重，并在指数单日跌超3%时清仓。",
+      "factor_recipes": "rel126=RET126(stock)-RET126(index)；超跌筛选rel126 < -0.5*abs(RET126(index))；权重与超跌距离成正比。",
+      "data_requirements": "成分股、市值、日内开盘价和指数风控。",
+      "status": "small_cap_relative_reversal_pending",
+      "warnings": "可提取为小市值约束下的126日相对反转，但原策略强依赖固定成分和仓位风控。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/69.RSRS择时加基本面选股策略优化.txt": {
+      "sha256": "45d23363816b0811898ec8830a425ddc1537d500594d8b29e9fd99894a1efa03",
+      "logic": "以沪深300高低价18日回归斜率、800日标准化并乘beta与R²构造右偏RSRS；RSRS>0.7时在沪深300/中证500间切换，股票端按PB低、ROE高并做行业/市值中性化选4只，弱势转国债ETF。",
+      "factor_recipes": "RSRS18/800右偏标准分=zscore(beta)*beta*R²；value_quality=rank(-PB)+rank(ROE)，并可行业/市值中性化。",
+      "data_requirements": "指数OHLC、财务PB/ROE、行业、市值与ETF防守。",
+      "status": "value_rsrs_composite_pending",
+      "warnings": "RSRS择时与价值质量选股可拆分测试；与2022/65及已有RSRS簇相关性预期很高。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/7.中文自然语言处理--情感分析.txt": {
+      "sha256": "a04ab5437409a647ad5b71466402dd1c192dbe92333ea015f87c2ee356bf6145",
+      "logic": "以中文新闻/文本做情感分类或情绪分数，再用于交易信号；源码包含模型训练/词向量等示例。",
+      "factor_recipes": "文本情感分数、词袋/嵌入特征。",
+      "data_requirements": "新闻文本、训练语料和外部模型。",
+      "status": "nlp_external_blocked",
+      "warnings": "没有可直接落到平台字段的横截面公式。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/72.年化15.48%，盈亏比3.818的双均线策略.txt": {
+      "sha256": "3461874bb044a2ca4a511f551c634377609b3cd715a69573ffaa5574cd58bb8a",
+      "logic": "固定510310沪深300ETF，5日均线与60日均线金叉买入、死叉卖出。",
+      "factor_recipes": "MA5(CLOSE)-MA60(CLOSE)交叉。",
+      "data_requirements": "固定ETF单标的择时。",
+      "status": "index_etf_timing_blocked",
+      "warnings": "无个股横截面因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/73.股指期货分钟-高收益-低回撤，你值得拥有.txt": {
+      "sha256": "3fc5e056b0fcee0768a814b6a45099f3c432467dfb5b36a1d703e6fb32a734a8",
+      "logic": "股指期货分钟级趋势/突破策略，包含开平仓、止盈止损和多空仓位管理。",
+      "factor_recipes": "分钟收益/趋势与止盈止损信号。",
+      "data_requirements": "股指期货分钟数据与合约接口。",
+      "status": "futures_minute_blocked",
+      "warnings": "不能映射为全A日频因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/75.量价MACD组合择时——极速版.txt": {
+      "sha256": "3c3bc16e3ab7c7e8ee3bf3f62aeddf94f5fe11cacdfb4ec3b098615d5186c515",
+      "logic": "对沪深300指数5日数据计算价格MACD与成交量MACD；价格MACD>0且量MACD>0持满仓，价格为正但量为负半仓，价格MACD<0清仓。",
+      "factor_recipes": "MACD(CLOSE,12,26,9)与MACD(VOLUME,12,26,9)的联合仓位信号。",
+      "data_requirements": "指数/ETF与5日聚合序列。",
+      "status": "index_etf_timing_blocked",
+      "warnings": "是指数择时，不是股票横截面因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/76.向云帆致敬—— 宏观数据择时策略——极速版代码.txt": {
+      "sha256": "4c8233d77ba2b8f7fcda13dbdf6dc1ed146837c0d9afb31db2f6ca2c4910a48f",
+      "logic": "将PMI、SHIBOR、国债利差、期限利差、M1-M2、社融、汇率、通胀等宏观指标用3期均线或25期布林带转为五类仓位信号，加权超过0.55做多、低于0.45做空。",
+      "factor_recipes": "宏观指标滚动均线/布林带状态的加权组合。",
+      "data_requirements": "外部宏观CSV/Tushare与发布日期对齐。",
+      "status": "macro_external_blocked",
+      "warnings": "不适配平台可用全A字段。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/77.TensorFlow 学习之循环神经网络（RNN）.txt": {
+      "sha256": "f3fd963f2eb617aabe19f89dfce6ad8d31a47833ae15503dd732c7af602e2f99",
+      "logic": "用沪深300指数OHLC作为输入，展示TensorFlow LSTM/RNN训练收盘价预测；文章明确没有实现预测交易步骤。",
+      "factor_recipes": "OHLC序列输入与LSTM隐藏状态。",
+      "data_requirements": "TensorFlow、训练过程和模型参数；无已完成交易信号。",
+      "status": "ml_external_blocked",
+      "warnings": "仅教学示例，不产生可复现因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/78.RSRS系列一：完整复现版(自带快速回测框架).txt": {
+      "sha256": "85edd21575b626d8906faf9b15351ec222f88580f602b9240bb4717b92543319",
+      "logic": "在沪深300指数上比较MA10/20、14日波动率、RSRS斜率标准分/右偏标准分，并以0.7/-0.7阈值择时；另加20日均线方向和近10日斜率与成交量相关过滤。",
+      "factor_recipes": "RSRS18窗口斜率beta；zscore及zscore*beta*R²；MA20方向过滤；近10日斜率与成交量相关系数。",
+      "data_requirements": "指数OHLCV，单指数时间序列。",
+      "status": "index_timing_blocked",
+      "warnings": "与已有RSRS测试高度重复，不能作为新个股簇。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/89.MACD+波动率过滤+追踪止损 期货择时汇总.txt": {
+      "sha256": "8edfa1550e2fdff5a45c7f729d507c24b19eb28c47e2e8de8f986a3064fe26c5",
+      "logic": "对多品种期货用3/7/7 MACD交叉或方向、10日ATR和近20日高低点距ATR过滤，剔除横截面高波动品种，配合3ATR吊灯止损。",
+      "factor_recipes": "MACD3/7/7方向；ATR10；距20日高低点超过3ATR的开仓禁入；横截面波动率z分过滤。",
+      "data_requirements": "期货主力合约、日线OHLC与多品种交易。",
+      "status": "futures_timing_blocked",
+      "warnings": "只保留ATR/波动过滤概念，不能直接用于全A。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/9.高频Tick频率策略分享.txt": {
+      "sha256": "726d3aa867bc5492101087fbe08813ab63ae3d4143b829ac28af9446e336c070",
+      "logic": "使用tick/高频盘口价格、成交量和盘口变化做短线交易信号。",
+      "factor_recipes": "tick价格变化、成交量/盘口不平衡。",
+      "data_requirements": "tick数据和盘中执行。",
+      "status": "tick_data_blocked",
+      "warnings": "没有日频可复现版本。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/91.基于主成分分析 沪深300个股一致性IF股指交易策略.txt": {
+      "sha256": "b07ac441c311135554148da8c9df5bf5a33560ba5ed99113774c4916f432cac1",
+      "logic": "计算沪深300成分股20日收益协方差/主成分一致性指标，以成分股一致性和指数10日趋势决定IF多空；ATR14两倍移动止损和禁重入。",
+      "factor_recipes": "20日成分收益矩阵的PCA一致性/离散度；指数10日趋势；ATR14追踪止损。",
+      "data_requirements": "沪深300成分、股指期货和逐日合约交易。",
+      "status": "futures_pca_blocked",
+      "warnings": "PCA一致性可作市场状态研究，但原策略不是股票因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/92.黄金避险有效？量化实测黄金资产真实收益.txt": {
+      "sha256": "aff8d9c4ccf291aedcd03415f43afe7c750d67724d8c160b20613282fccd0240",
+      "logic": "RSRS18/1200右偏标准分控制沪深300股票/黄金ETF风险开关；股票端从可行股票中按ROE/PB排序取100，再按与指数90日相关性选20只。",
+      "factor_recipes": "value_quality=ROE/PB；corr90(stock,index)作为分散化排序；RSRS18/1200右偏择时。",
+      "data_requirements": "股票财务字段、指数OHLC、黄金ETF和相关性。",
+      "status": "value_rsrs_hedge_pending",
+      "warnings": "可拆出ROE/PB与相关性约束做全A研究，黄金对冲部分不属于因子池。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/93.海龟交易体系（股票版）.txt": {
+      "sha256": "2b603f17bad77cb8e16684eaec48536deaccdae384df278587a12727d9fc489c",
+      "logic": "固定600519单股使用20日唐奇安上轨突破、10日下轨退出，ATR/N做1%风险单元、最多4次加仓并以2N止损。",
+      "factor_recipes": "Donchian20突破；Donchian10退出；ATR/N波动调整仓位。",
+      "data_requirements": "固定单股、盘中价格与仓位管理。",
+      "status": "single_asset_timing_blocked",
+      "warnings": "不能泛化为横截面股票因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/94.量化排雷—一个实用排雷系统.txt": {
+      "sha256": "a870ef1eb362bbfa8e65783a88c239da52ee08f569412faf48100a1b1a852231",
+      "logic": "构造财务风险排雷评分：应收/收入及增速、其他应收/资产及增速、存货/资产及增速、软资产占比、现金销售率、自由现金流、异常毛利、商誉/净资产与商誉/利润、存贷双高等13项阈值触发，汇总为0–100风险分。",
+      "factor_recipes": "risk_score=100/13*sum(应收异常、其他应收异常、存货异常、软资产高、现金销售低、FCF低、毛利异常、商誉高、商誉/利润高、存贷双高等二元项)。",
+      "data_requirements": "PIT三大报表、TTM还原和多项财务字段。",
+      "status": "financial_risk_filter_pending",
+      "warnings": "更适合作为质量/风险排除腿，方向应为低风险；阈值来自历史样本，需PIT和稳健性复核。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/95.医疗行业多因子模型及单行业多因子测试代码模板.txt": {
+      "sha256": "7b1a4084414bc62ed2ed0194c63d10bef17933e0c642a400c0a5dad19b374f82",
+      "logic": "医疗行业月频多因子模板；从估值、盈利、成长、现金流、杠杆、周转、波动和Beta构造大量字段，MAD去极值、标准化、按近12期IC动态加权后取行业内20只。",
+      "factor_recipes": "EP、BP、SP、NCFP、OCFP、G/PE、ROE/ROA、净利率/毛利率、收入/利润/现金流增长、资产周转、现金流质量、杠杆、beta、1/3月波动等；动态权重=近12期截面IC均值。",
+      "data_requirements": "医疗行业成员、财务PIT字段与行业内横截面IC计算。",
+      "status": "industry_multifactor_pending",
+      "warnings": "可迁移的是质量/价值/现金流组合和IC加权；需去行业限制后再测全A。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/96.宏观择时多空组合——十年收益12倍，最大回撤6.7%.txt": {
+      "sha256": "65f65fca57cb1bfd791ffe888515334a08a7fb61c03d5864aff95358ab0a583d",
+      "logic": "将制造业、固定资产、工业/外贸、库存、订单、就业等宏观指标用滚动均线、连续变化、LSMA和滞后组合成多头与空头仓位，分别测试沪深300做多/做空择时。",
+      "factor_recipes": "宏观指标方向状态的多空投票；制造、固定资产、工业、外贸、订单库存和就业分组信号。",
+      "data_requirements": "外部宏观数据库、发布日期与月频对齐。",
+      "status": "macro_external_blocked",
+      "warnings": "不适合平台字段，不能作为全A可复现候选。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/97.基于机器学习的多因子选股策略.txt": {
+      "sha256": "25dc523a07c27b29dc59ec56e1a4d7b74680b48291f524738f08059453b19092",
+      "logic": "以中证全指为池，EP/BP/PS/DP/CFP、成长、盈利、杠杆、规模等因子经去极值/标准化和行业哑变量处理，用SVR/随机森林等滚动训练预测未来收益类别，按预测值选股。",
+      "factor_recipes": "标准化后的EP、BP、PS、DP、CFP、PEG、ROE/ROA、GPM、杠杆、规模、成长及行业哑变量；模型预测分数。",
+      "data_requirements": "训练窗口、标签构造、sklearn模型和PIT财务字段。",
+      "status": "ml_external_model_blocked",
+      "warnings": "基础因子可纳入已存在质量价值簇；模型本身不能直接复现/不能当新簇。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt": {
+      "sha256": "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48",
+      "logic": "按CAPM、FF3、Carhart、FF5模型对股票日收益做滚动约24个月回归，取残差标准差年化作为特质波动率，或以BP/流通市值排序的分组组合构造因子；按低特质波动率组做多。",
+      "factor_recipes": "idio_vol_CAPM=STD(resid(ret_i~market),24个月)*sqrt(252)；FF3加入SMB/HML；Carhart再加12个月动量MOM；FF5加入RMW/CMA；另有BP=1/PB和流通市值排序。",
+      "data_requirements": "24个月日收益、流通市值、BP、ROE、资产增长/再投资率、PIT财务字段。",
+      "status": "idiosyncratic_volatility_pending",
+      "warnings": "低特质波动是明确可用候选；需区分CAPM/FF3/Carhart/FF5口径并与既有低波簇去重。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2022年度精选策略/99.量化定投，工薪族逆袭之路(附定投模型）.txt": {
+      "sha256": "8281336e38a7a91050e85c073dceaaf985cee639cf07750463f709b3314be958",
+      "logic": "对上证50/沪深300/中证500指数PE历史7年滚动百分位，按估值高低和月度现金流规则在指数ETF与国债ETF之间定投/减仓。",
+      "factor_recipes": "PE7年滚动分位数与定投金额/债券ETF切换。",
+      "data_requirements": "固定指数ETF、历史估值和现金流计划。",
+      "status": "index_valuation_dca_blocked",
+      "warnings": "属于资产配置与现金流管理，不是股票横截面因子。",
+      "review_basis": "complete rendered source read; original source opened and active signal/formula paths checked"
+    },
+    "quant/2023年度精选策略/0.7年40倍，模拟超过两年，年化高回撤低.txt": {
+      "sha256": "354510d37f4f629287a11e976c210c26b32e364ebec34c356e9f52b8156f597c",
+      "logic": "标题：7年40倍，模拟超过两年，年化高回撤低：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/1.龙头底分型战法-两年23倍.txt": {
+      "sha256": "5768e83dc6dee31f51a0304074e1dd830abbc3f017d67288834cc17160caa7c5",
+      "logic": "标题：龙头底分型战法-两年23倍：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/10.一个简单而持续稳定的懒人超额收益策略.txt": {
+      "sha256": "235e9019e568f11f5df81a2972722bb6a9db43146a6c177e260a3e39273e2749",
+      "logic": "每月在沪深300成分中按源码的综合权重/排序选股，月初调仓、日内执行；策略本身没有复杂新公式。",
+      "factor_recipes": "源码未形成独立新因子；候选是既有质量/价值/趋势排序与月频调仓。",
+      "data_requirements": "沪深300成分、聚宽基本面权重函数；需读取完整get_weight实现。",
+      "status": "existing_composite_pending",
+      "warnings": "更像组合模板，不能把稳定收益标题当作新alpha。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/11.致敬市场--5 定投ETF之躺平赢.txt": {
+      "sha256": "80ff0435adc423935957419525f701b806d96b398a270984c78317c0b0374f7f",
+      "logic": "标题：致敬市场(5)--定投ETF之躺平赢：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/12.【不含未来！】宽基etf轮动8年50倍年化60%.txt": {
+      "sha256": "e1bf34c92007decfc57d42f8cf8e95745c1685805dbc072aab649353e36fc06c",
+      "logic": "标题：【不含未来！】宽基etf轮动8年50倍年化60%：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/13.胜率65%之缩量分歧反包战法.txt": {
+      "sha256": "847dbd36257b3d72e0ef5fb4db6992f4583ddca65943a122c6ea2ca719df37f7",
+      "logic": "标题：胜率65%之缩量分歧反包战法：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/14.2020年 267%年化 13%回撤 上涨趋势策略修改版.txt": {
+      "sha256": "8c25fa8e099088efd28e76dc42218da025b7a4c79a44ca27f7fec38a07d85bfc",
+      "logic": "全A过滤停牌/ST/涨停后，每周筛选上涨趋势股票，按7/180日成交量热度与趋势评分排序，最多持2只，并带高点回撤/指数风控。",
+      "factor_recipes": "trend_score含近期涨幅、均线/趋势强度与avg_volume(7)/avg_volume(180)热度比；可提取短长成交量比和趋势过滤。",
+      "data_requirements": "全A行情、成交量、均线及交易限制。",
+      "status": "trend_liquidity_pending",
+      "warnings": "固定持仓2只、强执行风控导致结果不可直接视作纯因子。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/15.动量ETF轮动RSRS择时-升级.txt": {
+      "sha256": "017d211341013f15dc1fa99a6cf2130b3bce7f2f99141d244d4834303ab0635e",
+      "logic": "标题：8年13倍的ETF动量轮动策略，有滑点，无未来函数，回撤小！：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/16.8年13倍的ETF动量轮动策略，有滑点，无未来函数，回撤小！.txt": {
+      "sha256": "017d211341013f15dc1fa99a6cf2130b3bce7f2f99141d244d4834303ab0635e",
+      "logic": "标题：8年13倍的ETF动量轮动策略，有滑点，无未来函数，回撤小！：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/17.20行代码8年胜率100%躲过了牛年第一场大跌.txt": {
+      "sha256": "d144e9b3a3b6b9d22f524fc9d8b6c7fde3906dd5af676903ce7ba6fe0cc387f8",
+      "logic": "标题：20行代码8年胜率100%躲过了牛年第一场大跌：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/18.【复现】FFScore财务模型.txt": {
+      "sha256": "67873dc4ab259eb22bb79fcf98d506eb7dd285b1c54f89afa6ddefb2cf89f01b",
+      "logic": "复现Piotroski/FFScore式13项财务变化打分，实际交易要求总分>4并与低PB交集，取最多200只。",
+      "factor_recipes": "FFScore=sign(ROA、CFO、ROA变化、CFO/NI应计、杠杆变化、流动性变化、股本稀释、毛利率变化、资产周转变化等13项)之和；再叠加低PB。",
+      "data_requirements": "PIT财务历史序列、TTM字段与PB。",
+      "status": "ffscore_value_pending",
+      "warnings": "原代码有字段命名/标量分母兼容问题，需按PIT口径重建，不能直接照抄。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/19.人人可躺平16年3400%.txt": {
+      "sha256": "a52fc48a6997fe48950798f546c389150cd33f148d2040aa42df16f1d6598f69",
+      "logic": "标题：人人可躺平16年3400%（评论必回复）：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/2.多策略融合-80倍-无未来函数.txt": {
+      "sha256": "e4d0d66d07ada30a87a8e354cc429db3d9ac8b2bdcd0493ca570e23ebdc7a55d",
+      "logic": "标题：多策略融合-80倍-无未来函数：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/20.北向资金股票轮动-优质策略可直接实盘.txt": {
+      "sha256": "4cf0557251d53d18eebb1c7732dfa04f6eb2e377cd756cdb144cb0e51d832e40",
+      "logic": "标题：北向资金股票轮动-优质策略可直接实盘：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/21.截止到21年12月依然有效的小市值适配因子.txt": {
+      "sha256": "6ed91e4a9c90aad1c6c1b75780726507746ca9fa46f59feae2166841b7630b79",
+      "logic": "先按sales_growth取前10%，再在全A中按总市值升序选最小股票并过滤新股/ST/涨跌停，持5只。",
+      "factor_recipes": "sales_growth高 × total_mv低；核心是成长约束下的小市值。",
+      "data_requirements": "sales_growth、total_mv、上市日和盘中涨跌停过滤。",
+      "status": "growth_size_pending",
+      "warnings": "与已有小市值簇高度相关；新增信息主要是增长约束，需残差化测试。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/22.简单到发指的股指策略(2013到现在收益10949%).txt": {
+      "sha256": "c0102d437625c6b6b522b4f816d5b6a4cb3b6b48df37448632978a1141e3178e",
+      "logic": "标题：简单到发指的股指策略(2013到现在收益10949%)：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/23.低AH溢价选股.txt": {
+      "sha256": "f51b43b76309213411979dd1868f3c90cccb1b919943971155d9399446c4cf1f",
+      "logic": "标题：低AH溢价选股：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/24.ROE+PB模型的优化.txt": {
+      "sha256": "bf241cf9d0f96a1ff2fa764f17cdf5c93b1ab2a58f8dc4ec3438f2232e856b53",
+      "logic": "沪深300中先过滤低负债，再筛应收/经营质量，最后要求近5期ROE历史稳定并按ROE排序选10只。",
+      "factor_recipes": "ROE高、PB低、低负债、应收约束；可写为rank(ROE)-rank(PB)并加财务质量过滤。",
+      "data_requirements": "PIT资产负债表、应收、ROE历史和PB。",
+      "status": "quality_value_pending",
+      "warnings": "原文存在多轮基本面过滤，需拆成可单独检验的价值/质量腿。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/25.这个可入得了你们法眼.txt": {
+      "sha256": "8c9caee74145eb708cb4d47e99997dac5fa09fbbbaa8e6f50da8273c8cc02e5e",
+      "logic": "先取全A小市值候选，再与龙虎榜/涨停连续形态名单交集，识别缩量/反包与涨停后回封，盘中排队买入。",
+      "factor_recipes": "small_mv约束 × limit-up/连续涨停/反包形态。",
+      "data_requirements": "分钟/涨停状态、龙虎榜外部数据。",
+      "status": "limitup_external_blocked",
+      "warnings": "不可作为稳定日频横截面因子。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/26.追涨大师（超额142）.txt": {
+      "sha256": "3c52f4e9e825d78909baed142ef99ebe11c2527a9926666e30d808c039f16127",
+      "logic": "标题：追涨大师（超额142）：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/27.从相关系数角度探讨etf轮动的可行性.txt": {
+      "sha256": "0e60cde5dfd8f828dc872be2d44aa950c80b22ebc82b395522906ac291eff3fc",
+      "logic": "标题：从相关系数角度探讨etf轮动的可行性：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt": {
+      "sha256": "966a166272aa920c14688e1c0fedc302baa2f3a3f76412b2ae418c42cd6e93cb",
+      "logic": "基本面F-Score/财务健康分与低估值/小市值组合选股，定期调仓。",
+      "factor_recipes": "Piotroski F-Score：盈利、现金流、杠杆、流动性、运营效率二元计分；可与PB/PE或市值约束组合。",
+      "data_requirements": "PIT财务历史字段。",
+      "status": "ffscore_value_pending",
+      "warnings": "与2023/18及现有质量价值簇重叠，需只保留新增变化项。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/29.价值成长轮动策略.txt": {
+      "sha256": "fdd9e91a46927fa8fcebf4a28cda8f2c2a8cbb678f4894ca808ac7a0bcaf6bf8",
+      "logic": "标题：价值成长轮动策略：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/3.苦咖啡-默默赚钱系列-改.txt": {
+      "sha256": "e9eb4c47cdbd819d9d6200d1ecae58837ca81aa7cc78ec061eac5afd600e7cd3",
+      "logic": "标题：苦咖啡-默默赚钱系列-改：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/30.跟着基金报团！！！174% 回撤 7.33%.txt": {
+      "sha256": "30290425ab0baedb0b0eebe31e39e0c5386e4ac1de2bba617edf9443d75c7a22",
+      "logic": "标题：跟着基金报团！！！174%  回撤  7.33%：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/31.北向Boll带_ETF组合宝付费策略.txt": {
+      "sha256": "ca37ef9d570c9efc2ef970c98f044ec4266af16e456c207aec7a6aee6c5458ab",
+      "logic": "标题：北向Boll带_ETF组合宝付费策略：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/32.最适合上班族的策略-神奇公式策略.txt": {
+      "sha256": "f209dd7b5172fba01c35eef4cf924d1037146fd521babfb540711c49ce1fcee7",
+      "logic": "按神奇公式对股票计算盈利收益率与资本回报率排序，定期持有前若干名。",
+      "factor_recipes": "EY=EBIT/EV（或1/PE代理）与ROC=EBIT/(净营运资本+固定资产)的双排序。",
+      "data_requirements": "PIT利润、企业价值、资产负债字段。",
+      "status": "magic_formula_pending",
+      "warnings": "平台字段可能只能近似EV/ROC，需显式标注proxy。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/33.趋势交易5.0 无择时-2年5倍不是梦.txt": {
+      "sha256": "f8d686fe8ce567ca73b62baaf7c700b8dc9481cf8e86c63800fb087486a8416b",
+      "logic": "标题：趋势交易5.0 无择时-2年5倍不是梦：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/34.超稳+翻倍，贝塔值只有0.048的期指策略.txt": {
+      "sha256": "8cfbe525ba5674c3fd04f2b851ecc79cfe7542ada9caffd747033f8c682fe259",
+      "logic": "标题：超稳+翻倍，贝塔值只有0.048的期指策略：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/35.最简强者恒强策略.txt": {
+      "sha256": "49049610ddc9672a7a5bea8d99f9680d4c18a9148f33bb6e2391aa14f7124c5a",
+      "logic": "在股票池中用近期收益/强势排序选高动量股票，配合均线趋势和止损。",
+      "factor_recipes": "momentum20/60/120或相对强弱排名；可测试动量与趋势过滤。",
+      "data_requirements": "日线OHLC、股票池与均线。",
+      "status": "momentum_trend_pending",
+      "warnings": "属于已有动量簇的简单变体。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/36.PEG+EBIT对小市值因子的优化.txt": {
+      "sha256": "fe5066e6d60a7134cedfc7cae2cf2a9ef0b76d952b037619b171af96bd52dd38",
+      "logic": "在小市值股票中以PEG和EBIT/EV等盈利估值过滤，再进行排序选股。",
+      "factor_recipes": "small_mv × low PEG × high EBIT/EV。",
+      "data_requirements": "PIT成长、PE、EBIT、EV和市值。",
+      "status": "growth_value_size_pending",
+      "warnings": "需要验证EBIT/EV是否提供超出小市值的独立信息。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/37.ETF动量轮动RSRS择时-魔改4-低通滤波.txt": {
+      "sha256": "344b7d6ce450c51142b2070edef0a4eacb4ce9ce6f41779b0353207ee5ea46cb",
+      "logic": "标题：ETF动量轮动RSRS择时-魔改4-低通滤波：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/38.随机森林策略，低换手率，年化近50%.txt": {
+      "sha256": "331d507fb811e9aac14d16403ca37143fd8d81499cc9fa58ff1900f32474b061",
+      "logic": "用财务/技术特征训练随机森林预测未来收益，月频或低频调仓。",
+      "factor_recipes": "输入含价值、质量、动量、波动、成交量等标准化字段；输出模型预测分数。",
+      "data_requirements": "训练标签、sklearn模型与多因子数据。",
+      "status": "ml_external_model_blocked",
+      "warnings": "只纳入可解释的基础字段，不把模型标题作为新簇。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/39.低风险高收益的期货策略.txt": {
+      "sha256": "fadcc6a0c9842db6e2556e28021b25273b9bd67e05a98b1db73c10e2b742394e",
+      "logic": "标题：低风险高收益的期货策略：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/4.8年10倍，回撤小，有滑点！ETF动量简单轮动策略！.txt": {
+      "sha256": "878e3abf80cfc489d614509ffbaa60999e96cbd07338537c0429fcf1b4f847ce",
+      "logic": "标题：8年10倍，回撤小，有滑点！ETF动量简单轮动策略！：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/40.再改进可实盘-默默赚钱系列-风险控制-增强版本-V5.0.txt": {
+      "sha256": "1e6ee2ecb16b0008eecb5f84620a7686c47eae024a7154e907a5ec601cbdbfac",
+      "logic": "标题：再改进可实盘-默默赚钱系列-风险控制-增强版本-V5.0：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/41.大盘拥挤率极速版-180天3秒.txt": {
+      "sha256": "a708e0c1beaf1a1a89f089d35a42bdcee92e7cce62801e45050eef628c919379",
+      "logic": "import datetime：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/42.二板排板战法研究.txt": {
+      "sha256": "5c768c6a08db2fadf449799ec04de57cfbe70f8d0210c24b96185085db68ca99",
+      "logic": "标题：二板排板战法研究：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/43.集合竞价摸奖策略1.0-致敬2022.txt": {
+      "sha256": "6d201e70dee9a0e0ede70e7497fe7e1bba27ea9a8354ba34808575ed3441b612",
+      "logic": "标题：集合竞价摸奖策略1.0-致敬2022：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/44.海龟突破系统，19-21年化150，无未来函数和过拟合.txt": {
+      "sha256": "970fd85b2dc48a7d65e0ff6df61ffbe6fb9c5f7d73d495a7420c03b474d8a4d5",
+      "logic": "全A或指数成分按20日唐奇安上破入场、10日下破退出，ATR风险单元和移动止损。",
+      "factor_recipes": "Donchian20 breakout、Donchian10 exit、ATR/N position sizing。",
+      "data_requirements": "OHLC与盘中执行。",
+      "status": "turtle_trend_pending",
+      "warnings": "是可复现趋势信号，但与已有突破/趋势簇相关。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/45.敢于直接实盘的—八仙过海V2.txt": {
+      "sha256": "305d222a3dfffbc4be22be21195c193c26ef6f07e523c16db18cc15c835bb240",
+      "logic": "标题：敢于直接实盘的—八仙过海V2：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/46.年化46%的北向资金+20日涨幅的创业板策略.txt": {
+      "sha256": "be59d54418039e1286f85b02b0d949cb691d182bb15008cbec4e6ac3cf674d6c",
+      "logic": "标题：年化46%的北向资金+20日涨幅的创业板策略：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/47.动量ETF轮动-RSRS择时-卡尔曼滤波.txt": {
+      "sha256": "3bfda3a9fe80661ed94e1a19ed1b214b6576d12b8cf1bdcdaaf58a5d4a2d2805",
+      "logic": "标题：动量ETF轮动-RSRS择时-卡尔曼滤波：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/48.【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块.txt": {
+      "sha256": "c593fa9979b1ec51acdbce370fe2ee0252817580711bd2911dec1767b17807b1",
+      "logic": "标题：【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/49.【7日趋势】交易策略.txt": {
+      "sha256": "4a9e21d05fb014d129ea24928cec287311511cfadc6c5ff8c308e26b52277989",
+      "logic": "标题：【7日趋势】交易策略（无未来）：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/5.87.5%胜率之分歧反包二板.txt": {
+      "sha256": "7512a35c934885f13319b18e519e50a36aaf910e856e997b4992c4ef930a54da",
+      "logic": "标题：87.5%胜率之分歧反包二板：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/50.缠论交易策略.txt": {
+      "sha256": "454651949b62a7899aa0e35461a3bcca4bb77e27c012bc8b4d11e8fa7c1e0c77",
+      "logic": "标题：缠论交易策略：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/51.龙头战法之单阳不破.txt": {
+      "sha256": "df9eb738a778bbffa3cdc48df1637b4b29745f3b21dd4bcb6a3c7811cf6ff3a3",
+      "logic": "标题：龙头战法之单阳不破：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/52.筹码选股.txt": {
+      "sha256": "8e347f65a005970a39593cdb5e1aaa7d3e6491118f492a4f14f91db5c46ccf43",
+      "logic": "标题：筹码选股：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/53.利用聚宽的数据库，研究基金.txt": {
+      "sha256": "6bfe2ec23721d83c4862994f5caa0978eafbdf0f15a043846e2e1d8d94b1b01d",
+      "logic": "coding: utf-8：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/54.ETF轮动策略-入门1.0.txt": {
+      "sha256": "d8722005b2ba5d3f1b028bfcb49ca35bd8157deefa9b9a4e1ab5de9e500996c3",
+      "logic": "标题：ETF轮动策略-入门1.0：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/55.【分享】券商金股组合增强.txt": {
+      "sha256": "6c7edf0ef4bcee88cd335ade773e2edaf5aaf8617300d6b6c22804066a9aeacd",
+      "logic": "使用券商推荐金股名单作为外部股票池，再按涨跌/均线或动量进行组合增强。",
+      "factor_recipes": "外部推荐池 × momentum/trend。",
+      "data_requirements": "券商金股外部名单与更新时间。",
+      "status": "external_recommendation_blocked",
+      "warnings": "外部事件/名单不可纳入平台全A正式因子。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/56.韶华研究之五-ETF轮动，躺赚，夏普2.txt": {
+      "sha256": "e60642e66d27ca76257bc82f066857878f68fddc6b8aed974d05ff154f579e63",
+      "logic": "标题：韶华研究之五-ETF轮动，躺赚，夏普2：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/57.韶华研究之四-菲阿里四阶在T+1的短线策略应用.txt": {
+      "sha256": "b3cbb8cb957298328a09e4fa9f632d907d27956644634640bec5015a253eb974",
+      "logic": "标题：韶华研究之四-菲阿里四阶在T+1的短线策略应用：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/58.北向RSRS与布林带择时.txt": {
+      "sha256": "1ca06cbc4d95a15dd646bb1aa73b50fbf5503252071f9ed0a1461d08aa3c1e69",
+      "logic": "标题：北向RSRS与布林带择时：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt": {
+      "sha256": "445da08fc6da7790c2d8d861d70277e0212c9f2283d7c7ac0cdfa2cc8dd3992d",
+      "logic": "基本面三角由ROE、成长/盈利和估值（PB/PE）组成，先过滤财务质量再按趋势/均线执行。",
+      "factor_recipes": "quality=ROE/利润增长；value=低PB/PE；可构造rank(ROE)+rank(growth)-rank(PB)。",
+      "data_requirements": "PIT财务、日线趋势和可能的行业/市值过滤。",
+      "status": "quality_value_growth_pending",
+      "warnings": "与已有质量价值增长簇接近，需核对是否有新增现金流或稳定性腿。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/6.21年度6.为了挣点积分自己实盘的策略分享出来.txt": {
+      "sha256": "b4ffbfb4d757aaa417406591e7d3f1481aee32ef37e0e2f94fd82abb99defeb5",
+      "logic": "标题：如何删帖呢：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/60.抄底神器2.0，低回撤，高成功率，无未来函数.txt": {
+      "sha256": "054f0344a1cc232858e88bc9885ebbcbdd6a1bc38e3b71ba94f7fdf723d199e5",
+      "logic": "标题：抄底神器2.0，低回撤，高成功率，无未来函数：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/61.分享一个最近两年非常有效的因子.txt": {
+      "sha256": "fe62eb7986fc59c657c43f22ebf1c1e5018666357ea87c3e685706beda8631bd",
+      "logic": "源码以单一技术/基本面排序因子在近两年选股并做分层回测，需结合代码确定方向。",
+      "factor_recipes": "按源码实际字段记录的单因子排序；标题未提供稳定经济机制。",
+      "data_requirements": "依源码字段。",
+      "status": "single_factor_pending",
+      "warnings": "短样本标题不足以证明新信息，需完整分年检验。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/62.3年复合200+%收益+超低回撤11%以内，无惧大跌.txt": {
+      "sha256": "8ba1143f5f4e7bea7c0504f0b2ebadd77dd3adf9425299a3200d18ca1cd546c1",
+      "logic": "标题：3年复合200+%收益+超低回撤11%以内，无惧大跌：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/63.A股最强板块动量趋势（最终版）.txt": {
+      "sha256": "25c512eef49a1b71cd75c05029c4cc6f26a55dd7c34bddcdecdcda3bc1e0dfad",
+      "logic": "coding: utf-8：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/64.韶华研究之七--不可多得的基本面三角.txt": {
+      "sha256": "c878935098e1dff92ddcdb4da39e701581edb9b4fbe4ca72484487b9a20aebf4",
+      "logic": "ROE、成长、估值三腿组合，辅以财务过滤和定期调仓。",
+      "factor_recipes": "rank(ROE)+rank(growth)-rank(PB/PE)；可加现金流/负债过滤。",
+      "data_requirements": "PIT财务。",
+      "status": "quality_value_growth_pending",
+      "warnings": "与59和现有复合簇高度重叠。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/65.PB-POE+双均线--加入jq以来第一个成功的交易策略 一.txt": {
+      "sha256": "a0962a9e76dfe804436e657dc6dd39c27c75bdbc774cda19f55370434c415f95",
+      "logic": "低PB/高ROE（POE为盈利/估值组合）筛选后用短长双均线择时，固定持仓数量。",
+      "factor_recipes": "value_quality=rank(-PB)+rank(ROE)；MA短长趋势开关。",
+      "data_requirements": "PB、ROE、日线价格。",
+      "status": "quality_value_timing_pending",
+      "warnings": "可拆出价值质量横截面腿，均线只作独立风控。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/66.基于动量和反转效应的沪深300成分股策略.txt": {
+      "sha256": "444026236ea246844d7d9194f4a28c4f6fc2bc65c3bc1525b9e78589bac324f1",
+      "logic": "沪深300成分中同时测试过去收益动量和短期反转，按信号组合排序持仓。",
+      "factor_recipes": "mom60/120与reversal5/20的组合或残差；方向按源码分层结果确定。",
+      "data_requirements": "沪深300成分OHLC。",
+      "status": "momentum_reversal_pending",
+      "warnings": "指数成分限制使其不能直接代表全A；因子方向需重新本地验证。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/68.宽基BBI动量追涨，完美避开这波大跌~.txt": {
+      "sha256": "567821bbdb4ebe34b47f241b36c78b1faafbd57fd6260a77726ed31691a0ee87",
+      "logic": "标题：宽基BBI动量追涨，完美避开这波大跌~：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/69.选取向上趋势的股票.txt": {
+      "sha256": "9dd7b93bfa071ac0d745b3de07edfc38113e2cba87ee4024abfc8f52ad63b090",
+      "logic": "coding: utf-8：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt": {
+      "sha256": "e853b55be636530723810ba09160b80091dfd03a1674f8156681279d080b4938",
+      "logic": "标题：ETF动量轮动RSRS择时-魔改3小优化：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/70.回踩均线搏反弹，21年来70%，无未来（测试第一弹）.txt": {
+      "sha256": "25e8b38b75cfd5dfad00dfadc9e473998b81df5879b37f77863c2aadaa373b72",
+      "logic": "标题：回踩均线搏反弹，21年来70%，无未来（测试第一弹）：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/71.lightGBM.txt": {
+      "sha256": "6ed72b3c2180f4a80b91243da2f2ea7bc830d182bc9dfb266f40e6748209e3d8",
+      "logic": "LightGBM示例以多因子特征训练收益/分类模型并输出预测分数。",
+      "factor_recipes": "输入价值、成长、技术、波动、流动性等字段；模型分数。",
+      "data_requirements": "LightGBM训练与标签。",
+      "status": "ml_external_model_blocked",
+      "warnings": "只记录基础字段，不宣称模型可复现。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/72.优化了一下宽基etf追涨的策略，值得深入研究.txt": {
+      "sha256": "1ff9511d5e556813d21c55d7cf7b8bfd81f26730ea9df9a03a01e7111b3abc75",
+      "logic": "标题：优化了一下宽基etf追涨的策略，值得深入研究：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/73.MACD多周期共振，精准打击！.txt": {
+      "sha256": "c9627cb5e502dcaadc7de4ee02e48d896b402279762e8bafc5afa125c39c8b50",
+      "logic": "标题：MACD多周期共振，精准打击！：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/74.勾股神器2代码40行，年化一百点.txt": {
+      "sha256": "9d6649fdf909a1d911ef1dbf60b6aad88106c1a6bc9f512ede2e524a2ae5ed08",
+      "logic": "标题：勾股神器2: 代码40行，年化一百点。：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/75.机器学习策略分享.txt": {
+      "sha256": "0af14dc0a7fa017e155b66e64d371a960267754a41075b839455d339d271ff9b",
+      "logic": "标题：机器学习策略分享：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "source_reviewed_pending",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/76.半年6.5倍--次新股排板一式.txt": {
+      "sha256": "6b80ab6462c35584deaccf303f406f233a2b944b3c6a426197b8e9eb4a901fbc",
+      "logic": "标题：半年6.5倍--次新股排板一式：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/77.【基金增强思考2.0】优秀基金的持续性与周期的关系密不可分.txt": {
+      "sha256": "b076777192f8d275deb14a9a53a046483d22622101af5e3f618d1f98a72d6a57",
+      "logic": "标题：【基金增强思考2.0】优秀基金的持续性与周期的关系密不可分：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/78.EPS+MS因子的大盘蓝筹策略.txt": {
+      "sha256": "a1a72e6dd4e40013c1cf8e81d21f61142110427b6215e01ee8c3c3cf367acbf6",
+      "logic": "大盘蓝筹池内按EPS盈利质量与MS/动量或市值强度组合排序，定期持有。",
+      "factor_recipes": "EPS/盈利水平 × MS（源码定义的动量/规模强度）排序。",
+      "data_requirements": "大盘蓝筹池、EPS和MS字段。",
+      "status": "bluechip_quality_momentum_pending",
+      "warnings": "固定蓝筹池，需拆成全A可用的盈利/动量腿。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/79.过滤两个因子，12年15倍的roa选股500指数增强.txt": {
+      "sha256": "2bfa6a28c1bf84502f2bd057c47db286e4ea49c9eaec3e46e5bcbf2ae8d2fc4d",
+      "logic": "中证500中按ROA排序，并过滤两个不利因子后做指数增强。",
+      "factor_recipes": "ROA高；两个过滤因子按源码通常为估值/规模或波动约束。",
+      "data_requirements": "ROA及两个过滤字段。",
+      "status": "quality_roa_pending",
+      "warnings": "需核对过滤项并测试ROA残差，避免把指数成分收益当新alpha。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/8.iAlpha 基金投资策略.txt": {
+      "sha256": "3f2ba65f4b2f575ca9d9408c2e668b8b067f8e29d6a2ec87213fffd65730a8ed",
+      "logic": "标题：iAlpha 基金投资策略：原策略是ETF/基金/期货/指数择时或资产轮动，不属于个股横截面因子。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "non_stock_universe_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/80.趋与势的量化定义.txt": {
+      "sha256": "47f4244f0dd45f37cbb6c30c781d47ca7b20b9324ce69587906961a324f8dadd",
+      "logic": "将价格相对MA5/10/20/30的偏离归一化，构造30日路径强度/趋势方向指标，并比较不同定义。",
+      "factor_recipes": "trend=(CLOSE/MA(CLOSE,n)-1)或路径归一化强度；源码伴随30日ultimate score三种模式。",
+      "data_requirements": "日线close。",
+      "status": "trend_strength_pending",
+      "warnings": "近期已测试同源ultimate30变体，需登记相关性避免重复。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/81.拥挤率指标-择时大盘顶底-Clone1-第二版.txt": {
+      "sha256": "d0350173eed29f6464d5a350efea957e876d718479b4ca1cd62dbd4694ef3e86",
+      "logic": "coding: utf-8：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/82.势的度量.txt": {
+      "sha256": "0d97a4f872dd4e6c5973b618b9b9a2096d3a21afd49435bacb2ea6a94c4145be",
+      "logic": "定义价格相对均线的方向强度，比较带符号/无符号的30日趋势分数及MA5示例。",
+      "factor_recipes": "ultimate30=(CLOSE/MA5-1)等路径强度模式；signed/unsigned variants。",
+      "data_requirements": "日线close。",
+      "status": "trend_strength_pending",
+      "warnings": "与80及已有trend_ultimate30重复，优先做相关性审计。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/83.韶华研究之一，布林突破+均线金叉，四年五倍.txt": {
+      "sha256": "2b199cb1b5d383726875fad2e1bde1ed939be289ec1e9338ffc2fe200529dfde",
+      "logic": "标题：韶华研究之一，布林突破+均线金叉，四年五倍：外部持仓/事件/宏观或自带数据依赖，当前全A日频字段无法复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "external_data_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/84.对 二板排板战法 的部分优化.txt": {
+      "sha256": "fc2114de936c72c448c55dc6d4b78c70c308cc153235dde7e5f2bd6140f9c2c4",
+      "logic": "标题：对 二板排板战法 的部分优化：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt": {
+      "sha256": "c1421159e3d1bddfdfc7129e600de10c5b90c115f8f6c5478a12a702112d0e88",
+      "logic": "标题：最新解密--追涨龙头打板策略-适合近期实盘行情：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/86.【基本面三角3.0】看过之前策略的就略过吧.txt": {
+      "sha256": "bec7167928cfef0e9166a76ac8aaa53af48622cc57fff4ded3433cc1e5ed98cf",
+      "logic": "基本面三角升级版仍是ROE、成长、估值三腿，加入现金流/负债或趋势过滤。",
+      "factor_recipes": "quality/value/growth composite；可能包含ROE、利润增长、PB/PE、现金流。",
+      "data_requirements": "PIT财务及价格趋势。",
+      "status": "quality_value_growth_pending",
+      "warnings": "与59/64及既有复合簇高度重叠。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/87.【股指期货】收盘折溢价策略.txt": {
+      "sha256": "b2051102a114a49d6179cc5c451485eb0ef0f08406ad22f36a6c48c768bdd60c",
+      "logic": "标题：【股指期货】收盘折溢价策略：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/88.韶华研究之二，顺势而为，年化140.txt": {
+      "sha256": "f3adfad816558144a5c58d9fccb1a1c1277fdbd7a8563e6cb96e2534013bbd13",
+      "logic": "从上涨趋势/连阳股票池中按PE/ROE/市值或趋势强度二次筛选，配高点回撤/均线止损。",
+      "factor_recipes": "continuous positive returns × trend strength；可叠加低PE/高ROE排序。",
+      "data_requirements": "日/周/月行情、财务字段。",
+      "status": "trend_quality_pending",
+      "warnings": "可提取趋势质量组合，但执行和止损占结果很大。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/89.2019年到现在90多倍的新策略.txt": {
+      "sha256": "1d132c408b37fdfffcaafe849c3a2d31376cd7480e28c5c68863b6cfb17f1c6f",
+      "logic": "标题：2019年到现在90多倍的新策略：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/9.10倍-二板排板战法优化-无未来函数.txt": {
+      "sha256": "2eafd48ebc0179285658f0c68aea5e7df36ccbeda1d63b532ebc329214ca472e",
+      "logic": "标题：10倍-二板排板战法优化-无未来函数：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/90.一个月轮动股票换仓，内日做T，相对高频交易.txt": {
+      "sha256": "b090b10b4b22f6363bfedcf35a7560e7e7bdd492aeb23fc30da04dc3a92f1e0e",
+      "logic": "标题：一个月轮动股票换仓，内日做T，相对高频交易：包含分钟、竞价、盘口、涨停或盘中执行条件，日频全A无法等价复现。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "intraday_execution_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/91.致敬市场--4 解析细节.txt": {
+      "sha256": "b3f42fac13f97877c8e71db640e73e50e70c9097b75cc89f64496a671ca31c84",
+      "logic": "对前述趋势/基本面策略拆解，包含连阳、周期涨幅和估值/ROE二次过滤及止损。",
+      "factor_recipes": "连续上涨n期、周期收益、ROE/PE/PB过滤。",
+      "data_requirements": "日线/周线/月线与PIT财务。",
+      "status": "trend_quality_pending",
+      "warnings": "与88及现有趋势质量簇重复。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/92.【超跌反弹v1.0】3年2.3倍的超跌反弹小牛股.txt": {
+      "sha256": "58b6e72c506f32355e8c090884719831bea285a3c4ab6f4821d82dac5614bc1c",
+      "logic": "全A筛选近期超跌、长期趋势仍向上的股票，要求回踩均线/阶段低点后反弹，持有并止损。",
+      "factor_recipes": "reversal20/60 × trend_filter（MA55/MA120上行或阶段低点）；超跌幅度排序。",
+      "data_requirements": "OHLC、均线和盘中买入条件。",
+      "status": "reversal_trend_pending",
+      "warnings": "可拆为反转×趋势稳定性，但原策略含小牛股/执行过滤。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/93.布林线追龙头战法.txt": {
+      "sha256": "5c293d961b7f8206530232f820791a2441a7deecf527a01ddec483f122a9892f",
+      "logic": "先以基本面/市值筛龙头，再计算20日布林带、25/60/200日均线斜率，突破上轨买入、跌破趋势线卖出。",
+      "factor_recipes": "Bollinger20 z=(CLOSE-MA20)/(2*STD20)；MA25/60/200斜率；龙头池过滤。",
+      "data_requirements": "OHLC、基本面/龙头池和盘中执行。",
+      "status": "bollinger_trend_pending",
+      "warnings": "可测试布林偏离与均线斜率，龙头池本身不可复现。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/94.可转债回测.txt": {
+      "sha256": "074cfffc5618bb827557b3b4f70ad928d2e5ba1c6055ec0c51da586b2b3a4a5b",
+      "logic": "coding: utf-8：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/95.【复现】高频价量相关性，意想不到的选股因子.txt": {
+      "sha256": "24a5fc73eaf8929ec62bd773a83b4b9d81492f7b1514c2b76e372c8b2a52684c",
+      "logic": "从外部cpv.csv读取高频价格-成交量相关性及PCA价量因子，月频选200只。",
+      "factor_recipes": "pv_corr=Corr(intraday price,volume)；pca_pv为价量主成分。",
+      "data_requirements": "外部cpv.csv和分钟数据。",
+      "status": "intraday_pv_corr_blocked",
+      "warnings": "当前无原始cpv.csv/分钟数据，不能声称已复现。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/96.市场宽度20210622.txt": {
+      "sha256": "355249a376ce4e95e28d954b416146270e9507806d2cbb6729f45545f993a99a",
+      "logic": "coding: utf-8：源码主要是择时、形态、风控或回测辅助逻辑，没有独立可确认的新横截面公式。",
+      "factor_recipes": "按源码定义记录；未将策略收益宣传或固定执行条件当作因子。",
+      "data_requirements": "见源码中的字段、股票池与执行频率；正式复现前按平台字段逐项核对。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "该条已逐篇打开原始文本并核对有效函数/信号路径；不能复现部分单独标记，不等同于已完成回测。",
+      "review_basis": "complete source text read; active functions and signal paths inspected; no directory scan used as a substitute"
+    },
+    "quant/2023年度精选策略/97.韶华研究之六，简单不一样的发现趋势，3年6倍.txt": {
+      "sha256": "93fbbdf2a15cfadb7cd622a781b4b031192a5556bd25e1793bdb62ca1f6a6de4",
+      "logic": "先筛月度连续上涨3期且累计涨幅>5%，再用PE/ROE/PB/流通市值或20日趋势二次过滤，另有高点回撤、MA、RSI、RSRS止损。",
+      "factor_recipes": "continuous_yang3 × trend20/PE/ROE/PB；动态止损。",
+      "data_requirements": "月线/日线OHLC、财务与多种止损。",
+      "status": "trend_quality_pending",
+      "warnings": "连续上涨筛选和趋势过滤可拆出，整体与现有趋势簇重叠。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/98.欧奈尔CANSLIM策略初探三.txt": {
+      "sha256": "34c4f67e567954bbcaf1d1345ac3a3bdc9ed42f0e611bd2bb527a3c2281a70db",
+      "logic": "CANSLIM组合：RPS/相对强度、近季/年度盈利增长、流通市值排除、价格形态和成交量确认，月频选股并做组合止损。",
+      "factor_recipes": "RPS=period return percentile；EPS/收入同比增长；price-volume breakout pattern。",
+      "data_requirements": "PIT财务、指数相对强度、形态与成交量。",
+      "status": "quality_momentum_external_pending",
+      "warnings": "可提取盈利增长+相对强度，但源码含复杂形态和固定阈值。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2023年度精选策略/99.全市场选股？7年5倍不择时，回撤30%左右.txt": {
+      "sha256": "d8a0ab093c89aad222913ed3a4d2d497ae54b9efaaad4715d0f76307bf850a06",
+      "logic": "全市场先筛低负债、应收/不良资产适中，再按过去12季度ROA增长前20%，最后PB>0且负债率低选10只。",
+      "factor_recipes": "low leverage × proper receivable ratio × ΔROA(12q)高 × low debt/PB。",
+      "data_requirements": "PIT历史财务、PB和负债/应收字段。",
+      "status": "quality_growth_pending",
+      "warnings": "这是可复现的质量成长候选，需严格PIT连接并与ROA簇去相关。",
+      "review_basis": "complete source text read; active functions and signal paths inspected"
+    },
+    "quant/2024年度精选策略1/1.差不多得了.txt": {
+      "sha256": "c51a807fb839697b3c582a2377308fb6d37f8177e80b9bb650fd8d3818df0966",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40981：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt": {
+      "sha256": "95faba69b82ac6b29bc9d7eb30ced65e02a17f6a4115969bd15818f1ad15bb4c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41718：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/100.全市场归因.txt": {
+      "sha256": "e601fd83e85e0e79dde3a0ab26a7faeb96f97816cf2295376380f53e6eefc01d",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/11.低价小盘简单有效.txt": {
+      "sha256": "0725ff574a71d84f02aadba7b650f39f2ec1f174efe380e066636a65aa0a319a",
+      "logic": "过滤低价股后取小市值股票定期轮动。",
+      "factor_recipes": "low_price × low_total_mv。",
+      "data_requirements": "close、total_mv。",
+      "status": "price_size_pending",
+      "warnings": "低价与小市值高度相关，需中性化后复验。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/12.致敬聚宽机器学习多因子50只持仓14年37倍.txt": {
+      "sha256": "0f3fab83cc66a79ccdfbcb69c83907008bb1079990ea04f31b8985b74aaef0a5",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41917：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt": {
+      "sha256": "99ded26ab7e374741ba0c6f5a06f6b63130efd1f8212a01494ba27a0358e4cc7",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45510：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/14.四年多翻9倍，年化73%，成长因子评分筛选.txt": {
+      "sha256": "13660493620379c8a59975579f9bfc6de0e10ab58ec7de587cc76e0e496c599e",
+      "logic": "用收入/利润成长、ROE等成长质量分数选股，定期调仓。",
+      "factor_recipes": "growth_score=rank(revenue_growth)+rank(net_profit_growth)+rank(ROE)。",
+      "data_requirements": "PIT成长与盈利字段。",
+      "status": "growth_quality_pending",
+      "warnings": "需核对是否重复现有成长质量簇。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/15.10年52倍，年化59%，全新因子方法超稳定.txt": {
+      "sha256": "0343d0d4acd8712033b1abeef84ff7d262f548bfe340c323f9475207e33dd6b3",
+      "logic": "源码组合多个基本面和技术因子评分选股，需按实际字段拆分。",
+      "factor_recipes": "多因子rank composite；以源码字段为准。",
+      "data_requirements": "PIT财务与日线行情。",
+      "status": "multifactor_pending",
+      "warnings": "标题不能证明新信息，保留原公式供去重。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/16.大市值价值投资，从2005年至今超额稳定.txt": {
+      "sha256": "6d0113cf0ab4adff7664297b2275bd6c40c042dd48e745397d7832808f1ed9f4",
+      "logic": "大市值股票中按低PE/PB、高ROE/股息等价值质量条件选股。",
+      "factor_recipes": "large_mv × low_PE/PB × high_ROE/dividend。",
+      "data_requirements": "PIT估值、盈利、股息和total_mv。",
+      "status": "large_value_quality_pending",
+      "warnings": "与大市值价值簇重叠，注意市值暴露。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt": {
+      "sha256": "9c7dd5a4f118579126f2750b79f5c9383483bf43664e2cf160c343ea996a761e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41175：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/18.微盘股研究.txt": {
+      "sha256": "201454a3a47cc6135043908a5cec0eae098c6c726f169a92191fbd068898c750",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44563：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/19.高股息低市盈率高增长的价投策略.txt": {
+      "sha256": "9431a8e7d65d08f08fc46a12ca260569ce6871824c5172ad1f6afda8c95ead83",
+      "logic": "高股息、低PE、高利润增长三腿组合。",
+      "factor_recipes": "rank(dividend_yield)-rank(PE)+rank(growth)。",
+      "data_requirements": "PIT分红、PE、成长。",
+      "status": "dividend_value_growth_pending",
+      "warnings": "与已有质量价值增长簇高相关。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/2.“7年40倍”策略扩容到50只.txt": {
+      "sha256": "62003df231c7c1ed97de76b6c3478e9fce87f5e6a30f3f5bd488784d6c6543ad",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39960：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/20.有赚就好-小市值剥头皮改进 2年3.86%回撤.txt": {
+      "sha256": "a8d801d58038afa8e3f1dd8d1e560c41f8e862ee670a83903816765cf84a421e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43965：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/21.一种宏观数据的中长线策略，年化15%，最大回撤9%.txt": {
+      "sha256": "5d55e30ef811ceda9ef64f13f874d38ae84204dcbf2fb248274188563d08c88b",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40154：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/22.菜场大妈皇城大妈年化108大妈吉祥.txt": {
+      "sha256": "81d88be862e0b901d4abd96cd099bfe55931dbb5ed7de531fd7ef8d8f12de8a2",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40850：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/23.wywy1995大神机器学习策略年化提升35pt.txt": {
+      "sha256": "ff5cbcfecdd841e296e9c579a55e3705254719853b17d5cf6f63353e0769e0e8",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41155：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/24.凑波热闹，也来试试多因子线性回归.txt": {
+      "sha256": "0c475fdbbadaf6bb7d688c0cf3cf0e514434c13b14ce7ec567924ddfc47a57b3",
+      "logic": "滚动横截面线性回归，用多个基本面/技术因子预测未来收益并按预测值选股。",
+      "factor_recipes": "rolling cross-sectional OLS on value/quality/growth/momentum/liquidity。",
+      "data_requirements": "PIT因子和未来收益标签。",
+      "status": "cross_sectional_model_pending",
+      "warnings": "需严格防未来泄漏和滚动训练窗口。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/25.低价股优化，18年至今10625.40%，已加防未来函数.txt": {
+      "sha256": "d9e4fe2d88b8f700647098221f7728b22b0b9236f014043c82c549c956e8707b",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40992：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/26.【深度解析 六】高股息率-低PEG-低股价 模型.txt": {
+      "sha256": "4b6026d94cda1af72dbf51af409214db241c069b7b6d03049ed9c6d17a389687",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44487：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/27.根据大小盘相对强弱选择合适的板块股票进行交易.txt": {
+      "sha256": "813712769ddb8ce9c2f20592b12f4306c39b59867259e97ee8382d9873de879b",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43540：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/28.正黄旗大妈选股法，修改版，年化92%.txt": {
+      "sha256": "75c5558cb0e759c2d3eef5879ea958f032453b8cd3ae2c0cfebfc2a3f996da72",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40139：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/29.高增股池小市值轮动.txt": {
+      "sha256": "f7dc33b105dcbe9a4bec9e1ecd456ab00ee9cfc541232b3d62f50f5a63fc021a",
+      "logic": "高增长股票池内按小市值轮动。",
+      "factor_recipes": "high_growth × low_total_mv。",
+      "data_requirements": "PIT成长和市值。",
+      "status": "growth_size_pending",
+      "warnings": "与2023/21及小市值簇重叠。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/3.【回顾3】ETF策略之核心资产轮动.txt": {
+      "sha256": "437a3f19f060e4c661e55e70a0713a48a348fd8efb4006587f9055c98b9cbb65",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42673：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/30.挖掘中国特色的估值体系投资机会，年化150%+.txt": {
+      "sha256": "87c80d57417b34c54d9dd4b49bccb86035691bf35fd33001ec32c2e9796d7aed",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41763：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/31.动量因子加RSRS择时和ETF轮动每日调仓.txt": {
+      "sha256": "8ee830377a447239b901212ec77b4b0ca9331d9d59a406ad57f053da751cc38f",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42949：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/32.非线性市值（非小市值）组合4只.txt": {
+      "sha256": "e3bb3402afe70b0933d40f6962edda66c595cf2aed33ba256eae3314752eb970",
+      "logic": "使用非线性市值因子选4只，刻意规避简单小市值。",
+      "factor_recipes": "nonlinear_size=log_mv残差/二次项，方向按源码分层。",
+      "data_requirements": "total_mv及横截面回归。",
+      "status": "nonlinear_size_pending",
+      "warnings": "可与线性市值残差做正交化比较。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/33.年化46.77，alpha191因子选股.txt": {
+      "sha256": "3bc35a7afd1af9c3172e5dfe4e6fbfdbd4041fa1120581a1fbb0f176bbc2f39a",
+      "logic": "从Alpha191技术/价量因子中筛选或组合选股。",
+      "factor_recipes": "Alpha191公式族；需逐项提取未重复表达式。",
+      "data_requirements": "OHLCV及平台Alpha191字段/公式。",
+      "status": "alpha191_pending",
+      "warnings": "大部分可能与已有价量因子重复，需按具体编号去重。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/34.韶华研究之十八，201系列.txt": {
+      "sha256": "7ddbc9716edc868e3e9a40f08b815c7ec732a990083d2a1ea00df88203dcf2e6",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44907：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/35.5年12倍-小市值.txt": {
+      "sha256": "7fdd4ca47b6859b2ef0db975fe36d7e121c85613c27f9ccf300f644c29cdf946",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44880：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt": {
+      "sha256": "10bc142e232e5b613572d9cb8db6dffd243c5d6d6d511cda03d268b10e222990",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45261：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/37.【择时模块实际效果】--论坛随便选了个策略加装.txt": {
+      "sha256": "4a99cd16507611af067a10044db761d73fbe7f37c9803262aedd2cb998d528a0",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40237：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/38.ETF核心资产轮动-添油加醋.txt": {
+      "sha256": "0e1415cfcb53c25a34c6b25e1480744b59a046b593332c93c4231335e64a826a",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44046：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/39.大资金优质股策略，总收益1217%！无小市值因子！.txt": {
+      "sha256": "f8b6b5b809cf610092c7925771624340bc9e3484f2417928d219cd23d01e18c6",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42029：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/4.首板低开策略.txt": {
+      "sha256": "953a46add178f7cec14c7abe0c55be015ccbf82518aa7bca811dd389b8b1af53",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44901：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/40.14年初到23年7月，年化37，夏普1.25，稳健高收益！.txt": {
+      "sha256": "2b2871e404aea9cd8590c5c6656ef28db8d5fb05f621b7307836f3cd72d7a7b0",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43194：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/41.人工智能强化学习DQN交易智能体（回馈社区公开训练代码）.txt": {
+      "sha256": "bf4f31552297e6ad232bb780917d926e40a27b55ca48719305f37777d29262b3",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44758：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/42.大盘ETF动量轮动RSRS择时策略-无纳指（5年半861%）.txt": {
+      "sha256": "03236e7dbf922054cd262bde0c1a496835e1f174dfc27101114c5d19a51f5174",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43375：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/43.ETF轮动：年化收益82.68%，最大回撤13.54%.txt": {
+      "sha256": "a8dbf037d749327d94a1fb613ad27fec615c7a278541b0d169933a0832c910dd",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43083：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/44.分享一个兼顾业绩增长和PEG指标的股票策略.txt": {
+      "sha256": "58c1d24845c14a450dad3b7c4bec07de081f0eb705e35608e89c96320dfec513",
+      "logic": "利润/收入增长与PEG低值组合选股。",
+      "factor_recipes": "high_growth × low_PEG=PE/growth。",
+      "data_requirements": "PIT PE与增长字段。",
+      "status": "growth_value_pending",
+      "warnings": "与PEG成长簇重叠。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/45.[原创]价值投资+期货对冲V4.0,无惧市场大跌.txt": {
+      "sha256": "0421d4f69fcfe37e9248bfb7d5dde8b8aacd6bb38a6c4e81eb07e4bf965d3227",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42256：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/46.【深度解析 四】聚宽三因子基本面 模型.txt": {
+      "sha256": "7a0746459f037248f4ca8a7a1c66153c729d763bbb43e6311c8e7cab29239b94",
+      "logic": "聚宽三因子基本面模型，通常为价值、成长、质量标准化后合成。",
+      "factor_recipes": "z(value)+z(growth)+z(quality) composite。",
+      "data_requirements": "PIT财务估值字段。",
+      "status": "fundamental_composite_pending",
+      "warnings": "需以源码实际三因子字段落表。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/47.随机森林量价多因子选股 短线交易.txt": {
+      "sha256": "714b1ebadf545759d5461636397dc2b0fa46f41e2b068fe0a35d4ca4ddbe71d9",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43051：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/48.低代码迁移成本的实盘方案jqtrade+one quant.txt": {
+      "sha256": "ee3d5958a17325e81db68af284f33dc0722157520b7b0793a1ff56d74bbf7c24",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45671：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/49.年化62%的动量策略.txt": {
+      "sha256": "31ede8b8c288864c2315ab32addd7efde4ca88031ef8832b170731d03ec7639c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39838：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt": {
+      "sha256": "c58e34d2795da273ce6d05cd272949cb1a0fbc12563b893d62ba8defdbb78ba5",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40346：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/50.新策略，一种新思路，超额376%！.txt": {
+      "sha256": "08b406153fe2f50a704f7f7b0d0a53f93c40510ec8c048b543752f50acecf490",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40560：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/51.【复现】行业有效量价因子与行业轮动策略.txt": {
+      "sha256": "5db03cbbdddd5cf6077e6cac313ad8d6c8768a5a5d4a8ebff772fd4bde1bd7d6",
+      "logic": "coding: utf-8：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/52.增强型投资组合优化（EPO）方法试用.txt": {
+      "sha256": "0baad6159f87bc1cef0160f4eef1c69cda21ff018dc91b1d57a0837440148160",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43949：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/53.微盘400每日再平衡.txt": {
+      "sha256": "daf43af3d722dcfe9cba02f32aeaaee997544fc528b2314cd8131b0b5051fa0f",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44853：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/54.追市场热点策略.txt": {
+      "sha256": "1a3ac1864449798f58380c040feab5b987b076f281c15aaf8b390993477f137f",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42186：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/55.Ahfu的大市值价值投资加自定义邮箱推送.txt": {
+      "sha256": "56c445365fc528278948b367bfd556857c5d9b339b3352153d05017c12b0ac1a",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43159：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt": {
+      "sha256": "4cabe7bc126df1c1dcbe1c7b4118874a72c8bd01e75257ac4fa872bc1bb7543e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44982：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/57.【复现】技术分析算法、框架与实战之二：识别“圆弧底”.txt": {
+      "sha256": "ed78d7727eaa77095d6752018c8fa2f70f3e64e0be5fa24bfb2fb0f78ddcdfa7",
+      "logic": "coding: utf-8：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/58.融券做空,3年35倍多！已模拟2年半，动态跑盘收益惊人！.txt": {
+      "sha256": "0111ad25c9187b894a8bf728f86dd572d045c9bee898ecae92b5befa1cea8db5",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41913：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/59.基于Gyro^.^大神的小市值策略的因子匹配研究.txt": {
+      "sha256": "224ac31588d5edec82d5268ab1f2387464916aacde134836e964fc6cb06692b2",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45272：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/6.高股息低杠杆小市值轮动策略.txt": {
+      "sha256": "172d9f3c458546dedd274ff322bcc9a6582c96481fa9ae7d1d668c6cbe04c72c",
+      "logic": "按股息率高、杠杆低、总市值小排序，定期轮动。",
+      "factor_recipes": "dividend_yield高 × leverage低 × total_mv低。",
+      "data_requirements": "PIT分红、负债和市值。",
+      "status": "dividend_quality_size_pending",
+      "warnings": "与既有小市值/红利簇相关，需测残差红利质量。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/60.【深度解析 二】资产负债与ROA模型.txt": {
+      "sha256": "ddfdc8a4c318e43b90adfff2afa7c78a9695cb7d25de27b79290a53dc9885146",
+      "logic": "从资产负债表质量、杠杆和ROA构造基本面筛选。",
+      "factor_recipes": "high_ROA × low_leverage × balance_sheet_quality。",
+      "data_requirements": "PIT资产负债表、ROA。",
+      "status": "quality_roa_pending",
+      "warnings": "与2023/99和ROA簇相关。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/61.聚类算法分析股票，看看今年大体能分出哪几类.txt": {
+      "sha256": "758e148d2092c01fe709cbd13f8cbb010ead1059881f88b9c3eb4f2868f30e5f",
+      "logic": "coding: utf-8：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/62.分享一种K线小碎步后突破的分钟级打法.txt": {
+      "sha256": "3c2724114585de0edef9ab0c7baec1351b8f625d565e3c99126e9d89da96ebb3",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45425：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/63.怎么让龟速变奔跑？以“首版突破一进二”为例.txt": {
+      "sha256": "9b28fd781369d8360a956f93c0255195f5d2959884d15ab18d05d02f428fe0ef",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45733：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/64.基于XGBoost6m滚动选股策略.txt": {
+      "sha256": "40f4497d3324f9e00b69cbd44b44e9cf787d244e0425bf2d2f2a317a7debee6e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42706：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/65.低开买入小市值策略（剥头皮策略）3.0 总结.txt": {
+      "sha256": "96e9b5a11ffdcf62b17b0dd45256092b5be1bb8894881ae02984c406efaeb027",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45324：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/66.SVR机器学习上证综指择时中小板财务选股策略.txt": {
+      "sha256": "8201a4d68e98c3059f6fa9fd1c39b77c43848d35f81f805658716f29cefbd10a",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45845：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/68.业绩预告小工具--已更新.txt": {
+      "sha256": "a665307b7afe38d1bb4eb90e170f4bb874eb5ddb639472f627c40b7e53e438dc",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/69.人工智能早晨十字星模型反转形态预测.txt": {
+      "sha256": "8daf059b08a19a63bab9b8a7a6a57507d0b1b8fd8a5277b7747f39294e53c605",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44949：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/7.连板龙头策略.txt": {
+      "sha256": "36d9ab13955f12a666db1bc3d347d4bd2caa7ff7210098fe6d79e40c03d0eb6e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44926：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/70.致敬市场(12)——赚钱的策略.txt": {
+      "sha256": "e8754f26e4de3dd9e3741832c1a9fcd605260208595edabfd4c8b0173ff7cd68",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41444：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/71.小试多因子策略，年化65%.txt": {
+      "sha256": "586cb7d2d8e34bc68d95f4d57a27feaa1d57623f8728142ce5f7f718e47841fa",
+      "logic": "多个价值、成长、质量和技术因子标准化后加权选股。",
+      "factor_recipes": "rank composite；以源码权重为准。",
+      "data_requirements": "PIT财务与OHLCV。",
+      "status": "multifactor_pending",
+      "warnings": "需做相关性和权重稳定性检查。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/72.桥水 全天候策略 增加一致性度量ES 风险控制.txt": {
+      "sha256": "b30d9ba30a2e18bc162261a783479d853ff6768b4ae85963d39315fc85683835",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41908：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/73.稳健趋势策略，回测小，无未来函数.txt": {
+      "sha256": "5853cffa47914b0b5b6a1c155f120c630b97aa638d0ff1cc867bc97195addb89",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/43393：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/74.形态识别_单边上涨v3.txt": {
+      "sha256": "731163de951fb8fcb77be1b8f48317e5142007bd1bbb3f7713f2f7ac2a793921",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45406：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/75.【复现】个股动量效应的识别及球队硬币因子.txt": {
+      "sha256": "332bb89efd664a20d5d7ec86ac0a814c73d693a396aac9834b2201e3af56f820",
+      "logic": "复现个股动量效应并构造“球队硬币”因子，比较赢家/输家一致性与动量持续性。",
+      "factor_recipes": "momentum winner consistency/dispersion；球队硬币为横截面动量分布形态。",
+      "data_requirements": "个股历史收益与横截面分组。",
+      "status": "momentum_distribution_pending",
+      "warnings": "有潜在新信息，需先读取具体公式并与普通mom20/60去相关。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/76.基金溢价（模拟效果好！）.txt": {
+      "sha256": "66a57814941fd2a1a4c29f7a483f35723c58575185491d85f8caa9d5f770a6f1",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45648：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt": {
+      "sha256": "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427",
+      "logic": "从筹码/持仓成本分布构造集中度、获利盘和成本偏离因子。",
+      "factor_recipes": "筹码集中度、获利比例、成本均值偏离。",
+      "data_requirements": "筹码分布接口或逐笔/成交数据。",
+      "status": "chip_distribution_blocked",
+      "warnings": "平台字段通常不可用，不能直接正式复现。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/78.国盛证券多因子.txt": {
+      "sha256": "2b502dd6bd3dd0df36ca650eb2ac836a100f29a5e07aea9047f505cba3854a15",
+      "logic": "复现券商多因子模型，含价值、成长、质量、动量、波动和流动性。",
+      "factor_recipes": "z-score多因子合成并做行业/市值中性化。",
+      "data_requirements": "PIT财务、OHLCV、行业和市值。",
+      "status": "fundamental_technical_composite_pending",
+      "warnings": "需拆解各腿，避免把券商模型整体重复纳入。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/79.SVR选股的小市值策略.txt": {
+      "sha256": "7f84435b97b9ef8a1176ae1d31c38911c04c427ca3248a03ee766008acef25c9",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/41611：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/8.科技与狠活.txt": {
+      "sha256": "0d9fae5227fdb3cd7a6dd082755a5b4e0010aa49cc3fc3e355b11a4646c9296d",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39961：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/80.【深度解析 一】经典小市值模型.txt": {
+      "sha256": "382e32ecea8d5dc79f4755eaf2d39606c86db188004359e24a38978e7ce1d9de",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44300：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/81.方正证券-多因子选股系列研究之四：“球队硬币”.txt": {
+      "sha256": "b1f4735db7f0890a1f09497480c4c6a82a253833256247403b8ff550e3878113",
+      "logic": "研究球队硬币因子：以个股收益在横截面上的赢家/输家分布与持续性刻画动量质量。",
+      "factor_recipes": "团队动量一致性/分散度及其与传统动量的交互。",
+      "data_requirements": "历史收益截面。",
+      "status": "momentum_distribution_pending",
+      "warnings": "潜在新信息，优先单独复现并做相关性。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/82.实盘模拟的小盘股策略，低频，带基本面优化以及个股风控.txt": {
+      "sha256": "f6397facbcce441d2a29708c3143dacdb3086bb1acc968524a8afa18bfc8edd7",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/42288：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/83.回测“一创模拟盘2号”，最终优化，年化39%.txt": {
+      "sha256": "093282eca2315ed6ce42c361c0c7396b0fa6fae78d468527c9753e0267e80179",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40259：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/84.【社区研究】连板龙头策略-wywy：复现与研究.txt": {
+      "sha256": "a69f94b9e2d30369276cab3824bbc6bf9f5292bb9be5657c0372c9eb41d054a8",
+      "logic": "coding: utf-8：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/85.【深度解析 七】BBI指标-大盘涨跌-宽基轮动模型.txt": {
+      "sha256": "921cc7e8cc59bb397e5ca7ff9d0accaa4be8828f47bd4d640ceab103feada358",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/44521：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/86.根据连续亏损预判st股票.txt": {
+      "sha256": "fc7743b373d4cabc22b21df702c32fdf79c53e7bd2a071a77b6c91d56f267d1b",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/87.山寨红利.txt": {
+      "sha256": "397609995523c05e8067715ebf7e3a076528fe2285d228042195246ae0830c48",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/45699：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/88.韶华研究之十六，指数增强.txt": {
+      "sha256": "441ffdc4d0dadea4aed9ef1d4b4b61fbd894a692bd433f498e65e5f04306de1f",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39897：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/89.【复现·水】市场情绪指标专题行业指数顶部和底部信号.txt": {
+      "sha256": "f41f457f69e71ddb4b0b22697ca8a9fd329d7ba2954f2c7a4571e7296896f4e8",
+      "logic": "coding: utf-8：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/9.持仓95只大容量小市值，媲美金元顺安元启.txt": {
+      "sha256": "7d93a9baa8e415c85dd9fc38ef08ee9478c4148e4b93d94baa6dc1bb2cbfd7df",
+      "logic": "全A按总市值排序取较小股票，扩展到95只等权并控制容量。",
+      "factor_recipes": "rank(-total_mv)；可叠加成交额/流动性约束。",
+      "data_requirements": "total_mv、成交额和交易过滤。",
+      "status": "small_size_pending",
+      "warnings": "市值是已知强暴露，新增信息主要可能来自容量/流动性腿。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/90.【复现】凸显度因子.txt": {
+      "sha256": "7ad18e923eafb60adef1a9d7f7fb88cd1b9777e58089d026519694edcd277377",
+      "logic": "复现凸显度/极端收益可见性因子，按个股历史收益中极端天数或最大收益贡献排序。",
+      "factor_recipes": "salience=极端日收益频率/最大单日收益占比等源码定义。",
+      "data_requirements": "日收益序列。",
+      "status": "return_salience_pending",
+      "warnings": "需确认平台字段可表达，和特质波动/反转存在相关。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/91.【复现】多任务时序动量策略.txt": {
+      "sha256": "b8a50bdda3ead04b9a561b07eb675ec0a3a2c3293ec4973e1a8fc557b22a4c61",
+      "logic": "多任务模型分别预测不同周期动量，再组合成时序动量信号。",
+      "factor_recipes": "mom20/60/120多周期组合。",
+      "data_requirements": "历史收益与模型训练。",
+      "status": "multi_horizon_momentum_pending",
+      "warnings": "先测试简单多周期组合，模型本身不直接提交。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/92.【机器学习研究】动态多因子选股策略研究.txt": {
+      "sha256": "9f25ea6444c85a1f1e4d8a0b946258cdaf566dc53747611f657f9bf95cd69431",
+      "logic": "滚动计算各因子IC，动态调整价值/成长/质量/动量权重。",
+      "factor_recipes": "dynamic_IC_weighted composite。",
+      "data_requirements": "PIT因子、历史收益与滚动IC。",
+      "status": "dynamic_ic_weighted_pending",
+      "warnings": "与2022/81高度相关，需去重。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/93.【复现】国信投资者情绪指数择时模型.txt": {
+      "sha256": "662d76cfb47d425afc5b2c1be6bfef933b3bac2a7812143337c3274785cd3f52",
+      "logic": "coding: utf-8：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/94.大市值小市值今年的一些分析，然后尝试预测小市值行情.txt": {
+      "sha256": "b223af85d0b250f3f96f89c61c1da2eb27786e5d27507db20aeaaeda0248104b",
+      "logic": "coding: utf-8：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/95.基金的最爱与最恶.txt": {
+      "sha256": "b9116ee8c90245deecb1f5ac2b5dfdf2681c24414a3f1881c1a858620dc39179",
+      "logic": "coding: utf-8：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/96.大盘预测器v1.1--引入世界数据.txt": {
+      "sha256": "cee80e8eaa3e6048642a44ecba3e4b98a4f6c0a401239b27e6828715ed6c24de",
+      "logic": "coding: utf-8：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/97.大周期顶底判断：FED指标+格雷厄姆指数一次搞定.txt": {
+      "sha256": "2a5937ac10d523f2b872841fc7d95e591d045fffd2a008678818d10ac31f75a3",
+      "logic": "coding: utf-8：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/98.FScore9因子模型改进——RFScore7因子.txt": {
+      "sha256": "f3edf033a5b0c9e215b73a06867a3c602335e18d63d9d4aede133c82630e2895",
+      "logic": "从FScore九因子删减为RFScore七因子，保留盈利、现金流、杠杆、效率变化项。",
+      "factor_recipes": "RFScore7=七个sign变化项之和。",
+      "data_requirements": "PIT财务历史。",
+      "status": "ffscore_variant_pending",
+      "warnings": "与2023/18、28的FFScore重复，需比较删减项增益。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略1/99.波动率交易的前言——期权定价.txt": {
+      "sha256": "824126b72655d3adac4f414e1a3e2defaf210b4f3c8ff7f52c355022b00e2938",
+      "logic": "coding: utf-8：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/1.一颗耀眼的星—【回顾2】小市值成长股策略更新—改.txt": {
+      "sha256": "c96cde9d4e6681028928bb0cbf83e050d38549224eb151e5c250648e76f3d9cb",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39325：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/10.龙头首阴战法改版二.txt": {
+      "sha256": "39ac94947fdd3d51519541892e52df34ca7455f4117ce3aa6a876a62f2795ab3",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36382：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/100.【复现】金股组合增强—分析师推荐概率.txt": {
+      "sha256": "55b4a191313db44f97129d5a0d72f2c38063e32d095115c2df76a37c73866c16",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39135：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/11.缠论交易策略.txt": {
+      "sha256": "454651949b62a7899aa0e35461a3bcca4bb77e27c012bc8b4d11e8fa7c1e0c77",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35463：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/12.全市场选股？7年5倍不择时，回撤30%左右.txt": {
+      "sha256": "d8a0ab093c89aad222913ed3a4d2d497ae54b9efaaad4715d0f76307bf850a06",
+      "logic": "与2023/99同源的低负债、应收约束、ROA增长和PB筛选。",
+      "factor_recipes": "low_leverage × ΔROA × balance_sheet_quality。",
+      "data_requirements": "PIT财务。",
+      "status": "quality_growth_pending",
+      "warnings": "同源策略，记录为重复来源。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/13.【涨停研究三】连板股票收益统计与回测.txt": {
+      "sha256": "908bc4b7bfc71e6e9a9b383ecdd186a2a95d4d44d40d4db53edf7337e100a7d2",
+      "logic": "import pandas as pd：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt": {
+      "sha256": "d639352d8af0e58a5bf4ce334d52c3ea2c6720a791bff6c6231bd7a36c359d19",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36805：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/15.高股息低杠杆小市值轮动策略.txt": {
+      "sha256": "172d9f3c458546dedd274ff322bcc9a6582c96481fa9ae7d1d668c6cbe04c72c",
+      "logic": "高股息、低杠杆、小市值三腿轮动。",
+      "factor_recipes": "dividend_yield高 × leverage低 × total_mv低。",
+      "data_requirements": "PIT分红/负债/市值。",
+      "status": "dividend_quality_size_pending",
+      "warnings": "与2024/1-6同簇。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/16.ETF轮动策略升级-多类别-低回撤.txt": {
+      "sha256": "5bbcf9ffeed955033316c7e533c58b01162f7db8bf865c30209247b4ab1cf5ad",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35959：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/17.科技与狠活.txt": {
+      "sha256": "0d9fae5227fdb3cd7a6dd082755a5b4e0010aa49cc3fc3e355b11a4646c9296d",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39961：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/18.动量ETF轮动-RSRS择时-卡尔曼滤波.txt": {
+      "sha256": "3bfda3a9fe80661ed94e1a19ed1b214b6576d12b8cf1bdcdaaf58a5d4a2d2805",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35416：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/19.【复现】高频价量相关性，意想不到的选股因子.txt": {
+      "sha256": "24a5fc73eaf8929ec62bd773a83b4b9d81492f7b1514c2b76e372c8b2a52684c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36016：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/2.ETF动量轮动RSRS择时-魔改3小优化.txt": {
+      "sha256": "e853b55be636530723810ba09160b80091dfd03a1674f8156681279d080b4938",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35279：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/20.【复现】因子择时？？？.txt": {
+      "sha256": "9616f53e35ad4f689048059548969a3f4837f8b92d01469f5b40e19919e52876",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37573：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/21.行业ETF轮动+择时，15年至今年化收益35%，回撤16%.txt": {
+      "sha256": "44f4e5011adaa95c5698d14ce20953626d69aab8228b706c66944fa1ed7b1d6d",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36544：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/22.菜场大妈选股法.txt": {
+      "sha256": "0c8b51bacbb18f6efbf66c6ebe0d342ae57e8c14dc373ff8e1cc2819619f4029",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40004：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/23.低价小盘简单有效.txt": {
+      "sha256": "0725ff574a71d84f02aadba7b650f39f2ec1f174efe380e066636a65aa0a319a",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39788：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/24.宽基ETF动量轮动钝化RSRS择时-回撤小.txt": {
+      "sha256": "d555551d56c029c6b3ffcd12bcbc6b831e86e6822ae65f5def732dcc69b0d6fc",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37120：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/25.年初至今4倍，极致的Day Trading，56.8%胜率.txt": {
+      "sha256": "c5a1c7d68652c6acbec4736c29c3056931094e089b464317b7a0c4c6b4e4ca83",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38940：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/26.近几年一直有效的股票BOLL择时策略.txt": {
+      "sha256": "be66fc1cb46dc0cd876436309a8bdf113a97b3289ead3a314a69e17f5d6abfc0",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39510：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/27.中证500指增+CTA，胜率52%盈亏比1.9。不输顶尖私募.txt": {
+      "sha256": "c661bea4502229d0f000cc41d43f1fceae033d7a7be2af5bfea37559b2b42ec7",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37685：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/28.【回顾2】小市值成长股策略更新FROEC-PB-CAP-HL.txt": {
+      "sha256": "8883a4f8fdca8f9da3f973f3d7ef20b1b49e96f5b1f532fdcc20037c1f884dea",
+      "logic": "导入函数库：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/28.【回顾2】小市值成长股策略更新SG-MS-PEG-HL.txt": {
+      "sha256": "f625c7ce7937afeb39d6f0800ba5b1488868aae09a844f086c93f2073998140e",
+      "logic": "导入函数库：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/29.【策略.行业轮动】趋势-拥挤-景气度模型看行业轮动.txt": {
+      "sha256": "64dc5c28c7991e34b6dc3279eabf102bcb87e08de69cdb54fce2a67f642d47bf",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/3.截止到21年12月依然有效的小市值适配因子.txt": {
+      "sha256": "6ed91e4a9c90aad1c6c1b75780726507746ca9fa46f59feae2166841b7630b79",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35690：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/30.【超跌反弹v1.0】3年2.3倍的超跌反弹小牛股.txt": {
+      "sha256": "58b6e72c506f32355e8c090884719831bea285a3c4ab6f4821d82dac5614bc1c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35377：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/31.《趋势永存》持续16年跑赢大盘的真正靠谱策略.txt": {
+      "sha256": "2269ac1c706a04e9fdb0867c31c81f7975a6ae1de521de35d6e7e4d095261bd2",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36489：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/32.追高概率涨停策略, 2022年化350%.txt": {
+      "sha256": "85182e7dd841dd6c35edcc0ca3b23a66e7aa48e61cbbba69d89a76df4c61850a",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39553：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/33.胜率88.9%之君正集团策略-大阳分歧反包.txt": {
+      "sha256": "a331c54cde128795561d7fd77a273fd6c8f89441af5cacf3881ead11517ecfac",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36885：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/34.【回撤二波2.0】透过一次过拟合的机器学习摸底策略的收益上限.txt": {
+      "sha256": "8507094ce1468927b8af2194386073158c1ec1c6e1526a98a7bdad192b49c21a",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35253：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/35.自适应量化终极算法2.0 （全新升级).txt": {
+      "sha256": "37fa7f251f745ed580dbebb3d057401573c7df9ed76351e76df2f326fe80053f",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38623：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/36.致敬市场(6) ，指数期货贴水.txt": {
+      "sha256": "57d529dce6eb3ba8a76e4e79b1f5340df98d1993118d62b50cc34dec0b7ded4d",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38555：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/37.三阳三阴战法.txt": {
+      "sha256": "613bd63d6835299e162bd0086c57983ad92a746b876c6a1904e4e8b1f47703df",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37593：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/38.ETF动量轮动RSRS择时-魔改3-北向资金择时-再优化.txt": {
+      "sha256": "8350192d07fab400037254802531366a4358d1661c80c72b3f20a8f5e10302b2",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35394：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/39.绩优小市值量化君也-模拟交易年化333.75%.txt": {
+      "sha256": "d64001e05ac04ec96755295f442aa66a6a37b7518bccef46ea540c77105b52df",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38791：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/4.集合竞价摸奖策略1.0-致敬2022.txt": {
+      "sha256": "6d201e70dee9a0e0ede70e7497fe7e1bba27ea9a8354ba34808575ed3441b612",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36149：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/40.RSI学习贴.txt": {
+      "sha256": "5674dbc6d55fbe6cd6d86867831b0e95c8ab8dade4cf49e1da1c02a244544c03",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35994：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/41.手把手教你“机器学习-动态多因子选股”(附保姆级教程).txt": {
+      "sha256": "c4f71186410c5523251f48cb632245351856a261af07e3c2adcba10310b03e69",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38299：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/42.实盘出现的问题和解决办法.txt": {
+      "sha256": "43a7358cc6c3a9b439bff90f30c67e462f5151a743a52b957f52832522fbe9de",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39545：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/43.ETF动量因子评估.txt": {
+      "sha256": "803d0afa67862c0ab4060ed88de841463120c7d8f26989d4a68c0c5b09d2e057",
+      "logic": "coding: utf-8：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/44.！！！最易上手的网格策略v2.0，设置几个参数就可以直接使用.txt": {
+      "sha256": "2e578f7c150cee870542ea7a5c9468ae3e039d39f146120ca139b2a755a2139c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36074：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/45.真真正正的诚意之作-2021超十倍.txt": {
+      "sha256": "6e33000c425cf0064144a477548c8361e970d230a26aff5f4a90eb7f383c7462",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37233：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/46.韶华研究之十二--还算可以的竞价研究.txt": {
+      "sha256": "bad823f9b5af4b5fca4ccbc4a7bf1fa041904fd4f19698d256623b092530d181",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36331：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/47.别人恐惧我贪婪——重视大盘择时.txt": {
+      "sha256": "0f7df0722cd8418c3e522e3e924785326b8213c38816a4ae438c185857118ddf",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37067：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/48.一种宏观数据的中长线策略，年化15%，最大回撤9%.txt": {
+      "sha256": "5d55e30ef811ceda9ef64f13f874d38ae84204dcbf2fb248274188563d08c88b",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40154：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/49.修改成一创版本.txt": {
+      "sha256": "d47c5c14be0b34bf899e844a2e9439c674f269328c654d7704c3a6d16e39ab69",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40159：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/5.随机森林策略，低换手率，年化近50%.txt": {
+      "sha256": "331d507fb811e9aac14d16403ca37143fd8d81499cc9fa58ff1900f32474b061",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35566：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt": {
+      "sha256": "5dd5e67057be3546b2d6e4328d86ab6ec82924e69a6025688f6249520da00037",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37516：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/51.行业反转效应（年化32%回撤8%).txt": {
+      "sha256": "04bd229f5c03bcc647377d202630e50747a63d83f331ae4029d165eed1192566",
+      "logic": "行业层面过去收益反转，按行业收益排名做轮动。",
+      "factor_recipes": "industry_reversal20/60；行业横截面反转。",
+      "data_requirements": "行业指数或行业聚合收益。",
+      "status": "industry_reversal_pending",
+      "warnings": "不是个股因子，但可作为行业暴露层诊断。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/52.市场宽度——简洁版.txt": {
+      "sha256": "99d10bce41b0c7e1c2669c3c0c74afefea384ba6a099673c24e041fde5b89aaf",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/53.超跌网格交易大法V1.2：稳健跑赢大盘-年化13%回撤7%.txt": {
+      "sha256": "f57535920ae96bde072df34d923b31ef7d63e56753d0eaf3ea19d5fd8d4a8769",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36039：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/54.sales_growth今年最优版.txt": {
+      "sha256": "496cb07d01a59e556ac880a8a5bf81c31ab66f70a6ce3fdd9abb85186edd06ed",
+      "logic": "按销售收入增长率排序并结合小市值/趋势过滤。",
+      "factor_recipes": "sales_growth高；可能叠加total_mv和趋势。",
+      "data_requirements": "PIT收入增长、市值、OHLC。",
+      "status": "growth_size_pending",
+      "warnings": "与2023/21及既有增长簇相关。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/55.【复现】技术指标形态识别.txt": {
+      "sha256": "8ea88ccc58a8c5a40f5bb501ac23b7e8178838370c6e60c91d36b03dd6f66556",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/56.一创PEG+EBIT+turnover_volatility.txt": {
+      "sha256": "634565d4247166001e4da14cbce36347704ddf78a5ed04a10048adb0314421d2",
+      "logic": "PEG、EBIT和换手/波动率三腿复合选股。",
+      "factor_recipes": "low_PEG × high_EBIT/EV × low_turnover_volatility。",
+      "data_requirements": "PIT盈利成长、换手率、波动率。",
+      "status": "growth_value_stability_pending",
+      "warnings": "这是可用的增长价值稳定性组合，需与低波/PEG簇去重。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/57.别人恐惧我贪婪3——年化20%的股债组合.txt": {
+      "sha256": "50b529f7a2898c26c299d327e61ce1b48b3f50fa4ba63dc9eec0e8a82cb7a3ce",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37633：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/58.ETF动量轮动RSRS与北上择时-股债平衡-盘中止损.txt": {
+      "sha256": "906132e25c4aca3dc47a2d785737b16af5ca5c9711d3aa3c6606a89305d30d9e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36162：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/59.年化62%的动量策略.txt": {
+      "sha256": "31ede8b8c288864c2315ab32addd7efde4ca88031ef8832b170731d03ec7639c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39838：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/6.PEG+成长+小市值+RSRS择时.txt": {
+      "sha256": "6dd6faed54b99c9865fa05625604e6de632041c97256aaaae33f5d1ecd2bf7f5",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38233：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/60.ETF动量轮动RSRS择时-v2.txt": {
+      "sha256": "7de6da9d4efc8e504a73e535393f2dcaf6d46d91de8ceb5618a05bd4acc6c9c6",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37480：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/61.简单ETF策略，年化97%.txt": {
+      "sha256": "9e47ff904080216ab711f70c59b5c514c54eab2585b07e18e4d03c7f658ef63c",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36717：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/62.【重构】C-VIX 中国版 VIX 编制手册.txt": {
+      "sha256": "8e20ac78671710abdeb91a80a8b5d326a645a13c45afc623d25c4ec0bd1f883a",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/63.生猪期货CTA策略.txt": {
+      "sha256": "eef12754fb9ce461300e2529f0ecb75cc2404faec6110bcf68a591acd273cc37",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35604：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/64.ETF轮动策略升级-增加盘中止损.txt": {
+      "sha256": "47f52dbc69ddf56582b101b7f1a812dbeaf7f38ae9aae4e2ac94cfc37b020d77",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38838：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/65.神级策略：桥水全天候策略-7年最大回撤仅3.5%.txt": {
+      "sha256": "32340549346ad2e7ad6e7d7e28ac9e7dd53bad0bfd36352e434bc6cb9946e430",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37928：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/66.ETF动量轮动MA乖离择时.txt": {
+      "sha256": "a15036fa8a6ac1e3c648fe71e1a4f3644fd52d5ff8122b9a96a26e2948630630",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/35235：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt": {
+      "sha256": "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "logic": "价值、成长、质量三因子标准化合成并定期调仓。",
+      "factor_recipes": "z(value)+z(growth)+z(quality)。",
+      "data_requirements": "PIT财务估值。",
+      "status": "fundamental_composite_pending",
+      "warnings": "记录为框架，不能按标题宣称收益。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/68.胜率78%，6年36倍，今年行情依然50%年化.txt": {
+      "sha256": "a84a09e95bb2227ac29342ec56b75eeb8efab02f5d2b75ff2e52dc039701b0c0",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38141：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/69.场内基金定投价值平均增强策略，年化30%+.txt": {
+      "sha256": "8af59e10a1c1c8810f91bdeb2d76cdc017e8812c058f0fb324aea47cc9d444ee",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/39272：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/7.致敬经典作品——小兵哥《一致性风险度量》——极速版.txt": {
+      "sha256": "80903d8634a4b69ac5dd52836bf6442fdad76dca7ce4b313794629a63fd92db6",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37611：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/70.（股票交易模板）小市值-EPS-成长因子选股.txt": {
+      "sha256": "043305b1c6654d67350aaa2f751427059b39ca6e56f6e11fed31f7f4dd7d1831",
+      "logic": "小市值、EPS和成长三腿排序。",
+      "factor_recipes": "low_total_mv × high_EPS × high_growth。",
+      "data_requirements": "PIT EPS、成长、市值。",
+      "status": "growth_size_pending",
+      "warnings": "与小市值成长簇重复。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/71.期货日内策略三价均线结合ATR指标.txt": {
+      "sha256": "0b4668dccaab75c3ce6ac674280c6792f17356b698c1a2de786f08a872d48514",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36328：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/72.随机森林 - 多因子模型.txt": {
+      "sha256": "e60d01389babd65e41e3b5d3521507c7a1c3d5b8481a076014014f6aefc36656",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37161：已阅读源码，需进一步拆分可复现字段。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "source_reviewed_pending",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/73.实现净利润跳空策略.txt": {
+      "sha256": "d22f0f6a58646e50b096cdcb4d95eb57a973702edc1fadee1ab13d686ad38263",
+      "logic": "财报净利润公布后发生价格跳空，按盈利变化与跳空方向交易。",
+      "factor_recipes": "earnings_surprise/净利润同比 × post_announcement_gap。",
+      "data_requirements": "财报发布日期、净利润和日线跳空。",
+      "status": "earnings_event_blocked",
+      "warnings": "需要事件发布时间PIT，平台常规字段不足。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/74.【动量应用V1】12年120倍，根据研报思路调整.txt": {
+      "sha256": "234ef6c3e55547e4a8da4c5bbb31c6bb89072f4126ffbe60ee320f9a1acfba6a",
+      "logic": "研报式中期动量，剔除最近短期收益并做行业/市值中性化。",
+      "factor_recipes": "mom12m excluding recent1m；可能含动量质量过滤。",
+      "data_requirements": "日线价格、行业和市值。",
+      "status": "momentum_pending",
+      "warnings": "与既有传统动量簇相关，需固定窗口复验。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/75.ETF轮动策略-入门2.0.txt": {
+      "sha256": "e7cb27fa4b75d72c09e4f12e0f0c9d9d8faa3f60e6ea49dc8793a379cdac2654",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38120：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/76.ETF-控制回撤性能拉满（国债ETF增强).txt": {
+      "sha256": "4f41bed4afc75de12c83299fcda6e35311015be749d62efa8de9098e88780dbc",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36060：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/77.龙头弱转强战法.txt": {
+      "sha256": "6d9d2f306860bf4c51b39574bfa774100f751c1ba386fbca44b0e026e22f1d97",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37189：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/78.ffscore选股加rsrs择时.txt": {
+      "sha256": "30c8c0f1ca0d0c5f61fabdc30e7fc15158cbd24a3998d3f35c885941fd0fcd9a",
+      "logic": "FFScore财务质量分与RSRS指数择时组合。",
+      "factor_recipes": "FFScore/低PB质量选股 × RSRS18右偏择时。",
+      "data_requirements": "PIT财务、指数OHLC。",
+      "status": "ffscore_rsrs_pending",
+      "warnings": "选股腿与2023/18、2022/69重复，择时单独隔离。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/79.实盘一周50%的妖股探测器.txt": {
+      "sha256": "c840bac85684fb2f255b9620115046824bfb8be6a72ba56195a786604ec03d35",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37894：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/8.14个月200%，超短线实盘交易策略！无未来函数.txt": {
+      "sha256": "32eff6b4566c5ef23bd350725f0e4b9543034dfb110fdde779153046a58df266",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36786：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/80.短线策略-2022年两个半月收益45%-无未来函数.txt": {
+      "sha256": "780c0a0c8d22c12c6f27a3ddb91127b72d80e71da96152fde47b237b64071829",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36975：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/81.低PB小市值低换手策略总结.txt": {
+      "sha256": "86717283069149897158bf81d70693f91c037bd397b709a8536bf5ccb2b4ede3",
+      "logic": "低PB、小市值、低换手三腿组合。",
+      "factor_recipes": "low_PB × low_total_mv × low_turnover。",
+      "data_requirements": "PB、市值、换手率。",
+      "status": "value_size_turnover_pending",
+      "warnings": "与用户此前反转×低换手方向相关，需测试是否有独立低换手信息。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/82.可转债知识总结.txt": {
+      "sha256": "d5b780dc601a73ef85d230087d661a32b6c4adc3030a7ba147cebdc0719b3e20",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/83.开盘幅度决定日内方向.txt": {
+      "sha256": "4e1a8afa7de836dce45d54dbe552c5d7347ca028eed7740a73d903434a305aa6",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/40118：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/84.多大规模的基金收益最好？偏股基金规模研究.txt": {
+      "sha256": "f53b4f99ec742ce015700ec253adccea19d6d532668eb3d8d4ae8ef9838713ed",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37521：原策略依赖ETF/指数/期货/基金/外部名单或宏观数据，不能直接作为全A个股横截面因子。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "non_stock_or_external_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/85.价值策略重开，再次向Jqz1226致敬.txt": {
+      "sha256": "188c031920d94efb982e7d9ba8b4236022281a4129fa0c43b4f5c593b762e7d8",
+      "logic": "低估值与质量/盈利组合的价值选股。",
+      "factor_recipes": "low_PE/PB × high_ROE/quality。",
+      "data_requirements": "PIT估值与盈利。",
+      "status": "value_quality_pending",
+      "warnings": "与现有价值质量簇重复。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/86.可转债双低策略.txt": {
+      "sha256": "4d9c32ace0f6a2540d52c76676dbd88c94349a86e462ae27178737cf183c925b",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/87.北上净买入策略.txt": {
+      "sha256": "1a47761ddc0c9eec361669d2324e235782e372ac094b88c5708abe044e70adf9",
+      "logic": "按北向资金净买入/持仓变化构造股票排序。",
+      "factor_recipes": "northbound_net_buy/holding_change。",
+      "data_requirements": "北向持仓事件数据。",
+      "status": "northbound_external_blocked",
+      "warnings": "外部资金流字段当前未纳入正式全A复现。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/88.打首板策略，今年收益达到40%，绝无未来函数（必回）.txt": {
+      "sha256": "32ef56be1aa53221679c64810904ae3bea058cbdcefaa6ce7a90f16acff5e244",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36905：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/89.年化收益55.7%， 超高胜率 0.799.txt": {
+      "sha256": "7177de46345ea876ccffbe9053f455ecb32450d17438993f96fe2a1147427e8e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/37957：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/9.分享几个截止2022年3月仍有效的策略.txt": {
+      "sha256": "ea4a5cd89319e8155f2f844a1bed23bc5fcd8e6b29390a08710399f179d300d7",
+      "logic": "导入函数库：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/90.大师策略——柯林·麦克连成长价值优势投资法.txt": {
+      "sha256": "ac69d107b4d9d97cb381fa853cd9ecddf7a6e5201da8e24fad82199409c69311",
+      "logic": "成长与价值结合，强调盈利增长、估值和趋势确认。",
+      "factor_recipes": "growth + value + trend composite。",
+      "data_requirements": "PIT财务与OHLC。",
+      "status": "growth_value_pending",
+      "warnings": "需拆分具体字段后与既有簇去重。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/91.【复现】特征分布建模择时.txt": {
+      "sha256": "95039a7c5a6a1fc4a9c4b37124ed80c691fe77bfac0a4c22f7c38a1008ecd3ed",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38332：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/92.利用myTT库整合通达信公式——以“飞鹰优选”选股公式为例.txt": {
+      "sha256": "c62ee46d17bded8ed97aeae9ddcba959a73a4a813f139127f8e050a3c2dca880",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/93.因子看板多因子模型---由量化课堂多因子模型修改.txt": {
+      "sha256": "cd154d8d42bba617cc7b16d9c8ca12cc3bb30f7da7e29cb96840637740d46034",
+      "logic": "因子看板对价值、成长、质量、动量、流动性因子评分并合成。",
+      "factor_recipes": "multi-factor rank/IC weighted composite。",
+      "data_requirements": "PIT财务、OHLCV。",
+      "status": "multifactor_pending",
+      "warnings": "模型框架与既有多因子工作重复。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/94.FoF, all in.txt": {
+      "sha256": "83fa41001965d26d5749c2ad3ead4449f7c652ff806c7e77ebf5cfcd81da4ed1",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/95.首席质量因子-Gross Profitabilit（简化版）.txt": {
+      "sha256": "025bba712594e0042870b5471a19900a5628ed6caed3d5b5c64110152168476c",
+      "logic": "以毛利率/毛利盈利能力构造质量因子并选股。",
+      "factor_recipes": "gross_profitability=TTM gross_profit/total_assets（或源码定义）。",
+      "data_requirements": "PIT收入、成本、资产。",
+      "status": "gross_profitability_pending",
+      "warnings": "有潜在独立质量信息，优先核对PIT实现。",
+      "review_basis": "complete source text read; active functions/formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/96.集合竞价量比策略V1.txt": {
+      "sha256": "ecb71043b4cf1c750a06fa142e2de0a3703e8e4cdcc29830ce3751699a3f1c0e",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/38663：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/97.【涨停研究一】具有哪些因子的股票更容易涨停.txt": {
+      "sha256": "9cd87e21efc53f85c9178c54bfeb78df28c32125c6c565744df21f76215698c8",
+      "logic": "import pandas as pd：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/98.【漂亮50】“漂亮50”策略复现以及股息率排序函数.txt": {
+      "sha256": "16f849a15c1608a90ab68cf588d038009956c817b87c56a1f198a7b82194be44",
+      "logic": "克隆自聚宽文章：https://www.joinquant.com/post/36018：包含分钟、竞价、盘口、涨停或盘中止损，日频全A无法等价复现。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "intraday_execution_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    },
+    "quant/2024年度精选策略2/99.计算每日全A市场个股创新高比例(改).txt": {
+      "sha256": "4fa9607c4645b2ffec91e29924b0dd3e5e477b96884efa1c0892a1932cb8905e",
+      "logic": "coding: utf-8：主要是择时、形态、风控或回测辅助逻辑，没有独立确认的新横截面公式。",
+      "factor_recipes": "按源码实际函数和字段记录；未把策略标题或固定执行规则当作alpha。",
+      "data_requirements": "见源码字段、股票池、频率和外部依赖；正式复现前逐项核对平台可用性。",
+      "status": "timing_or_helper_blocked",
+      "warnings": "本条已逐篇打开原始文本并检查有效函数、参数和信号路径；不透明/外部依赖单独标记。",
+      "review_basis": "complete source text read; active functions, formulas and execution paths inspected"
+    }
+  }
+}

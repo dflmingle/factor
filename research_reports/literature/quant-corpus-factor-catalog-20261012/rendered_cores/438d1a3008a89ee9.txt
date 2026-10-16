@@ -1,0 +1,115 @@
+quant/量化策略/量化策略/小市值策略2026/实01小市值精细风控-25年收益117.98.txt
+from jqdata import *
+
+def initialize(context):
+    g.security_universe_index = '399101.XSHE'
+    g.buy_stock_count = 5
+    g.last_hold_stocks = []
+    run_weekly(my_trade, weekday=1, time='open')
+    run_daily(log_hold, time='15:00')
+
+def my_trade(context):
+    check_out_lists = get_index_stocks(g.security_universe_index)
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(check_out_lists)).order_by(valuation.circulating_market_cap.asc()).limit(g.buy_stock_count * 3)
+    df = get_fundamentals(q)
+    if df is None or len(df) == 0:
+        return
+    check_out_lists = list(df['code'])
+    original_count = len(check_out_lists)
+    check_out_lists = filter_st_stock(check_out_lists)
+    st_filtered_count = original_count - len(check_out_lists)
+    original_count = len(check_out_lists)
+    check_out_lists = filter_paused_stock(check_out_lists)
+    paused_filtered_count = original_count - len(check_out_lists)
+    if len(check_out_lists) < g.buy_stock_count:
+        pass
+    target_stocks = check_out_lists[:g.buy_stock_count]
+    for stock in target_stocks:
+        current_data = get_current_data()[stock]
+    log_trade_info(context, target_stocks)
+    adjust_position(context, target_stocks)
+    g.last_hold_stocks = list(context.portfolio.positions.keys())
+
+def log_trade_info(context, target_stocks):
+    current_hold = list(context.portfolio.positions.keys())
+    new_stocks = [s for s in target_stocks if s not in current_hold]
+    sell_stocks = [s for s in current_hold if s not in target_stocks]
+    if new_stocks:
+        for stock in new_stocks:
+            current_data = get_current_data()[stock]
+    if sell_stocks:
+        for stock in sell_stocks:
+            current_data = get_current_data()[stock]
+    if not new_stocks and (not sell_stocks):
+        pass
+
+def filter_st_stock(stock_list):
+    if not stock_list:
+        return []
+    current_data = get_current_data()
+    result = []
+    filtered = []
+    for stock in stock_list:
+        try:
+            if not current_data[stock].is_st and 'ST' not in current_data[stock].name:
+                result.append(stock)
+            else:
+                filtered.append(stock)
+        except:
+            result.append(stock)
+    if filtered:
+        pass
+    return result
+
+def filter_paused_stock(stock_list):
+    if not stock_list:
+        return []
+    current_data = get_current_data()
+    result = []
+    filtered = []
+    for stock in stock_list:
+        try:
+            if not current_data[stock].paused:
+                result.append(stock)
+            else:
+                filtered.append(stock)
+        except:
+            result.append(stock)
+    if filtered:
+        pass
+    return result
+
+def adjust_position(context, stock_list):
+    for stock in context.portfolio.positions:
+        if stock not in stock_list:
+            current_data = get_current_data()[stock]
+            position = context.portfolio.positions[stock]
+            order_target(stock, 0)
+    if len(stock_list) > 0:
+        weight = 1.0 / len(stock_list)
+        total_value = context.portfolio.total_value
+        for stock in stock_list:
+            current_position = context.portfolio.positions.get(stock, None)
+            current_amount = current_position.total_amount if current_position else 0
+            target_value = total_value * weight
+            current_data = get_current_data()[stock]
+            current_price = current_data.last_price
+            if current_price > 0:
+                target_amount = int(target_value / current_price / 100) * 100
+                if target_amount > current_amount:
+                    buy_amount = target_amount - current_amount
+                    if buy_amount > 0:
+                        order(stock, buy_amount)
+                elif target_amount < current_amount:
+                    sell_amount = current_amount - target_amount
+                    if sell_amount > 0:
+                        order(stock, -sell_amount)
+
+def log_hold(context):
+    if not context.portfolio.positions:
+        return
+    total_value = context.portfolio.total_value
+    for stock, position in context.portfolio.positions.items():
+        current_data = get_current_data()[stock]
+        stock_value = position.total_amount * position.price
+        weight = stock_value / total_value * 100 if total_value > 0 else 0

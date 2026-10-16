@@ -1,0 +1,150 @@
+quant/2021年度精选策略/39.因子分析系列文章（八）：多因子策略（多元线性回归）.txt
+import math
+import datetime
+import numpy as np
+import pandas as pd
+from jqdata import *
+import statsmodels.api as sm
+from statsmodels import regression
+import datetime as dt
+'EXACT_REVIEWED_FUNCTION initialize sha256=507bbc3c7a2e4f1e57807f9c530a607b5733d4e37a9f594d7ecae19d990d4ec8 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def set_params():
+    g.tc = 5
+    g.stocknum = 20
+'EXACT_REVIEWED_FUNCTION set_variables sha256=ef3054e17478dcd74b0f3cb09c0b16318e69b1007dafb4c7943e2f2e1d8a742e source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def before_trading_start(context):
+    if g.t % g.tc == 0:
+        g.if_trade = True
+        set_slip_fee(context)
+    g.t += 1
+'EXACT_REVIEWED_FUNCTION set_feasible_stocks sha256=a6b3946272f8942ab9d596b79d24edaa46b045b2c8b92696a4cfeed3d0e9819f source=quant/2020年度精选策略/92 多因子选股策略.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+
+def filter_stock_ST(stock_list):
+    curr_data = get_current_data()
+    for stock in stock_list:
+        if curr_data[stock].paused or curr_data[stock].is_st or 'ST' in curr_data[stock].name or ('*' in curr_data[stock].name) or ('退' in curr_data[stock].name):
+            stock_list.remove(stock)
+    return stock_list
+
+def filter_stock_limit(stock_list):
+    curr_data = get_current_data()
+    for stock in stock_list:
+        price = curr_data[stock].day_open
+        if curr_data[stock].high_limit <= price or price <= curr_data[stock].low_limit:
+            stock_list.remove(stock)
+    return stock_list
+
+def remove_new_stocks(security_list, context):
+    for stock in security_list:
+        days_public = (context.current_dt.date() - get_security_info(stock).start_date).days
+        if days_public < 180:
+            security_list.remove(stock)
+    return security_list
+
+def fun_normalizeData(df):
+    for key in df.keys():
+        if key != 'code':
+            mad = func_mad(df[key])
+            MA = np.mean(df[key])
+            for i in range(len(df[key])):
+                x = df.loc[i, key]
+                if x > MA + 3 * mad:
+                    x = MA + 3 * mad
+                elif x < MA - 3 * mad:
+                    x = MA - 3 * mad
+    return df
+
+def func_mad(myData):
+    return np.mean(np.absolute(myData - np.mean(myData)))
+
+def getStockPrice(stock, interval):
+    h = attribute_history(stock, interval, unit='1d', fields='close', skip_paused=True)
+    return (h['close'].values[0], h['close'].values[-1])
+
+def linreg(factors, returns):
+    X = sm.add_constant(array(factors))
+    Y = array(returns)
+    results = regression.linear_model.OLS(Y, X).fit()
+    return results.params
+
+def df_neutralization(df, X):
+    for key in df.keys():
+        if key != 'code' and key != X:
+            y = df[key]
+            x = df[X]
+            df[key] = linres(y, x)
+    return df
+
+def linres(y, x):
+    y = array(y)
+    x = sm.add_constant(array(x))
+    if len(y) > 1:
+        model = regression.linear_model.OLS(y, x).fit()
+    return model.resid
+
+def handle_data(context, data):
+    if g.if_trade == True:
+        sample = get_index_stocks('000985.XSHG', date=None)
+        sample = filter_stock_ST(sample)
+        sample = remove_new_stocks(sample, context)
+        sample = filter_stock_limit(sample)
+        q = query(valuation.code, valuation.market_cap, balance.total_assets / balance.total_liability, indicator.inc_net_profit_year_on_year, indicator.inc_revenue_year_on_year, indicator.roe / valuation.pb_ratio, valuation.pe_ratio / indicator.inc_net_profit_year_on_year).filter(valuation.pe_ratio / indicator.inc_net_profit_year_on_year > 0, valuation.pe_ratio / indicator.inc_net_profit_year_on_year < 1, valuation.code.in_(sample))
+        df = get_fundamentals(q, date=None)
+        df.dropna(axis=0, how='any')
+        pre_date = context.current_dt - dt.timedelta(days=g.tc + 1)
+        df_p = get_fundamentals(q, date=pre_date)
+        df_p.dropna(axis=0, how='any')
+        momentum = []
+        for i in list(df.code):
+            interval, Yesterday = getStockPrice(i, g.tc)
+            stock_momentum = Yesterday / interval - 1
+            momentum.append((i, stock_momentum))
+        np_momentuma = np.array(momentum)
+        momentum_value = np_momentuma[:, 1].astype(float).tolist()
+        df['momentum_value'] = momentum_value
+        df = df.dropna()
+        df.columns = ['code', 'market_cap', 'LEV', 'INP_YOY', 'IR_YOY', 'ROE_PB', 'PE_G', 'momentum_value']
+        df.index = df.code.values
+        del df['code']
+        df_p = df_p.dropna()
+        df_p.columns = ['code', 'market_cap', 'LEV', 'INP_YOY', 'IR_YOY', 'ROE_PB', 'PE_G']
+        df_p.index = df_p.code.values
+        del df_p['code']
+        X_p = df_p[['LEV', 'IR_YOY', 'INP_YOY', 'ROE_PB', 'PE_G']]
+        X = df[['LEV', 'IR_YOY', 'INP_YOY', 'ROE_PB', 'PE_G']]
+        Y = df[['momentum_value']]
+        diffIndex = X_p.index.difference(Y.index)
+        X_p = X_p.drop(diffIndex, errors='ignore')
+        X = X.drop(diffIndex, errors='ignore')
+        Y = Y.drop(diffIndex, errors='ignore')
+        diffIndex = Y.index.difference(X_p.index)
+        X_p = X_p.drop(diffIndex, errors='ignore')
+        X = X.drop(diffIndex, errors='ignore')
+        Y = Y.drop(diffIndex, errors='ignore')
+        weights = linreg(X_p, Y)
+        points = X.dot(weights[1:]) + weights[0]
+        points.sort(ascending=False)
+        order_list = list(points.index[:g.stocknum])
+        order_stock_sell(context, order_list)
+        order_stock_buy(context, order_list)
+    g.if_trade = False
+
+def order_stock_sell(context, order_list):
+    for stock in context.portfolio.positions:
+        if stock not in order_list:
+            order_target_value(stock, 0)
+
+def order_stock_buy(context, order_list):
+    if len(context.portfolio.positions) < g.stocknum:
+        num = g.stocknum - len(context.portfolio.positions)
+        g.each_stock_cash = context.portfolio.cash / num
+    else:
+        cash = 0
+        num = 0
+    for stock in order_list:
+        if stock not in context.portfolio.positions:
+            order_target_value(stock, g.each_stock_cash)

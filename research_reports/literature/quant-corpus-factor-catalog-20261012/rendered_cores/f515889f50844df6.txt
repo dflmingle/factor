@@ -1,0 +1,100 @@
+quant/2024年度精选策略1/25.低价股优化，18年至今10625.40%，已加防未来函数.txt
+from jqdata import *
+import numpy as np
+import pandas as pd
+from pandas import Series
+from datetime import datetime, time
+
+def initialize(context):
+    g.sel_stock = None
+    g.strategy_starttime = time(10, 20)
+    g.strategy_endtime = time(14, 55)
+    run_weekly(weekly, weekday=1, time='09:31', reference_security='000300.XSHG')
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='every_bar', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def weekly(context):
+    g.sel_stock = None
+    current_data = get_current_data()
+    stock_list = get_all_securities().index.tolist()
+    last_5_prices = history(count=5, field='close', security_list=stock_list)
+    last_5_prices = pd.DataFrame({'mean_val': last_5_prices.mean()})
+    last_5_prices_sort = last_5_prices.sort_values(axis=0, ascending=True, by=['mean_val'])
+    q = 'mean_val>=1.5'
+    last_5_prices_query = last_5_prices_sort.query(q)
+    last_5_prices_stock = list(last_5_prices_query.index)
+    today_str = context.current_dt.strftime('%Y-%m-%d')
+    for security in last_5_prices_stock:
+        if current_data[security].paused == False and (not current_data[security].is_st) and ('*' not in current_data[security].name) and ('退' not in current_data[security].name):
+            g.sel_stock = security
+            break
+    if g.sel_stock is not None:
+        sell_list = set(context.portfolio.positions.keys()) - set([g.sel_stock])
+        for stock in sell_list:
+            order_target_value(stock, 0)
+    else:
+        for stock in context.portfolio.positions.keys():
+            order_target_value(stock, 0)
+
+def before_market_open(context):
+    g.not_buy_flg = 1
+    g.not_sell_flg = 1
+    g.last_buy_orderid = None
+    g.last_sell_orderid = None
+    g.last_buy_price = 0
+    g.last_sell_price = 0
+    g.price_50m = {'open': 0.0, 'close': 0.0, 'high': 0.0, 'low': 0.0}
+    g.price_before_close = 0.0
+
+def get_buy_price(context):
+    sel_stock_price = attribute_history(g.sel_stock, 1, unit='50m', fields=('open', 'close', 'high', 'low'), skip_paused=True, df=True, fq='pre')
+    if context.current_dt.time() >= g.strategy_starttime and context.current_dt.time() < g.strategy_endtime:
+        return sel_stock_price['low'][0]
+    else:
+        return sel_stock_price['close'][0]
+
+def get_sell_price(context):
+    sel_stock_price = attribute_history(g.sel_stock, 1, unit='50m', fields=('open', 'close', 'high', 'low'), skip_paused=True, df=True, fq='pre')
+    if context.current_dt.time() >= g.strategy_starttime and context.current_dt.time() < g.strategy_endtime:
+        return sel_stock_price['high'][0]
+    else:
+        return sel_stock_price['close'][0]
+
+def market_open(context):
+    current_data = get_current_data()
+    if g.sel_stock is None:
+        return
+    if context.current_dt.time() >= g.strategy_starttime:
+        if g.not_buy_flg == 1:
+            now_buy_price = get_buy_price(context)
+            orders = get_open_orders()
+            for _order in orders.values():
+                if _order.order_id == g.last_buy_orderid:
+                    cancel_order(_order)
+            g.last_buy_price = now_buy_price
+            buy_count = int(context.portfolio.available_cash / now_buy_price / 100) * 100
+            if buy_count >= 100:
+                new_order = order(g.sel_stock, buy_count, LimitOrderStyle(now_buy_price))
+                if new_order is not None:
+                    if str(new_order.status) == 'held':
+                        g.not_sell_flg = 0
+                    else:
+                        g.last_buy_orderid = new_order.order_id
+        if context.current_dt.time() < g.strategy_endtime and g.not_sell_flg == 1:
+            now_sell_price = get_sell_price(context)
+            orders = get_open_orders()
+            for _order in orders.values():
+                if _order.order_id == g.last_sell_orderid:
+                    cancel_order(_order)
+            if g.sel_stock in context.portfolio.positions and context.portfolio.positions[g.sel_stock].closeable_amount > 0:
+                g.last_sell_price = now_sell_price
+                new_order = order(g.sel_stock, -context.portfolio.positions[g.sel_stock].closeable_amount, LimitOrderStyle(now_sell_price))
+                if new_order is not None:
+                    if str(new_order.status) == 'held':
+                        g.not_sell_flg = 0
+                    else:
+                        g.last_sell_orderid = new_order.order_id
+            else:
+                g.not_sell_flg == 0
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

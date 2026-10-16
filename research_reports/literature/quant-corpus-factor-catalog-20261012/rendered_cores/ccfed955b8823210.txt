@@ -1,0 +1,156 @@
+quant/2022年度精选策略/38.【期货策略】钢厂利润模型-螺纹钢铁矿石焦炭套利.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    set_parameter(context)
+    g.init_cash = context.portfolio.starting_cash
+    g.main_rb = get_dominant_future('RB', date=context.current_dt)
+    g.main_i = get_dominant_future('I', date=context.current_dt)
+    g.main_j = get_dominant_future('J', date=context.current_dt)
+    run_daily(market_open, time='open', reference_security='RB8888.XSGE')
+    run_daily(after_market_close, time='after_close', reference_security='RB8888.XSGE')
+
+def set_parameter(context):
+    g.ma = 15
+    g.up_std = 1.8
+    g.down_std = 1.8
+    g.state = 0
+    g.x = 1
+    g.y = 1.6
+    g.z = 0.5
+    g.risk_days = 10
+    g.tot_values = [context.portfolio.starting_cash] * g.risk_days
+    g.maxdown = 0.03
+
+def market_open(context):
+    if g.risk_days < 10:
+        hold_future_s = context.portfolio.short_positions.keys()
+        hold_future_l = context.portfolio.long_positions.keys()
+        if len(hold_future_s) > 0:
+            for future_s in hold_future_s:
+                order_target_value(future_s, 0, side='short')
+        if len(hold_future_l) > 0:
+            for future_l in hold_future_l:
+                order_target_value(future_l, 0, side='long')
+    else:
+        risk = rolling_risk(context)
+        if risk:
+            pass
+        else:
+            trade(context)
+    g.risk_days += 1
+
+def trade(context):
+    price_df = history(50, security_list=['RB8888.XSGE', 'I8888.XDCE', 'J8888.XDCE', 'JM8888.XDCE', 'RB9999.XSGE', 'I9999.XDCE', 'J9999.XDCE', 'JM9999.XDCE'])
+    se = g.x * price_df['RB8888.XSGE'] - g.y * price_df['I8888.XDCE'] - g.z * price_df['J8888.XDCE']
+    a, b, c = (g.y * g.z, g.x * g.z, g.y * g.z)
+    cash = g.init_cash * 0.1
+    cash_i = b / (a + b + c) * cash
+    cash_j = c / (a + b + c) * cash
+    cash_rb = a / (a + b + c) * cash
+    trade_signal = get_signal(se.values)
+    main_rb = get_dominant_future('RB', date=context.current_dt)
+    main_i = get_dominant_future('I', date=context.current_dt)
+    main_j = get_dominant_future('J', date=context.current_dt)
+    hold_future_s = context.portfolio.short_positions.keys()
+    hold_future_l = context.portfolio.long_positions.keys()
+    if trade_signal > 1:
+        if len(hold_future_s) > 0:
+            for future_s in hold_future_s:
+                if future_s != main_rb:
+                    order_target_value(future_s, 0, side='short')
+        order_target_value(main_rb, cash_rb, side='short')
+        if len(hold_future_l) > 0:
+            for future_l in hold_future_l:
+                if future_l != main_i and future_l != main_j:
+                    order_target_value(future_l, 0, side='long')
+        order_target_value(main_i, cash_i, side='long')
+        order_target_value(main_j, cash_j, side='long')
+    elif trade_signal < -1:
+        if len(hold_future_l) > 0:
+            for future_l in hold_future_l:
+                if future_l != main_rb:
+                    order_target_value(future_l, 0, side='long')
+        order_target_value(main_rb, cash_rb, side='long')
+        if len(hold_future_s) > 0:
+            for future_s in hold_future_s:
+                if future_s != main_i and future_s != main_j:
+                    order_target_value(future_s, 0, side='short')
+        order_target_value(main_i, cash_i, side='short')
+        order_target_value(main_j, cash_j, side='short')
+    if g.main_rb != main_rb:
+        if g.main_rb in hold_future_s:
+            order_target_value(g.main_rb, 0, side='short')
+            order_target_value(main_rb, cash_rb, side='short')
+        elif g.main_rb in hold_future_l:
+            order_target_value(g.main_rb, 0, side='long')
+            order_target_value(main_rb, cash_rb, side='long')
+    if g.main_j != main_j:
+        if g.main_j in hold_future_s:
+            order_target_value(g.main_j, 0, side='short')
+            order_target_value(main_j, cash_j, side='short')
+        elif g.main_j in hold_future_l:
+            order_target_value(g.main_j, 0, side='long')
+            order_target_value(main_j, cash_j, side='long')
+    if g.main_i != main_i:
+        if g.main_i in hold_future_s:
+            order_target_value(g.main_i, 0, side='short')
+            order_target_value(main_i, cash_i, side='short')
+        elif g.main_i in hold_future_l:
+            order_target_value(g.main_i, 0, side='long')
+            order_target_value(main_i, cash_i, side='long')
+    g.main_rb = main_rb
+    g.main_j = main_j
+    g.main_i = main_i
+
+def rolling_risk(context):
+    value = context.portfolio.total_value
+    g.tot_values.append(value)
+    g.tot_values = g.tot_values[1:]
+    max_down = 1 - value * 1.0 / max(g.tot_values)
+    if max_down >= g.maxdown:
+        g.risk_days = 0
+        g.tot_values = [value] * 10
+        return 1
+    else:
+        return 0
+
+def get_signal(se):
+    price_now = se[-1]
+    se_temp = se[-g.ma:]
+    mid = np.mean(se_temp)
+    up = mid + g.up_std * np.std(se_temp)
+    down = mid - g.down_std * np.std(se_temp)
+    signal = 0
+    if price_now > up:
+        state_new = 2
+    elif price_now < down:
+        state_new = -2
+    elif price_now > mid:
+        state_new = 1
+    elif price_now < mid:
+        state_new = -1
+    else:
+        state_new = 0
+    if g.state == 2 and state_new < 2:
+        signal = 2
+    elif g.state == -2 and state_new > -2:
+        signal = -2
+    elif g.state < 0 and state_new > 0:
+        signal = 1
+    elif g.state > 0 and state_new < 0:
+        signal = -1
+    else:
+        signal = 0
+    g.state = state_new
+    return signal
+
+def after_market_close(context):
+    cash_ratio = 1 - context.portfolio.available_cash * 1.0 / context.portfolio.total_value
+    l_hold_future = context.portfolio.long_positions.keys()
+    s_hold_future = context.portfolio.short_positions.keys()
+    for future in l_hold_future:
+        pass
+    for future in s_hold_future:
+        pass

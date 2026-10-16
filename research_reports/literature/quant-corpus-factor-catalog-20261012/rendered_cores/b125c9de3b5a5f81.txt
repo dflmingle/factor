@@ -1,0 +1,202 @@
+quant/2022年度精选策略/5.高频策略研究（一）——基于开盘情况预测走势-Copy1.txt
+import pandas as pd
+import numpy as np
+from jqdata import *
+import datetime
+import warnings
+import pickle
+import matplotlib.pyplot as plt
+import seaborn as sns
+warnings.filterwarnings('ignore')
+start_date = '2017-01-01'
+end_date = '2019-09-05'
+train_percent = 0.5
+sel_percent = [0.8, 0.98]
+cut_layer = 10
+stocks = get_index_stocks('000300.XSHG')
+'EXACT_REVIEWED_FUNCTION get_tradeday_list sha256=09738207b2ec48d3d4d607ead6a64175c6be52463d0c9e49df360d3296201550 source=quant/2021年度精选策略/10.多因子选股.txt'
+
+def find_max_drawdown(returns):
+    result = 0
+    historical_return = 0
+    for i in range(len(returns)):
+        historical_return = max(historical_return, returns[i])
+        drawdown = 1 - returns[i] / historical_return
+        result = max(drawdown, result)
+    return result
+date_list = get_tradeday_list(start=start_date, end=end_date)
+
+def get_profit_minutes_period(stocks, date, n=5, next_n=120):
+    price = get_price(stocks, end_date=date, frequency='1m', count=n + next_n, fields=['close'])['close']
+    l = len(price.shape)
+    if l > 1:
+        profit_open = price.pct_change(n - 1)
+        profit_open = profit_open.iloc[n - 1]
+        profit_next = price.pct_change(next_n)
+        profit_next = profit_next.iloc[-1]
+        profit = pd.concat([profit_open, profit_next], axis=1)
+        profit.columns = ['open_profit', 'next_profit']
+    else:
+        profit_open = price.pct_change(n)
+        profit_open = profit_open.iloc[n]
+        profit_open = pd.DataFrame([profit_open], index=[stocks])
+        profit_next = price.pct_change(next_n - 1)
+        profit_next = profit_next.iloc[-1]
+        profit_next = pd.DataFrame([profit_next], index=[stocks])
+        profit = pd.concat([profit_open, profit_next], axis=1)
+        profit.columns = ['open_profit', 'next_profit']
+    return profit
+
+def get_open_profit_minutes_period(stocks, date, n=5, next_n=120):
+    price = get_price(stocks, end_date=date, frequency='1m', count=240, fields=['close'])['close']
+    l = len(price.shape)
+    if l > 1:
+        profit_open = price.pct_change(n)
+        profit_open = profit_open.iloc[n]
+        profit_next = price.pct_change(next_n)
+        profit_next = profit_next.iloc[n + next_n + 1]
+        profit = pd.concat([profit_open, profit_next], axis=1)
+        profit.columns = ['open_profit', 'next_profit']
+    else:
+        profit_open = price.pct_change(n)
+        profit_open = profit_open.iloc[n]
+        profit_next = price.pct_change(next_n)
+        profit_next = profit_next.iloc[n + next_n + 1]
+        profit_open = pd.DataFrame([profit_open], index=[stocks])
+        profit_next = pd.DataFrame([profit_next], index=[stocks])
+        profit = pd.concat([profit_open, profit_next], axis=1)
+        profit.columns = ['open_profit', 'next_profit']
+    return profit
+
+def get_day_profit_backward(stocks, end_date, start_date=None, count=3):
+    if count == -1:
+        price = get_price(stocks, start_date, end_date, fields=['close'])['close']
+    else:
+        price = get_price(stocks, end_date=end_date, count=count + 1, fields=['close'])['close']
+    profit = price.pct_change(count - 1)
+    profit = profit.iloc[-2]
+    if isinstance(profit, pd.Series):
+        profit = profit.to_frame()
+    else:
+        profit = pd.DataFrame([profit], index=[stocks])
+    profit.columns = ['back_profit']
+    return profit
+
+def get_open_and_backward_profit(stocks, date_list, n=5, next_n=60, count=3):
+    l = len(date_list)
+    dic = {}
+    for d in range(l - 1):
+        date = date_list[d + 1]
+        open_profit = get_profit_minutes_period(stocks, date, n, next_n)
+        date = date_list[d]
+        backward_profit = get_day_profit_backward(stocks, date, count)
+        profit = pd.merge(open_profit, backward_profit, left_index=True, right_index=True, how='inner')
+        dic[date] = profit
+    return dic
+dic_res_5_60_3_hs300 = get_open_and_backward_profit(stocks, date_list, n=5, next_n=120, count=3)
+with open('movement_5_120_3_afternoon.pkl', 'wb') as pk_file:
+    pickle.dump(dic_res_5_60_3_hs300, pk_file)
+len(dic_res_5_60_3_hs300)
+with open('movement_5_120_3_afternoon.pkl', 'rb') as pk_file:
+    dic_res = pickle.load(pk_file)
+
+def combine_data(dic_res, sel_percent):
+    keys = list(dic_res.keys())
+    data_list = []
+    for key in keys:
+        data = dic_res[key]
+        data_list.append(data)
+    all_data = pd.concat(data_list)
+    test_data = all_data.dropna()
+    new_col = ['back_profit', 'open_profit', 'next_profit']
+    all_data = all_data[new_col]
+    all_data.index = np.arange(len(all_data))
+    sel_data = all_data[all_data['open_profit'] == 0].index
+    all_data = all_data.drop(sel_data, axis=0)
+    length = len(all_data)
+    start_point = int(sel_percent[0] * length)
+    end_point = int(sel_percent[1] * length)
+    sel_data = all_data[start_point:end_point]
+    return sel_data
+
+def cut_data(data, n):
+    f = 1 / n
+    l = []
+    for i in range(n):
+        l.append(f * (i + 1))
+    q = data.quantile(l)
+    qv = q.values
+    shape = qv.shape
+    col = data.columns
+    for i in range(shape[1] - 1):
+        for j in range(shape[0]):
+            data[col[i]][data[col[i]] <= qv[j][i]] = j + 1
+    return data.dropna()
+
+def calculate_IC(factor, profit, method='pearson'):
+    if method == 'pearson':
+        ic, pvalue = st.spearmanr(factor, profit)
+    else:
+        ic, pvalue = st.pearsonr(factor, profit)
+    return (ic, pvalue)
+
+def draw_heatmap(data):
+    col = data.columns
+    group_res = data.groupby([col[0], col[1]]).mean()
+    group_res = group_res.unstack(0).fillna(0)
+    ax = sns.heatmap(group_res)
+
+def draw_bar(data):
+    col = data.columns
+    group_data = data.groupby(col[0]).mean()
+    y_data = group_data[col[1]].values
+    index = np.arange(1, len(group_data) + 1)
+    return group_data
+sel_data = combine_data(dic_res, sel_percent)
+cut_res = cut_data(sel_data, cut_layer)
+draw_heatmap(cut_res)
+d = cut_res[['open_profit', 'next_profit']]
+draw_bar(d)
+back_next = cut_res[['back_profit', 'next_profit']]
+t = draw_bar(back_next)
+
+def get_day_profit(day_data, date, sel_n):
+    day_data = day_data.dropna()
+    new_col = ['back_profit', 'open_profit', 'next_profit']
+    day_data = day_data[new_col]
+    sel_data = day_data[day_data['open_profit'] == 0].index
+    day_data = day_data.drop(sel_data, axis=0)
+    cut_day_data = cut_data(day_data, cut_layer)
+    col = cut_day_data.columns
+    group_day_data = cut_day_data.groupby(['open_profit']).mean()
+    day_profit = group_day_data.iloc[sel_n - 1, -1]
+    day_profit = pd.DataFrame([day_profit], index=[date], columns=['profit'])
+    return day_profit
+keys = list(dic_res.keys())
+day_data = dic_res[keys[4]]
+get_day_profit(day_data, keys[4], 10)
+sel_n = 8
+day_profit_l = []
+for key in keys:
+    day_data = dic_res[key]
+    day_profit = get_day_profit(day_data, key, sel_n)
+    day_profit_l.append(day_profit)
+profit_df = pd.concat(day_profit_l)
+index = list(profit_df.index)
+base_start_date = index[0]
+base_end_date = index[-1]
+base_price = get_price('000300.XSHG', start_date=base_start_date, end_date=base_end_date, fields=['close'])['close']
+profit_df['cum_profit'] = (profit_df['profit'] + 1).cumprod()
+base_price = get_price('000300.XSHG', start_date=base_start_date, end_date=base_end_date, fields=['close'])['close']
+base_pofit = base_price.pct_change().dropna()
+base_profit_cump = (base_pofit + 1).cumprod()
+index = list(base_profit_cump.index)
+new_index = [datetime.datetime.strftime(i, '%Y-%m-%d') for i in index]
+base_profit_cump.index = new_index
+base_profit_cump.name = 'base_profit'
+profit_df_combine = pd.concat([profit_df, base_profit_cump], axis=1).dropna()
+draw_profit = profit_df_combine[['cum_profit', 'base_profit']]
+draw_profit.plot(figsize=(15, 8))
+base_profit_show = profit_df_combine['base_profit'][-1]
+stratage_profit_show = profit_df_combine['cum_profit'][-1]
+max_drawdown = find_max_drawdown(profit_df_combine['cum_profit'])

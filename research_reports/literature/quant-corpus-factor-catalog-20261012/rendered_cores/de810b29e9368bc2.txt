@@ -1,0 +1,37 @@
+quant/2021年度精选策略/94.小资金短线策略.txt
+import numpy as numpy
+import pandas as pd
+
+def initialize(context):
+    g.max_hold_stocknum = 3
+    run_daily(before_trading_start, time='09:00')
+    run_daily(trade, time='9:30')
+
+def before_trading_start(context):
+    t_date = context.current_dt.strftime('%Y-%m-%d')
+    universe = get_index_stocks('000905.XSHG', date=t_date)
+    universe = get_feasible(universe)
+    data = history(30, unit='1m', field='close', security_list=universe, df=True, skip_paused=True, fq=None)
+    bias = data.apply(lambda x: get_bias(x))
+    data = data / data.iloc[0, :] - 1
+    ret = data.iloc[-1, :].T
+    factor = pd.concat([bias, ret], axis=1)
+    factor['sum'] = factor.sum(axis=1)
+    g.security = list(factor.sort_values('sum').iloc[2:5].index)
+
+def trade(context):
+    for security in context.portfolio.long_positions:
+        order_target(security, 0)
+    for security in g.security:
+        value = context.portfolio.available_cash / 3
+        order_value(security, value, side='long')
+
+def get_bias(series):
+    average = np.array(series.rolling(window=12).mean())
+    Y = series.iloc[-1] / average[-1] - 1
+    return Y
+
+def get_feasible(universe):
+    curr_data = get_current_data()
+    stocks = [stock for stock in universe if not curr_data[stock].paused and (not curr_data[stock].is_st) and ('ST' not in curr_data[stock].name) and ('*' not in curr_data[stock].name) and ('退' not in curr_data[stock].name)]
+    return stocks

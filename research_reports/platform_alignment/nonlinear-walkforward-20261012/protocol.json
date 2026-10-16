@@ -1,0 +1,162 @@
+{
+  "specs": [
+    {
+      "name": "NL01",
+      "mechanism": "Reversal conditional on volatility and trading activity",
+      "features": [
+        "rev6",
+        "rev20",
+        "vol20",
+        "vol60",
+        "lowturn",
+        "vrel3"
+      ],
+      "target": "rank_return"
+    },
+    {
+      "name": "NL02",
+      "mechanism": "Intraday/overnight disagreement conditional on overnight risk and flow",
+      "features": [
+        "rev20",
+        "idrev20",
+        "onrev20",
+        "tug20",
+        "onvol60",
+        "signedflow20",
+        "lowturn"
+      ],
+      "target": "rank_return"
+    },
+    {
+      "name": "NL03",
+      "mechanism": "Learn return information beyond within-date size buckets",
+      "features": [
+        "rev6",
+        "rev20",
+        "vol20",
+        "vol60",
+        "lowturn",
+        "vrel3",
+        "tug20",
+        "signedflow20"
+      ],
+      "target": "size_bucket_residual_rank_return"
+    }
+  ],
+  "lightgbm_params": {
+    "objective": "regression",
+    "learning_rate": 0.03,
+    "num_leaves": 3,
+    "max_depth": 2,
+    "max_bin": 15,
+    "min_data_in_leaf": 2500,
+    "lambda_l2": 100.0,
+    "feature_fraction": 1.0,
+    "bagging_fraction": 1.0,
+    "seed": 20261012,
+    "num_threads": 1,
+    "verbosity": -1,
+    "deterministic": true,
+    "force_col_wise": true
+  },
+  "trees": 60,
+  "train_last_periods": 72,
+  "min_training_periods": 48,
+  "retrain": "quarterly at first actual test signal",
+  "purge": "label exit strictly earlier than first test signal",
+  "direction": 1,
+  "local_candidate_count": 3,
+  "fixed_linear_controls": 3,
+  "parameter_search": false,
+  "formal_window": [
+    "20210907",
+    "20260907"
+  ],
+  "recent_window": [
+    "20260101",
+    "latest local data"
+  ],
+  "pre_formal_training_start": "20190101",
+  "data_start": "20180101",
+  "cost": 0.003,
+  "no_size_input": true,
+  "platform_runs": 0,
+  "historical_data_previously_viewed": true,
+  "method_version": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4-nonlinear-wf-fullA-arithmetic-v1",
+  "core_alignment": {
+    "universe": "full_a",
+    "price_mode": "qfq",
+    "market_cap_field": "total_mv",
+    "data_start": "20180101",
+    "start": "20210907",
+    "end": "20260907",
+    "groups": 10,
+    "label_offset": 1,
+    "round_trip_cost": 0.006,
+    "one_way_cost": 0.003,
+    "benchmark_mode": "factor_valid",
+    "correlation_method": "daily_cross_sectional_spearman_mean",
+    "platform_turnover_high_threshold": 0.85,
+    "local_turnover_low_threshold": 0.5,
+    "turnover_gap_alert_threshold": 0.25,
+    "platform_turnover_over_100_threshold": 1.0,
+    "turnover_sensitivity_method": "local gross excess minus annualized cost using saved platform turnover; diagnostic only",
+    "large_net_delta_pp": 5.0,
+    "net_close_pp": 2.0,
+    "large_gross_delta_pp": 5.0,
+    "large_rank_ic_delta": 0.02,
+    "min_top20_overlap": 15,
+    "min_period_coverage": 0.95,
+    "min_ic_series_corr": 0.5,
+    "max_ic_series_mean_abs_delta": 0.06,
+    "max_ic_series_scaled_delta": 0.06,
+    "ic_chart_scale_gap_ratio": 0.2,
+    "min_ic_series_periods": 10,
+    "platform_unsupported_handlers": [
+      "beta_low",
+      "profitability",
+      "residual_volatility",
+      "residual_volatility_max_interact"
+    ],
+    "top20_role": "diagnostic_flag_only",
+    "turnover_dominant_max_sensitivity_delta_pp": 2.0,
+    "verified_search_fields": [
+      "amount",
+      "book_to_market_ratio_lf",
+      "book_to_market_ratio_lyr",
+      "close",
+      "current_assets",
+      "current_liabilities",
+      "gr_total_asset_lyr",
+      "high",
+      "inventory",
+      "low",
+      "market_cap",
+      "open",
+      "oper_main_profit_ttm",
+      "oper_roe_lyr",
+      "ratio_bm_ttm",
+      "ratio_ep_ttm",
+      "ratio_pcf_ocf_ttm",
+      "ratio_sp_ttm",
+      "turnover",
+      "volume"
+    ]
+  },
+  "universe": "Full SH/SZ A shares, active total_mv/turnover; no ST filter",
+  "headline": "arithmetic annualised excess minus observed member-overlap turnover cost",
+  "method_boundary": "User full-A/arithmetic contract; distinct from legacy qualitygate3 filtered/compound comparisons.",
+  "pool_boundary": "Saved five-seat signal cache, aligned to new dates/stocks; require all seats valid. Archived-seat common-universe diagnostic, not new formal platform pool reproduction.",
+  "controls": "Same feature sets, target and folds; fixed ridge alpha=.01; no control selection.",
+  "decision_gate": {
+    "min_s_i": 0.035,
+    "min_net": 0.15,
+    "max_turnover": 0.4,
+    "max_abs_size_rho": 0.3,
+    "max_abs_existing_cluster_rho": 0.8,
+    "pool_size_neutral_net_must_not_decrease": true,
+    "pool_size_exposure_must_not_increase": true,
+    "mean_monthly_delta_comb_must_be_positive": true
+  },
+  "multiple_testing": "3 fixed tree hypotheses + 3 fixed linear controls in this new round; historical 475 comparisons already exposed these recipes. No pristine blind holdout claim."
+}

@@ -1,0 +1,26 @@
+quant/量化策略/量化策略/ETF轮动策略2026/08ETF动量均线轮动策略-调优版-25年96.txt
+from jqdata import *
+import pandas as pd
+import talib as ta
+import smtplib
+from email.header import Header
+from email.mime.text import MIMEText
+import prettytable as pt
+'EXACT_REVIEWED_FUNCTION initialize sha256=22e41f5dc17f837ce2c7e3cb204915fe8738257e6de3ac2a4a1fb377ed9220ba source=quant/2024年度精选策略2/64.ETF轮动策略升级-增加盘中止损.txt'
+
+def set_params():
+    g.target_market = '000300.XSHG'
+    g.moment_period = 13
+    g.ma_period = 10
+    g.type_num = 1
+    g.ETF_targets = {'000300.XSHG': '510300.XSHG', '399006.XSHE': '399006.XSHE', '512690.XSHG': '512690.XSHG', '512480.XSHG': '512480.XSHG', '515700.XSHG': '515700.XSHG', '512760.XSHG': '512760.XSHG', '516780.XSHG': '516780.XSHG', '515220.XSHG': '515220.XSHG', '516880.XSHG': '516880.XSHG', '515210.XSHG': '515210.XSHG', '512880.XSHG': '512880.XSHG', '512660.XSHG': '512660.XSHG', '159992.XSHE': '159992.XSHE', '588050.XSHG': '588050.XSHG', '518880.XSHG': '518880.XSHG', '501018.XSHG': '501018.XSHG', '161226.XSHE': '161226.XSHE', '159985.XSHE': '159985.XSHE', '159981.XSHE': '159981.XSHE', '159980.XSHE': '159980.XSHE', '513100.XSHG': '513100.XSHG', '513030.XSHG': '513030.XSHG', '513520.XSHG': '513520.XSHG', '164824.XSHE': '164824.XSHE'}
+    g.local_stocks = ['510300.XSHG', '159915.XSHE', '512690.XSHG', '512480.XSHG', '515700.XSHG', '515760.XSHG', '516780.XSHG', '515220.XSHG', '516880.XSHG', '515210.XSHG', '512880.XSHG', '512660.XSHG', '159992.XSHE', '588050.XSHG', '513100.XSHG', '164824.XSHE', '513030.XSHG', '513520.XSHG', '159980.XSHE', '159981.XSHE', '159985.XSHE', '161226.XSHE', '518880.XSHG', '501018.XSHG']
+    stocks_info = '股票池:\n'
+    for security in g.ETF_targets.values():
+        s_info = get_security_info(security)
+        stocks_info += '【%s】%s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.start_date)
+'EXACT_REVIEWED_FUNCTION hold_check sha256=785743e5216f6477fc7df6db940ada1be799775318847bf28683f9f3fdc24e06 source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=60742145da37b5c16a3a7403ded56f62abe327abe20b53cbbfedaeb84fec8b6d source=quant/2024年度精选策略2/16.ETF轮动策略升级-多类别-低回撤.txt'
+'EXACT_REVIEWED_FUNCTION ETF_trade sha256=265c622705c038ca9e26b9b1c1b378eb01273221072ffed9ee3a0b9c7275e411 source=quant/2024年度精选策略2/16.ETF轮动策略升级-多类别-低回撤.txt'
+'EXACT_REVIEWED_FUNCTION get_signal sha256=3c93ef938904a6321a098a5a0f21549faa278af9ffcbb3ae233d797d3ebfc4f5 source=quant/2024年度精选策略2/64.ETF轮动策略升级-增加盘中止损.txt'

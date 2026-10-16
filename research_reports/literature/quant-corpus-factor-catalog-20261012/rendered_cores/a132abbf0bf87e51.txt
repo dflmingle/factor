@@ -1,0 +1,127 @@
+quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+from datetime import time
+
+def initialize(context):
+    g.trading_signal = True
+    g.run_stoploss = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.pass_months = [1, 4]
+    g.limitup_stocks = []
+    g.stock_num = 9
+    g.reason_to_sell = ''
+    g.stoploss_strategy = 3
+    g.stoploss_limit = 0.1
+    g.stoploss_market = 0.05
+    g.etf = '511880.XSHG'
+    run_daily(prepare_stock_list, '9:05')
+    run_daily(trade_afternoon, time='14:00', reference_security='399101.XSHE')
+    run_daily(sell_stocks, time='10:00')
+    run_daily(close_account, '14:50')
+    run_weekly(weekly_adjustment, 2, '10:00')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=3dcc49c7a53354c033668ab36cb80b8141ce7c6b8cf4b8264ecceda7ea965f47 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+
+def get_stock_list(context):
+    final_list = []
+    MKT_index = '399101.XSHE'
+    initial_list = filter_stocks(context, get_index_stocks(MKT_index))
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(initial_list), valuation.market_cap.between(5, 300)).order_by(valuation.market_cap.asc())
+    df_fun = get_fundamentals(q)
+    df_fun = df_fun[:g.stock_num * 3]
+    final_list = list(df_fun.code)
+    return final_list
+
+def weekly_adjustment(context):
+    if g.trading_signal == True:
+        g.target_list = get_stock_list(context)[:g.stock_num]
+        sell_list = []
+        hold_list = []
+        for stock in g.hold_list:
+            if stock not in g.target_list and stock not in g.yesterday_HL_list:
+                sell_list.append(stock)
+                position = context.portfolio.positions[stock]
+                close_position(position)
+            else:
+                hold_list.append(stock)
+        buy_security(context, g.target_list)
+        for position in list(context.portfolio.positions.values()):
+            stock = position.security
+    else:
+        buy_security(context, [g.etf])
+
+def check_limit_up(context):
+    now_time = context.current_dt
+    if g.yesterday_HL_list != []:
+        for stock in g.yesterday_HL_list:
+            current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close', 'high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            if current_data.iloc[0, 0] < current_data.iloc[0, 1]:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+                g.reason_to_sell = 'limitup'
+                g.limitup_stocks.append(stock)
+
+def check_remain_amount(context):
+    if g.reason_to_sell is 'limitup':
+        g.hold_list = []
+        for position in list(context.portfolio.positions.values()):
+            stock = position.security
+            g.hold_list.append(stock)
+        if len(g.hold_list) < g.stock_num:
+            num_stocks_to_buy = min(len(g.limitup_stocks), g.stock_num - len(context.portfolio.positions))
+            target_list = [stock for stock in g.target_list if stock not in g.limitup_stocks][:num_stocks_to_buy]
+            buy_security(context, target_list)
+        g.reason_to_sell = ''
+    elif g.reason_to_sell is 'stoploss':
+        buy_security(context, [g.etf])
+        g.reason_to_sell = ''
+'EXACT_REVIEWED_FUNCTION trade_afternoon sha256=3b08a15459e278d0c1aed32aec5fc802f5d4eb3a58742b4d1171bb414b3e22ff source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+
+def sell_stocks(context):
+    if g.run_stoploss:
+        current_positions = context.portfolio.positions
+        if g.stoploss_strategy == 1 or g.stoploss_strategy == 3:
+            for stock in current_positions.keys():
+                price = current_positions[stock].price
+                avg_cost = current_positions[stock].avg_cost
+                if price >= avg_cost * 2:
+                    order_target_value(stock, 0)
+                elif price < avg_cost * (1 - g.stoploss_limit):
+                    order_target_value(stock, 0)
+                    g.reason_to_sell = 'stoploss'
+        if g.stoploss_strategy == 2 or g.stoploss_strategy == 3:
+            stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close', 'open'], count=1, panel=False)
+            down_ratio = abs((stock_df['close'] / stock_df['open'] - 1).mean())
+            if down_ratio >= g.stoploss_market:
+                g.reason_to_sell = 'stoploss'
+                for stock in current_positions.keys():
+                    order_target_value(stock, 0)
+'EXACT_REVIEWED_FUNCTION filter_stocks sha256=14234735e9b875376734ad8e0f72714229833900d7bd680c6c6e42d81c143a13 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def buy_security(context, target_list):
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+
+def today_is_between(context):
+    today = context.current_dt
+    month = today.month
+    if month in g.pass_months:
+        return False
+    else:
+        return True
+'EXACT_REVIEWED_FUNCTION close_account sha256=f058ce086f9b73f06705e588ea967ef41963cbd10faffc8101c74b2f6679939f source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=f229df512eb347633849a5ac3024b4305832c343903d3395709c0e080583ab1d source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'

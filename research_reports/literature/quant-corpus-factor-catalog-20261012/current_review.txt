@@ -1,0 +1,279 @@
+
+SOURCE quant/2021年度精选策略/86.北上詹姆斯.txt
+0 exact previously reviewed functions; proofs: research_reports/literature/quant-corpus-factor-catalog-20261012/rendered_cores/7c43004b74e29193.txt
+from jqdata import *
+import random
+import pandas as pd
+import numpy as np
+import datetime as dt
+
+def initialize(context):
+    g.max_stock_count = 15
+    g.back_trade_days = 40
+    g.top_money_in = []
+    g.window = 150
+    g.stdev_n = 2
+    g.mf, g.upper, g.lower = (None, None, None)
+    run_daily(before_market_open, time='07:00')
+    run_daily(reblance, '9:30')
+
+def before_market_open(context):
+    pre_date = (context.current_dt - datetime.timedelta(1)).strftime('%Y-%m-%d')
+    g.mf, g.upper, g.lower = get_boll(pre_date)
+
+def get_boll(end_date):
+    table = finance.STK_ML_QUOTA
+    q = query(table.day, table.quota_daily, table.quota_daily_balance).filter(table.link_id.in_(['310001', '310002']), table.day <= end_date).order_by(table.day)
+    money_df = finance.run_query(q)
+    money_df['net_amount'] = money_df['quota_daily'] - money_df['quota_daily_balance']
+    money_df = money_df.groupby('day')[['net_amount']].sum().iloc[-g.window:]
+    mid = money_df['net_amount'].mean()
+    stdev = money_df['net_amount'].std()
+    upper = mid + g.stdev_n * stdev
+    lower = mid - g.stdev_n * stdev
+    mf = money_df['net_amount'].iloc[-1]
+    return (mf, upper, lower)
+
+def calc_change(context):
+    table = finance.STK_HK_HOLD_INFO
+    q = query(table.day, table.name, table.code, table.share_ratio).filter(table.link_id.in_(['310001', '310002']), table.day.in_([context.previous_date]))
+    df = finance.run_query(q)
+    return df.sort_values(by='share_ratio', ascending=False)[:g.max_stock_count]['code'].values
+
+def reblance(context):
+    if g.mf >= g.upper:
+        s_change_rank = calc_change(context)
+        final = list(s_change_rank)
+        current_hold_funds_set = set(context.portfolio.positions.keys())
+        if set(final) != current_hold_funds_set:
+            need_buy = set(final).difference(current_hold_funds_set)
+            need_sell = current_hold_funds_set.difference(final)
+            cash_per_fund = context.portfolio.total_value / g.max_stock_count * 0.99
+            for fund in need_sell:
+                order_target(fund, 0)
+            for fund in need_buy:
+                order_value(fund, cash_per_fund)
+    elif g.mf <= g.lower:
+        current_hold_funds_set = set(context.portfolio.positions.keys())
+        if len(current_hold_funds_set) != 0:
+            for fund in current_hold_funds_set:
+                order_target(fund, 0)
+
+SOURCE quant/2021年度精选策略/87.穿越牛熊基业长青的价值精选策略（小资本也有大作为）.txt
+5 exact previously reviewed functions; proofs: research_reports/literature/quant-corpus-factor-catalog-20261012/rendered_cores/da02c0d8bf07289f.txt
+import pandas as pd
+import numpy as np
+from jqdata import *
+from kuanke.wizard import *
+
+def initialize(context):
+    g.buy_list = []
+    g.security_max_proportion = 0.2
+    g.max_hold_stocknum = 3
+    g.max_buy_value = None
+    g.max_buy_amount = None
+    g.order_style_str = 'by_cap_mean'
+    g.order_style_value = 100
+    run_monthly(before_market_open, 10, time='before_open', reference_security='000300.XSHG')
+    run_monthly(market_open, 10, time='open', reference_security='000300.XSHG')
+
+def buy(context, buy_lists):
+    Num = g.max_hold_stocknum - len(context.portfolio.positions)
+    buy_lists = buy_lists[:Num]
+    if len(buy_lists) > 0:
+        result = order_style(context, buy_lists, g.max_hold_stocknum, g.order_style_str, g.order_style_value)
+        for stock in buy_lists:
+            if len(context.portfolio.positions) < g.max_hold_stocknum:
+                amount = result[stock]
+                cash = context.portfolio.available_cash
+                order_target_value(stock, amount)
+    return
+
+def get_check_stocks_sort(context, check_out_lists):
+    df = get_fundamentals(query(valuation.circulating_cap, valuation.pe_ratio, valuation.code).filter(valuation.code.in_(check_out_lists)), date=context.previous_date)
+    df = df.sort('circulating_cap', ascending=1)
+    out_lists = list(df['code'].values)
+    return out_lists
+
+def get_stock_list(context):
+    temp_list = list(get_all_securities(types=['stock']).index)
+    all_data = get_current_data()
+    temp_list = [stock for stock in temp_list if not all_data[stock].paused]
+    panel = get_data(temp_list, 4)
+    df_mkt = panel.loc[['circulating_market_cap'], 3, :]
+    df_mkt = df_mkt[df_mkt['circulating_market_cap'] > df_mkt['circulating_market_cap'].mean()]
+    l1 = set(df_mkt.index)
+    df_cr = panel.loc[['total_current_assets', 'total_current_liability'], 3, :]
+    df_cr = df_cr[df_cr['total_current_liability'] != 0]
+    df_cr['cr'] = df_cr['total_current_assets'] / df_cr['total_current_liability']
+    df_cr_temp = df_cr[df_cr['cr'] > df_cr['cr'].mean()]
+    l2 = set(df_cr_temp.index)
+    l3 = {}
+    for i in range(4):
+        roe_mean = panel.loc['roe', i, :].mean()
+        df_3 = panel.iloc[:, i, :]
+        df_temp_3 = df_3[df_3['roe'] > roe_mean]
+        if i == 0:
+            l3 = set(df_temp_3.index)
+        else:
+            l_temp = df_temp_3.index
+            l3 = l3 & set(l_temp)
+    l3 = set(l3)
+    y = context.current_dt.year
+    l4 = {}
+    for i in range(1, 4):
+        df = get_fundamentals(query(cash_flow.code, cash_flow.statDate, cash_flow.net_operate_cash_flow, cash_flow.net_invest_cash_flow), statDate=str(y - i))
+        if len(df) != 0:
+            df['FCF'] = df['net_operate_cash_flow'] + df['net_invest_cash_flow']
+            df = df[df['net_operate_cash_flow'] > 0]
+            l_temp = df['code'].values
+            if len(l4) != 0:
+                l4 = set(l4) & set(l_temp)
+            l4 = l_temp
+        else:
+            continue
+    l4 = set(l4)
+    l5 = {}
+    for i in range(4):
+        df_5 = panel.iloc[:, i, :]
+        df_temp_5 = df_5[(df_5['inc_revenue_year_on_year'] > 0) & (df_5['inc_revenue_year_on_year'] < 50)]
+        if i == 0:
+            l5 = set(df_temp_5.index)
+        else:
+            l_temp = df_temp_5.index
+            l5 = l5 & set(l_temp)
+    l5 = set(l5)
+    l6 = {}
+    for i in range(4):
+        df_6 = panel.iloc[:, i, :]
+        df_temp = df_6[(df_6['eps'] > 0.04) & (df_6['eps'] < 0.5)]
+        if i == 0:
+            l6 = set(df_temp.index)
+        else:
+            l_temp = df_temp.index
+            l6 = l6 & set(l_temp)
+    l6 = set(l6)
+    return list(l1 & l2 & l3 & l4 & l5 & l6)
+
+def get_data(pool, periods):
+    q = query(valuation.code, income.statDate, income.pubDate).filter(valuation.code.in_(pool))
+    df = get_fundamentals(q)
+    df.index = df.code
+    stat_dates = set(df.statDate)
+    stat_date_stocks = {sd: [stock for stock in df.index if df['statDate'][stock] == sd] for sd in stat_dates}
+    'EXACT_REVIEWED_FUNCTION quarter_push sha256=ce76de8944b827cd1c9a10cce2d17856f423fd729fee5fe0cb5996681492d3d2 source=quant/2020年度精选策略/07 穿越牛熊基业长青的价值精选策略.txt'
+    q = query(valuation.code, valuation.code, valuation.circulating_market_cap, balance.total_current_assets, balance.total_current_liability, indicator.roe, cash_flow.net_operate_cash_flow, cash_flow.net_invest_cash_flow, indicator.inc_revenue_year_on_year, indicator.eps)
+    stat_date_panels = {sd: None for sd in stat_dates}
+    for sd in stat_dates:
+        quarters = [sd[:4] + 'q' + str(int(sd[5:7]) / 3)]
+        for i in range(periods - 1):
+            quarters.append(quarter_push(quarters[-1]))
+        nq = q.filter(valuation.code.in_(stat_date_stocks[sd]))
+        pre_panel = {quarter: get_fundamentals(nq, statDate=quarter) for quarter in quarters}
+        for thing in list(pre_panel.values()):
+            thing.index = thing.code.values
+        panel = pd.Panel(pre_panel)
+        panel.items = list(range(len(quarters)))
+        stat_date_panels[sd] = panel.transpose(2, 0, 1)
+    final = pd.concat(list(stat_date_panels.values()), axis=2)
+    return final.dropna(axis=2)
+
+SOURCE quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt
+0 exact previously reviewed functions; proofs: research_reports/literature/quant-corpus-factor-catalog-20261012/rendered_cores/3d2ff9c55117c80d.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    initial_config()
+    run_weekly(trade, weekday=3, reference_security='000300.XSHG')
+
+def initial_config():
+    g.index_pool = [('000016.XSHG', '510050.XSHG'), ('000300.XSHG', '510300.XSHG'), ('399905.XSHE', '510500.XSHG'), ('399006.XSHE', '159915.XSHE'), ('000015.XSHG', '510880.XSHG'), ('399932.XSHE', '159928.XSHE'), ('399913.XSHE', '512010.XSHG')]
+    g.stock_num = 2
+    g.momentum_day = 15
+    g.stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.mean_day = 20
+    g.mean_diff_day = 3
+    g.score_threshold = 0.7
+    g.slope_series = initial_slope_series()[:-1]
+
+def trade(context):
+    stock_hold = set(context.portfolio.positions.keys())
+    stock_pool = get_stock_pool()
+    signal = get_signal()
+    if stock_pool and signal != 'SELL':
+        if stock_hold:
+            change_signal = 0
+            for stock in stock_hold:
+                if stock not in stock_pool or stock_pool.index(stock) > g.stock_num + 1:
+                    change_signal = 1
+            if change_signal:
+                change_position(context, stock_pool)
+            else:
+                pass
+        else:
+            change_position(context, stock_pool)
+    else:
+        if stock_pool and signal == 'SELL':
+            pass
+        for stock in stock_hold:
+            order_target_value(stock, 0)
+
+def get_stock_pool():
+    index_pool = [index for index, stock in g.index_pool]
+    index_rank = []
+    for index in index_pool:
+        score = get_socre(index)
+        if score > 0:
+            index_rank.append((index, score))
+    index_rank = sorted(index_rank, key=lambda x: x[1], reverse=True)
+    index_dict = dict(g.index_pool)
+    return tuple((index_dict[index[0]] for index in index_rank))
+
+def get_socre(stock):
+    data = attribute_history(stock, g.momentum_day, '1d', ['close'])
+    y = data['log'] = np.log(data.close)
+    x = data['num'] = np.arange(data.log.size)
+    slope, intercept = np.polyfit(x, y, 1)
+    annualized_returns = math.pow(math.exp(slope), 250) - 1
+    r_squared = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+    return annualized_returns * r_squared
+
+def change_position(context, stock_pool):
+    for security in set(context.portfolio.positions.keys()):
+        order_target_value(security, 0)
+    stock_num = g.stock_num if len(stock_pool) > g.stock_num else len(stock_pool)
+    cash = context.portfolio.available_cash / stock_num
+    for stock in stock_pool[:stock_num]:
+        order_target_value(stock, cash)
+
+def get_signal():
+    close_data = attribute_history(g.stock, g.mean_day + g.mean_diff_day, '1d', ['close'])
+    today_MA = close_data.close[g.mean_diff_day:].mean()
+    before_MA = close_data.close[:-g.mean_diff_day].mean()
+    data = attribute_history(g.stock, g.N, '1d', ['high', 'low'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * slope * r2
+    if rsrs_score > g.score_threshold and today_MA > before_MA:
+        return 'BUY'
+    elif rsrs_score < -g.score_threshold and today_MA < before_MA:
+        return 'SELL'
+    else:
+        return 'KEEP'
+
+def get_ols(x, y):
+    slope, intercept = np.polyfit(x, y, 1)
+    r2 = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+    return (intercept, slope, r2)
+
+def initial_slope_series():
+    data = attribute_history(g.stock, g.N + g.M, '1d', ['high', 'low'])
+    return [get_ols(data.low[i:i + g.N], data.high[i:i + g.N])[1] for i in range(g.M)]
+
+def get_zscore(slope_series):
+    mean = np.mean(slope_series)
+    std = np.std(slope_series)
+    return (slope_series[-1] - mean) / std

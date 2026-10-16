@@ -1,0 +1,114 @@
+quant/2021年度精选策略/61.【复现】扩散指标择时.txt
+from tqdm import *
+from jqdata import *
+import pandas as pd
+import numpy as np
+enable_profile()
+
+def initialize(context):
+    set_params()
+    set_variables()
+    set_backtest()
+    Preprocessing(context)
+    run_daily(Trade, time='open', reference_security='000300.XSHG')
+
+def set_params():
+    g.index_symbol = '000300.XSHG'
+    g.target = '510300.XSHG'
+    g.weight_method = 'mktcap'
+    g.N = 100
+    g.N1 = 90
+    g.N2 = 30
+
+def set_variables():
+    g.singal = []
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def before_trading_start(context):
+    dt = context.current_dt
+    if dt > datetime.datetime(2013, 1, 1):
+        pass
+    elif dt > datetime.datetime(2011, 1, 1):
+        pass
+    elif dt > datetime.datetime(2009, 1, 1):
+        pass
+
+def Preprocessing(context):
+    bar_time = context.current_dt.date()
+    target_info = get_security_info(g.target)
+    g.begin_date = target_info.start_date
+    if bar_time >= g.begin_date or target_info.type == 'index':
+        PrepareData(context)
+
+def PrepareData(context):
+    pre_date = context.previous_date
+    limit = g.N1 + g.N2
+    date_range = get_trade_days(end_date=pre_date, count=limit)
+    if date_range[0] < datetime.date(2005, 1, 1):
+        pass
+    roc_indicator = np.zeros(len(date_range))
+    pbar = tqdm(total=len(date_range))
+    pbar.set_description('Processing')
+    for i, trade in enumerate(date_range):
+        pbar.update(1)
+        stocks = get_index_stocks(g.index_symbol, date=trade)
+        roc_indicator[i] = CalROCSingal(stocks, trade, g.N, g.weight_method)
+    pbar.close()
+    g.singal = roc_indicator
+
+def GetSingal(context):
+    if context.current_dt.date() == g.begin_date:
+        fast_ma = rolling_average(g.singal, g.N1)
+        slow_ma = rolling_average(fast_ma, g.N2)
+        return fast_ma[-1] > slow_ma[-1]
+    else:
+        bar_time = context.previous_date
+        stocks = get_index_stocks(g.index_symbol, date=bar_time)
+        roc_indicator = CalROCSingal(stocks, bar_time, g.N, g.weight_method)
+        g.singal = np.append(g.singal, roc_indicator)[1:]
+        fast_ma = rolling_average(g.singal, g.N1)
+        slow_ma = rolling_average(fast_ma, g.N2)
+        return fast_ma[-1] > slow_ma[-1]
+
+def CalROCSingal(stocks: list, watch_date: datetime.date, N: int, weight_method: str) -> int:
+    roc_ser = GetROC(stocks, watch_date, N)
+    if weight_method == 'avg':
+        return len(roc_ser[roc_ser > 0])
+    elif weight_method == 'mktcap':
+        mkt_cap = get_valuation(stocks, end_date=watch_date, fields='circulating_market_cap', count=1)
+        mkt_cap.set_index('code', inplace=True)
+        weights = mkt_cap['circulating_market_cap'] / mkt_cap['circulating_market_cap'].sum()
+        mkt_roc = roc_ser[roc_ser > 0] * weights
+        return np.sum(mkt_roc)
+
+def GetROC(stocks: list, watch_date: datetime.date, N: int) -> pd.Series:
+    offset_day = get_trade_days(end_date=watch_date, count=N)[0]
+    now = get_price(stocks, end_date=watch_date, count=1, fields='close', panel=False).set_index('code')
+    last = get_price(stocks, end_date=offset_day, count=1, fields='close', panel=False).set_index('code')
+    last = last[~last['close'].isna() & last['close'] != 0]
+    return (now['close'] / last['close'] - 1).dropna()
+
+def rolling_average(arr: np.array, window: int) -> np.array:
+    ret = np.cumsum(arr, dtype=float)
+    ret[window:] = ret[window:] - ret[:-window]
+    return ret[window - 1:] / window
+
+def Trade(context):
+    bar_time = context.current_dt.date()
+    if bar_time >= g.begin_date:
+        if len(g.singal) == 0:
+            PrepareData(context)
+        flag = GetSingal(context)
+        if flag:
+            StockBuy(g.target, context)
+        else:
+            StockSell(g.target, context)
+
+def StockBuy(target: str, context):
+    everyStocks = context.portfolio.total_value
+    if target not in context.portfolio.long_positions:
+        order_target_value(target, everyStocks)
+
+def StockSell(target: str, context):
+    if target in context.portfolio.long_positions:
+        order_target(target, 0)

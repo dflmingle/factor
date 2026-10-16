@@ -1,0 +1,112 @@
+quant/2021年度精选策略/25.基本不耍六毛的ETF轮动策略.txt
+from jqdata import *
+import pandas as pd
+import talib
+
+def initialize(context):
+    set_params()
+    choice_etfs(context)
+    choice_mmf(context)
+    run_monthly(choice_etfs, monthday=1, time='before_open', reference_security='000300.XSHG')
+    run_monthly(choice_mmf, monthday=1, time='before_open', reference_security='000300.XSHG')
+    run_daily(get_signal, time='11:30')
+    run_daily(ETFtrade, time='14:40')
+
+def set_params():
+    g.target_market = '399001.XSHE'
+    g.empty_keep_stock = ''
+    g.ETFList = []
+    g.emotion_rate = 0
+    g.signal = 'BUY'
+    g.buy = []
+    g.lag = 6
+    g.lag0 = 7
+    g.lag1 = 13
+    g.lag2 = 13
+
+def ETFtrade(context):
+    if g.empty_keep_stock != '':
+        if g.empty_keep_stock in context.portfolio.positions:
+            order_target(g.empty_keep_stock, 0)
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            order_target(stock, 0)
+    elif g.signal == 'BUY':
+        holdings = set(context.portfolio.positions.keys())
+        targets = set(g.buy)
+        sells = holdings - targets
+        for code in sells:
+            order_target(code, 0)
+        for code in g.buy:
+            val = context.portfolio.available_cash
+            if val > 500:
+                order_value(code, val)
+            else:
+                break
+        current_returns = 100 * context.portfolio.returns
+    if g.empty_keep_stock != '':
+        if context.portfolio.available_cash > 500:
+            order_target_value(g.empty_keep_stock, context.portfolio.available_cash)
+
+def get_signal(context):
+    if EmotionMonitor() == -1:
+        g.signal = 'CLEAR'
+        return
+    df_etf = pd.DataFrame(columns=['基金代码', '周期涨幅', '均线差值'])
+    current_data = get_current_data()
+    for security in g.ETFList:
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_price = current_data[security].last_price
+        cp_increase = (current_price / close_data['close'][g.lag2 - g.lag1] - 1) * 100
+        ma_n1 = close_data['close'].mean()
+        pre_price = (current_price / ma_n1 - 1) * 100
+        df_etf = df_etf.append({'基金代码': security, '周期涨幅': cp_increase, '均线差值': pre_price}, ignore_index=True)
+    if len(df_etf) == 0:
+        g.signal = 'CLEAR'
+        return
+    df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+    df_etf.reset_index(drop=True, inplace=True)
+    if df_etf['周期涨幅'].iloc[0] < 0.1 or df_etf['均线差值'].iloc[0] < 0:
+        g.signal = 'CLEAR'
+        return
+    df_etf = df_etf[(df_etf['周期涨幅'] >= 0.1) & (df_etf['均线差值'] >= 0)]
+    g.buy = list(df_etf['基金代码'])
+    g.signal = 'BUY'
+    return
+'EXACT_REVIEWED_FUNCTION EmotionMonitor sha256=1a34895334804fe51b0eae2867c9cab86a0ca09d8a86ca38e5b87fa18380de4e source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def choice_etfs(context):
+    ret_val = []
+    fund_list = list(get_all_securities(types=['etf', 'lof'], date=context.previous_date).index)
+    if len(fund_list) > 0:
+        h = history(15, unit='1d', field='volume', security_list=fund_list)
+        h.dropna(axis=1, inplace=True)
+        if len(h.columns) > 0:
+            s_h = h.mean(axis=0)
+            ret_val = list(s_h.sort_values(ascending=False)[:6].index)
+    g.ETFList = ret_val
+    _info = '\nETF池:\n'
+    for security in g.ETFList:
+        s_info = get_security_info(security)
+        _info += '【%s】%s %s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.type, s_info.start_date)
+
+def choice_mmf(context):
+    ret_val = ''
+    funds = get_all_securities(types='fund', date=context.previous_date)
+    if len(funds) > 0:
+        mmf_list = list(funds[funds.type == 'mmf'].index)
+        if len(mmf_list) > 0:
+            h = history(15, unit='1d', field='money', security_list=mmf_list)
+            h.dropna(axis=1, inplace=True)
+            if len(h.columns) > 0:
+                s_money = h.mean(axis=0)
+                mmf_list = list(s_money[s_money > 10000000].index)
+                if len(mmf_list) > 0:
+                    h = history(15, unit='1d', field='close', security_list=mmf_list)
+                    mmf_rate = 100 * (h.iloc[-1] / h.iloc[0] - 1)
+                    ret_val = mmf_rate.sort_values(ascending=False).index[0]
+    g.empty_keep_stock = ret_val
+    _info = '\n货币基金:\n'
+    if len(g.empty_keep_stock) > 0:
+        s_info = get_security_info(g.empty_keep_stock)
+        _info += '【%s】%s %s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.type, s_info.start_date)

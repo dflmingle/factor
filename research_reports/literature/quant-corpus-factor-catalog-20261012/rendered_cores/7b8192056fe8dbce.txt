@@ -1,0 +1,37 @@
+quant/聚宽2025年精选/97趋势筛选后相关性最小etf轮动-加速10倍版.txt
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.etf_pool = ['512660.XSHG', '510880.XSHG', '159915.XSHE', '513050.XSHG', '510050.XSHG', '588100.XSHG', '512100.XSHG', '518800.XSHG', '513060.XSHG', '511010.XSHG', '512980.XSHG', '512010.XSHG', '513100.XSHG', '512720.XSHG', '512070.XSHG', '515880.XSHG', '159920.XSHE', '159922.XSHE', '513520.XSHG', '515000.XSHG', '515790.XSHG', '515700.XSHG', '159825.XSHE', '512400.XSHG', '512200.XSHG', '513360.XSHG', '512480.XSHG', '510230.XSHG', '159647.XSHE', '159928.XSHE']
+    g.m_days = 25
+    up_strength(context)
+    run_daily(trade, '10:00')
+    run_monthly(up_strength, 1, '9:00')
+'EXACT_REVIEWED_FUNCTION min_corr sha256=d4262d88cdbf724927734065bbe6442dcc87c23e801496491315ed68fac07af9 source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'
+'EXACT_REVIEWED_FUNCTION get_rank sha256=7d5c109431a4fa7e237fe7f929252d9a4ff67e2bc7f3f853a4649b2b8ce3ebfb source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'
+
+def up_strength(context):
+    g.trend_length_ranking = get_trend_length(g.etf_pool, 3)
+
+def trade(context):
+    target_num = 1
+    etf_pool = min_corr(g.trend_length_ranking)
+    target_list = get_rank(etf_pool)[:target_num]
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+    hold_list = list(context.portfolio.positions)
+    if len(hold_list) < target_num:
+        value = context.portfolio.available_cash / (target_num - len(hold_list))
+        for etf in target_list:
+            if context.portfolio.positions[etf].total_amount == 0:
+                order_target_value(etf, value)
+    hold_list = list(context.portfolio.positions)
+    if hold_list:
+        pass
+'EXACT_REVIEWED_FUNCTION calculate_ma sha256=422f45f84530397ef04c393b58345a0096f9bfef6c29675c17eb200dd3c1d4ca source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'
+'EXACT_REVIEWED_FUNCTION count_days_above sha256=aa860b253d45646c03da7262ba5654509f2319cdd8ad41b21e164a9ecdd2405c source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'
+'EXACT_REVIEWED_FUNCTION get_trend_length sha256=14030d3e2f7af6da88717139554b70355dbe3b1a67d68a2e0da8f6a5bc9795a3 source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'
+'EXACT_REVIEWED_FUNCTION mingcheng sha256=a8867aeabfe9e03b1622343a79826ced4da85739cc79a8224f2b7c1494682535 source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'

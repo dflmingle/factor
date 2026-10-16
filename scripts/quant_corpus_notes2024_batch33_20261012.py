@@ -1,0 +1,12 @@
+from quant_corpus_semantic_review_20261012 import add_authored
+E={
+'90.':('5/9/11月换仓，营收同比正且加速、连续3年FCF正、4季营业利润率>10%、经营利润/可用资本四季和>=8%、税率>=5%。','revenue growth acceleration × sustained positive FCF × margin/return-on-capital quality。','PIT营收、资本开支、经营现金流、税费和资本结构。','sustained_fcf_quality_candidate','可用资本=权益+非流动负债+一年内到期非流动负债；季度累计口径不能当独立季度求和；statDate按月份取期仍须公告日锁定；非价格量因子但可做质量约束。'),
+'91.':('外部trade_list.csv日期表控制沪深300ETF进出场；HMA和龙虎榜函数并未用于信号。','external precomputed entry/exit dates。','原始特征分布模型、trade_list.csv生成脚本。','external_timing_model_blocked','calc_netbuy定义递归且无实际求值，HMA依赖talib未导入；不能由标题推断模型公式或PIT。'),
+'92.':('飞鹰优选：C/MA40<.78或C/MA60<.74；5日中至少2次H/L>1.051且当日满足；MA27>1.169C、MA17>1.158C，C与MA60低于MA120、MA60>MA30、CCI14>−210，首次连续触发。','deep oversold MA ratios × range activity × CCI guard × first occurrence。','日线HLC、MA/AVEDEV/COUNT/BARSLASTCOUNT。','oversold_range_cci_candidate','仅单股示例；myTT外部算子语义应核对。极严格阈值可能稀疏，测试时不擅自调参，记录有效截面不足。'),
+'93.':('HS300月度持30，以资产增长、母公司净利增长、筹资现金增长、净利息费用、销售现金/营收、DAVOL20的原始值逐项排名加权。','high asset/netprofit/financing growth; low net_interest_expense, goods_service_cash_to_revenue, DAVOL20。','PIT财务、DAVOL20供应商定义、历史成分。','multifactor_rank_direction_inventory','getRank高值rank=1，bubble按总分降序，权重[-1,-1,-1,+1,+1,+1]实际方向如公式栏，不能直译权重正负；含缺失截面均值填补、非行业中性。原子先去重/核字段。'),
+'94.':('基金成立满1年、资产>1亿、21日最小日成交额足够，241观测收益波动在1%与沪深300波动之间，倒数波动分配95%。','inverse volatility among moderate-low-vol liquid funds。','基金份额、价格、成交额、指数。','fund_risk_allocation_not_alpha','只做同窗口组合统计，没有独立样本外回测；不能将历史组合均值当未来alpha或新股票簇。'),
+'96.':('9:26全A按LB(N=5)量比最高10，再按竞价金额/(流通市值*100万)>.3并降序，9:27买3，14:45未涨停卖。','auction turnover ratio × relative volume5。','竞价tick、LB当时值、流通市值。','auction_relative_volume_blocked','流通市值字段亿元而分母100万代表人为百分率单位；未走holded_filter。缺竞价不能用全日amount替代。'),
+'97.':('研究250日封板次数高于均值5/6倍的次日涨停概率；附策略以250日位置高于均值、流通市值<.5均值、涨停次数>4均值筛，上午追涨次日退出。','historical limit-up frequency × range position × small cap。','历史涨停价与分钟、交易状态。','limitup_frequency_event_candidate','研究标签为次日涨停概率不是固定持有净收益；源码price_chg< =有语法错误，位置提取iloc可能越界；多片段同名函数覆盖。缺真实涨停数据须单列blocked或阈值proxy。'),
+'98.':('CSI500剔最小25%及最大1只；行业内PEG低70%、净利增长高70%、ROE最高1/3交集，最终按流通市值降序。','industry-relative PEG/growth/ROE quality × larger size。','历史成分/行业、PIT财务及供应商PEG。','quality_growth_size_variant','活动get_stock_list没调用股息排序；漂亮50标题不能当纯红利。小行业截面取整可能无股票。'),
+'99.':('全A在252观测最高收盘为最新日且此前最高点距最新至少约60日的股票占比，并保存名单。','fresh high252 after old high gap60; market breadth=count/N。','全A日线收盘、历史上市池。','fresh_high_after_consolidation_candidate','嵌入IPython cell magic源码已打开；argmax取第一个峰，等高并列不会被视为最新高。可提取新高事件股票原子与行业广度，尚未测增量。')}
+if __name__=='__main__':add_authored(E,'2024年度精选策略2')

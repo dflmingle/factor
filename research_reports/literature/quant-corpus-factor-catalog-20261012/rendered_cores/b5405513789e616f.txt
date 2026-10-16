@@ -1,0 +1,112 @@
+quant/量化策略/量化策略/实盘2026/Ptrade/pt版02小市值技术过滤策略.txt
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.index_code = '399101.XSHE'
+    g.buy_stock_count = 3
+    g.screen_count = 30
+    g.ma_period = 5
+    g.position_pct = 0.1
+    set_universe([])
+    g.is_real = is_trade()
+    if not g.is_real:
+        set_limit_mode('UNLIMITED')
+    if g.is_real:
+        run_daily(context, trade, time='14:55')
+
+def before_trading_start(context, data):
+    all_stocks = get_index_stocks(g.index_code)
+    if not all_stocks:
+        g.candidate_stocks = []
+        return
+    try:
+        df = get_fundamentals(all_stocks, 'valuation', fields='float_value', date=context.previous_date, is_dataframe=True)
+        if df is None or df.empty:
+            g.candidate_stocks = []
+            return
+        df = df.sort_values('float_value', ascending=True)
+        candidate_stocks = list(df.index[:g.screen_count])
+    except Exception as e:
+        g.candidate_stocks = []
+        return
+    filtered = filter_stock_by_status(candidate_stocks, ['ST', 'HALT', 'DELISTING'])
+    if not filtered:
+        g.candidate_stocks = []
+        return
+    g.candidate_stocks = filtered[:g.buy_stock_count]
+
+def handle_data(context, data):
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 14 and current_dt.minute == 55:
+        trade(context, data)
+
+def check_ma_condition(stock, context, data=None):
+    hist = get_history(g.ma_period, '1d', 'close', security_list=stock, fq='pre', is_dict=True)
+    if hist is None or stock not in hist:
+        return False
+    close_prices = hist[stock]['close']
+    if len(close_prices) < g.ma_period:
+        return False
+    ma = np.mean(close_prices)
+    if not g.is_real and data is not None:
+        try:
+            current_price = data[stock].close
+        except:
+            return False
+    else:
+        snapshot = get_snapshot(stock)
+        if snapshot and stock in snapshot:
+            current_price = snapshot[stock].get('last_px')
+        else:
+            return False
+    return current_price is not None and current_price > ma
+
+def trade(context, data=None):
+    if not hasattr(g, 'candidate_stocks') or not g.candidate_stocks:
+        return
+    buy_stocks = []
+    for stock in g.candidate_stocks:
+        if check_ma_condition(stock, context, data):
+            buy_stocks.append(stock)
+    for stock in list(context.portfolio.positions.keys()):
+        if stock not in buy_stocks:
+            pos = context.portfolio.positions[stock]
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+            if sellable <= 0:
+                continue
+            order_target_value(stock, 0)
+    if not buy_stocks:
+        return
+    if g.is_real:
+        total_buy_cash = context.portfolio.cash * g.position_pct
+        if total_buy_cash <= 0:
+            return
+        per_value = total_buy_cash / len(buy_stocks)
+    else:
+        total_value = context.portfolio.portfolio_value
+        per_value = total_value / len(buy_stocks)
+    for stock in buy_stocks:
+        if not g.is_real and data is not None:
+            try:
+                price = data[stock].close
+            except:
+                price = None
+        else:
+            snapshot = get_snapshot(stock)
+            price = snapshot.get(stock, {}).get('last_px') if snapshot else None
+        if price is None or price <= 0:
+            continue
+        if per_value >= price * 100:
+            order_target_value(stock, per_value)
+
+def log_hold(context):
+    if context.portfolio.positions:
+        pass
+if not is_trade():
+    pass

@@ -1,0 +1,98 @@
+quant/2021年度精选策略/97.稳定高回报周期股策略2-RSRS择时.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+import datetime
+import statsmodels.api as sm
+
+def initialize(context):
+    set_param()
+    run_monthly(main, 1, time='9:30')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    sl = g.sell
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def set_param():
+    g.bten = []
+    g.bfive = []
+    g.stock_num = 5
+    g.fin = pd.DataFrame()
+    g.N = 18
+    g.M = 800
+    g.buy = 0.8
+    g.sell = -0.8
+    g.ans = []
+    g.ans_rightdev = []
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('max_colwidth', 100)
+    g.security = '000300.XSHG'
+
+def main(context):
+    s_stat_date = controlBasic(context)
+    df_fin = controlReport(s_stat_date, 6)
+    stocks_rank(df_fin)
+
+def market_open(context):
+    security = g.security
+    beta = 0
+    r2 = 0
+    prices = attribute_history(security, g.N, '1d', ['high', 'low'])
+    highs = prices.high
+    lows = prices.low
+    X = sm.add_constant(lows)
+    model = sm.OLS(highs, X)
+    beta = model.fit().params[1]
+    g.ans.append(beta)
+    r2 = model.fit().rsquared
+    g.ans_rightdev.append(r2)
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    zscore_rightdev = zscore * beta * r2
+    current_data = get_current_data()
+    if zscore_rightdev > g.buy:
+        trade_func(context)
+    elif zscore_rightdev < g.sell and len(context.portfolio.positions.keys()) > 0:
+        for s in context.portfolio.positions.keys():
+            order_target(s, 0)
+
+def trade_func(context):
+    pool = g.bfive
+    cash = context.portfolio.total_value / len(pool)
+    hold_stock = context.portfolio.positions.keys()
+    current_data = get_current_data()
+    for s in hold_stock:
+        if s not in pool:
+            order_target(s, 0)
+    for s in pool:
+        order_target_value(s, cash)
+'EXACT_REVIEWED_FUNCTION f_sum sha256=eb9af3a70a3bcafb24515d87f4c0c7a5911c7fe14f6f29d7577045e672cf59db source=quant/2020年度精选策略/05 兄台且慢，去天台排队不如看看这个策略先.txt'
+'EXACT_REVIEWED_FUNCTION controlBasic sha256=7de87f29023830577bc4e63a2c42b284f47aa090c0fb9544afc9dd0305275486 source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+
+def stocks_rank(df_fin):
+    if len(df_fin) <= 0:
+        return
+    q_cap = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(list(df_fin.index)))
+    df_cap = get_fundamentals(q_cap).set_index('code')
+    df_pe = pd.concat([df_fin, df_cap], axis=1)
+    df_pe['pe'] = df_pe['market_cap'] * 100000000 / df_pe['adjusted_profit']
+    df_pe = df_pe[(df_pe['pe'] < 20) & (df_pe['pe'] > 0)]
+    df_pe = df_pe.sort_values(by='pe', ascending=True).reset_index(drop=False)
+    df_pe['pes'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe = df_pe.sort_values(by='hb', ascending=False).reset_index(drop=True)
+    df_pe['hbs'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe = df_pe.sort_values(by='tb', ascending=False).reset_index(drop=True)
+    df_pe['tbs'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe['s'] = df_pe['pes'] * 1.0 + df_pe['hbs'] * 0.3 + df_pe['tbs'] * 0.5
+    df_pe = df_pe.sort_values(by='s', ascending=False).reset_index(drop=True)
+    g.bten = list(df_pe.code[:g.stock_num * 2])
+    g.bfive = list(df_pe.code[:g.stock_num])
+'EXACT_REVIEWED_FUNCTION controlReport sha256=678f153cfc586c68e29055c144af054d1aa623a46017d123a028400e1844386a source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+'EXACT_REVIEWED_FUNCTION get_past_quarters sha256=310989d288d9ec9c1a1ea7ee477363b64ade9de2c78f952309c182428ff1861d source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+
+def after_market_close(context):
+    trades = get_trades()
+    for _trade in list(trades.values()):
+        pass

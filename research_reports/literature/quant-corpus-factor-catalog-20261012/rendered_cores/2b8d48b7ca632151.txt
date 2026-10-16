@@ -1,0 +1,48 @@
+quant/2024年度精选策略1/6.高股息低杠杆小市值轮动策略.txt
+from jqdata import *
+from jqfactor import get_factor_values
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.stock_num = 10
+    g.limit_days = 20
+    g.limit_up_list = []
+    g.hold_list = []
+    g.history_hold_list = []
+    g.not_buy_again_list = []
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_weekly(weekly_adjustment, weekday=1, time='9:30', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:00', reference_security='000300.XSHG')
+    run_daily(print_position_info, time='15:10', reference_security='000300.XSHG')
+'EXACT_REVIEWED_FUNCTION get_dividend_ratio_filter_list sha256=38bd0f889a1c3ac16e6d1096b39c06e0aa4623de9d7967b12e2a27f0062063ec source=quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt'
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    initial_list = get_all_securities().index.tolist()
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_new_stock(context, initial_list, 375)
+    initial_list = filter_st_stock(initial_list)
+    dr_list = get_dividend_ratio_filter_list(context, initial_list, False, 0, 0.5)
+    tv_list = get_factor_filter_list(context, dr_list, 'turnover_volatility', False, 0, 0.8)
+    lev_list = get_factor_filter_list(context, tv_list, 'MLEV', True, 0, 0.5)
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(lev_list)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q, date=yesterday)
+    final_list = list(df.code)[:15]
+    return final_list
+'EXACT_REVIEWED_FUNCTION get_factor_filter_list sha256=d2a9b2f11b098fe6a814caab77d0389616c292bd321ddd2ca6000dc629da87af source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=d8baeb67677ec74f3ecd14a16f30c441fe70da5cfc56b36025cc217da895d507 source=quant/2024年度精选策略1/37.【择时模块实际效果】--论坛随便选了个策略加装.txt'
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=760987f3b12e2eceea9922bd3d3cc23608196c720d7686d687eb2260d3db5809 source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=8f3f9bbb828a332f2c16935917d374b2d4406be4a3b488fa841eae8402f7d115 source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION get_recent_limit_up_stock sha256=6f96d6fbb6791ab81d101d45811a024a55f8d46cbafc2e879a01c1e7ebc93174 source=quant/2024年度精选策略1/2.“7年40倍”策略扩容到50只.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=830901de87efd9e7150b1f4e5743dd7bcc02b29dafe8c76d48bdb4559613238a source=quant/2024年度精选策略1/2.“7年40倍”策略扩容到50只.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=d2c93ae317f170ee07f7b40dccd4a5e0d50f9734fc44ef081c0a1ec6d22b28e3 source=quant/2023年度精选策略/29.价值成长轮动策略.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=c55d81f9ae93e9528bed6bbf6d7d9504dd411d50e2d5fd0c8e639642b4fd584e source=quant/2023年度精选策略/21.截止到21年12月依然有效的小市值适配因子.txt'

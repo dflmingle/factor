@@ -1,0 +1,387 @@
+{
+  "candidate": "F-SCH1016-01",
+  "source": "research_reports/peer_reconstruction/star-coin-alpha-transfer-20261016-v2/candidate.json",
+  "source_name": "v20+m02w18",
+  "trees": [
+    {
+      "op": "neg",
+      "args": [
+        {
+          "op": "add",
+          "args": [
+            {
+              "op": "rank",
+              "args": [
+                {
+                  "op": "neg",
+                  "args": [
+                    {
+                      "op": "field",
+                      "value": "cap"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "op": "mean2",
+              "args": [
+                {
+                  "op": "rank",
+                  "args": [
+                    {
+                      "op": "neg",
+                      "args": [
+                        {
+                          "op": "field",
+                          "value": "close"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "field",
+                  "value": "cfp"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "rank",
+      "args": [
+        {
+          "op": "ts_std",
+          "args": [
+            {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "field",
+                      "value": "close"
+                    },
+                    {
+                      "op": "delay",
+                      "args": [
+                        {
+                          "op": "field",
+                          "value": "close"
+                        }
+                      ],
+                      "value": 1
+                    }
+                  ]
+                },
+                {
+                  "op": "const",
+                  "value": 1.0
+                }
+              ]
+            }
+          ],
+          "value": 20
+        }
+      ]
+    },
+    {
+      "op": "ema",
+      "args": [
+        {
+          "op": "zscore",
+          "args": [
+            {
+              "op": "neg",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "rank",
+                      "args": [
+                        {
+                          "op": "neg",
+                          "args": [
+                            {
+                              "op": "sma",
+                              "args": [
+                                {
+                                  "op": "field",
+                                  "value": "volume"
+                                }
+                              ],
+                              "value": 1
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "rank",
+                      "args": [
+                        {
+                          "op": "neg",
+                          "args": [
+                            {
+                              "op": "field",
+                              "value": "low"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "value": 3
+    },
+    {
+      "op": "ts_mean",
+      "args": [
+        {
+          "op": "field",
+          "value": "turnover"
+        }
+      ],
+      "value": 20
+    },
+    {
+      "op": "add",
+      "args": [
+        {
+          "op": "mul",
+          "args": [
+            {
+              "op": "const",
+              "value": 0.975
+            },
+            {
+              "op": "zscore",
+              "args": [
+                {
+                  "op": "field",
+                  "value": "bm"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "mul",
+          "args": [
+            {
+              "op": "const",
+              "value": 0.025
+            },
+            {
+              "op": "zscore",
+              "args": [
+                {
+                  "op": "rank",
+                  "args": [
+                    {
+                      "op": "field",
+                      "value": "bm"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "field",
+      "value": "cap"
+    },
+    {
+      "op": "field",
+      "value": "cap"
+    },
+    {
+      "op": "div",
+      "args": [
+        {
+          "op": "field",
+          "value": "close"
+        },
+        {
+          "op": "ts_mean",
+          "args": [
+            {
+              "op": "field",
+              "value": "open"
+            }
+          ],
+          "value": 10
+        }
+      ]
+    },
+    {
+      "op": "ts_mean",
+      "args": [
+        {
+          "op": "sub",
+          "args": [
+            {
+              "op": "field",
+              "value": "cap"
+            },
+            {
+              "op": "rank",
+              "args": [
+                {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "rank",
+                      "args": [
+                        {
+                          "op": "neg",
+                          "args": [
+                            {
+                              "op": "neg",
+                              "args": [
+                                {
+                                  "op": "ts_mean",
+                                  "args": [
+                                    {
+                                      "op": "ts_mean",
+                                      "args": [
+                                        {
+                                          "op": "field",
+                                          "value": "ep"
+                                        }
+                                      ],
+                                      "value": 1
+                                    }
+                                  ],
+                                  "value": 20
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "neg",
+                      "args": [
+                        {
+                          "op": "ts_mean",
+                          "args": [
+                            {
+                              "op": "ts_mean",
+                              "args": [
+                                {
+                                  "op": "div",
+                                  "args": [
+                                    {
+                                      "op": "const",
+                                      "value": 2.0
+                                    },
+                                    {
+                                      "op": "ts_kurt",
+                                      "args": [
+                                        {
+                                          "op": "field",
+                                          "value": "sp"
+                                        }
+                                      ],
+                                      "value": 18
+                                    }
+                                  ]
+                                }
+                              ],
+                              "value": 1
+                            }
+                          ],
+                          "value": 18
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "value": 20
+    },
+    {
+      "op": "field",
+      "value": "ep"
+    }
+  ],
+  "formulas": [
+    "(-(RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM)))",
+    "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),20))",
+    "EMA(ZSCORE((-(RANK((-SMA(VOLUME,1,1)))+RANK((-LOW))))),3)",
+    "TS_MEAN(TURNOVER,20)",
+    "((0.975*ZSCORE(BOOK_TO_MARKET_RATIO_LF))+(0.025*ZSCORE(RANK(BOOK_TO_MARKET_RATIO_LF))))",
+    "MARKET_CAP",
+    "MARKET_CAP",
+    "(CLOSE/TS_MEAN(OPEN,10))",
+    "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),20))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,18)),1),18))))),20)",
+    "RATIO_EP_TTM"
+  ],
+  "directions": [
+    -1,
+    -1,
+    -1,
+    -1,
+    1,
+    -1,
+    -1,
+    -1,
+    -1,
+    1
+  ],
+  "code_sha256": "bea7e962c684d93c67335388bd3e23b15f93f5b87ce9afb411dc950e80245054",
+  "native_fields": [
+    "close",
+    "open",
+    "high",
+    "low",
+    "volume",
+    "amount",
+    "turnover",
+    "market_cap",
+    "book_to_market_ratio_lf",
+    "ratio_ep_ttm",
+    "ratio_cfp_ttm",
+    "ratio_sp_ttm"
+  ],
+  "purpose": "same-date native platform vs local vs opponent holdings diagnostic",
+  "proposed_window": [
+    "20211008",
+    "20261008"
+  ],
+  "cycle": 5,
+  "groups": 10,
+  "target_signal_date": "20261008",
+  "target_trade_date": "20261009",
+  "local_full_holdings_overlap": 0.7808764940239044,
+  "platform_status": "not_submitted",
+  "candidates": 1,
+  "expected_compute": 4,
+  "budget_cap": 8,
+  "notes": [
+    "Fixed ten active seats at target date; no birth-date switching in historical return diagnostic.",
+    "ST-name mask unavailable; numeric tradability proxy only.",
+    "Native data changes only; no fillna zero or dynamic leg reweighting.",
+    "Top20 endpoint cannot establish full502 holdings overlap.",
+    "Peer-aligned five-year diagnostic, separate from canonical formal 20210907..20260907 window."
+  ]
+}

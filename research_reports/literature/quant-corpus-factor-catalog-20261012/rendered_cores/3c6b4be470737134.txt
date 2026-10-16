@@ -1,0 +1,24 @@
+quant/2020年度精选策略/45 布林带策略.txt
+import jqdata
+import talib
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.security = '600519.XSHG'
+
+def market_open(context):
+    security = g.security
+    h = attribute_history(security, 25, '1d', ['high', 'low', 'close'])
+    cash = context.portfolio.available_cash
+    upper, middle, lower = talib.BBANDS(h['close'].values, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+    current_position = context.portfolio.positions[security].amount
+    current_price = h['close'][-1]
+    if current_price > upper[-1] and current_position >= 0:
+        order_target_value(security, cash)
+    elif current_price < lower[-1] and current_position <= 0:
+        order_value(security, 0)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

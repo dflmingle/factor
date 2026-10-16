@@ -1,0 +1,46 @@
+{
+  "paper": "From Economic Explanation to Performance Improvement in Machine-Learning Portfolios (Liang, Zohren & Cucuringu, arXiv:2610.15144, 2026)",
+  "features": [
+    "small_size",
+    "reversal20",
+    "momentum120",
+    "low_vol20",
+    "low_turn20",
+    "volume_low_std20",
+    "amount_low_std20",
+    "pv_corr20",
+    "cgo100_low",
+    "capm_residual_vol120_low",
+    "book_market",
+    "roe",
+    "roic",
+    "asset_turnover",
+    "growth_sales",
+    "cash_accrual_quality",
+    "ebit_ev",
+    "fear_std20_low"
+  ],
+  "grid_start": "2020-03-19 00:00:00",
+  "grid_end": "2026-08-10 00:00:00",
+  "periods": 156,
+  "train_periods": 24,
+  "validation_periods": 12,
+  "oos_block_periods": 12,
+  "eta": 0.5,
+  "lambda_bounds": [
+    0.0,
+    3.0
+  ],
+  "paper_cost": 0.0005,
+  "local_cost": 0.003,
+  "top_cap": 1500,
+  "universe": "daily full-A source panel, top-total_mv 1500 per date for ML proxy",
+  "model_proxy": {
+    "xgb": "LightGBM regression with pred_contrib, not custom Sharpe objective",
+    "ffn": "PyTorch 2xReLU regression, gradient-times-input attribution"
+  },
+  "adaptation": "10-trading-day labels/holding periods; 24 train + 12 validation due local 2018 data; annual blocks",
+  "no_platform_calls": true,
+  "parameter_selection": "frozen from paper; no outcome grid search",
+  "alignment": "feature overlap exact on saved 120 formal dates"
+}

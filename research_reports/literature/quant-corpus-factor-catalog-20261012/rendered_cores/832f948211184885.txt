@@ -1,0 +1,613 @@
+quant/聚宽2025年精选/98热点行业和热点概念-成分股-及龙一龙二龙三.py
+from IPython.core.display import display, HTML
+import jqdata
+from jqdata import *
+import datetime as dt
+import time
+import warnings
+import numpy as np
+import seaborn as sns
+program_start_dt = dt.datetime.now()
+import pandas as pd
+pd.options.display.float_format = '{:.2f}'.format
+pd.set_option('display.width', 1200)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+
+class a:
+    pass
+g = a()
+context = a()
+g.auc_date = get_trade_days(count=10)[-1].strftime('%Y-%m-%d')
+g.end_date = get_trade_days(count=10)[-2].strftime('%Y-%m-%d')
+g.watch_days = 7
+g.remove_concept_with_more_than_N_stocks = 300
+if True:
+    g.end_date = dt.datetime.strptime(g.end_date, '%Y-%m-%d').strftime('%Y-%m-%d')
+    g.auc_date = dt.datetime.strptime(g.auc_date, '%Y-%m-%d').strftime('%Y-%m-%d')
+
+def get_stock_name(stock_code):
+    security_info = get_security_info(stock_code)
+    if security_info is not None:
+        return security_info.display_name
+    else:
+        return 'Unknown'
+
+class Category:
+
+    def __init__(self, industries_type='sw_l3'):
+        warnings.filterwarnings('ignore')
+        self.industries_type = industries_type
+        self.industry_category = self.stock_industry(industries_type=industries_type)
+        self.concept_category = self.stock_concepts_and_industry_ths_20240928()
+
+    def stock_concepts_and_industry_ths_20240928(self, keep_concept_with_below_N_stocks=200):
+        concept_stocks_file = 'cpt_ind_stocks_20240928.csv'
+        concepts_file = 'cpt_ind_20240928.csv'
+        concept_stocks = pd.read_csv(concept_stocks_file, encoding='utf-8')
+        concepts = pd.read_csv(concepts_file, encoding='utf-8')
+        merged_df = concept_stocks.merge(concepts[['Unnamed: 0', 'name', 'type']], left_on='index', right_on='Unnamed: 0', how='left')
+        merged_df['name'].fillna('未知概念/行业', inplace=True)
+        merged_df['stock'] = merged_df['stock'].str.replace('.SZ', '.XSHE', regex=False)
+        merged_df['stock'] = merged_df['stock'].str.replace('.SH', '.XSHG', regex=False)
+        merged_df = merged_df[~merged_df['stock'].str.startswith(('8', '4', '68', '9'))]
+        final_df = merged_df[['stock', 'name']]
+        final_df.columns = ['code', 'category']
+        return final_df
+
+    def stock_concepts_ths_20240831(self, keep_concept_with_below_N_stocks=200):
+        concept_stocks_file = 'concept_stocks_20241209.csv'
+        concepts_file = 'concepts_20241209.csv'
+        concept_stocks = pd.read_csv(concept_stocks_file)
+        concepts = pd.read_csv(concepts_file)
+        merged_df = concept_stocks.merge(concepts[['concept_thscode', 'concept_name']], left_on='concept', right_on='concept_thscode', how='left')
+        merged_df['concept_name'].fillna('未知概念', inplace=True)
+        merged_df['stock'] = merged_df['stock'].str.replace('.SZ', '.XSHE', regex=False)
+        merged_df['stock'] = merged_df['stock'].str.replace('.SH', '.XSHG', regex=False)
+        df = merged_df[['stock', 'concept_name']]
+        df.columns = ['code', 'category']
+        df.head(10)
+        return df
+
+    def stock_concepts_jq(self, keep_concept_with_below_N_stocks=200):
+        q = query(jy.LC_ConceptList.ConceptCode, jy.LC_ConceptList.ConceptName)
+        dict_concept = jy.run_query(q).set_index('ConceptCode')['ConceptName'].to_dict()
+        stocks = jy.run_query(query(jy.SecuMain.InnerCode, jy.SecuMain.SecuCode).filter(jy.SecuMain.SecuCategory == 1, jy.SecuMain.SecuMarket.in_([83, 90]), jy.SecuMain.ListedState.in_([1])))
+        s_code = stocks.set_index('InnerCode')['SecuCode']
+        dfs = []
+        min_id = 9953668143482
+        while len(dfs) < 30 and min_id > 0:
+            q = query(jy.LC_COConcept).filter(jy.LC_COConcept.IndiState == 1, jy.LC_COConcept.ID < min_id).order_by(jy.LC_COConcept.ID.desc())
+            df = jy.run_query(q)
+            min_id = df.ID.min()
+            if len(df) > 0:
+                dfs.append(df)
+            else:
+                break
+        df = pd.concat(dfs, ignore_index=True)
+        sc = df.groupby('InnerCode').apply(lambda dx: ','.join([dict_concept[code] for code in dx.ConceptCode.unique()]))
+        df_concept = pd.DataFrame({'concept': sc, 'code': s_code})
+        df_concept['symbol'] = df_concept.code.map(normalize_code, na_action='ignore')
+        s_concept = df_concept.dropna().set_index('symbol')['concept']
+        df = pd.DataFrame(s_concept.str.split(',').tolist(), index=s_concept.index).stack()
+        df = df.reset_index([0, 'symbol'])
+        df.columns = ['code', 'category']
+        return df
+
+    def remove_category_with_stocks_more_than_N(self, N=300):
+        category_counts = self.concept_category.groupby('category')['code'].nunique()
+        valid_categories = category_counts[category_counts <= N].index
+        self.concept_category = self.concept_category[self.concept_category['category'].isin(valid_categories)]
+
+    def stock_industry(self, stocks_list=list(get_all_securities().index), industries_type='sw_l3'):
+        stocks_industry_dict = get_industry(stocks_list)
+        stocks_industry_df = pd.DataFrame(stocks_industry_dict).T[[industries_type]]
+        stocks_industry_df[industries_type] = stocks_industry_df[industries_type].dropna().apply(lambda x: x['industry_name'])
+        df_category = stocks_industry_df[[industries_type]].dropna().reset_index()
+        df_category.columns = ['code', 'category']
+        return df_category
+
+    def industry_hierarchy(self, industries_type='sw_l3'):
+        stocks_list = list(get_all_securities().index)
+        stocks_industry_dict = get_industry(stocks_list)
+        df_industry = pd.DataFrame(stocks_industry_dict).T
+        df_industry['一级行业'] = df_industry['sw_l1'].apply(lambda x: x['industry_name'] if pd.notna(x) else '未知')
+        df_industry['二级行业'] = df_industry['sw_l2'].apply(lambda x: x['industry_name'] if pd.notna(x) else '未知')
+        df_industry['三级行业'] = df_industry['sw_l3'].apply(lambda x: x['industry_name'] if pd.notna(x) else '未知')
+        df_industry = df_industry[['一级行业', '二级行业', '三级行业']].dropna().drop_duplicates().reset_index(drop=True)
+        return df_industry
+
+    def score_by_return(self, stock_list=list(get_all_securities().index), return_days=1, return_filter=0.099, end_dt=dt.datetime.now(), count=60, debug=False):
+        stock_list = [stock for stock in stock_list if stock[0] != '4' and stock[0] != '8' and (stock[0] != '9') and (stock[:2] != '68')]
+        close = get_price(stock_list, end_date=end_dt, count=count + return_days, fields=['close'], panel=True)['close']
+        if debug:
+            pass
+        df_return = (close / close.shift(return_days) - 1).iloc[return_days:]
+        df_filter = (df_return > return_filter).astype(int)
+        df_filter.index = df_return.index.strftime('%Y-%m-%d')
+        return df_filter.T
+
+    def score_by_attack(self, stock_list=list(get_all_securities().index), return_days=1, return_filter=0.099, end_dt=dt.datetime.now(), count=60, debug=False):
+        stock_list = [stock for stock in stock_list if stock[0] != '4' and stock[0] != '8' and (stock[0] != '9') and (stock[:2] != '68')]
+        prices = get_price(stock_list, end_date=end_dt, count=count + return_days, fields=['pre_close', 'high'], panel=False)
+        if debug:
+            pass
+        prices['attack'] = (prices['high'] > (1 + return_filter) * prices['pre_close']).astype(int)
+        prices['time'] = prices['time'].dt.strftime('%Y-%m-%d')
+        df_attack = prices.pivot(index='code', columns='time', values='attack')
+        return df_attack
+
+    def score_by_return_at_dt(self, stock_list=list(get_all_securities().index), return_days=1, return_filter=0.099, end_dt=dt.datetime.now(), count=6, debug=False):
+        stock_list = [stock for stock in stock_list if stock[0] != '4' and stock[0] != '8' and (stock[0] != '9') and (stock[:2] != '68')]
+        if isinstance(end_dt, str):
+            try:
+                end_dt = dt.datetime.strptime(end_dt, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                end_dt = dt.datetime.strptime(end_dt, '%Y-%m-%d')
+                end_dt = end_dt.replace(hour=23, minute=59, second=59)
+        dfb = get_bars(stock_list, count=count + return_days, unit='1d', fields=['date', 'close'], include_now=True, end_dt=end_dt, fq_ref_date=dt.date.today(), df=True)
+        df_flattened = dfb.reset_index()
+        df_flattened.rename(columns={'level_0': 'stock_code'}, inplace=True)
+        df_flattened.drop(columns=['level_1'], inplace=True)
+        recent_dates = df_flattened['date'].sort_values().unique()[-count:]
+        df_flattened = df_flattened[df_flattened['date'].isin(recent_dates)]
+        if debug:
+            pass
+        df_flattened['pct_change'] = df_flattened.groupby('stock_code')['close'].pct_change(return_days)
+        df_return = df_flattened.pivot(index='stock_code', columns='date', values='pct_change').iloc[return_days:]
+        df_return.columns = pd.to_datetime(df_return.columns).strftime('%Y-%m-%d')
+        df_filter = (df_return > return_filter).astype(int)
+        return df_filter
+
+    def score_by_bias(self, stock_list=list(get_all_securities().index), ma_len=20, end_date=dt.datetime.now(), count=510):
+        stock_list = [stock for stock in stock_list if stock[0] != '4' and stock[0] != '8' and (stock[0] != '9') and (stock[:2] != '68')]
+        close = get_price(stock_list, end_date=end_date, count=count + ma_len + 1, fields=['close'])['close']
+        ma = close.rolling(ma_len).mean()
+        return (close > ma).astype(int).iloc[-count:].T
+
+    def category_score_and_pct_attacking(self, df_score, df_category=None, count=60, daily_top_filter=30, top_N=10):
+        code_category_dict = df_category.groupby('code').apply(lambda dx: list(dx['category'].unique())).to_dict()
+        dats = df_score.columns
+        dat_cat_dict = {}
+        for i in range(0, len(dats)):
+            codes = list(df_score[df_score[dats[i]] > 0].index)
+            s_score = df_score[dats[i]]
+            category_count_dict = {}
+            for code in codes:
+                if code in code_category_dict:
+                    categories = code_category_dict[code]
+                    for category in categories:
+                        if category not in category_count_dict:
+                            category_count_dict[category] = float(s_score[code])
+                        else:
+                            category_count_dict[category] += float(s_score[code])
+            dat_cat_dict[dats[i]] = category_count_dict
+        df_category_score = pd.DataFrame.from_dict(dat_cat_dict, orient='index').fillna(0).tail(count).T
+        stock_count_dict = df_category.groupby('category')['code'].nunique().to_dict()
+        all_results = []
+        total_days = len(df_category_score.columns)
+        for index, date in enumerate(df_category_score.columns):
+            pct_of_attack_dict = {}
+            for category in df_category_score.index:
+                score = df_category_score.at[category, date]
+                stock_count = stock_count_dict.get(category, 1)
+                pct_of_attack = 100 * score / stock_count if stock_count > 0 else 0
+                pct_of_attack_dict[category] = round(pct_of_attack, 2)
+            df_daily = pd.DataFrame({'category': df_category_score.index, 'date': date, 'score': df_category_score[date].values, 'stock_count': [stock_count_dict.get(category, 0) for category in df_category_score.index], 'pct_of_attack': [pct_of_attack_dict.get(category, 0) for category in df_category_score.index]})
+            df_daily = df_daily.sort_values(by='score', ascending=False).head(daily_top_filter)
+            all_results.append(df_daily)
+        df_attack = pd.concat(all_results, ignore_index=True)
+        return df_attack
+
+    def industry_score_and_pct_attacking(self, df_score, count=60, daily_top_filter=30, top_N=10, level=2):
+        industry_level = {1: 'sw_l1', 2: 'sw_l2', 3: 'sw_l3'}
+        selected_industry = industry_level.get(level, 'sw_l2')
+        df_category = self.stock_industry(industries_type=selected_industry)
+        code_category_dict = df_category.groupby('code').apply(lambda dx: list(dx['category'].unique())).to_dict()
+        dats = df_score.columns
+        dat_cat_dict = {}
+        for i in range(0, len(dats)):
+            codes = list(df_score[df_score[dats[i]] > 0].index)
+            s_score = df_score[dats[i]]
+            category_count_dict = {}
+            for code in codes:
+                if code in code_category_dict:
+                    categories = code_category_dict[code]
+                    for category in categories:
+                        if category not in category_count_dict:
+                            category_count_dict[category] = float(s_score[code])
+                        else:
+                            category_count_dict[category] += float(s_score[code])
+            dat_cat_dict[dats[i]] = category_count_dict
+        df_category_score = pd.DataFrame.from_dict(dat_cat_dict, orient='index').fillna(0).tail(count).T
+        stock_count_dict = df_category.groupby('category')['code'].nunique().to_dict()
+        all_results = []
+        total_days = len(df_category_score.columns)
+        for index, date in enumerate(df_category_score.columns):
+            pct_of_attack_dict = {}
+            for category in df_category_score.index:
+                score = df_category_score.at[category, date]
+                stock_count = stock_count_dict.get(category, 1)
+                pct_of_attack = 100 * score / stock_count if stock_count > 0 else 0
+                pct_of_attack_dict[category] = round(pct_of_attack, 2)
+            df_daily = pd.DataFrame({'category': df_category_score.index, 'date': date, 'score': df_category_score[date].values, 'stock_count': [stock_count_dict.get(category, 0) for category in df_category_score.index], 'pct_of_attack': [pct_of_attack_dict.get(category, 0) for category in df_category_score.index]})
+            df_daily = df_daily.sort_values(by='score', ascending=False).head(daily_top_filter)
+            all_results.append(df_daily)
+        df_attack = pd.concat(all_results, ignore_index=True)
+        return df_attack
+
+    def industry_money_flow(self, end_date=dt.datetime.now(), count=10, top_N=10, level=1):
+        if isinstance(end_date, str):
+            end_date = dt.datetime.strptime(end_date, '%Y-%m-%d')
+        industry_category_df = self.stock_industry(industries_type={1: 'sw_l1', 2: 'sw_l2', 3: 'sw_l3'}.get(level, 'sw_l2'))
+        stock_list = industry_category_df['code'].unique()
+        money_flow_df = get_money_flow(stock_list, end_date=end_date, fields=['sec_code', 'date', 'net_amount_main', 'net_amount_xl', 'net_amount_l', 'net_amount_m', 'net_amount_s'], count=count)
+        money_flow_df['code'] = money_flow_df['sec_code']
+        money_flow_df = money_flow_df.merge(industry_category_df[['code', 'category']], on='code', how='left')
+        money_flow_df['total_money'] = money_flow_df[['net_amount_xl', 'net_amount_l', 'net_amount_m', 'net_amount_s']].sum(axis=1)
+        stock_count_df = industry_category_df.groupby('category')['code'].nunique().reset_index()
+        stock_count_df.columns = ['category', 'stock_count']
+        daily_money_flow = money_flow_df.groupby(['category', 'date']).agg({'net_amount_main': 'sum', 'total_money': 'sum'}).reset_index()
+        daily_money_flow = daily_money_flow.merge(stock_count_df, on='category', how='left')
+        daily_money_flow['avg_big_money_per_stock'] = daily_money_flow.apply(lambda row: row['net_amount_main'] / row['stock_count'] if row['stock_count'] > 0 else 0, axis=1)
+        daily_money_flow['avg_total_money_per_stock'] = daily_money_flow.apply(lambda row: row['total_money'] / row['stock_count'] if row['stock_count'] > 0 else 0, axis=1)
+        daily_money_flow['big_money_to_total_money_abs_ratio'] = daily_money_flow['net_amount_main'] / daily_money_flow['total_money'].abs()
+        daily_money_flow['big_money_vs_total_money_diff'] = daily_money_flow['net_amount_main'] - daily_money_flow['total_money']
+        top_industries = daily_money_flow.groupby('category').agg({'total_money': 'sum'}).sort_values(by='total_money', ascending=False).head(top_N).index
+        top_money_flow = daily_money_flow[daily_money_flow['category'].isin(top_industries)]
+        return top_money_flow[['category', 'date', 'stock_count', 'net_amount_main', 'total_money', 'avg_big_money_per_stock', 'avg_total_money_per_stock', 'big_money_to_total_money_abs_ratio', 'big_money_vs_total_money_diff']]
+
+    def category_money_flow(self, end_date=dt.datetime.now(), count=10, top_N=10):
+        if isinstance(end_date, str):
+            end_date = dt.datetime.strptime(end_date, '%Y-%m-%d')
+        stock_list = list(self.concept_category['code'].unique())
+        money_flow_df = get_money_flow(stock_list, end_date=end_date, fields=['sec_code', 'date', 'net_amount_main', 'net_amount_xl', 'net_amount_l', 'net_amount_m', 'net_amount_s'], count=count)
+        money_flow_df['code'] = money_flow_df['sec_code']
+        money_flow_df = money_flow_df.merge(self.concept_category[['code', 'category']], on='code', how='left')
+        money_flow_df['total_money'] = money_flow_df[['net_amount_xl', 'net_amount_l', 'net_amount_m', 'net_amount_s']].sum(axis=1)
+        stock_count = self.concept_category.groupby('category')['code'].nunique().to_dict()
+        missing_data_warning = money_flow_df[money_flow_df[['net_amount_main', 'total_money']].isnull().any(axis=1)]
+        if not missing_data_warning.empty:
+            for index, row in missing_data_warning.iterrows():
+                pass
+        df_summary = money_flow_df.groupby(['category', 'date']).agg({'net_amount_main': 'sum', 'total_money': 'sum'}).reset_index()
+        df_summary['avg_big_money_per_stock'] = df_summary.apply(lambda row: row['net_amount_main'] / stock_count.get(row['category'], 1), axis=1)
+        df_summary['avg_total_money_per_stock'] = df_summary.apply(lambda row: row['total_money'] / stock_count.get(row['category'], 1), axis=1)
+        df_summary['big_money_to_total_money_abs_ratio'] = df_summary['net_amount_main'] / df_summary['total_money'].abs()
+        df_summary['big_money_vs_total_money_diff'] = df_summary['net_amount_main'] - df_summary['total_money']
+        df_summary['stock_count'] = df_summary['category'].map(stock_count)
+        top_categories = df_summary.groupby('category').agg({'total_money': 'sum'}).sort_values(by='total_money', ascending=False).head(top_N).index
+        top_money_flow = df_summary[df_summary['category'].isin(top_categories)]
+        return top_money_flow[['category', 'date', 'stock_count', 'net_amount_main', 'total_money', 'avg_big_money_per_stock', 'avg_total_money_per_stock', 'big_money_to_total_money_abs_ratio', 'big_money_vs_total_money_diff']]
+
+    def construct_category_rank_table(self, df_final, top_N=10):
+        df_final['combined_info'] = df_final.apply(lambda row: f"{row['category']} ({row['stock_count']}只, {row['pct_of_attack']}%攻击)", axis=1)
+        category_rank_table = df_final.pivot_table(index='category', columns='date', values='combined_info', aggfunc='first')
+        ranked_table = pd.DataFrame()
+        for date in category_rank_table.columns:
+            top_categories = df_final[df_final['date'] == date].sort_values(by='score', ascending=False).head(top_N)
+            ranked_table[date] = top_categories['combined_info'].values
+        ranked_table.index = range(1, top_N + 1)
+        return ranked_table
+
+    def find_categories_by_words(self, words):
+        if hasattr(self, 'concept_category') and 'category' in self.concept_category.columns:
+            matching_categories = self.concept_category[self.concept_category['category'].str.contains(words, na=False)]['category']
+            unique_categories = matching_categories.unique()
+            for category in unique_categories:
+                pass
+
+    def find_stocks_by_category(self, category_value, fuzzy_match=True):
+        category_df = self.concept_category
+        if category_df is None or category_df.empty:
+            raise ValueError('概念数据未正确加载，请检查 self.concept_category')
+        if fuzzy_match:
+            filtered_df = category_df[category_df['category'].str.contains(category_value, case=False, na=False)]
+        else:
+            filtered_df = category_df[category_df['category'] == category_value]
+        if filtered_df.empty:
+            return []
+        return filtered_df['code'].unique().tolist()
+
+    def find_stocks_by_industry(self, industry_name, fuzzy_match=True):
+        industry_df_l1 = self.stock_industry(industries_type='sw_l1')
+        industry_df_l2 = self.stock_industry(industries_type='sw_l2')
+        industry_df_l3 = self.stock_industry(industries_type='sw_l3')
+        industry_df = pd.concat([industry_df_l1, industry_df_l2, industry_df_l3])
+        if industry_df.empty:
+            raise ValueError('行业数据未正确加载，请检查 industry_category')
+        if fuzzy_match:
+            filtered_df = industry_df[industry_df['category'].str.contains(industry_name, case=False, na=False)]
+        else:
+            filtered_df = industry_df[industry_df['category'] == industry_name]
+        if filtered_df.empty:
+            return []
+        return filtered_df['code'].unique().tolist()
+
+    def get_stock_count_and_avg_change_of_a_category(self, concept, count=30):
+        if hasattr(self, 'concept_category') and 'category' in self.concept_category.columns:
+            concept_stocks = self.concept_category[self.concept_category['category'] == concept]['code'].unique()
+
+            def format_stock_code(code):
+                if code.endswith('.XSHG') or code.endswith('.XSHE'):
+                    return code
+                elif code.startswith('60'):
+                    return code + '.XSHG'
+                elif code.startswith('00') or code.startswith('30'):
+                    return code + '.XSHE'
+                return code
+            concept_stocks_formatted = [format_stock_code(code) for code in concept_stocks]
+            try:
+                close_prices = get_price(concept_stocks_formatted, end_date=dt.datetime.now(), count=count + 1, fields=['close'], panel=True)['close']
+                df_return = (close_prices / close_prices.shift(1) - 1).iloc[1:]
+                if not isinstance(df_return.index, pd.DatetimeIndex):
+                    df_return.index = pd.to_datetime(df_return.index)
+                stock_counts = df_return.notna().sum(axis=1)
+                count_of_attack = (df_return > 0.09).sum(axis=1)
+                avg_changes = df_return.mean(axis=1, skipna=True)
+                pct_of_attack = (count_of_attack / stock_counts * 100).round(2)
+                df_result = pd.DataFrame({'date': df_return.index.strftime('%Y-%m-%d'), 'count': stock_counts.values, 'avg_change': avg_changes.values, 'count_of_attack': count_of_attack.values, 'pct_of_attack': pct_of_attack.values})
+                df_result['category'] = concept
+                return df_result[['category', 'date', 'count', 'avg_change', 'count_of_attack', 'pct_of_attack']]
+            except Exception as e:
+                return pd.DataFrame()
+        else:
+            return pd.DataFrame()
+
+    def get_top_N_days_by_avg_change(self, concept, days=1200, N=10):
+        df_concept = self.get_stock_count_and_avg_change_of_a_category(concept, count=days)
+        if df_concept.empty:
+            return
+        top_N_days = df_concept.sort_values(by='avg_change', ascending=False).head(N)
+        for index, row in top_N_days.iterrows():
+            pass
+        return top_N_days.copy()
+
+    def lead_stocks_in_category(self, category_value, end_date=dt.datetime.now(), watch_days=60, top_N=10, fuzzy_match=True, draw_chart=True):
+        if not fuzzy_match:
+            concept_stocks = self.concept_category[self.concept_category['category'] == category_value]['code'].unique()
+        else:
+            concept_stocks = self.concept_category[self.concept_category['category'].str.contains(category_value)]['code'].unique()
+        concept_stocks = [code if code.endswith('.XSHG') or code.endswith('.XSHE') else code + '.XSHG' if code.startswith('6') else code + '.XSHE' for code in concept_stocks]
+        if len(concept_stocks) == 0:
+            return []
+        try:
+            close_prices = get_price(concept_stocks, end_date=end_date, count=watch_days + 1, fields=['close'], panel=True)['close']
+        except Exception as e:
+            return []
+        if close_prices.empty:
+            return []
+        close_prices = close_prices.fillna(method='ffill').fillna(0)
+        df_return = (close_prices / close_prices.shift(1) - 1).iloc[1:]
+        df_attack = (df_return > 0.09).astype(int)
+        valid_stocks = df_return.columns[df_return.notna().any()].tolist()
+        df_return = df_return[valid_stocks]
+        df_attack = df_attack[valid_stocks]
+        if df_return.empty:
+            return []
+        attack_counts = df_attack.sum(axis=0).sort_values(ascending=False).head(top_N)
+        lead_stocks_by_attack = attack_counts.index
+        import matplotlib.pyplot as plt
+        stock_cumulative_returns = {}
+        for stock in lead_stocks_by_attack:
+            stock_cumulative_return = close_prices[stock].pct_change().cumsum().iloc[-watch_days:]
+            stock_cumulative_returns[stock] = stock_cumulative_return.iloc[-1]
+        sorted_stocks_by_return = sorted(stock_cumulative_returns.items(), key=lambda x: x[1], reverse=True)
+        if draw_chart:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            lines = []
+            labels_by_return = []
+            for stock, _ in sorted_stocks_by_return:
+                stock_name = get_stock_name(stock)
+                stock_return = close_prices[stock].pct_change().cumsum().iloc[-watch_days:]
+                line, = ax.plot(stock_return.index, stock_return.values, label=f'{stock} ({stock_name})')
+                lines.append(line)
+                labels_by_return.append(f'{stock} ({stock_name})')
+            try:
+                pass
+            except Exception as e:
+                pass
+        return list(lead_stocks_by_attack)
+
+    def lead_stocks_in_category_with_K_line(self, category_value, end_date=dt.datetime.now(), watch_days=60, top_N=10, fuzzy_match=True):
+        if not fuzzy_match:
+            concept_stocks = self.concept_category[self.concept_category['category'] == category_value]['code'].unique()
+        else:
+            concept_stocks = self.concept_category[self.concept_category['category'].str.contains(category_value)]['code'].unique()
+        concept_stocks = [code if code.endswith('.XSHG') or code.endswith('.XSHE') else code + '.XSHG' if code.startswith('6') else code + '.XSHE' for code in concept_stocks]
+        if len(concept_stocks) == 0:
+            return
+        daily_prices = get_price(concept_stocks, end_date=end_date, count=watch_days + 1, fields=['open', 'close', 'high', 'low', 'high_limit', 'volume'], panel=True)
+        open_prices = daily_prices['open']
+        close_prices = daily_prices['close']
+        high_prices = daily_prices['high']
+        low_prices = daily_prices['low']
+        df_return = (close_prices / close_prices.shift(1) - 1).iloc[1:]
+        df_attack = (df_return > 0.09).astype(int)
+        attack_counts = df_attack.sum(axis=0).sort_values(ascending=False).head(top_N)
+        lead_stocks = attack_counts.index
+        mc = mpf.make_marketcolors(up='green', down='red', edge='inherit', wick='inherit', volume='inherit')
+        s = mpf.make_mpf_style(marketcolors=mc)
+        for stock in lead_stocks:
+            stock_name = get_stock_name(stock)
+            stock_data = pd.DataFrame({'open': open_prices[stock], 'high': high_prices[stock], 'low': low_prices[stock], 'close': close_prices[stock], 'volume': daily_prices['volume'][stock]})
+            stock_data.index = pd.to_datetime(stock_data.index)
+            mpf.plot(stock_data, type='candle', style=s, title=f'{stock_name} ({stock}) - K Line', ylabel='Price', volume=True, mav=(5, 10), show_nontrading=False, figsize=(12, 6))
+        plt.rcParams.update(plt.rcParamsDefault)
+category = Category()
+category.concept_category['name'] = category.concept_category['code'].apply(get_stock_name)
+category.concept_category = category.concept_category[category.concept_category['name'] != 'Unknown']
+category.concept_category.reset_index(drop=True, inplace=True)
+categories_to_drop = ['标普道琼斯中国', '富时罗素', 'MSCI', 'CIPS概念', 'ST', 'st', '融资融券', '融券', '融资微盘股', '专精特新', '区块链', '数字经济', '注册制次新股', '新股与次新股', '低价股', '可转债', '昨日涨停', '昨日连板', '昨日首板', '昨日触板', '科创企业同股同权', '一带一路', '北京冬奥会', '房价上涨', '广东', '浙江', '上海', '江苏', '深圳', '北京']
+category.concept_category = category.concept_category[~category.concept_category['category'].isin(categories_to_drop)]
+pattern = '|'.join([f'.*{word}.*' for word in categories_to_drop])
+category.concept_category = category.concept_category[~category.concept_category['category'].str.contains(pattern, na=False)]
+if g.remove_concept_with_more_than_N_stocks:
+    category.remove_category_with_stocks_more_than_N(N=g.remove_concept_with_more_than_N_stocks)
+category.find_categories_by_words('光刻')
+category.lead_stocks_in_category('先进封装', end_date=g.end_date, watch_days=10, top_N=8)
+df_stock_score = category.score_by_return(return_days=1, return_filter=0.09, end_dt=g.end_date, count=g.watch_days, debug=True)
+df_industry_score = category.industry_score_and_pct_attacking(df_score=df_stock_score, count=g.watch_days, daily_top_filter=10, top_N=5, level=1)
+df_industry_score_rank_table = category.construct_category_rank_table(df_final=df_industry_score, top_N=5)
+df_industry_score_rank_table
+df_category_score = category.category_score_and_pct_attacking(df_score=df_stock_score, df_category=category.concept_category, count=g.watch_days, daily_top_filter=10)
+df_category_money_flow_rank_table = category.construct_category_rank_table(df_final=df_category_score, top_N=5)
+df_category_money_flow_rank_table
+df_category_score_by_pct_attacking = df_category_score.copy()
+df_category_score_by_pct_attacking['score'] = df_category_score_by_pct_attacking['pct_of_attack']
+df_category_money_flow_rank_table_by_pct_attacking = category.construct_category_rank_table(df_final=df_category_score_by_pct_attacking, top_N=5)
+df_category_money_flow_rank_table_by_pct_attacking
+last_day = df_category_score_by_pct_attacking['date'].max()
+df_last_day_category_score = df_category_score[df_category_score['date'] == last_day]
+df_last_day_category_score_sorted = df_last_day_category_score.sort_values(by='pct_of_attack', ascending=False)
+df_last_day_category_score_sorted
+category.lead_stocks_in_category('金属新材料', end_date=g.end_date, watch_days=10, top_N=8)
+stocks_in_hot_industry = category.find_stocks_by_industry('国企改革', fuzzy_match=True)
+stocks_in_hot_concept = category.find_stocks_by_category('房地产', fuzzy_match=True)
+hot_stocks_intersection = list(set(stocks_in_hot_industry).intersection(set(stocks_in_hot_concept)))
+for stock in hot_stocks_intersection:
+    pass
+hot_stocks_union = list(set(stocks_in_hot_industry).union(set(stocks_in_hot_concept)))
+
+def get_hot_industry_stocks(df_industry_score, category):
+    last_day = df_industry_score['date'].max()
+    hottest_industry = df_industry_score[df_industry_score['date'] == last_day].sort_values(by='score', ascending=False).iloc[0]['category']
+    industry_stocks = category.find_stocks_by_industry(hottest_industry, fuzzy_match=True)
+    return industry_stocks
+
+def get_hot_category_stocks(df_category_score, concept_category_df):
+    last_day = df_category_score['date'].max()
+    hottest_category_by_attack_count = df_category_score[df_category_score['date'] == last_day].sort_values(by='score', ascending=False).iloc[0]['category']
+    stocks_in_hottest_category_by_attack_count = concept_category_df[concept_category_df['category'] == hottest_category_by_attack_count]['code'].unique().tolist()
+    hottest_category_by_attack_pct = df_category_score[df_category_score['date'] == last_day].sort_values(by='pct_of_attack', ascending=False).iloc[0]['category']
+    stocks_in_hottest_category_by_attack_pct = concept_category_df[concept_category_df['category'] == hottest_category_by_attack_pct]['code'].unique().tolist()
+    category_stocks = list(set(stocks_in_hottest_category_by_attack_count).union(set(stocks_in_hottest_category_by_attack_pct)))
+    return category_stocks
+
+def get_combined_stocks(df_industry_score, df_category_score, category):
+    industry_stocks = get_hot_industry_stocks(df_industry_score, category)
+    category_stocks = get_hot_category_stocks(df_category_score, category.concept_category)
+    combined_stocks = set(industry_stocks).union(set(category_stocks))
+    return list(combined_stocks)
+hot_stocks = get_combined_stocks(df_industry_score, df_category_score, category)
+N_days = 20
+category.lead_stocks_in_category('新型城镇化', end_date=g.end_date, watch_days=10, top_N=8)
+category.lead_stocks_in_category('数字货币', end_date=g.end_date, watch_days=N_days, top_N=8)
+category.lead_stocks_in_category('送转预期', end_date=g.end_date, watch_days=N_days, top_N=8)
+N_days = 10
+min_pct_of_attack = 5
+top_N = 3
+
+def find_lead_stocks_in_recent_hot_concepts(df_category_score, N_days=10, top_N=8, min_pct_of_attack=5, draw_chart=True):
+    df_category_score = df_category_score.sort_values(by='date', ascending=False)
+    printed_categories = set()
+    all_lead_stocks = set()
+    for date in df_category_score['date'].unique():
+        df_daily = df_category_score[df_category_score['date'] == date]
+        highest_score_concept = df_daily.loc[df_daily['score'].idxmax()]
+        highest_score_category = highest_score_concept['category']
+        highest_score_value = highest_score_concept['score']
+        highest_pct_attack_concept = df_daily.loc[df_daily['pct_of_attack'].idxmax()]
+        highest_pct_attack_category = highest_pct_attack_concept['category']
+        highest_pct_attack_value = highest_pct_attack_concept['pct_of_attack']
+        if highest_score_category not in printed_categories:
+            if draw_chart:
+                pass
+            if draw_chart:
+                pass
+            lead_stocks = category.lead_stocks_in_category(highest_score_category, end_date=g.auc_date, watch_days=N_days, top_N=top_N, fuzzy_match=False, draw_chart=draw_chart)
+            all_lead_stocks.update(lead_stocks)
+            printed_categories.add(highest_score_category)
+        if highest_pct_attack_category not in printed_categories:
+            if draw_chart:
+                pass
+            if draw_chart:
+                pass
+            lead_stocks = category.lead_stocks_in_category(highest_pct_attack_category, end_date=g.auc_date, watch_days=N_days, top_N=top_N, fuzzy_match=False, draw_chart=draw_chart)
+            all_lead_stocks.update(lead_stocks)
+            printed_categories.add(highest_pct_attack_category)
+        df_high_attack = df_daily[df_daily['pct_of_attack'] > min_pct_of_attack]
+        for _, row in df_high_attack.iterrows():
+            category_name = row['category']
+            pct_of_attack = row['pct_of_attack']
+            if category_name not in printed_categories:
+                if draw_chart:
+                    pass
+                if draw_chart:
+                    pass
+                lead_stocks = category.lead_stocks_in_category(category_name, end_date=g.auc_date, watch_days=N_days, top_N=top_N, fuzzy_match=False, draw_chart=draw_chart)
+                all_lead_stocks.update(lead_stocks)
+                printed_categories.add(category_name)
+    return list(all_lead_stocks)
+hot_stocks_in_last_N_days = find_lead_stocks_in_recent_hot_concepts(df_category_score, N_days, top_N, min_pct_of_attack, draw_chart=True)
+for stock in hot_stocks_in_last_N_days:
+    pass
+import matplotlib.pyplot as plt
+
+def plot_top_5_concepts_in_full_period(df, column, title, top_n=5, top_down=True):
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    max_values = df.groupby('category')[column].max()
+    if top_down:
+        top_categories = max_values.nlargest(top_n).index.tolist()
+    else:
+        top_categories = max_values.nsmallest(top_n).index.tolist()
+    df['category_stock_count'] = df['category'] + ' (' + df['stock_count'].astype(str) + ' 成分股)'
+    nan_data_pre_merge = df[df.isnull().any(axis=1)]
+    if not nan_data_pre_merge.empty:
+        missing_columns = ['net_amount_main', 'total_money']
+        for index, row in nan_data_pre_merge.iterrows():
+            for col in missing_columns:
+                if pd.isnull(row[col]):
+                    pass
+    combined_data_table = df[df['category'].isin(top_categories)].pivot_table(index='category', columns='date', values=column, aggfunc='sum', fill_value=0).reindex(top_categories)
+    combined_data_table.index = [f"{category} ({df[df['category'] == category]['stock_count'].iloc[0]} 成分股)" for category in top_categories]
+    nan_data_post_merge = combined_data_table[combined_data_table.isnull().any(axis=1)]
+    if not nan_data_post_merge.empty:
+        pass
+    for category, label in zip(top_categories, combined_data_table.index):
+        category_data = df[df['category'] == category]
+
+def plot_top_5_concepts_in_last_day(df, column, title, top_n=5, top_down=True):
+    import matplotlib.pyplot as plt
+    latest_date = df['date'].max()
+    df_latest = df[df['date'] == latest_date]
+    if top_down:
+        df_latest_sorted = df_latest.nlargest(top_n, column)
+    else:
+        df_latest_sorted = df_latest.nsmallest(top_n, column)
+    top_categories = df_latest_sorted['category'].tolist()
+    df_latest_sorted['category_stock_count'] = df_latest_sorted['category'] + ' (' + df_latest_sorted['stock_count'].astype(str) + ' 成分股)'
+    combined_data_table = df[df['category'].isin(top_categories)].pivot_table(index='category', columns='date', values=column, aggfunc='sum', fill_value=0).reindex(top_categories)
+    combined_data_table.index = df_latest_sorted['category_stock_count']
+    for category, label in zip(df_latest_sorted['category'], df_latest_sorted['category_stock_count']):
+        category_data = df[df['category'] == category]
+df_industry_hierarchy = category.industry_hierarchy()
+industry_L1_list = df_industry_hierarchy['一级行业'].drop_duplicates().tolist()
+industry_L2_list = df_industry_hierarchy['二级行业'].drop_duplicates().tolist()
+industry_L3_list = df_industry_hierarchy['三级行业'].drop_duplicates().tolist()
+industry_money_flow_df = category.industry_money_flow(end_date=g.end_date, count=g.watch_days, top_N=10000, level=1)
+last_date = max(industry_money_flow_df['date'])
+industry_money_flow_last_date_df = industry_money_flow_df[industry_money_flow_df['date'] == last_date]
+industry_money_flow_last_date_df_sorted = industry_money_flow_last_date_df.sort_values(by='net_amount_main', ascending=False)
+industry_money_flow_last_date_df_sorted
+plot_top_5_concepts_in_last_day(industry_money_flow_df, 'net_amount_main', '最后一天 【大单资金】流入最多的行业', top_n=5, top_down=True)
+plot_top_5_concepts_in_last_day(industry_money_flow_df, 'net_amount_main', '最后一天 【大单资金】流出最多的行业', top_n=5, top_down=False)
+industry_L2_money_flow_df = category.industry_money_flow(end_date=g.end_date, count=g.watch_days, top_N=10000, level=2)
+plot_top_5_concepts_in_last_day(industry_L2_money_flow_df, 'net_amount_main', '最后一天 【大单资金】流入最多的 二级行业', top_n=5, top_down=True)
+plot_top_5_concepts_in_last_day(industry_L2_money_flow_df, 'net_amount_main', '最后一天 【大单资金】流出最多的 二级行业', top_n=5, top_down=False)
+category.lead_stocks_in_category('证券II', end_date=g.end_date, watch_days=10, top_N=8)
+unique_concepts = category.concept_category['category'].nunique()
+concept_names = category.concept_category['category'].unique()
+df_category_money_flow = category.category_money_flow(end_date=g.end_date, count=g.watch_days, top_N=10000)
+nan_data = df_category_money_flow[df_category_money_flow.isnull().any(axis=1)]
+plot_top_5_concepts_in_last_day(df_category_money_flow, 'net_amount_main', '最后一天 【大单资金】流入最多的板块', top_n=5, top_down=True)
+plot_top_5_concepts_in_last_day(df_category_money_flow, 'net_amount_main', '最后一天 【大单资金】流出最多的板块', top_n=5, top_down=False)
+plot_top_5_concepts_in_last_day(df_category_money_flow, 'avg_big_money_per_stock', '最后一天 平均每股【大单资金】流入最多的板块', top_n=5, top_down=True)
+plot_top_5_concepts_in_last_day(df_category_money_flow, 'avg_big_money_per_stock', '最后一天 平均每股【大单资金】流出最多的板块', top_n=5, top_down=False)
+category.lead_stocks_in_category('稀土', end_date=g.end_date, watch_days=10, top_N=8)
+category.lead_stocks_in_category('华为欧拉', end_date=g.end_date, watch_days=10, top_N=8)
+category.lead_stocks_in_category('华为昇腾', end_date=g.end_date, watch_days=10, top_N=8)
+df_stocks_count_and_avg_change_of_a_category = category.get_stock_count_and_avg_change_of_a_category('房地产开发', count=60)
+df_stocks_count_and_avg_change_of_a_category
+df_top_N_days_by_avg_change = category.get_top_N_days_by_avg_change('房地产开发', days=2400, N=10)

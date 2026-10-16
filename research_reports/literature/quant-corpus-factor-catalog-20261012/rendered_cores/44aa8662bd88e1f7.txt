@@ -1,0 +1,56 @@
+quant/2024年度精选策略2/91.【复现】特征分布建模择时.txt
+from typing import List, Tuple, Dict, Callable, Union
+import datetime as dt
+import numpy as np
+import pandas as pd
+from six import BytesIO
+from jqdata import *
+enable_profile()
+
+def initialize(context):
+    set_backtest()
+    set_params()
+    set_variables()
+    before_trading_start(context)
+    run_daily(get_signal, '9:00', reference_security='000300.XSHG')
+    run_daily(trade, 'open', reference_security='000300.XSHG')
+
+def set_params():
+    g.fast_period = 30
+    g.slow_period = 100
+    g.target_benchmark = '000300.XSHG'
+    g.target_etf = '510300.XSHG'
+    g.to_buy = False
+
+def set_variables():
+    g.orders_frame = pd.read_csv(BytesIO(read_file('trade_list.csv')), index_col=[0], parse_dates=['datein', 'dateout'])
+    g.orders_frame['datein'] = g.orders_frame['datein'].dt.date
+    g.orders_frame['dateout'] = g.orders_frame['dateout'].dt.date
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=b2647d09183df0425121a2f2f5ab1a204ce4359e1d8071c993b7eb6b021ac9be source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+
+def calc_netbuy(billboard: pd.DataFrame) -> pd.Series:
+
+    def _calc_func(df: pd.DataFrame):
+        return billboard.query('sales_depart_name=="机构专用"').groupby('day').apply(_calc_func)
+    return billboard.groupby('day').apply(_calc_func)
+
+def HMA(price: pd.Series, window: int) -> pd.Series:
+    if not isinstance(price, pd.Series):
+        raise ValueError('price必须为pd.Series')
+    hma = talib.WMA(2 * talib.WMA(price, int(window * 0.5)) - talib.WMA(price, window), int(np.sqrt(window)))
+    return hma
+
+def get_signal(context):
+    trade_dt = context.current_dt.date()
+    if trade_dt in g.orders_frame['datein'].tolist():
+        g.to_buy = True
+    if trade_dt in g.orders_frame['dateout'].tolist():
+        g.to_buy = False
+
+def trade(context):
+    if g.to_buy:
+        if not context.portfolio.long_positions:
+            order_target_value(g.target_etf, context.portfolio.total_value)
+    elif context.portfolio.long_positions:
+        order_target(g.target_etf, 0)

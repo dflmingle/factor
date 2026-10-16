@@ -1,0 +1,108 @@
+quant/2024年度精选策略2/42.实盘出现的问题和解决办法.txt
+import math
+'EXACT_REVIEWED_FUNCTION set_param sha256=be901e9e0c4a75a166d1c288d047f02b0cb0aef7ca390fc4f84de5c68ec38bce source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION get_growth_rate sha256=f1ddb3d8925411553af58794b109297080c39e7147c7543ba82444bfc19d8a71 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+'EXACT_REVIEWED_FUNCTION get_growth_rate60 sha256=7546d167c6a650566bcf5ce1678362a93401076786fd66e094ec3dc4826a896c source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=2e292d984bfcc9e0efa18b0bf3bcdee6f318ad039f81fd1e7b4bf1324692a8af source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+'EXACT_REVIEWED_FUNCTION get_close_price sha256=bfeb75b846dd71d934c2e0d5c19c571057c3dbc10e1bd46d0d7fc17339047381 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=c736b54518a95ac38a800d7666718ea85ccd12e460d9849068d4b45c83634972 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+'EXACT_REVIEWED_FUNCTION clear_position sha256=f3ce4b9d4cc46bd6280c33a287587b82b7a939eb25eb8ca89fb067456e163317 source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_st_stock(stock_list):
+    current_data = get_current_data()
+    selection = []
+    for stock in stock_list:
+        try:
+            if not current_data[stock].is_st and 'ST' not in current_data[stock].name and ('*' not in current_data[stock].name) and ('退' not in current_data[stock].name):
+                selection.append(stock)
+        except Exception as e:
+            pass
+    return selection
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=2e49b968b19f0649457bb030b5b707bc9ba8fbf6c76eae342fbed44491173e91 source=quant/2024年度精选策略1/66.SVR机器学习上证综指择时中小板财务选股策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=a064bad8626e9e1130f5c10efaee655d66a87f8f715ddd71cc78178794a9e237 source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION filter_increase1d sha256=e41dc6ac7b3fe549679931aad0b079e50e999635fa756369afa788faaf2cb8e3 source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION filter_buyagain sha256=8dc4a05fdab104a08d45646280c708dd1e703bda9e1078ec918b38cb40f43efe source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_list sha256=51dece56d488c585932323959fa0e26328c1adbe9c101a2c59025057c14bfd1d source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_rank_m_m sha256=a10512d159a09623b550f424920cb7861d02a53c3791bb5c63062b4823f3d013 source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+
+def my_adjust_position(context, hold_stocks):
+    if g.choose_time_signal and (not g.isbull):
+        free_value = context.portfolio.total_value * g.bearpercent
+        maxpercent = 1.3 / g.stocknum * g.bearpercent
+    else:
+        free_value = context.portfolio.total_value
+        maxpercent = 1.3 / g.stocknum
+    buycash = free_value / g.stocknum
+    for stock in context.portfolio.positions.keys():
+        current_data = get_current_data()
+        price1d = get_close_price(stock, 1)
+        nosell_1 = context.portfolio.positions[stock].price >= current_data[stock].high_limit
+        if g.direction == -1:
+            sell_2 = stock not in hold_stocks[:g.stocknum]
+        else:
+            sell_2 = stock not in hold_stocks
+        if sell_2 and (not nosell_1):
+            close_position(stock)
+        else:
+            current_percent = context.portfolio.positions[stock].value / context.portfolio.total_value
+            if current_percent > maxpercent:
+                order_target_value(stock, buycash)
+
+def mybuy(context):
+    if not g.nohold:
+        hold_stocks = filter_buyagain(g.chosen_stock_list)
+        if g.choose_time_signal and (not g.isbull):
+            free_value = context.portfolio.total_value * g.bearpercent
+            minpercent = 0.7 / g.stocknum * g.bearpercent
+        else:
+            free_value = context.portfolio.total_value
+            minpercent = 0.7 / g.stocknum
+        buycash = free_value / g.stocknum
+        free_cash = free_value - context.portfolio.positions_value
+        for i in range(min(g.buyrank, len(hold_stocks))):
+            if hold_stocks[i] not in get_blacklist() and free_cash > context.portfolio.total_value / (g.stocknum * 10):
+                if hold_stocks[i] in context.portfolio.positions.keys():
+                    current_percent = context.portfolio.positions[hold_stocks[i]].value / context.portfolio.total_value
+                    if current_percent >= minpercent:
+                        continue
+                    tobuy = min(free_cash, buycash - context.portfolio.positions[hold_stocks[i]].value)
+                else:
+                    tobuy = min(buycash, free_cash)
+                order_value(hold_stocks[i], tobuy)
+                free_cash += -tobuy
+'EXACT_REVIEWED_FUNCTION get_bull_bear_signal_minute sha256=4871cfa3bf7166c802a2f4fae6f5408638adda8b61fb26d494b11719736fca68 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+
+def before_trading_start(context):
+    temp = g.sold_stock
+    g.sold_stock = {}
+    for stock in temp.keys():
+        if temp[stock] >= g.buyagain - 1:
+            pass
+        else:
+            g.sold_stock[stock] = temp[stock] + 1
+    g.chosen_stock_list = get_stock_list(context)
+'EXACT_REVIEWED_FUNCTION myscheduler sha256=6bd4ca9e9819b4f6bf1fc9e8d4a6754ddd26205e45c856541d1e0388e5dca75b source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION after_code_changed sha256=cb84fea524a98b9f3b5b2670f49d4b61cfb3519300d90e69c7da269e896dcf01 source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+'EXACT_REVIEWED_FUNCTION initialize sha256=ef22611275c07523427812bc5dcca780463bdaf24b178f28aaba05412ef368f9 source=quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt'
+
+def gogogo(context):
+    temp0 = g.isbull
+    get_bull_bear_signal_minute()
+    temp1 = g.isbull
+    if temp0 and (not temp1):
+        g.direction = -1
+    elif not temp0 and temp1:
+        g.direction = 1
+    else:
+        g.direction = 0
+    if g.isbull:
+        pass
+    if g.choose_time_signal and (not g.isbull) and (not g.bearposition) or len(g.chosen_stock_list) < 10:
+        clear_position(context)
+        g.nohold = True
+    else:
+        g.chosen_stock_list = get_stock_rank_m_m(g.chosen_stock_list)
+        my_adjust_position(context, g.chosen_stock_list)
+        g.nohold = False
+'EXACT_REVIEWED_FUNCTION get_blacklist sha256=1a66014e64f39e15fccd893ed80482e0638892b2ca7304ab4dad6aa3c09ebd92 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'

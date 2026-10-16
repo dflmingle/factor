@@ -1,0 +1,1496 @@
+{
+  "valid": true,
+  "score": -158.71209181754975,
+  "pool": [
+    {
+      "op": "ts_mean",
+      "args": [
+        {
+          "op": "div",
+          "args": [
+            {
+              "op": "abs",
+              "args": [
+                {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "field",
+                          "value": "close"
+                        },
+                        {
+                          "op": "delay",
+                          "args": [
+                            {
+                              "op": "decaylinear",
+                              "args": [
+                                {
+                                  "op": "abs",
+                                  "args": [
+                                    {
+                                      "op": "max2",
+                                      "args": [
+                                        {
+                                          "op": "field",
+                                          "value": "open"
+                                        },
+                                        {
+                                          "op": "field",
+                                          "value": "roe"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ],
+                              "value": 27
+                            }
+                          ],
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "const",
+                      "value": 1.0
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "value": "amount"
+            }
+          ]
+        }
+      ],
+      "value": 60
+    },
+    {
+      "op": "field",
+      "value": "bm"
+    },
+    {
+      "op": "zscore",
+      "args": [
+        {
+          "op": "ts_mean",
+          "args": [
+            {
+              "op": "div",
+              "args": [
+                {
+                  "op": "abs",
+                  "args": [
+                    {
+                      "op": "sub",
+                      "args": [
+                        {
+                          "op": "field",
+                          "value": "cfp"
+                        },
+                        {
+                          "op": "less2",
+                          "args": [
+                            {
+                              "op": "field",
+                              "value": "bm"
+                            },
+                            {
+                              "op": "field",
+                              "value": "current_ratio"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "field",
+                  "value": "amount"
+                }
+              ]
+            }
+          ],
+          "value": 40
+        }
+      ]
+    },
+    {
+      "op": "zscore",
+      "args": [
+        {
+          "op": "rank",
+          "args": [
+            {
+              "op": "field",
+              "value": "cap"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "sub",
+      "args": [
+        {
+          "op": "div",
+          "args": [
+            {
+              "op": "field",
+              "value": "close"
+            },
+            {
+              "op": "ts_max",
+              "args": [
+                {
+                  "op": "field",
+                  "value": "close"
+                }
+              ],
+              "value": 90
+            }
+          ]
+        },
+        {
+          "op": "const",
+          "value": 100.0
+        }
+      ]
+    },
+    {
+      "op": "field",
+      "value": "leverage"
+    },
+    {
+      "op": "rank",
+      "args": [
+        {
+          "op": "field",
+          "value": "turnover"
+        }
+      ]
+    },
+    {
+      "op": "div",
+      "args": [
+        {
+          "op": "field",
+          "value": "open"
+        },
+        {
+          "op": "field",
+          "value": "volume"
+        }
+      ]
+    },
+    {
+      "op": "max2",
+      "args": [
+        {
+          "op": "ts_skew",
+          "args": [
+            {
+              "op": "max2",
+              "args": [
+                {
+                  "op": "ema",
+                  "args": [
+                    {
+                      "op": "const",
+                      "value": 2.0
+                    }
+                  ],
+                  "value": 77
+                },
+                {
+                  "op": "abs",
+                  "args": [
+                    {
+                      "op": "field",
+                      "value": "gm"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "value": 3
+        },
+        {
+          "op": "field",
+          "value": "roe"
+        }
+      ]
+    }
+  ],
+  "formulas": [
+    "TS_MEAN((ABS(((CLOSE/DELAY(DECAYLINEAR(ABS(MAX(OPEN,ROE)),27),1))-1))/AMOUNT),60)",
+    "BOOK_TO_MARKET_RATIO_LF",
+    "ZSCORE(TS_MEAN((ABS((RATIO_CFP_TTM-(BOOK_TO_MARKET_RATIO_LF<CURRENT_RATIO)))/AMOUNT),40))",
+    "ZSCORE(RANK(MARKET_CAP))",
+    "((CLOSE/TS_MAX(CLOSE,90))-100)",
+    "LEVERAGE",
+    "RANK(TURNOVER)",
+    "(OPEN/VOLUME)",
+    "MAX(TS_SKEW(MAX(EMA(2,77),ABS(GM)),3),ROE)"
+  ],
+  "directions": [
+    1.0,
+    1.0,
+    1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    1.0,
+    1.0,
+    -1.0
+  ],
+  "equal_seat_weights": true,
+  "target": {
+    "rank": 39,
+    "participant_id": "681b3e706bc74ecf94e832895a6f058d",
+    "pool_id": "b08e67050c30eb0fa1f10159",
+    "display_name": "小马珍珠",
+    "avatar_url": "https://pandaai.tos-cn-shanghai.volces.com/avatar/panda-8.webp",
+    "school_name": null,
+    "entrant_type": "agent",
+    "identity_type": "professional",
+    "pool_name": "day0",
+    "style_tag": "价值质量型",
+    "score": 35893.19666676582,
+    "monthly_points": 9943.522492822833,
+    "total_points": 35893.19666676582,
+    "active_factor_count": 8,
+    "pool_age_months": 1,
+    "rank_delta": 49,
+    "prize_rank": null,
+    "reward": null,
+    "metrics": {
+      "monthly_points": 9943.522492822833,
+      "monthly_points_estimate": 9943.522492822833,
+      "monthly_points_official": null,
+      "booked_points": 25949.67417394299,
+      "cumulative_points": 35893.19666676582,
+      "na": 0.08922746165863349,
+      "nb": 0.5946961578069387,
+      "nc": 0.0,
+      "contribution_a": 0.0178454923317267,
+      "contribution_b": 0.20814365523242856,
+      "contribution_c": 0.0,
+      "comb": 0.22598914756415528,
+      "raw_a": 0.007138196932690679,
+      "raw_b": 0.03568176946841633,
+      "raw_c": -75.20299817447264,
+      "anchor_a": 0.08,
+      "anchor_b": 0.06,
+      "anchor_c": 0.6,
+      "denominator_a": 8,
+      "denominator_b": 5,
+      "decay": 1.0,
+      "new_pool_cap": 0.7,
+      "newbie_factor": 1.1,
+      "points_before_cap": 9943.522492822833,
+      "frozen": false,
+      "freeze_reason": null,
+      "is_newbie": true,
+      "annual_rex": 1.6340896862504315,
+      "annual_sr": -16.242595228985646,
+      "monthly_rex": 0.08405806926565446,
+      "max_dd": 0.01655565227575717,
+      "turn": 0.3459244532803161,
+      "score_period": "2026-10",
+      "score_snapshot_type": "preview",
+      "active_factor_count": 8,
+      "pool_age_months": 1,
+      "points_before_newbie": 9039.565902566212
+    }
+  },
+  "cycle": 5,
+  "ic": [
+    [
+      0.009950022912825467,
+      -0.061041756262286535,
+      0.23922509795004557,
+      0.11552692464323602
+    ],
+    [
+      0.13817765867286727,
+      -0.1697113132571255,
+      -0.03501166600278899,
+      0.34952837825912564
+    ],
+    [
+      0.02074407664882673,
+      -0.09254145910086685,
+      0.21008338928275458,
+      0.20358151986768575
+    ],
+    [
+      -0.03693829914658441,
+      0.06165721420893412,
+      -0.2280372690806464,
+      -0.1991134770781677
+    ],
+    [
+      0.05938717927805358,
+      -0.2555641096195442,
+      -0.024606812749542465,
+      0.26756562127256434
+    ],
+    [
+      0.08573639918488776
+    ],
+    [],
+    [],
+    []
+  ],
+  "rank_ic": [
+    [
+      0.028282654297067427,
+      -0.08151355949002462,
+      0.3353817185049923,
+      0.09192311681828966
+    ],
+    [
+      0.22126637191081777,
+      -0.2222842318351172,
+      -0.004032990873723514,
+      0.4864621831981851
+    ],
+    [
+      0.04601387075787456,
+      -0.11332231462216402,
+      0.3198950408729737,
+      0.21012497385547935
+    ],
+    [
+      -0.023837273124292107,
+      0.07774619027210238,
+      -0.3212494249604912,
+      -0.14781120383751356
+    ],
+    [
+      0.13681140870365668,
+      -0.2923746677431557,
+      -0.07021962856197829,
+      0.2952742695210014
+    ],
+    [
+      0.09332070361024067
+    ],
+    [],
+    [],
+    []
+  ],
+  "ic_mae": 0.020900174881879716,
+  "ic_max": 0.069785980722468,
+  "rankic_mae": 0.020884151394069423,
+  "rankic_max": 0.09471728261319606,
+  "checks": [
+    {
+      "trade_date": "20260903",
+      "signal_date": "20260902",
+      "overlap": 0.752,
+      "public_top1": "603385.SH",
+      "predicted_top1": "000910.SZ",
+      "top1_exact": false,
+      "public_holdings": 500,
+      "predicted_holdings": 471,
+      "numeric_labels": 500,
+      "missing_numeric_predictions": 14,
+      "unknown_symbols": 0,
+      "composite_rmse": 0.3007418165190493,
+      "observed_composite_rmse": 0.25346495971975724
+    },
+    {
+      "trade_date": "20260910",
+      "signal_date": "20260909",
+      "overlap": 0.7361111111111112,
+      "public_top1": "688737.SH",
+      "predicted_top1": "688737.SH",
+      "top1_exact": true,
+      "public_holdings": 504,
+      "predicted_holdings": 471,
+      "numeric_labels": 501,
+      "missing_numeric_predictions": 14,
+      "unknown_symbols": 0,
+      "composite_rmse": 0.3044427665654848,
+      "observed_composite_rmse": 0.2580744701555585
+    },
+    {
+      "trade_date": "20260917",
+      "signal_date": "20260916",
+      "overlap": 0.7733598409542743,
+      "public_top1": "603385.SH",
+      "predicted_top1": "688737.SH",
+      "top1_exact": false,
+      "public_holdings": 503,
+      "predicted_holdings": 471,
+      "numeric_labels": 502,
+      "missing_numeric_predictions": 11,
+      "unknown_symbols": 0,
+      "composite_rmse": 0.28263244624702255,
+      "observed_composite_rmse": 0.24344904590781213
+    },
+    {
+      "trade_date": "20260924",
+      "signal_date": "20260923",
+      "overlap": 0.6215139442231076,
+      "public_top1": "603385.SH",
+      "predicted_top1": "688737.SH",
+      "top1_exact": false,
+      "public_holdings": 502,
+      "predicted_holdings": 472,
+      "numeric_labels": 501,
+      "missing_numeric_predictions": 19,
+      "unknown_symbols": 0,
+      "composite_rmse": 0.35947140794590365,
+      "observed_composite_rmse": 0.30804923037885296
+    },
+    {
+      "trade_date": "20261009",
+      "signal_date": "20261008",
+      "overlap": 0.5407554671968191,
+      "public_top1": "605138.SH",
+      "predicted_top1": "688576.SH",
+      "top1_exact": false,
+      "public_holdings": 503,
+      "predicted_holdings": 472,
+      "numeric_labels": 502,
+      "missing_numeric_predictions": 9,
+      "unknown_symbols": 0,
+      "composite_rmse": 0.34840568703159736,
+      "observed_composite_rmse": 0.3245719116132808
+    }
+  ],
+  "components": {
+    "seat0:RankIC": 18.628329819988792,
+    "seat0:IC": 2.2020969661654455,
+    "seat1:RankIC": 0.27921763112067677,
+    "seat1:IC": 0.20333920320660206,
+    "seat2:RankIC": 66.37601050340331,
+    "seat2:IC": 10.686456672093696,
+    "seat3:RankIC": 0.0030761529346605147,
+    "seat3:IC": 1.128950630015168,
+    "seat4:RankIC": 1.3864415773902903,
+    "seat4:IC": 0.2678728055650683,
+    "seat5:RankIC": 10.66038918682655,
+    "seat5:IC": 18.958967310812998,
+    "composite": 41.08946831002956,
+    "holdings": 21.904667048916117,
+    "2026-09:raw_b": 48.71799455270811,
+    "2026-09:raw_c": 7.497203126641461,
+    "2026-09:turn": 0.25063507410111235,
+    "2026-09:annual_sr": 5.217516004564478,
+    "2026-09:max_dd": 1.1779451218933623,
+    "2026-09:annual_rex": 0.7054467181330688,
+    "2026-10:raw_b": 22.3761833211318,
+    "2026-10:raw_c": 2.7576748685194623,
+    "2026-10:turn": 3.222254056282536,
+    "2026-10:annual_sr": 0.0676812176206289,
+    "2026-10:max_dd": 0.17491381314054963,
+    "2026-10:annual_rex": 1.3792566311594021,
+    "2026-09:A_seat0": 0.001577678799832857,
+    "2026-10:A_seat0": 0.001577678799832857,
+    "2026-09:A_seat1": 0.0008715823013298688,
+    "2026-10:A_seat1": 0.0008715823013298688,
+    "2026-09:A_seat2": 0.17198796298201902,
+    "2026-10:A_seat2": 0.17198796298201902,
+    "2026-09:A_seat3": 0.02065360052806167,
+    "2026-10:A_seat3": 0.02065360052806167,
+    "2026-09:A_seat4": 1.2961510060741308,
+    "2026-10:A_seat4": 1.2961510060741308,
+    "2026-09:A_seat5": 0.039049451175744904,
+    "2026-10:A_seat6": 0.08991567913140082,
+    "2026-10:A_seat7": 0.986623149280201,
+    "2026-10:A_seat8": 2.0988203661851936,
+    "2026-09:raw_a": 15.849641918433056,
+    "2026-10:raw_a": 4.21766108515814
+  },
+  "membership_mismatch": [],
+  "reconstructed": false,
+  "search_objective_version": "IC-holdings-ABC-v3-month-roster-B3",
+  "months": [
+    {
+      "period": "2026-09",
+      "annual_rex": 0.8328936403958922,
+      "annual_sr": 0.6192004017228104,
+      "max_dd": 0.06289274767522501,
+      "turn": 0.905007377019684,
+      "raw_c": 0.5268525117855564,
+      "raw_b": 0.018397388475777716,
+      "seat_b": [
+        {
+          "id": "0595e9899e65d7a8c5cb8f96",
+          "score": 0.027289539011812764,
+          "periods": 3
+        },
+        {
+          "id": "40701375f1d8367ab2767327",
+          "score": 4.260237985398325e-06,
+          "periods": 3
+        },
+        {
+          "id": "cf82eb31e58ccc07af99a1cd",
+          "score": 0.021567945446200318,
+          "periods": 3
+        },
+        {
+          "id": "83bb36e51fe3d89b8a616c57",
+          "score": 0.02553208091777521,
+          "periods": 3
+        },
+        {
+          "id": "5bf3eec7256a0e19617fdafe",
+          "score": 0.017593116765114873,
+          "periods": 3
+        }
+      ],
+      "denominator_b": 5,
+      "local_B_count": 5,
+      "daily": [
+        {
+          "date": "20260903",
+          "p": -0.01678515297771634,
+          "b": 0.0010811919773427991,
+          "turnover": 0.5
+        },
+        {
+          "date": "20260904",
+          "p": 0.001359925775384996,
+          "b": -0.006313813630834386,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260907",
+          "p": 0.006755115100583003,
+          "b": 0.01079831942934728,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260908",
+          "p": 0.00945216412755967,
+          "b": 0.0002788687722361516,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260909",
+          "p": -0.006810900020358721,
+          "b": 0.0007279373817101753,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260910",
+          "p": -0.017248100337936736,
+          "b": -0.00800109672290461,
+          "turnover": 0.08280254777070062
+        },
+        {
+          "date": "20260911",
+          "p": -0.02453378666373262,
+          "b": -0.014150598801561332,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260914",
+          "p": 0.009910163868840723,
+          "b": -0.001237384519445217,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260915",
+          "p": -0.025417771619873093,
+          "b": -0.006628872667306163,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260916",
+          "p": 0.015525118989569344,
+          "b": 0.012905049241049849,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260917",
+          "p": 0.007496901411684965,
+          "b": -0.0033116722458007564,
+          "turnover": 0.08067940552016983
+        },
+        {
+          "date": "20260918",
+          "p": 0.011254879491380416,
+          "b": 0.014481042250988008,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260921",
+          "p": 0.027344369693592687,
+          "b": 0.010216014878391855,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260922",
+          "p": 0.01092308286079114,
+          "b": 0.00026651838137570216,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260923",
+          "p": 0.003379229047404627,
+          "b": -0.004362237889808385,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260924",
+          "p": -0.0029692009949293914,
+          "b": -0.01856930768061338,
+          "turnover": 0.24152542372881358
+        },
+        {
+          "date": "20260928",
+          "p": -0.00882042556463031,
+          "b": -0.02728698118145423,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260929",
+          "p": 0.012769862685208584,
+          "b": 0.0035605305196690917,
+          "turnover": 0.0
+        },
+        {
+          "date": "20260930",
+          "p": -0.0030120022495424945,
+          "b": -0.00035309962035645626,
+          "turnover": 0.0
+        }
+      ],
+      "public": {
+        "raw_a": 0.006014139271344818,
+        "raw_b": 0.021382281249721007,
+        "raw_c": 0.6304221196886985,
+        "annual_rex": 0.8618486080812563,
+        "annual_sr": 0.6990370080589314,
+        "max_dd": 0.05965544983005878,
+        "turn": 0.8872400517529743
+      },
+      "relative_delta": {
+        "raw_b": -0.1395965537579035,
+        "raw_c": -0.16428612618206462
+      },
+      "raw_a": 0.00649300439071005,
+      "na": 0.08116255488387562,
+      "nb": 0.306623141262962,
+      "nc": 0.878087519642594,
+      "comb": 0.5186899942579791,
+      "points": 22822.35974735108,
+      "raw_a_relative": 0.07962321751457438,
+      "raw_b_relative": 0.1395965537579035,
+      "raw_c_relative": 0.16428612618206462
+    },
+    {
+      "period": "2026-10",
+      "annual_rex": 1.5573255406431468,
+      "annual_sr": -16.453875773591637,
+      "max_dd": 0.01690185330469307,
+      "turn": 0.3707627118644068,
+      "raw_c": -67.70996015318518,
+      "raw_b": 0.03230602640141918,
+      "seat_b": [
+        {
+          "id": "0595e9899e65d7a8c5cb8f96",
+          "score": 0.03717588017194049,
+          "periods": 4
+        },
+        {
+          "id": "40701375f1d8367ab2767327",
+          "score": 0.023830414440234402,
+          "periods": 4
+        },
+        {
+          "id": "cf82eb31e58ccc07af99a1cd",
+          "score": 0.05291435900754378,
+          "periods": 4
+        },
+        {
+          "id": "83bb36e51fe3d89b8a616c57",
+          "score": 0.04701773697677054,
+          "periods": 4
+        },
+        {
+          "id": "5bf3eec7256a0e19617fdafe",
+          "score": 0.0005917414106066866,
+          "periods": 4
+        }
+      ],
+      "denominator_b": 5,
+      "local_B_count": 5,
+      "daily": [
+        {
+          "date": "20261008",
+          "p": -0.0017809908784016332,
+          "b": -0.015623666346172183,
+          "turnover": 0.0
+        },
+        {
+          "date": "20261009",
+          "p": -0.0032905491155795657,
+          "b": 0.0018551960732844375,
+          "turnover": 0.3707627118644068
+        },
+        {
+          "date": "20261012",
+          "p": -0.011896437287830124,
+          "b": -0.01422871525410696,
+          "turnover": 0.0
+        }
+      ],
+      "public": {
+        "raw_a": 0.007138196932690679,
+        "raw_b": 0.03568176946841633,
+        "raw_c": -75.20299817447264,
+        "annual_rex": 1.6340896862504315,
+        "annual_sr": -16.242595228985646,
+        "max_dd": 0.01655565227575717,
+        "turn": 0.3459244532803161
+      },
+      "relative_delta": {
+        "raw_b": -0.09460694122765369,
+        "raw_c": 0.09963749056790855
+      },
+      "raw_a": 0.007431390447809762,
+      "na": 0.09289238059762202,
+      "nb": 0.5384337733569863,
+      "nc": 0,
+      "comb": 0.20703029679446958,
+      "points": 9109.333058956663,
+      "raw_a_relative": 0.041073889930992126,
+      "raw_b_relative": 0.09460694122765369,
+      "raw_c_relative": 0.09963749056790855
+    }
+  ],
+  "seat_A": [
+    {
+      "seat_id": "0595e9899e65d7a8c5cb8f96",
+      "name": "p01a-p01-illiquid",
+      "formula": "TS_MEAN((ABS(((CLOSE/DELAY(DECAYLINEAR(ABS(MAX(OPEN,ROE)),27),1))-1))/AMOUNT),60)",
+      "by_month": {
+        "2026-09": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": 0.05021639963873062,
+            "icir": 0.35189770803066145,
+            "ic_win_rate": 0.6208333333333333,
+            "s_i_a": 0.010970768145103062,
+            "pearson_ic": 0.011657333303834424,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "0595e9899e65d7a8c5cb8f96",
+            "factor_name": "p01a-p01-illiquid",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 100.0,
+            "ic_mean": 0.051489032442737025,
+            "icir": 0.3435146422870123,
+            "ic_win_rate": 0.6041666666666666,
+            "s_i_a": 0.010686038755768006,
+            "contribution": 0.01768723656127118,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        },
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": 0.05021639963873062,
+            "icir": 0.35189770803066145,
+            "ic_win_rate": 0.6208333333333333,
+            "s_i_a": 0.010970768145103062,
+            "pearson_ic": 0.011657333303834424,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "0595e9899e65d7a8c5cb8f96",
+            "factor_name": "p01a-p01-illiquid",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 71.0,
+            "ic_mean": 0.051489032442737025,
+            "icir": 0.3435146422870123,
+            "ic_win_rate": 0.6041666666666666,
+            "s_i_a": 0.010686038755768006,
+            "contribution": 0.01768723656127118,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "40701375f1d8367ab2767327",
+      "name": "p01a-p01-value-bmttm",
+      "formula": "BOOK_TO_MARKET_RATIO_LF",
+      "by_month": {
+        "2026-09": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": 0.05355880634426377,
+            "icir": 0.3295669080386367,
+            "ic_win_rate": 0.5333333333333333,
+            "s_i_a": 0.009413978776063536,
+            "pearson_ic": 0.01173873165663494,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "40701375f1d8367ab2767327",
+            "factor_name": "p01a-p01-value-bmttm",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 94.0,
+            "ic_mean": 0.053473519564875775,
+            "icir": 0.31235885832508603,
+            "ic_win_rate": 0.575,
+            "s_i_a": 0.00960418332509753,
+            "contribution": 0.016702927521908748,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        },
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": 0.05355880634426377,
+            "icir": 0.3295669080386367,
+            "ic_win_rate": 0.5333333333333333,
+            "s_i_a": 0.009413978776063536,
+            "pearson_ic": 0.01173873165663494,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "40701375f1d8367ab2767327",
+            "factor_name": "p01a-p01-value-bmttm",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 67.0,
+            "ic_mean": 0.053473519564875775,
+            "icir": 0.31235885832508603,
+            "ic_win_rate": 0.575,
+            "s_i_a": 0.00960418332509753,
+            "contribution": 0.016702927521908748,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "cf82eb31e58ccc07af99a1cd",
+      "name": "p02a-p02-illiquid-n30",
+      "formula": "ZSCORE(TS_MEAN((ABS((RATIO_CFP_TTM-(BOOK_TO_MARKET_RATIO_LF<CURRENT_RATIO)))/AMOUNT),40))",
+      "by_month": {
+        "2026-09": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": 0.05684929859180512,
+            "icir": 0.3665041115531038,
+            "ic_win_rate": 0.6041666666666666,
+            "s_i_a": 0.012588115593987351,
+            "pearson_ic": 0.027438113908625116,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "cf82eb31e58ccc07af99a1cd",
+            "factor_name": "p02a-p02-illiquid-n30",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 93.0,
+            "ic_mean": 0.04957834494855842,
+            "icir": 0.3310693947624281,
+            "ic_win_rate": 0.6,
+            "s_i_a": 0.009848323593265273,
+            "contribution": 0.01641387265544212,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        },
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": 0.05684929859180512,
+            "icir": 0.3665041115531038,
+            "ic_win_rate": 0.6041666666666666,
+            "s_i_a": 0.012588115593987351,
+            "pearson_ic": 0.027438113908625116,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "cf82eb31e58ccc07af99a1cd",
+            "factor_name": "p02a-p02-illiquid-n30",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 66.0,
+            "ic_mean": 0.04957834494855842,
+            "icir": 0.3310693947624281,
+            "ic_win_rate": 0.6,
+            "s_i_a": 0.009848323593265273,
+            "contribution": 0.01641387265544212,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "83bb36e51fe3d89b8a616c57",
+      "name": "p01a-p01-size-logcap",
+      "formula": "ZSCORE(RANK(MARKET_CAP))",
+      "by_month": {
+        "2026-09": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": -0.040606618443651786,
+            "icir": -0.2029968764934093,
+            "ic_win_rate": 0.5708333333333333,
+            "s_i_a": 0.004705388704732808,
+            "pearson_ic": -0.03408112215816976,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": false
+          },
+          "public": {
+            "factor_instance_id": "83bb36e51fe3d89b8a616c57",
+            "factor_name": "p01a-p01-size-logcap",
+            "source": "ai",
+            "direction": "negative",
+            "factor_value": 50.0,
+            "ic_mean": 0.04151119037063224,
+            "icir": 0.21352519017662858,
+            "ic_win_rate": 0.5875,
+            "s_i_a": 0.005207414830779145,
+            "contribution": 0.008863684818347482,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        },
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": -0.040606618443651786,
+            "icir": -0.2029968764934093,
+            "ic_win_rate": 0.5708333333333333,
+            "s_i_a": 0.004705388704732808,
+            "pearson_ic": -0.03408112215816976,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": false
+          },
+          "public": {
+            "factor_instance_id": "83bb36e51fe3d89b8a616c57",
+            "factor_name": "p01a-p01-size-logcap",
+            "source": "ai",
+            "direction": "negative",
+            "factor_value": 35.0,
+            "ic_mean": 0.04151119037063224,
+            "icir": 0.21352519017662858,
+            "ic_win_rate": 0.5875,
+            "s_i_a": 0.005207414830779145,
+            "contribution": 0.008863684818347482,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "5bf3eec7256a0e19617fdafe",
+      "name": "p02a-p02-disthigh-n90",
+      "formula": "((CLOSE/TS_MAX(CLOSE,90))-100)",
+      "by_month": {
+        "2026-09": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": -0.021443140602700427,
+            "icir": -0.12347881855219038,
+            "ic_win_rate": 0.48333333333333334,
+            "s_i_a": 0.0012797572727071436,
+            "pearson_ic": -0.014054468003753321,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": false
+          },
+          "public": {
+            "factor_instance_id": "5bf3eec7256a0e19617fdafe",
+            "factor_name": "p02a-p02-disthigh-n90",
+            "source": "ai",
+            "direction": "negative",
+            "factor_value": 9.0,
+            "ic_mean": 0.0163903708820835,
+            "icir": 0.09238950346822034,
+            "ic_win_rate": 0.4791666666666667,
+            "s_i_a": 0.0007256012339891758,
+            "contribution": 0.0015142982274556711,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        },
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 240,
+            "ic_mean": -0.021443140602700427,
+            "icir": -0.12347881855219038,
+            "ic_win_rate": 0.48333333333333334,
+            "s_i_a": 0.0012797572727071436,
+            "pearson_ic": -0.014054468003753321,
+            "first_signal": "20210901",
+            "last_signal": "20260811",
+            "public_window_start": "20210909",
+            "public_window_end": "20260819",
+            "expected_sample_count": 240,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": false
+          },
+          "public": {
+            "factor_instance_id": "5bf3eec7256a0e19617fdafe",
+            "factor_name": "p02a-p02-disthigh-n90",
+            "source": "ai",
+            "direction": "negative",
+            "factor_value": 6.0,
+            "ic_mean": 0.0163903708820835,
+            "icir": 0.09238950346822034,
+            "ic_win_rate": 0.4791666666666667,
+            "s_i_a": 0.0007256012339891758,
+            "contribution": 0.0015142982274556711,
+            "sample_count": 240,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210909",
+            "window_end": "20260819"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "e386d1c6fa26c5224d1f3619",
+      "name": "p09-fcfy",
+      "formula": "LEVERAGE",
+      "by_month": {
+        "2026-09": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 239,
+            "ic_mean": 6.687696852204017e-05,
+            "icir": 0.0006444138861081074,
+            "ic_win_rate": 0.41422594142259417,
+            "s_i_a": 1.7851666403620632e-08,
+            "pearson_ic": -0.0024498278035999083,
+            "first_signal": "20210915",
+            "last_signal": "20260818",
+            "public_window_start": "20210927",
+            "public_window_end": "20260826",
+            "expected_sample_count": 239,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "e386d1c6fa26c5224d1f3619",
+            "factor_name": "p09-fcfy",
+            "source": "ai",
+            "direction": "positive",
+            "factor_value": 0.0,
+            "ic_mean": 0.001532924704914453,
+            "icir": 0.022495074578722872,
+            "ic_win_rate": 0.38493723849372385,
+            "s_i_a": 1.3273889169777397e-05,
+            "contribution": 3.4483255560617375e-05,
+            "sample_count": 239,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20210927",
+            "window_end": "20260826"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "1cd72364c667439b39d9c538",
+      "name": "自由现金流",
+      "formula": "RANK(TURNOVER)",
+      "by_month": {
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 238,
+            "ic_mean": -0.07494744102254956,
+            "icir": -0.41691260544733444,
+            "ic_win_rate": 0.6176470588235294,
+            "s_i_a": 0.019299329149257444,
+            "pearson_ic": -0.02509266674561078,
+            "first_signal": "20210924",
+            "last_signal": "20260818",
+            "public_window_start": "20211011",
+            "public_window_end": "20260826",
+            "expected_sample_count": 238,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": false
+          },
+          "public": {
+            "factor_instance_id": "1cd72364c667439b39d9c538",
+            "factor_name": "自由现金流",
+            "source": "user",
+            "direction": "positive",
+            "factor_value": 100.0,
+            "ic_mean": 0.040633084629943285,
+            "icir": 0.6151061115319922,
+            "ic_win_rate": 0.6428571428571429,
+            "s_i_a": 0.016067352012605212,
+            "contribution": 0.02499365868627477,
+            "sample_count": 238,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20211011",
+            "window_end": "20260826"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "3277a02e841ec596711e1c9c",
+      "name": "经营活动产生的现金流量净额",
+      "formula": "(OPEN/VOLUME)",
+      "by_month": {
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 238,
+            "ic_mean": 0.01785883016821321,
+            "icir": 0.11984301089314905,
+            "ic_win_rate": 0.5378151260504201,
+            "s_i_a": 0.0011510620387969476,
+            "pearson_ic": -0.004091028456579334,
+            "first_signal": "20210924",
+            "last_signal": "20260818",
+            "public_window_start": "20211011",
+            "public_window_end": "20260826",
+            "expected_sample_count": 238,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": false
+          },
+          "public": {
+            "factor_instance_id": "3277a02e841ec596711e1c9c",
+            "factor_name": "经营活动产生的现金流量净额",
+            "source": "user",
+            "direction": "positive",
+            "factor_value": 26.0,
+            "ic_mean": 0.025955721115296815,
+            "icir": 0.25508730590423345,
+            "ic_win_rate": 0.5210084033613446,
+            "s_i_a": 0.0034495835989106455,
+            "contribution": 0.00662097497210269,
+            "sample_count": 238,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20211011",
+            "window_end": "20260826"
+          }
+        }
+      }
+    },
+    {
+      "seat_id": "d335e1c1ae7af3f416405ddf",
+      "name": "自由现金流",
+      "formula": "MAX(TS_SKEW(MAX(EMA(2,77),ABS(GM)),3),ROE)",
+      "by_month": {
+        "2026-10": {
+          "local": {
+            "status": "local A proxy; public endpoint return-date role inferred",
+            "sample_count": 238,
+            "ic_mean": -0.003565665260444136,
+            "icir": -0.02592475200094474,
+            "ic_win_rate": 0.46218487394957986,
+            "s_i_a": 4.272390182980592e-05,
+            "pearson_ic": -0.009351315875408208,
+            "first_signal": "20210924",
+            "last_signal": "20260818",
+            "public_window_start": "20211011",
+            "public_window_end": "20260826",
+            "expected_sample_count": 238,
+            "date_role_confirmed": false,
+            "rule_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+            "financial_proxy": true
+          },
+          "public": {
+            "factor_instance_id": "d335e1c1ae7af3f416405ddf",
+            "factor_name": "自由现金流",
+            "source": "user",
+            "direction": "negative",
+            "factor_value": 18.0,
+            "ic_mean": 0.024201682045429825,
+            "icir": 0.18418503011409348,
+            "ic_win_rate": 0.3403361344537815,
+            "s_i_a": 0.0015170781111104447,
+            "contribution": 0.004457587536349208,
+            "sample_count": 238,
+            "insufficient": false,
+            "counted": true,
+            "window_start": "20211011",
+            "window_end": "20260826"
+          }
+        }
+      }
+    }
+  ],
+  "boards": {
+    "quality": {
+      "local": 0.509555925050723,
+      "public": 0.5577358572596997,
+      "relative_error": 0.08638485688493672
+    },
+    "rex": {
+      "local": 1.1951095905195195,
+      "public": 1.2479691471658438,
+      "relative_error": 0.04235646110832882
+    },
+    "robust": {
+      "local": -8.043123181284862,
+      "public": -7.891090010123475,
+      "relative_error": 0.01926643479751775
+    },
+    "points": {
+      "local": 31931.692806307743,
+      "public": 35893.19666676582,
+      "relative_error": 0.11036921278527714
+    }
+  },
+  "acceptance": {
+    "reference": {
+      "reference": "F-PC1013-01 frozen reconstruction of 不知所云队",
+      "ic_mae": 0.0036811006102166004,
+      "ic_max": 0.014167762957930388,
+      "rankic_mae": 0.0009759259767708787,
+      "rankic_max": 0.003001687839742029,
+      "min_holdings_overlap": 0.9721669980119284,
+      "mean_holdings_overlap": 0.9796796401889416,
+      "top1_fraction": 0.6,
+      "missing_numeric_fraction": 0.005983246908655764,
+      "composite_observed_rmse_max": 0.022607733663927626,
+      "raw_b_relative": 0.003198249995060798,
+      "raw_c_relative": 0.0036834807292972505,
+      "raw_a_relative": 0.009537886634227277,
+      "rex_relative": 0.006115467191198691,
+      "robust_relative": 0.007481196761752516,
+      "quality_relative": 0.0014164516569830279,
+      "points_relative": 0.000398497993879692,
+      "scope": "same relative-error level as accepted reference; identification not claimed; all public dates retrospectively fitted"
+    },
+    "actual": {
+      "ic_mae": 0.020900174881879716,
+      "ic_max": 0.069785980722468,
+      "rankic_mae": 0.020884151394069423,
+      "rankic_max": 0.09471728261319606,
+      "min_holdings_overlap": 0.5407554671968191,
+      "mean_holdings_overlap": 0.6847480726970625,
+      "top1_fraction": 0.2,
+      "missing_numeric_fraction": 0.026735833998403832,
+      "composite_observed_rmse_max": 0.3245719116132808,
+      "raw_a_relative": 0.07962321751457438,
+      "raw_b_relative": 0.1395965537579035,
+      "raw_c_relative": 0.16428612618206462,
+      "quality_relative": 0.08638485688493672,
+      "rex_relative": 0.04235646110832882,
+      "robust_relative": 0.01926643479751775,
+      "points_relative": 0.11036921278527714
+    },
+    "failures": [
+      {
+        "metric": "ic_mae",
+        "actual": 0.020900174881879716,
+        "limit": 0.0036811006102166004
+      },
+      {
+        "metric": "ic_max",
+        "actual": 0.069785980722468,
+        "limit": 0.014167762957930388
+      },
+      {
+        "metric": "rankic_mae",
+        "actual": 0.020884151394069423,
+        "limit": 0.0009759259767708787
+      },
+      {
+        "metric": "rankic_max",
+        "actual": 0.09471728261319606,
+        "limit": 0.003001687839742029
+      },
+      {
+        "metric": "min_holdings_overlap",
+        "actual": 0.5407554671968191,
+        "limit": 0.9721669980119284
+      },
+      {
+        "metric": "mean_holdings_overlap",
+        "actual": 0.6847480726970625,
+        "limit": 0.9796796401889416
+      },
+      {
+        "metric": "top1_fraction",
+        "actual": 0.2,
+        "limit": 0.6
+      },
+      {
+        "metric": "missing_numeric_fraction",
+        "actual": 0.026735833998403832,
+        "limit": 0.005983246908655764
+      },
+      {
+        "metric": "composite_observed_rmse_max",
+        "actual": 0.3245719116132808,
+        "limit": 0.022607733663927626
+      },
+      {
+        "metric": "raw_a_relative",
+        "actual": 0.07962321751457438,
+        "limit": 0.009537886634227277
+      },
+      {
+        "metric": "raw_b_relative",
+        "actual": 0.1395965537579035,
+        "limit": 0.003198249995060798
+      },
+      {
+        "metric": "raw_c_relative",
+        "actual": 0.16428612618206462,
+        "limit": 0.0036834807292972505
+      },
+      {
+        "metric": "quality_relative",
+        "actual": 0.08638485688493672,
+        "limit": 0.0014164516569830279
+      },
+      {
+        "metric": "rex_relative",
+        "actual": 0.04235646110832882,
+        "limit": 0.006115467191198691
+      },
+      {
+        "metric": "robust_relative",
+        "actual": 0.01926643479751775,
+        "limit": 0.007481196761752516
+      },
+      {
+        "metric": "points_relative",
+        "actual": 0.11036921278527714,
+        "limit": 0.000398497993879692
+      }
+    ],
+    "passed": false
+  },
+  "A_status": "independent five-year legs; target-date role proxy",
+  "status": "继续搜索，未达到参照标准",
+  "platform_confirmed": false,
+  "exact_identity_confirmed": false,
+  "public_date_role_confirmed": false
+}

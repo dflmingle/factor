@@ -1,0 +1,36 @@
+quant/聚宽2025年精选/91ETF-T0动量策略，年化 18%，回撤3.31%.txt
+from jqdata import *
+
+def initialize(context):
+    g.security1 = '513030.XSHG'
+    g.yclose = 1
+    g.open = 1
+    g.thresholdMin = 0.003
+    g.thresholdMax = 0.5
+    run_daily(before_market_open, time='before_open')
+    run_daily(market_open, time='9:30')
+    run_daily(after_market_close, time='14:59')
+    run_daily(after_market_close2, time='15:05')
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=c28f361a54ae58fa45086f5fada58af5567aab5a448671ae63b7f557f5cb4d3c source=quant/2020年度精选策略/77 RSRS大盘择时优化.txt'
+
+def market_open(context):
+    current_data = get_current_data()
+    g.open = current_data[g.security1].day_open
+    yesterday = attribute_history(g.security1, 1, unit='1d', fields=['open', 'close', 'high', 'low'], df=False)
+    g.yclose = yesterday['close'][-1]
+    if g.open - g.yclose >= g.thresholdMin and g.open - g.yclose <= g.thresholdMax:
+        order_value(g.security1, context.portfolio.available_cash)
+    pass
+
+def after_market_close(context):
+    positions = context.portfolio.positions
+    if len(positions) > 0:
+        order_target(g.security1, 0)
+    pass
+
+def after_market_close2(context):
+    trades = get_trades()
+    if len(trades) > 0:
+        for _trade in trades.values():
+            pass
+    pass

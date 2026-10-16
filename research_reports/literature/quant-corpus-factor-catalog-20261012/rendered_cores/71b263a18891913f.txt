@@ -1,0 +1,402 @@
+quant/量化策略/量化策略/实盘2026/Ptrade/pt版实10首板竞价三模式.txt
+import numpy as np
+from datetime import datetime, timedelta, date
+
+def initialize(context):
+    g.is_real = is_trade()
+    set_limit_mode('UNLIMITED')
+    g.new_stock_days = 50
+    g.ma_lookback_days = 4
+    g.position_pct = 1.0
+    g.avg_price_upper_limit = 0.07
+    g.sbgk_min_money = 550000000.0
+    g.sbgk_max_money = 2000000000.0
+    g.min_high_open_ratio = 1.0
+    g.max_high_open_ratio = 1.06
+    g.min_market_cap = 70
+    g.max_market_cap = 520
+    g.auction_vol_ratio = 0.03
+    g.volume_break_ratio = 0.9
+    g.left_pressure_buffer = 5
+    g.left_pressure_history_days = 101
+    g.sbdk_min_money = 100000000.0
+    g.low_open_min_ratio = 0.955
+    g.low_open_max_ratio = 0.97
+    g.position_low_limit = 0.5
+    g.rzq_max_4d_rise = 0.28
+    g.rzq_min_money = 300000000.0
+    g.rzq_max_money = 1900000000.0
+    g.rzq_avg_loss_limit = -0.04
+    g.rzq_open_high_min = 0.98
+    g.rzq_open_high_max = 1.09
+    g.first_board_stocks = []
+    g.broken_board_stocks = []
+    g.high_open_candidates = []
+    g.low_open_candidates = []
+    g.weak_candidates = []
+    g.last_buy_date = ''
+    if g.is_real:
+        run_daily(context, buy, time='09:30')
+
+def before_trading_start(context, data):
+    g.first_board_stocks, g.broken_board_stocks = get_first_and_broken_boards(context)
+    g.high_open_candidates = filter_high_open_candidates(context, g.first_board_stocks)
+    g.low_open_candidates = filter_low_open_candidates(context, g.first_board_stocks)
+    g.weak_candidates = filter_weak_candidates(context, g.broken_board_stocks)
+
+def handle_data(context, data):
+    current_time = context.blotter.current_dt.strftime('%H:%M')
+    if not g.is_real and current_time == '09:31':
+        buy(context, data)
+    if current_time in ('11:25', '14:50'):
+        sell(context, data)
+
+def filter_high_open_candidates(context, stock_list):
+    qualified = []
+    for stock in stock_list:
+        try:
+            hist = get_history(2, '1d', field=['close', 'volume', 'money'], security_list=stock, is_dict=True)
+            if stock not in hist or len(hist[stock]['close']) < 2:
+                continue
+            prev_close = hist[stock]['close'][-1]
+            prev_volume = hist[stock]['volume'][-1]
+            prev_money = hist[stock]['money'][-1]
+            avg_price = prev_money / prev_volume if prev_volume > 0 else 0
+            avg_price_increase = avg_price / prev_close * 1.1 - 1
+            if avg_price_increase < g.avg_price_upper_limit:
+                continue
+            if prev_money < g.sbgk_min_money or prev_money > g.sbgk_max_money:
+                continue
+            yesterday = context.previous_date
+            val = get_fundamentals([stock], 'valuation', fields=['total_value', 'float_value'], date=yesterday.strftime('%Y%m%d'), is_dataframe=True)
+            if val.empty or stock not in val.index:
+                continue
+            total_val = val.loc[stock, 'total_value'] / 100000000.0
+            float_val = val.loc[stock, 'float_value'] / 100000000.0
+            if total_val < g.min_market_cap or float_val > g.max_market_cap:
+                continue
+            if not check_left_pressure_break(context, stock):
+                continue
+            qualified.append(stock)
+        except Exception as e:
+            pass
+    return qualified
+
+def filter_low_open_candidates(context, stock_list):
+    qualified = []
+    for stock in stock_list:
+        try:
+            hist = get_history(60, '1d', field=['close', 'high', 'low', 'money'], security_list=stock, is_dict=True)
+            if stock not in hist or len(hist[stock]['close']) < 60:
+                continue
+            close = hist[stock]['close'][-1]
+            high = max(hist[stock]['high'])
+            low = min(hist[stock]['low'])
+            if high == low:
+                continue
+            pos_ratio = (close - low) / (high - low)
+            money = hist[stock]['money'][-1]
+            if pos_ratio <= g.position_low_limit and money >= g.sbdk_min_money:
+                qualified.append(stock)
+        except Exception as e:
+            pass
+    return qualified
+
+def filter_weak_candidates(context, stock_list):
+    qualified = []
+    for stock in stock_list:
+        try:
+            hist_4d = get_history(4, '1d', field=['open', 'close', 'volume', 'money'], security_list=stock, is_dict=True)
+            if stock not in hist_4d or len(hist_4d[stock]['close']) < 4:
+                continue
+            closes = hist_4d[stock]['close']
+            opens = hist_4d[stock]['open']
+            if closes[0] == 0:
+                continue
+            rise_4d = (closes[-1] - closes[0]) / closes[0]
+            if rise_4d > g.rzq_max_4d_rise:
+                continue
+            open_yest = opens[-1]
+            close_yest = closes[-1]
+            if open_yest == 0:
+                continue
+            if (close_yest - open_yest) / open_yest < -0.05:
+                continue
+            prev_money = hist_4d[stock]['money'][-1]
+            prev_volume = hist_4d[stock]['volume'][-1]
+            if prev_volume == 0:
+                continue
+            avg_price = prev_money / prev_volume
+            avg_loss = avg_price / close_yest - 1
+            if avg_loss < g.rzq_avg_loss_limit:
+                continue
+            if prev_money < g.rzq_min_money or prev_money > g.rzq_max_money:
+                continue
+            yesterday = context.previous_date
+            val = get_fundamentals([stock], 'valuation', fields=['total_value', 'float_value'], date=yesterday.strftime('%Y%m%d'), is_dataframe=True)
+            if val.empty or stock not in val.index:
+                continue
+            total_val = val.loc[stock, 'total_value'] / 100000000.0
+            float_val = val.loc[stock, 'float_value'] / 100000000.0
+            if total_val < g.min_market_cap or float_val > g.max_market_cap:
+                continue
+            if not check_left_pressure_break(context, stock):
+                continue
+            qualified.append(stock)
+        except Exception as e:
+            pass
+    return qualified
+
+def check_left_pressure_break(context, stock):
+    try:
+        hst = get_history(g.left_pressure_history_days, '1d', field=['high', 'volume'], security_list=stock, is_dict=True)
+        if stock not in hst or len(hst[stock]['high']) < 3:
+            return False
+        highs = hst[stock]['high']
+        volumes = hst[stock]['volume']
+        prev_high = highs[-1]
+        zyts_0 = 100
+        for i, high in enumerate(highs[-3::-1], 2):
+            if high >= prev_high:
+                zyts_0 = i - 1
+                break
+        zyts = zyts_0 + g.left_pressure_buffer
+        if zyts > len(highs):
+            zyts = len(highs)
+        volume_data = volumes[-zyts:]
+        if len(volume_data) < 2:
+            return False
+        max_vol_except_last = max(volume_data[:-1])
+        return volume_data[-1] > max_vol_except_last * g.volume_break_ratio
+    except Exception as e:
+        return False
+
+def buy(context, data=None):
+    if g.is_real:
+        today = context.blotter.current_dt.strftime('%Y%m%d')
+        if today != g.last_buy_date:
+            g.last_buy_date = today
+            g.buy_executed_today = False
+        if hasattr(g, 'buy_executed_today') and g.buy_executed_today:
+            return
+    candidates = []
+    for stock in g.high_open_candidates:
+        candidates.append((stock, 'high'))
+    for stock in g.low_open_candidates:
+        candidates.append((stock, 'low'))
+    for stock in g.weak_candidates:
+        candidates.append((stock, 'weak'))
+    if not candidates:
+        return
+    prev_data = {}
+    for stock, _ in candidates:
+        hist = get_history(2, '1d', field=['close', 'volume'], security_list=stock, is_dict=True)
+        if stock in hist and len(hist[stock]['close']) >= 2:
+            prev_data[stock] = {'close': hist[stock]['close'][-1], 'volume': hist[stock]['volume'][-1]}
+        else:
+            prev_data[stock] = None
+    qualified = []
+    count_cond2 = 0
+    for stock, mode in candidates:
+        if prev_data[stock] is None:
+            continue
+        prev_close = prev_data[stock]['close']
+        prev_volume = prev_data[stock]['volume']
+        try:
+            date_str = context.blotter.current_dt.strftime('%Y%m%d')
+            trend = get_trend_data(date=date_str, stocks=stock)
+            auction_vol = 0
+            auction_price = 0
+            data_source = None
+            if trend and stock in trend:
+                first = trend[stock][0] if isinstance(trend[stock], list) else trend[stock]
+                auction_vol = first.get('business_amount', 0)
+                auction_price = first.get('hq_px', 0)
+                if auction_vol > 0 and auction_price > 0:
+                    data_source = '集合竞价'
+                else:
+                    data_source = None
+            if data_source is None:
+                if not g.is_real:
+                    min_hist = get_history(2, '1m', field=['open', 'volume'], security_list=stock, include=True, is_dict=True)
+                    if stock not in min_hist or len(min_hist[stock]['open']) < 1:
+                        continue
+                    auction_vol = min_hist[stock]['volume'][-1] * 0.34
+                    auction_price = min_hist[stock]['open'][-1]
+                    data_source = '分钟线'
+                else:
+                    snapshot = get_snapshot(stock)
+                    if snapshot and stock in snapshot:
+                        auction_price = snapshot[stock].get('last_px', 0)
+                        auction_vol = snapshot[stock].get('volume', 0)
+                        if auction_price > 0 and auction_vol > 0:
+                            data_source = '快照'
+                        else:
+                            continue
+                    else:
+                        continue
+            vol_ratio = auction_vol / prev_volume if prev_volume > 0 else 0
+            if vol_ratio < g.auction_vol_ratio:
+                continue
+            if mode == 'high':
+                open_ratio = auction_price / prev_close
+                if open_ratio <= g.min_high_open_ratio or open_ratio >= g.max_high_open_ratio:
+                    continue
+            elif mode == 'low':
+                open_ratio = auction_price / prev_close
+                if open_ratio < g.low_open_min_ratio or open_ratio > g.low_open_max_ratio:
+                    continue
+            elif mode == 'weak':
+                limit_ratio = 0.2 if stock.startswith('30') or stock.startswith('68') else 0.1
+                yesterday_limit_price = prev_close * (1 + limit_ratio)
+                open_ratio_to_limit = auction_price / yesterday_limit_price
+                if open_ratio_to_limit < g.rzq_open_high_min or open_ratio_to_limit > g.rzq_open_high_max:
+                    continue
+            count_cond2 += 1
+            qualified.append(stock)
+        except Exception as e:
+            continue
+    if not qualified:
+        return
+    if g.is_real:
+        total_buy_cash = context.portfolio.cash * g.position_pct
+        if total_buy_cash <= 0:
+            return
+        cash_per_stock = total_buy_cash / len(qualified)
+        g.buy_executed_today = True
+    else:
+        cash_per_stock = context.portfolio.cash / len(qualified)
+    for stock in qualified:
+        if not g.is_real:
+            open_hist = get_history(2, '1m', 'open', stock, include=True, is_dict=True)
+            open_price = open_hist[stock]['open'][-1] if stock in open_hist and len(open_hist[stock]['open']) > 0 else 0
+            if cash_per_stock >= 100 * (open_price if open_price > 0 else 1):
+                order_value(stock, cash_per_stock)
+        else:
+            try:
+                date_str = context.blotter.current_dt.strftime('%Y%m%d')
+                trend = get_trend_data(date=date_str, stocks=stock)
+                if not trend or stock not in trend:
+                    snapshot = get_snapshot(stock)
+                    if not snapshot or stock not in snapshot:
+                        continue
+                    limit_price = snapshot[stock].get('last_px', 0)
+                else:
+                    first = trend[stock][0] if isinstance(trend[stock], list) else trend[stock]
+                    limit_price = first.get('hq_px', 0)
+                    if limit_price <= 0:
+                        continue
+                if cash_per_stock >= limit_price * 100:
+                    order_value(stock, cash_per_stock, limit_price=limit_price)
+            except Exception as e:
+                pass
+
+def sell(context, data):
+    for stock in list(context.portfolio.positions.keys()):
+        pos = context.portfolio.positions[stock]
+        if g.is_real:
+            available = pos.sellable
+        else:
+            available = pos.enable_amount
+        if available == 0:
+            continue
+        cost = getattr(pos, 'cost_basis', None)
+        if cost is None or cost == 0:
+            continue
+        cur_price = None
+        if not g.is_real:
+            min_hist = get_history(1, '1m', 'close', stock, include=True, is_dict=True)
+            if stock in min_hist and len(min_hist[stock]['close']) > 0:
+                cur_price = min_hist[stock]['close'][-1]
+        else:
+            snapshot = get_snapshot(stock)
+            if snapshot and stock in snapshot:
+                cur_price = snapshot[stock].get('last_px')
+        if cur_price is None or cur_price <= 0:
+            continue
+        close_hist = get_history(g.ma_lookback_days, '1d', 'close', stock, is_dict=True)
+        if stock in close_hist and len(close_hist[stock]['close']) >= g.ma_lookback_days:
+            M_prev = np.mean(close_hist[stock]['close'][-g.ma_lookback_days:])
+            ma = (M_prev * g.ma_lookback_days + cur_price) / (g.ma_lookback_days + 1)
+        else:
+            ma = 0
+        limit_status = check_limit(stock)[stock]
+        is_limit_up = limit_status == 1
+        if cur_price > cost and (not is_limit_up):
+            order_target(stock, 0)
+            ret = 100 * (cur_price / cost - 1)
+            continue
+        if cur_price < ma:
+            order_target(stock, 0)
+            ret = 100 * (cur_price / cost - 1)
+
+def get_first_and_broken_boards(context):
+    today = context.blotter.current_dt.date()
+    trade_days = get_trade_days(end_date=today.strftime('%Y%m%d'), count=3)
+    if len(trade_days) < 3:
+        return ([], [])
+    yesterday = to_date(trade_days[-2])
+    day_before = to_date(trade_days[-3])
+    initial_list = get_Ashares()
+    if not initial_list:
+        initial_list = get_index_stocks('000300.SS')
+    initial_list = [s for s in initial_list if not (s.startswith('4') or s.startswith('8') or s.startswith('688'))]
+    initial_list = filter_stock_by_status(initial_list, filter_type=['ST', 'HALT', 'DELISTING'], query_date=None)
+    initial_list = filter_new_stocks(initial_list, today, g.new_stock_days)
+    date_str = yesterday.strftime('%Y%m%d')
+    try:
+        price_dict = get_price(initial_list, end_date=date_str, frequency='1d', fields=['high', 'close', 'high_limit'], count=2, is_dict=True)
+        if not price_dict:
+            return ([], [])
+    except Exception as e:
+        return ([], [])
+    first_boards = []
+    broken_boards = []
+    for stock in initial_list:
+        arr = price_dict.get(stock)
+        if arr is None or len(arr) < 2:
+            continue
+        pre_close = arr[0]['close']
+        pre_limit = arr[0]['high_limit']
+        yest_high = arr[1]['high']
+        yest_close = arr[1]['close']
+        yest_limit = arr[1]['high_limit']
+        if yest_limit <= 0:
+            continue
+        pre_is_limit = abs(pre_close - pre_limit) <= 1e-05 if pre_limit > 0 else False
+        yest_is_limit = abs(yest_close - yest_limit) <= 1e-05
+        yest_is_broken = yest_high >= yest_limit - 1e-05 and yest_close < yest_limit - 1e-05
+        if yest_is_limit and (not pre_is_limit):
+            first_boards.append(stock)
+        elif yest_is_broken and (not pre_is_limit):
+            broken_boards.append(stock)
+    return (first_boards, broken_boards)
+
+def filter_new_stocks(stock_list, current_date, min_days):
+    filtered = []
+    for s in stock_list:
+        try:
+            info = get_stock_info(s)
+            if info and info.get('listed_date'):
+                list_date = datetime.strptime(info['listed_date'], '%Y-%m-%d').date()
+                if (current_date - list_date).days >= min_days:
+                    filtered.append(s)
+            else:
+                filtered.append(s)
+        except:
+            filtered.append(s)
+    return filtered
+
+def to_date(d):
+    if isinstance(d, str):
+        if '-' in d:
+            return datetime.strptime(d, '%Y-%m-%d').date()
+        else:
+            return datetime.strptime(d, '%Y%m%d').date()
+    elif isinstance(d, (datetime, np.datetime64)):
+        return d.date() if hasattr(d, 'date') else datetime.utcfromtimestamp(d.astype('O') / 1000000000.0).date()
+    else:
+        return d
+
+def stop(context):
+    pass

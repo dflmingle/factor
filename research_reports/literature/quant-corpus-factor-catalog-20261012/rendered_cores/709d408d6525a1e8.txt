@@ -1,0 +1,97 @@
+quant/聚宽2025年精选/31蛇皮走位小市值策略V1.0.txt
+from jqdata import *
+import warnings
+warnings.filterwarnings('ignore')
+
+def initialize(context):
+    g.stock_num = 10
+    run_daily(prepare_high_limit_list, time='9:05', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:00')
+    run_daily(consistent, time='14:30')
+
+def consistent(context):
+    yesterday = context.previous_date
+    now_time = context.current_dt
+    stocks = get_index_stocks('399101.XSHE', now_time)
+    q = query(valuation.code, valuation.circulating_market_cap, indicator.eps).filter(valuation.code.in_(stocks)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q)
+    lst = list(df.code)[:20]
+    h_ratio = get_price(lst, end_date=yesterday, frequency='1d', fields=['close'], count=2)['close']
+    first_row = h_ratio.iloc[0]
+    last_row = h_ratio.iloc[-1]
+    change_BIG = (last_row - first_row) / first_row * 100
+    A1 = np.array(change_BIG)
+    norm = np.linalg.norm(A1)
+    normalized_array = A1 / norm
+    variance = np.var(normalized_array)
+    mean = np.mean(normalized_array)
+    COST = []
+    current = []
+    for stock in context.portfolio.positions.keys():
+        current.append(context.portfolio.positions[stock].price)
+        COST.append(context.portfolio.positions[stock].avg_cost)
+    paired_prices = zip(COST, current)
+    change_list = [(current - cost) / cost for cost, current in paired_prices if current > cost]
+    total_change = sum(change_list)
+    if variance < 0.02 and mean > 0:
+        target_list = choose_stocks(context)
+        current_data = get_current_data()
+        for s in context.portfolio.positions:
+            if s in target_list or current_data[s].paused or current_data[s].last_price == current_data[s].high_limit:
+                continue
+            order_target(s, 0)
+        to_buy(context, target_list)
+    if -0.1 < total_change < 0.4:
+        pass
+    else:
+        hold_list = list(context.portfolio.positions)
+        for s in hold_list:
+            position = context.portfolio.positions[s]
+            close_position(position)
+
+def prepare_high_limit_list(context):
+    g.high_limit_list = []
+    hold_list = list(context.portfolio.positions)
+    if hold_list:
+        g.high_limit_list = get_price(hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'paused'], count=1, panel=False).query('close == high_limit and paused == 0')['code'].tolist()
+
+def check_limit_up(context):
+    sold_sth = False
+    current_data = get_current_data()
+    for stock in g.high_limit_list:
+        if current_data[stock].last_price < current_data[stock].high_limit:
+            order_target(stock, 0)
+            sold_sth = True
+
+def choose_stocks(context):
+    by_date = context.previous_date - datetime.timedelta(days=250)
+    stocks = get_all_securities('stock', by_date).index.tolist()
+    stocks = filter_stock_basic(stocks)
+    stocks = filter_high_price_stock(stocks)
+    stocks = get_peg(stocks)
+    return stocks[:g.stock_num]
+
+def filter_stock_basic(stock_list):
+    curr_data = get_current_data()
+    return [stock for stock in stock_list if not (stock.startswith(('68', '4', '8')) or curr_data[stock].paused or curr_data[stock].is_st or (curr_data[stock].last_price >= curr_data[stock].high_limit * 0.97) or (curr_data[stock].last_price <= curr_data[stock].low_limit * 1.04))]
+
+def filter_high_price_stock(stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list).iloc[0]
+    return last_prices[last_prices < 10].index.tolist()
+
+def to_buy(context, target_list):
+    current_data = get_current_data()
+    position_count = len(context.portfolio.positions)
+    if position_count < g.stock_num:
+        value = context.portfolio.available_cash / (g.stock_num - position_count)
+        for s in target_list:
+            if s not in context.portfolio.positions:
+                order_value(s, value)
+                if len(context.portfolio.positions) == g.stock_num:
+                    break
+
+def get_peg(stocks):
+    stocks = get_fundamentals(query(valuation.code).filter(indicator.roe > 0.15, indicator.roa > 0.1, valuation.code.in_(stocks)).order_by(valuation.market_cap.asc()))['code'].tolist()
+    return stocks
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'

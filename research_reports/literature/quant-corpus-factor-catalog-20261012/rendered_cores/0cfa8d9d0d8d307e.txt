@@ -1,0 +1,229 @@
+quant/2020年度精选策略/49 海龟克隆优化.txt
+import jqdata
+
+def initialize(context):
+    set_params(context)
+    g.future = get_future_code(g.future_index)
+    run_daily(before_market_open, time='before_open', reference_security=get_future_code(g.future_index))
+    run_daily(while_open, time='open', reference_security=get_future_code(g.future_index))
+    run_daily(after_market_close, time='after_close', reference_security=get_future_code(g.future_index))
+
+def set_params(context):
+    g.window = 20
+    g.limit_unit = 6
+    g.unit = 0
+    g.add_time = 0
+    g.position = 0
+    g.price_mark = 0
+    g.last_future = None
+    g.last_price = 0
+    g.future_index = 'SR'
+
+def before_market_open(context):
+    g.future = get_dominant_future(g.future_index)
+
+def while_open(context):
+    if g.last_future == None:
+        g.last_future = g.future
+    elif g.last_future != g.future:
+        if g.position == -1:
+            order_target(g.last_future, 0, side='short')
+            g.position == 0
+        elif g.position == 1:
+            order_target(g.last_future, 0, side='long')
+            g.position == 0
+        g.last_future = g.future
+        re_set()
+    future = g.future
+    end_date = get_CCFX_end_date(future)
+    if context.current_dt.date() == end_date:
+        return
+    price_list = attribute_history(future, g.window + 1, '1d', ['close', 'high', 'low'])
+    if len(price_list) == 0:
+        return
+    close_price = price_list['close'].iloc[-1]
+    ATR = get_ATR(price_list, g.window)
+    if g.position != 0:
+        signal = get_next_signal(close_price, g.last_price, ATR, g.position)
+        if signal == 1 and g.add_time < g.limit_unit:
+            g.unit = get_unit(context.portfolio.total_value, ATR, g.future_index)
+            if g.position == 1:
+                order(future, g.unit, side='long')
+                g.last_price = close_price
+                g.add_time += 1
+            elif g.position == -1:
+                order(future, g.unit, side='short')
+                g.last_price = close_price
+                g.add_time += 1
+        elif signal == -1:
+            if g.position == 1:
+                order_target(future, 0, side='long')
+                g.price_mark = 0
+                g.position = 0
+            elif g.position == -1:
+                order_target(future, 0, side='short')
+                g.price_mark = 0
+                g.position = 0
+            re_set()
+    open_signal = check_break(price_list, close_price, g.window)
+    if open_signal == 1 and g.position != 1:
+        if g.position == -1:
+            order_target(future, 0, side='short')
+            if context.portfolio.short_positions[future].total_amount == 0:
+                g.price_mark = 0
+                re_set()
+        g.unit = get_unit(context.portfolio.total_value, ATR, g.future_index)
+        order(future, g.unit, side='long')
+        if context.portfolio.positions[future].total_amount > 0:
+            g.position = 1
+            g.price_mark = context.portfolio.long_positions[future].price
+            g.add_time = 1
+            g.last_price = close_price
+            g.last_future = future
+    elif open_signal == -1 and g.position != -1:
+        if g.position == 1:
+            order_target(future, 0, side='long')
+            if context.portfolio.positions[future].total_amount == 0:
+                g.price_mark = 0
+                re_set()
+        g.unit = get_unit(context.portfolio.total_value, ATR, g.future_index)
+        order(future, g.unit, side='short')
+        if context.portfolio.short_positions[future].total_amount > 0:
+            g.position = -1
+            g.price_mark = context.portfolio.short_positions[future].price
+            g.add_time = 1
+            g.last_price = close_price
+            g.last_future = future
+    if g.position != 0:
+        set_price_mark(context, future)
+    signal = get_risk_signal(context, future)
+    if signal:
+        order_target(future, 0, side='short')
+        order_target(future, 0, side='long')
+        if context.portfolio.positions[future].total_amount == 0 and context.portfolio.short_positions[future].total_amount == 0:
+            g.position = 0
+            g.price_mark = 0
+    return
+
+def after_market_close(context):
+    pass
+
+def re_set():
+    g.unit = 0
+    g.add_time = 0
+    g.position = 0
+
+def check_break(price_list, price, T):
+    up = max(price_list['high'].iloc[-T - 1:-2])
+    down = min(price_list['low'].iloc[-T - 1:-2])
+    if price > up:
+        return 1
+    elif price < down:
+        return -1
+    else:
+        return 0
+
+def get_ATR(price_list, T):
+    TR_list = [max(price_list['high'].iloc[i], price_list['close'].iloc[i - 1]) - min(price_list['low'].iloc[i], price_list['close'].iloc[i - 1]) for i in range(1, T + 1)]
+    ATR = np.array(TR_list).mean()
+    return ATR
+
+def get_next_signal(price, last_price, ATR, position):
+    if price >= last_price + 0.5 * ATR and position == 1 or (price <= last_price - 0.5 * ATR and position == -1):
+        return 1
+    elif price <= last_price - 2 * ATR and position == 1 or (price >= last_price + 2 * ATR and position == -1):
+        return -1
+    else:
+        return 0
+
+def get_position(context):
+    try:
+        tmp = context.portfolio.positions.keys()[0]
+        if not context.portfolio.long_positions[tmp].total_amount and (not context.portfolio.short_positions[tmp].total_amount):
+            return 0
+        elif context.portfolio.long_positions[tmp].total_amount:
+            return 1
+        elif context.portfolio.short_positions[tmp].total_amount:
+            return -1
+        else:
+            return 0
+    except:
+        return 0
+
+def get_unit(cash, ATR, symbol):
+    future_coef_list = {'A': 10, 'AG': 15, 'AL': 5, 'AU': 1000, 'B': 10, 'BB': 500, 'BU': 10, 'C': 10, 'CF': 5, 'CS': 10, 'CU': 5, 'ER': 10, 'FB': 500, 'FG': 20, 'FU': 50, 'GN': 10, 'HC': 10, 'I': 100, 'IC': 200, 'IF': 300, 'IH': 300, 'J': 100, 'JD': 5, 'JM': 60, 'JR': 20, 'L': 5, 'LR': 10, 'M': 10, 'MA': 10, 'ME': 10, 'NI': 1, 'OI': 10, 'P': 10, 'PB': 5, 'PM': 50, 'PP': 5, 'RB': 10, 'RI': 20, 'RM': 10, 'RO': 10, 'RS': 10, 'RU': 10, 'SF': 5, 'SM': 5, 'SN': 1, 'SR': 10, 'T': 10000, 'TA': 5, 'TC': 100, 'TF': 10000, 'V': 5, 'WH': 20, 'WR': 10, 'WS': 50, 'WT': 10, 'Y': 10, 'ZC': 100, 'ZN': 5}
+    return cash * 0.01 / ATR / future_coef_list[symbol]
+
+def set_price_mark(context, future):
+    if g.position == -1:
+        g.price_mark = min(context.portfolio.short_positions[future].price, g.price_mark)
+    elif g.position == 1:
+        g.price_mark = max(context.portfolio.long_positions[future].price, g.price_mark)
+
+def get_risk_signal(context, future):
+    if g.position == -1:
+        if context.portfolio.short_positions[future].price >= 1.05 * g.price_mark:
+            return True
+        else:
+            return False
+    elif g.position == 1:
+        if context.portfolio.long_positions[future].price <= 0.95 * g.price_mark:
+            return True
+        else:
+            return False
+
+def get_future_code(symbol):
+    future_code_list = {'A': 'A9999.XDCE', 'AG': 'AG9999.XSGE', 'AL': 'AL9999.XSGE', 'AU': 'AU9999.XSGE', 'B': 'B9999.XDCE', 'BB': 'BB9999.XDCE', 'BU': 'BU9999.XSGE', 'C': 'C9999.XDCE', 'CF': 'CF9999.XZCE', 'CS': 'CS9999.XDCE', 'CU': 'CU9999.XSGE', 'ER': 'ER9999.XZCE', 'FB': 'FB9999.XDCE', 'FG': 'FG9999.XZCE', 'FU': 'FU9999.XSGE', 'GN': 'GN9999.XZCE', 'HC': 'HC9999.XSGE', 'I': 'I9999.XDCE', 'IC': 'IC9999.CCFX', 'IF': 'IF9999.CCFX', 'IH': 'IH9999.CCFX', 'J': 'J9999.XDCE', 'JD': 'JD9999.XDCE', 'JM': 'JM9999.XDCE', 'JR': 'JR9999.XZCE', 'L': 'L9999.XDCE', 'LR': 'LR9999.XZCE', 'M': 'M9999.XDCE', 'MA': 'MA9999.XZCE', 'ME': 'ME9999.XZCE', 'NI': 'NI9999.XSGE', 'OI': 'OI9999.XZCE', 'P': 'P9999.XDCE', 'PB': 'PB9999.XSGE', 'PM': 'PM9999.XZCE', 'PP': 'PP9999.XDCE', 'RB': 'RB9999.XSGE', 'RI': 'RI9999.XZCE', 'RM': 'RM9999.XZCE', 'RO': 'RO9999.XZCE', 'RS': 'RS9999.XZCE', 'RU': 'RU9999.XSGE', 'SF': 'SF9999.XZCE', 'SM': 'SM9999.XZCE', 'SN': 'SN9999.XSGE', 'SR': 'SR9999.XZCE', 'T': 'T9999.CCFX', 'TA': 'TA9999.XZCE', 'TC': 'TC9999.XZCE', 'TF': 'TF9999.CCFX', 'V': 'V9999.XDCE', 'WH': 'WH9999.XZCE', 'WR': 'WR9999.XSGE', 'WS': 'WS9999.XZCE', 'WT': 'WT9999.XZCE', 'Y': 'Y9999.XDCE', 'ZC': 'ZC9999.XZCE', 'ZN': 'ZN9999.XSGE'}
+    try:
+        return future_code_list[symbol]
+    except:
+        return 'WARNING: 无此合约'
+
+def get_stock_index_futrue_code(context, symbol, month='current_month'):
+    """
+    获取当天时间正在交易的股指期货合约。其中:
+    symbol:
+            'IF' #沪深300指数期货
+            'IC' #中证500股指期货
+            'IH' #上证50股指期货
+    month:
+            'current_month' #当月
+            'next_month'    #隔月
+            'next_quarter'  #下季
+            'skip_quarter'  #隔季
+    """
+    display_name_dict = {'IC': '中证500股指期货', 'IF': '沪深300指数期货', 'IH': '上证50股指期货'}
+    month_dict = {'current_month': 0, 'next_month': 1, 'next_quarter': 2, 'skip_quarter': 3}
+    display_name = display_name_dict[symbol]
+    n = month_dict[month]
+    dt = context.current_dt.date()
+    a = get_all_securities(types=['futures'], date=dt)
+    try:
+        df = a[(a.display_name == display_name) & (a.start_date <= dt) & (a.end_date >= dt)]
+        return df.index[n]
+    except:
+        return 'WARRING: 无此合约'
+
+def get_treasury_futrue_code(context, symbol, month='current'):
+    """
+    获取当天时间正在交易的国债期货合约。其中:
+    symbol:
+            'T' #10年期国债期货
+            'TF' #5年期国债期货
+    month:
+            'current' #最近期
+            'next'    #次近期
+            'skip'    #最远期
+    """
+    display_name_dict = {'T': '10年期国债期货', 'TF': '5年期国债期货'}
+    month_dict = {'current': 0, 'next': 1, 'skip': 2}
+    display_name = display_name_dict[symbol]
+    n = month_dict[month]
+    dt = context.current_dt.date()
+    a = get_all_securities(types=['futures'], date=dt)
+    try:
+        df = a[(a.display_name == display_name) & (a.start_date <= dt) & (a.end_date >= dt)]
+        return df.index[n]
+    except:
+        return 'WARRING: 无此合约'
+'EXACT_REVIEWED_FUNCTION get_CCFX_end_date sha256=3f51e351e323a8a18c9f762883224926e127627ed1f0cdae88126a3d9ba7fa33 source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

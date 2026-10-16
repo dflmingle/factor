@@ -1,0 +1,139 @@
+quant/聚宽2025年精选/23大盘择时，逻辑简单.txt
+import pandas as pd
+import talib as tb
+import numpy as np
+from jqdata import *
+from jqfactor import get_factor_values
+
+def initialize(context):
+    g.stock_num = 5
+    g.etf_A = '511880.XSHG'
+    g.etf_B = '510300.XSHG'
+    g.beta = 0.7
+    g.no_trading_today_signal = True
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_daily(get_macd, time='9:30', reference_security='000300.XSHG')
+    run_monthly(my_Trader, 1, time='9:35', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:00', reference_security='000300.XSHG')
+    run_daily(my_trade_stocknum, '15:00')
+
+def my_trade_stocknum(context):
+    pass
+
+def get_macd(context):
+    yesterday = context.previous_date
+    re_value = get_macd_M(['000300.XSHG'], yesterday)
+    dif, dea, macd = re_value['000300.XSHG']
+    today_sig = macd
+    stock_list = context.portfolio.positions.keys()
+    stock_list = list(stock_list)
+    if today_sig > 0:
+        g.no_trading_today_signal = False
+    if today_sig <= 0:
+        g.no_trading_today_signal = True
+    etfs_to_remove = {g.etf_A, g.etf_B}
+    stock_list = [stock for stock in stock_list if stock not in etfs_to_remove]
+    if today_sig > 0 and len(stock_list) > 0:
+        for s in stock_list:
+            order_target(s, 0)
+        order_value(g.etf_B, context.portfolio.available_cash)
+    elif today_sig <= 0 and len(stock_list) == 0:
+        my_Trader(context)
+
+def my_Trader(context):
+    if g.no_trading_today_signal == False:
+        return
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    stocks = filter_st_stock(stocks)
+    stocks = filter_new_stock(context, stocks)
+    stocks = choice_roa(context, stocks)
+    stocks = filter_paused_stock(stocks)
+    stocks = filter_limit_stock(context, stocks)[:20]
+    cdata = get_current_data()
+    if g.etf_A in context.portfolio.positions:
+        order_target(g.etf_A, 0)
+    for s in context.portfolio.positions:
+        if s not in stocks and cdata[s].last_price < cdata[s].high_limit:
+            order_target(s, 0)
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        psize = context.portfolio.available_cash / (g.stock_num - position_count)
+        for s in stocks:
+            if s not in context.portfolio.positions:
+                order_value(s, psize)
+                if len(context.portfolio.positions) == g.stock_num:
+                    break
+    order_value(g.etf_A, context.portfolio.cash)
+
+def choice_roa(context, stocks):
+    df = get_fundamentals(query(valuation.code, valuation.market_cap).filter(valuation.code.in_(stocks), valuation.pb_ratio < 1, valuation.pb_ratio > 0, valuation.market_cap > 500, indicator.roa > 0.15).order_by(indicator.roa.desc()).limit(100))
+    stocks = list(df.code)
+    yesterday = context.previous_date
+    stocks = get_beta(yesterday, stocks)
+    return stocks
+'EXACT_REVIEWED_FUNCTION slist sha256=10cc19fa56627b07c34f5fa9189d655b29b385c4a6df7a44ae63a220af4329df source=quant/2024年度精选策略1/19.高股息低市盈率高增长的价投策略.txt'
+
+def prepare_stock_list(context):
+    g.high_limit_list = []
+    for stock in context.portfolio.positions.keys():
+        df = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit'], count=1)
+        if df['close'][0] >= df['high_limit'][0] * 0.98:
+            g.high_limit_list.append(stock)
+
+def check_limit_up(context):
+    if g.high_limit_list != []:
+        current_data = get_current_data()
+        for stock in g.high_limit_list:
+            if current_data[stock].last_price < current_data[stock].high_limit:
+                order_target(stock, 0)
+                order_value(g.etf_A, context.portfolio.cash)
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limit_stock sha256=5a49ce5c23d9d98fd858e712537df126748cf174b3ae391d8fa058c9c731d5ec source=quant/2024年度精选策略1/19.高股息低市盈率高增长的价投策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=a55c600f82d9abb72d1e9c2e91ca6e76217875e8ed56e22a107be4d40605b079 source=quant/2024年度精选策略1/19.高股息低市盈率高增长的价投策略.txt'
+
+def get_macd_M(stock_list, check_date):
+    macd_list = {}
+    if isinstance(check_date, str):
+        check_date = datetime.datetime.strptime(check_date, '%Y-%m-%d %H:%M:%S')
+    if isinstance(stock_list, str):
+        stock_list = [stock_list]
+    for stock in stock_list:
+        array = get_bars(security=stock, count=500, unit='1M', fields=['close'], include_now=False, end_dt=check_date, fq_ref_date=check_date)
+        close_list = array['close']
+        dif, dea, macd = tb.MACD(close_list, fastperiod=12, slowperiod=26, signalperiod=9)
+        last_dif = dif[-1]
+        last_dea = dea[-1]
+        last_macd = macd[-1]
+        macd_dic = (last_dif, last_dea, last_macd * 2)
+        macd_list[stock] = macd_dic
+    return macd_list
+
+def get_beta(today, stock_list):
+    time0 = today
+    if time0.day == 29:
+        time1day = 28
+    else:
+        time1day = time0.day
+    time1 = datetime.datetime(time0.year - 1, time0.month, time1day)
+    score_list = []
+    index_data = get_price('000300.XSHG', start_date=time1.strftime('%Y-%m-%d'), end_date=time0.strftime('%Y-%m-%d'), frequency='daily', fields=['close'], panel=False)
+    index_returns = index_data['close'].pct_change()
+    index_var = index_returns.var()
+    for stock in stock_list:
+        stock_data = get_price(stock, start_date=time1.strftime('%Y-%m-%d'), end_date=time0.strftime('%Y-%m-%d'), frequency='daily', fields=['close'], panel=False)
+        stock_returns = stock_data['close'].pct_change()
+        cov_matrix = index_returns.cov(stock_returns)
+        cov = cov_matrix
+        ratio = cov / index_var
+        score_list.append(ratio)
+    df = pd.DataFrame(columns=['code', 'score'])
+    df['code'] = stock_list
+    df['score'] = score_list
+    df = df.dropna()
+    df = df.query(f'score<{g.beta}')
+    filter_list = list(df.code)
+    return filter_list

@@ -1,0 +1,65 @@
+quant/2021年度精选策略/23.玩趋势交易的看进来~~~~2.txt
+import pandas as pd
+import matplotlib.pyplot as plt
+import datetime
+date = datetime.datetime.now()
+A = 8
+M = 0.04
+K = 0.001
+C = 0.06
+D = C * 0.9
+E = 250
+
+def ma_math(stock_data, A):
+    return pd.Series.rolling(stock_data, window=A).mean()
+N = 500
+stock = '002568.XSHE'
+stock_data = get_price(stock, count=N + A, end_date=date, fields=['close'])['close']
+ma = ma_math(stock_data, A)
+K_EPs = pd.DataFrame(columns=['date', 'trend', 'ep', 'lineno', 'groupno'])
+extreme_price = f_max = f_min = ma[A]
+_groupno = 0
+_last_trend = 2
+for i in range(A, len(ma)):
+    if ma[i] > extreme_price * M + extreme_price:
+        if _last_trend != 1:
+            _last_trend = 1
+            _groupno += 1
+        extreme_price = f_max = ma[i]
+        K_EPs = K_EPs.append({'date': ma.index[i], 'trend': 1, 'ep': extreme_price, 'lineno': i, 'groupno': _groupno}, ignore_index=True)
+    if ma[i] < extreme_price - extreme_price * M:
+        if _last_trend != 0:
+            _last_trend = 0
+            _groupno += 1
+        extreme_price = f_min = ma[i]
+        K_EPs = K_EPs.append({'date': ma.index[i], 'trend': 0, 'ep': extreme_price, 'lineno': i, 'groupno': _groupno}, ignore_index=True)
+K_EPs.set_index('date', drop=True, inplace=True)
+fa_number = 10
+for i in range(len(K_EPs)):
+    _lineno = K_EPs['lineno'][i]
+transit_points = K_EPs.drop_duplicates(subset=['groupno'], keep='last')
+transit_points.reset_index(drop=True, inplace=True)
+for i in range(len(transit_points)):
+    if i < len(transit_points) - 2:
+        s_drift = pd.Series(0.0, index=ma.index[transit_points['lineno'][i]:transit_points['lineno'][i + 2]])
+    else:
+        s_drift = pd.Series(0.0, index=ma.index[transit_points['lineno'][i]:])
+    f_ep = transit_points['ep'][i]
+    for j in range(len(s_drift)):
+        s_drift[j] = f_ep * (1 + j * K)
+transit_0 = transit_points[transit_points.trend == 0].reset_index(drop=True)
+for i in range(len(transit_0)):
+    if i < len(transit_0) - 1:
+        s_protector = pd.Series(0.0, index=ma.index[transit_0['lineno'][i]:transit_0['lineno'][i + 1]])
+    else:
+        s_protector = pd.Series(0.0, index=ma.index[transit_0['lineno'][i]:])
+    midA = midB = transit_0['ep'][i]
+    for j in range(len(s_protector)):
+        if s_protector.index[j] in K_EPs.index:
+            if K_EPs['ep'][s_protector.index[j]] > midB * (1 + C):
+                midA = midB = midB * (1 + D)
+            else:
+                midA = midA * (1 + K)
+        else:
+            midA = midA * (1 + K)
+        s_protector[j] = midA

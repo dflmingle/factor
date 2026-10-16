@@ -1,0 +1,40 @@
+quant/2024年度精选策略1/58.融券做空,3年35倍多！已模拟2年半，动态跑盘收益惊人！.txt
+from jqdata import *
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(clear_close, time='14:55', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.buylist0 = []
+
+def market_open(context):
+    rq_stock = context.portfolio.short_positions
+    for stock in rq_stock:
+        current_price = get_bars(stock, count=1, unit='5m', fields=['close'], include_now=True)['close'][-1]
+        marginsec_close(stock, rq_stock[stock].total_amount)
+
+def clear_close(context):
+    security = get_marginsec_stocks(date=context.current_dt)
+    current_data = get_current_data()
+    zf_dict = {}
+    for s in security:
+        cc = get_bars(s, count=2, unit='1d', fields=['high', 'low', 'close'], include_now=True)
+        if current_data[s].paused == False and len(cc['close']) == 2:
+            zf = (cc['high'][-1] - cc['low'][-1]) / cc['close'][0] * 100
+            if (cc['high'][-1] - cc['low'][-1]) / (current_data[s].high_limit - cc['close'][0]) > 1.5:
+                zf_dict[s] = zf
+            else:
+                pass
+    dm = sorted(zf_dict.items(), key=lambda x: x[1], reverse=True)
+    buylist = [s[0] for s in dm]
+    g.buylist0 = buylist[:10]
+    if len(g.buylist0) > 0:
+        position_per_money = context.portfolio.total_value / len(g.buylist0)
+        for stock in g.buylist0:
+            current_price = get_bars(stock, count=1, unit='5m', fields=['close'], include_now=True)['close'][-1]
+            position_per_money_n = int(position_per_money / current_price / 100) * 100
+            marginsec_open(stock, position_per_money_n)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=d175d7508c33210f4cd6f63757d79c8189e46dc20fb6044c8ebef7b6b5b48863 source=quant/2020年度精选策略/50 简单配对交易.txt'

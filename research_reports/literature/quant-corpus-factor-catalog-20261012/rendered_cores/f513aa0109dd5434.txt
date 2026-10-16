@@ -1,0 +1,141 @@
+quant/2023年度精选策略/76.半年6.5倍--次新股排板一式.txt
+from jqdata import *
+help_stock = []
+'EXACT_REVIEWED_FUNCTION initialize sha256=dcc06ddf9c45058a600a62497c74ba389fbc1d4fd982412ebe383b5e5e8e3385 source=quant/2023年度精选策略/5.87.5%胜率之分歧反包二板.txt'
+
+def market_open(context):
+    time_buy = context.current_dt.strftime('%H:%M:%S')
+    aday = datetime.datetime.strptime('13:00:00', '%H:%M:%S').strftime('%H:%M:%S')
+    if len(help_stock) > 0:
+        for stock in help_stock:
+            cash = context.portfolio.available_cash
+            day_open_price = get_current_data()[stock].day_open
+            current_price = get_current_data()[stock].last_price
+            high_limit_price = get_current_data()[stock].high_limit
+            pre_date = (context.current_dt + timedelta(days=-1)).strftime('%Y-%m-%d')
+            df_panel = get_price(stock, count=1, end_date=pre_date, frequency='daily', fields=['open', 'high', 'close', 'low', 'high_limit', 'money', 'pre_close'])
+            pre_high_limit = df_panel['high_limit'].values
+            pre_close = df_panel['close'].values
+            pre_open = df_panel['open'].values
+            pre_high = df_panel['high'].values
+            pre_low = df_panel['low'].values
+            pre_pre_close = df_panel['pre_close'].values
+            now = context.current_dt
+            zeroToday = now - datetime.timedelta(hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+            lastToday = zeroToday + datetime.timedelta(hours=9, minutes=31, seconds=0)
+            df_panel_allday = get_price(stock, start_date=lastToday, end_date=context.current_dt, frequency='minute', fields=['high', 'low', 'close', 'high_limit', 'money'])
+            low_allday = df_panel_allday.loc[:, 'low'].min()
+            high_allday = df_panel_allday.loc[:, 'high'].max()
+            sum_plus_num_two = (df_panel_allday.loc[:, 'close'] == df_panel_allday.loc[:, 'high_limit']).sum()
+            if cash > 5000:
+                if sum_plus_num_two > 3 and current_price > pre_close * 1.08 and (current_price < high_limit_price):
+                    send_micromessage('2.跳空首阴反包---' + stock)
+                    orders = order_value(stock, cash)
+                    if str(orders.status) == 'held':
+                        help_stock.remove(stock)
+    time_sell = context.current_dt.strftime('%H:%M:%S')
+    cday = datetime.datetime.strptime('13:30:00', '%H:%M:%S').strftime('%H:%M:%S')
+    sell_day = datetime.datetime.strptime('11:10:00', '%H:%M:%S').strftime('%H:%M:%S')
+    sell_day_10 = datetime.datetime.strptime('13:30:00', '%H:%M:%S').strftime('%H:%M:%S')
+    if time_sell > cday:
+        stock_owner = context.portfolio.positions
+        if len(stock_owner) > 0:
+            for stock_two in stock_owner:
+                if context.portfolio.positions[stock_two].closeable_amount > 0:
+                    current_price_list = get_ticks(stock_two, start_dt=None, end_dt=context.current_dt, count=1, fields=['time', 'current', 'high', 'low', 'volume', 'money'])
+                    current_price = current_price_list['current'][0]
+                    day_open_price = get_current_data()[stock_two].day_open
+                    day_high_limit = get_current_data()[stock_two].high_limit
+                    day_low_limit = get_current_data()[stock_two].low_limit
+                    now = context.current_dt
+                    zeroToday = now - datetime.timedelta(hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+                    lastToday = zeroToday + datetime.timedelta(hours=9, minutes=31, seconds=0)
+                    df_panel_allday = get_price(stock_two, start_date=lastToday, end_date=context.current_dt, frequency='minute', fields=['high', 'low', 'close', 'high_limit', 'money'])
+                    low_allday = df_panel_allday.loc[:, 'low'].min()
+                    high_allday = df_panel_allday.loc[:, 'high'].max()
+                    sum_plus_num_two = (df_panel_allday.loc[:, 'close'] == df_panel_allday.loc[:, 'high_limit']).sum()
+                    pre_date = (context.current_dt + timedelta(days=-1)).strftime('%Y-%m-%d')
+                    df_panel = get_price(stock_two, count=1, end_date=pre_date, frequency='daily', fields=['open', 'close', 'high_limit', 'money', 'low'])
+                    pre_low_price = df_panel['low'].values
+                    pre_close_price = df_panel['close'].values
+                    cost = context.portfolio.positions[stock_two].avg_cost
+                    if current_price < high_allday * 0.95 and current_price < pre_close_price and (current_price > day_low_limit):
+                        order_target(stock_two, 0)
+                    if current_price < pre_close_price * 0.97:
+                        order_target(stock_two, 0)
+    else:
+        stock_owner = context.portfolio.positions
+        if len(stock_owner) > 0:
+            for stock_two in stock_owner:
+                if context.portfolio.positions[stock_two].closeable_amount > 0:
+                    current_price_list = get_ticks(stock_two, start_dt=None, end_dt=context.current_dt, count=1, fields=['time', 'current', 'high', 'low', 'volume', 'money'])
+                    current_price = current_price_list['current'][0]
+                    day_open_price = get_current_data()[stock_two].day_open
+                    day_high_limit = get_current_data()[stock_two].high_limit
+                    day_low_limit = get_current_data()[stock_two].low_limit
+                    pre_date = (context.current_dt + timedelta(days=-1)).strftime('%Y-%m-%d')
+                    df_panel = get_price(stock_two, count=1, end_date=pre_date, frequency='daily', fields=['open', 'close', 'high_limit', 'money', 'low'])
+                    pre_low_price = df_panel['low'].values
+                    pre_close_price = df_panel['close'].values
+                    now = context.current_dt
+                    zeroToday = now - datetime.timedelta(hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+                    lastToday = zeroToday + datetime.timedelta(hours=9, minutes=31, seconds=0)
+                    df_panel_allday = get_price(stock_two, start_date=lastToday, end_date=context.current_dt, frequency='minute', fields=['high', 'low', 'close', 'high_limit', 'money'])
+                    low_allday = df_panel_allday.loc[:, 'low'].min()
+                    high_allday = df_panel_allday.loc[:, 'high'].max()
+                    sum_plus_num_two = (df_panel_allday.loc[:, 'close'] == df_panel_allday.loc[:, 'high_limit']).sum()
+                    current_price = context.portfolio.positions[stock_two].price
+                    cost = context.portfolio.positions[stock_two].avg_cost
+                    if current_price < cost * 0.93 and current_price > day_low_limit:
+                        order_target(stock_two, 0)
+                    elif current_price < low_allday * 0.95 and day_open_price < pre_close_price * 0.93:
+                        order_target(stock_two, 0)
+                    elif day_open_price < pre_close_price * 0.93:
+                        order_target(stock_two, 0)
+    if time_sell > cday and len(help_stock) > 0:
+        instead_stock = help_stock
+        for stock_remove in instead_stock:
+            help_stock.remove(stock_remove)
+'EXACT_REVIEWED_FUNCTION send_micromessage sha256=d2ce0b8924f2b16d6177efad9c94000d012aa4e090342686a3b961e2dc5505b6 source=quant/2023年度精选策略/5.87.5%胜率之分歧反包二板.txt'
+
+def before_market_open(context):
+    date_now = (context.current_dt + timedelta(days=-1)).strftime('%Y-%m-%d')
+    yesterday = (context.current_dt + timedelta(days=-90)).strftime('%Y-%m-%d')
+    trade_date = get_trade_days(start_date=yesterday, end_date=date_now, count=None)
+    stocks = list(get_all_securities(['stock']).index)
+    end_date = trade_date[trade_date.size - 1]
+    pre_date = trade_date[trade_date.size - 3]
+    continuous_price_limit = pick_high_limit(stocks, end_date, pre_date)
+    filter_st_stock = filter_st(continuous_price_limit)
+    templist = filter_stock_by_days(context, filter_st_stock, 20)
+    for stock in templist:
+        help_stock.append(stock)
+
+def pick_high_limit(stocks, end_date, pre_date):
+    df_panel = get_price(stocks, count=1, end_date=end_date, frequency='daily', fields=['open', 'close', 'high_limit', 'money', 'pre_close'])
+    df_close = df_panel['close']
+    df_open = df_panel['open']
+    df_high_limit = df_panel['high_limit']
+    df_pre_close = df_panel['pre_close']
+    high_limit_stock = []
+    for stock in stocks:
+        _high_limit = df_high_limit[stock].values
+        _close = df_close[stock].values
+        _open = df_open[stock].values
+        _pre_close = df_pre_close[stock].values
+        if stock[0:3] == '300' or stock[0:3] == '688':
+            continue
+        if _high_limit == _close and _close > _pre_close * 1.02:
+            high_limit_stock.append(stock)
+    return high_limit_stock
+'EXACT_REVIEWED_FUNCTION count_limit_num_all sha256=f3304a53b7f5c40655b89618615d4a3998ef067e708a51a1af5afac78a911d79 source=quant/2023年度精选策略/5.87.5%胜率之分歧反包二板.txt'
+'EXACT_REVIEWED_FUNCTION filter_st sha256=8c2e1a7baea0658ed320d8c56ce0c32c49615a2a576f04cc0e3e1a8cd54f79d1 source=quant/2023年度精选策略/1.龙头底分型战法-两年23倍.txt'
+
+def filter_stock_by_days(context, stock_list, days):
+    tmpList = []
+    for stock in stock_list:
+        days_public = (context.current_dt.date() - get_security_info(stock).start_date).days
+        if days_public < days:
+            tmpList.append(stock)
+    return tmpList
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

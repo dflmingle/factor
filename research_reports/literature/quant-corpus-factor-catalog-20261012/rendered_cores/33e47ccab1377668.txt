@@ -1,0 +1,159 @@
+quant/聚宽2025年精选/76小市值止损策略【年化104.11】.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import random
+from datetime import time
+
+def initialize(context):
+    g.trading_signal = True
+    g.pass_months = True
+    g.run_stoploss = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.not_buy_again = []
+    g.history_hold_list = []
+    g.stock_num = 5
+    g.up_price = 80
+    g.reason_to_sell = ''
+    g.stoploss_limit = 0.07
+    g.stoploss_market = 0.05
+    g.limit_days = 5
+    g.etf = '511880.XSHG'
+    run_daily(prepare_stock_list, '9:00')
+    run_weekly(weekly_adjustment, 2, '10:00')
+    run_daily(sell_stocks, time='10:30')
+    run_daily(sell_stocks, time='14:00')
+    run_daily(trade_afternoon, time='14:30')
+    run_daily(close_account, '14:30')
+
+def prepare_stock_list(context):
+    g.hold_list = list(context.portfolio.positions)
+    g.not_buy_again = []
+    if len(g.history_hold_list) >= g.limit_days:
+        g.history_hold_list = g.history_hold_list[-g.limit_days:]
+    if g.hold_list:
+        df = get_price(g.hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'low_limit'], count=1, panel=False, fill_paused=False)
+        df = df[df['close'] == df['high_limit']]
+        g.yesterday_HL_list = list(df.code)
+    else:
+        g.yesterday_HL_list = []
+    g.trading_signal = today_is_pass(context)
+
+def get_stock_list(context):
+    final_list = []
+    by_date = context.previous_date - datetime.timedelta(days=375)
+    initial_list = get_index_stocks('399101.XSHE', by_date)
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_st_stock(initial_list)
+    initial_list = filter_paused_stock(initial_list)
+    initial_list = filter_limitup_stock(context, initial_list)
+    initial_list = filter_limitdown_stock(context, initial_list)
+    initial_list = filter_highprice_stock(context, initial_list)
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(initial_list), valuation.market_cap.between(5, 50)).order_by(valuation.market_cap.asc())
+    df_fun = get_fundamentals(q)[:50]
+    final_list = list(df_fun.code)
+    return final_list
+
+def weekly_adjustment(context):
+    if g.trading_signal == True:
+        g.target_list = get_stock_list(context)
+        target_list = g.target_list[:g.stock_num]
+        for stock in g.hold_list:
+            if stock not in target_list and stock not in g.yesterday_HL_list:
+                position = context.portfolio.positions[stock]
+                if not close_position(position):
+                    pass
+        buy_security(context, target_list)
+
+def sell_stocks(context):
+    if g.run_stoploss:
+        past_prices = history(2, '1d', 'close', get_index_stocks('399101.XSHE'))
+        down_ratio = (past_prices.iloc[-1] / past_prices.iloc[0]).mean()
+        if down_ratio <= 1 - g.stoploss_market:
+            for stock in context.portfolio.positions:
+                order_target_value_(stock, 0)
+        else:
+            for stock in context.portfolio.positions:
+                if context.portfolio.positions[stock].price < context.portfolio.positions[stock].avg_cost * (1 - g.stoploss_limit):
+                    order_target_value_(stock, 0)
+                    g.reason_to_sell = 'stoploss'
+                    g.not_buy_again.append(stock)
+
+def check_limit_up(context):
+    if g.yesterday_HL_list:
+        current_data = get_current_data()
+        for stock in g.yesterday_HL_list:
+            if current_data[stock].last_price < current_data[stock].high_limit:
+                position = context.portfolio.positions[stock]
+                if close_position(position):
+                    g.reason_to_sell = 'limitup'
+                    g.not_buy_again.append(stock)
+    g.history_hold_list.append(g.not_buy_again)
+
+def check_remain_amount(context):
+    if g.reason_to_sell in ['limitup', 'stoploss']:
+        g.hold_list = list(context.portfolio.positions)
+        if len(g.hold_list) < g.stock_num:
+            target_list = g.target_list
+            target_list = filter_not_buy_again(target_list)
+            target_list = target_list[:min(g.stock_num, len(target_list))]
+            buy_security(context, target_list)
+        g.reason_to_sell = ''
+
+def trade_afternoon(context):
+    if g.trading_signal == True:
+        check_limit_up(context)
+        check_remain_amount(context)
+    else:
+        value = context.portfolio.available_cash
+        if value > 0 and g.etf not in context.portfolio.positions:
+            order_value(g.etf, value)
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=09978c16fb700f1aa8384e0af3f913b9892d43e791345e694f5bb8a88820177c source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=3ebece5727cd54e79d8fce56a2f6424517de218e055d4201ceaa07e8665d6466 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=590265ec52a62a2fb67a20b5e2bc9900854d683ff1c8c8555006836a6a392c7a source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_highprice_stock sha256=bba03a03707a1b9b8221aac2c7d5522390f75a8ebd66796e5aea48dcf97d2801 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+
+def filter_not_buy_again(stock_list):
+    temp_set = set()
+    for hold_list in g.history_hold_list:
+        temp_set = temp_set.union(set(hold_list))
+    not_buy_again_list = list(temp_set)
+    return [stock for stock in stock_list if stock not in not_buy_again_list]
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def buy_security(context, target_list):
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.available_cash / (target_num - position_count)
+        for stock in target_list:
+            if stock not in context.portfolio.positions:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+
+def today_is_pass(context):
+    if g.pass_months:
+        today = context.current_dt.strftime('%m-%d')
+        if '04-05' <= today and today <= '04-30' or ('01-01' <= today and today <= '01-31'):
+            return False
+        else:
+            return True
+    else:
+        return True
+
+def close_account(context):
+    if g.trading_signal == False:
+        for stock in g.hold_list:
+            if stock != g.etf:
+                position = context.portfolio.positions[stock]
+                if not close_position(position):
+                    pass

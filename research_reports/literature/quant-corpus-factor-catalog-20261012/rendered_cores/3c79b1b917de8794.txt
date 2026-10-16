@@ -1,0 +1,98 @@
+quant/量化策略/量化策略/ETF轮动策略2026/04多标的版ETF策略-重构优化版-25年70.txt
+import pandas as pd
+import talib
+from jqdata import *
+
+def initialize(context):
+    g.etf = ['512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512660.XSHG', '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG']
+    g.etf_num = 3
+    g.rank_num = 8
+    g.min_inc = 0.05
+    g.max_inc = 0.2
+    g.longdays = 20
+    g.shortdays = 5
+    g.rank_status = {}
+    run_daily(generate_signals, '09:25')
+    run_daily(execute_trades, '09:30')
+    run_daily(log_portfolio, '15:10')
+    g.previous_portfolio_value = context.portfolio.starting_cash
+
+def calculate_metrics(etf_list, long_days, short_days):
+    inc_list = []
+    ma5_list = []
+    ma20_list = []
+    for etf in etf_list:
+        df = attribute_history(etf, long_days, fields=['close'])
+        inc = df['close'][-1] / df['close'][0] - 1
+        ma5 = df['close'].tail(short_days).mean()
+        ma20 = df['close'].mean()
+        inc_list.append(inc)
+        ma5_list.append(ma5)
+        ma20_list.append(ma20)
+    df_metrics = pd.DataFrame({'inc': inc_list, 'ma5': ma5_list, 'ma20': ma20_list}, index=etf_list)
+    return df_metrics
+
+def generate_signals(context):
+    df = calculate_metrics(g.etf, g.longdays, g.shortdays)
+    df = df.sort_values('inc', ascending=False)
+    for i, (etf, row) in enumerate(df.iterrows()):
+        name = get_security_info(etf).display_name
+        ma5_gt_ma20 = row['ma5'] > row['ma20']
+        buy_condition = ma5_gt_ma20 and g.min_inc < row['inc'] < g.max_inc
+    top_ranked = df.index[:g.rank_num].tolist()
+    for etf in g.etf:
+        if etf in top_ranked:
+            g.rank_status[etf] = 0
+        else:
+            g.rank_status[etf] = g.rank_status.get(etf, 0) + 1
+    mask = (df['ma5'] > df['ma20']) & (df['inc'] > g.min_inc) & (df['inc'] < g.max_inc)
+    candidates = df[mask].index.tolist()
+    g.buy_candidates = candidates[:g.etf_num]
+    g.sell_list = []
+    for etf in context.portfolio.positions:
+        if etf not in df.index:
+            continue
+        inc = df.loc[etf, 'inc']
+        if inc > g.max_inc:
+            g.sell_list.append(etf)
+        elif g.rank_status.get(etf, 0) >= 2:
+            g.sell_list.append(etf)
+    g.buy_list = [etf for etf in g.buy_candidates if etf not in g.sell_list]
+    if g.sell_list:
+        for etf in g.sell_list:
+            if etf in context.portfolio.positions:
+                if etf in df.index:
+                    inc = df.loc[etf, 'inc']
+                    if inc > g.max_inc:
+                        reason = '涨幅超过{:.0%}'.format(g.max_inc)
+                    elif g.rank_status.get(etf, 0) >= 2:
+                        reason = '连续{}天不在涨幅前{}'.format(g.rank_status[etf], g.rank_num)
+                    else:
+                        reason = '未知原因（可能已不在持仓中）'
+                else:
+                    reason = 'ETF数据缺失'
+
+def execute_trades(context):
+    for etf in g.sell_list:
+        order_target_value(etf, 0)
+    current_positions = len(context.portfolio.positions)
+    if current_positions < g.etf_num:
+        cash_per_etf = context.portfolio.available_cash / (g.etf_num - current_positions)
+        for etf in g.buy_list:
+            order_target_value(etf, cash_per_etf)
+            if len(context.portfolio.positions) >= g.etf_num:
+                break
+
+def log_portfolio(context):
+    if len(context.portfolio.positions) == 0:
+        pass
+    else:
+        for position in context.portfolio.positions.values():
+            name = get_security_info(position.security).display_name
+            buy_date = position.init_time.date()
+            buy_price = position.avg_cost
+            current_price = position.price
+            ret = (current_price / buy_price - 1) * 100
+    total_ret = (context.portfolio.portfolio_value / context.portfolio.starting_cash - 1) * 100
+    daily_ret = (context.portfolio.portfolio_value / g.previous_portfolio_value - 1) * 100
+    g.previous_portfolio_value = context.portfolio.portfolio_value

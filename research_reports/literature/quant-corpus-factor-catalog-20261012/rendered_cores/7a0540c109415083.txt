@@ -1,0 +1,47 @@
+quant/聚宽2025年精选/14安全摸狗策略.txt
+import numpy as np
+import pandas as pd
+'EXACT_REVIEWED_FUNCTION initialize sha256=54c29a9a5ffc18cfb219ec015b00cb4c6233cb1056003de3f8f1beb580af9ecd source=quant/2024年度精选策略1/3.【回顾3】ETF策略之核心资产轮动.txt'
+
+def MOM(etf):
+    df = attribute_history(etf, g.m_days, '1d', ['close'])
+    y = np.log(df['close'].values)
+    n = len(y)
+    x = np.arange(n)
+    weights = np.linspace(1, 2, n)
+    slope, intercept = np.polyfit(x, y, 1, w=weights)
+    annualized_returns = math.pow(math.exp(slope), 250) - 1
+    residuals = y - (slope * x + intercept)
+    weighted_residuals = weights * residuals ** 2
+    r_squared = 1 - np.sum(weighted_residuals) / np.sum(weights * (y - np.mean(y)) ** 2)
+    score = annualized_returns * r_squared
+    return score
+
+def get_rank(etf_pool):
+    score_list = []
+    for etf in etf_pool:
+        score = MOM(etf)
+        score_list.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': score_list})
+    df = df.sort_values(by='score', ascending=False)
+    df = df[(df['score'] > 0) & (df['score'] <= 5)]
+    rank_list = list(df.index)
+    if len(rank_list) == 0:
+        rank_list = []
+    return rank_list
+
+def trade(context):
+    target_num = 1
+    target_list = get_rank(g.etf_pool)[:target_num]
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+        else:
+            pass
+    hold_list = list(context.portfolio.positions)
+    if len(hold_list) < target_num:
+        value = context.portfolio.available_cash / (target_num - len(hold_list))
+        for etf in target_list:
+            if context.portfolio.positions[etf].total_amount == 0:
+                order_target_value(etf, value)

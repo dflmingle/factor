@@ -1,0 +1,66 @@
+quant/2023年度精选策略/65.PB-POE+双均线--加入jq以来第一个成功的交易策略 一.txt
+def initialize(context):
+    g.stocknum = 5
+    g.days = 0
+    g.refresh_rate = 30
+    run_daily(trade)
+
+def check_stocks(context):
+    q = query(valuation.code).filter(valuation.market_cap > 800, valuation.pb_ratio < 20, indicator.roe > 7).order_by((indicator.roe - valuation.pb_ratio).desc()).limit(100)
+    df = get_fundamentals(q)
+    buylist = []
+    for i in df['code']:
+        security = i
+        close_data_MAs = attribute_history(security, 10, '1d', ['close'])
+        MAs = close_data_MAs['close'].mean()
+        close_data_MAl = attribute_history(security, 60, '1d', ['close'])
+        MAl = close_data_MAl['close'].mean()
+        current_price = close_data_MAs['close'][-1]
+        last_price = close_data_MAs['close'][-2]
+        if current_price > MAl and MAs > MAl:
+            buylist.append(security)
+    buylist = filter_paused_stock(buylist)
+    return buylist[:g.stocknum]
+
+def check_holding(context):
+    sell_list = []
+    holding_list = list(context.portfolio.positions.keys())
+    for security in holding_list:
+        close_data_MAs = attribute_history(security, 10, '1d', ['close'])
+        MAs = close_data_MAs['close'].mean()
+        close_data_MAl = attribute_history(security, 60, '1d', ['close'])
+        MAl = close_data_MAl['close'].mean()
+        current_price = close_data_MAs['close'][-1]
+        if current_price < MAs and MAs < MAl:
+            sell_list.append(security)
+    return sell_list
+
+def trade(context):
+    if g.days % g.refresh_rate == 0:
+        now_list = list(context.portfolio.positions.keys())
+        stock_list = check_stocks(context)
+        sell = []
+        buy = []
+        for stock in now_list:
+            if stock not in stock_list:
+                sell.append(stock)
+        for stock in stock_list:
+            if stock not in now_list:
+                buy.append(stock)
+        if len(sell) > 0:
+            for stock in sell:
+                order_target_value(stock, 0)
+        if len(buy) > 0:
+            Cash = context.portfolio.cash / len(buy)
+        else:
+            Cash = 0
+        for stock in buy:
+            order_value(stock, Cash)
+        g.days = 1
+    else:
+        g.days += 1
+        sell_list = check_holding(context)
+        if len(sell_list) > 0:
+            for stock in sell_list:
+                order_target_value(stock, 0)
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'

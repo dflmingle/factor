@@ -1,0 +1,86 @@
+quant/聚宽2025年精选/17多品种ETF动量轮动+EPO优化.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import talib
+from scipy.optimize import minimize
+import statsmodels.api as sm
+from scipy.linalg import solve
+
+def initialize(context):
+    g.stock_num = 3
+    g._lambda = 10
+    g.w = 0.2
+    g.etf_pool = ['518880.XSHG', '159985.XSHE', '513100.XSHG', '510300.XSHG', '159915.XSHE', '159992.XSHE', '515700.XSHG', '510150.XSHG', '515790.XSHG', '515880.XSHG', '512720.XSHG', '512660.XSHG', '159740.XSHE']
+    run_monthly(trade, 1, '9:30')
+    g.m_days = 34
+
+def get_rank(etf_pool):
+    score_list = []
+    for etf in etf_pool:
+        df = attribute_history(etf, g.m_days, '1d', ['close'])
+        y = df['log'] = np.log(df.close)
+        x = df['num'] = np.arange(df.log.size)
+        slope, intercept = np.polyfit(x, y, 1)
+        annualized_returns = math.pow(math.exp(slope), 250) - 1
+        r_squared = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+        score = annualized_returns * r_squared
+        score_list.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': score_list})
+    df = df.sort_values(by='score', ascending=False)
+    df = df.dropna()
+    rank_list = list(df.index)
+    filtered_rank_list = [etf for etf in rank_list if df.loc[etf, 'score'] > 0]
+    return filtered_rank_list
+
+def epo(x, signal, lambda_, method='simple', w=None, anchor=None, normalize=True, endogenous=True):
+    n = x.shape[1]
+    vcov = x.cov()
+    corr = x.corr()
+    I = np.eye(n)
+    V = np.zeros((n, n))
+    np.fill_diagonal(V, vcov.values.diagonal())
+    std = np.sqrt(V)
+    s = signal
+    a = anchor
+    shrunk_cor = (1 - w) * I @ corr.values + w * I
+    cov_tilde = std @ shrunk_cor @ std
+    inv_shrunk_cov = solve(cov_tilde, np.eye(n))
+    if method == 'simple':
+        epo = 1 / lambda_ * inv_shrunk_cov @ signal
+    elif method == 'anchored':
+        if endogenous:
+            gamma = np.sqrt(a.T @ cov_tilde @ a) / np.sqrt(s.T @ inv_shrunk_cov @ cov_tilde @ inv_shrunk_cov @ s)
+            epo = inv_shrunk_cov @ ((1 - w) * gamma * s + w * I @ V @ a)
+        else:
+            epo = inv_shrunk_cov @ ((1 - w) * (1 / lambda_) * s + w * I @ V @ a)
+    if normalize:
+        epo = [0 if a < 0 else a for a in epo]
+        epo = epo / np.sum(epo)
+    return epo
+
+def run_optimization(stocks, end_date):
+    prices = get_price(stocks, count=1200, end_date=end_date, frequency='daily', fields=['close'])['close']
+    returns = prices.pct_change().dropna()
+    d = np.diag(returns.cov())
+    a = 1 / d / (1 / d).sum()
+    weights = epo(x=returns, signal=returns.mean(), lambda_=g._lambda, method='anchored', w=g.w, anchor=a)
+    return weights
+
+def trade(context):
+    end_date = context.previous_date
+    target_list = get_rank(g.etf_pool)[:g.stock_num]
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+    weights = run_optimization(target_list, end_date)
+    if weights is None:
+        return
+    total_value = context.portfolio.total_value
+    index = 0
+    for w in weights:
+        value = total_value * w
+        order_target_value(target_list[index], value)
+        index += 1

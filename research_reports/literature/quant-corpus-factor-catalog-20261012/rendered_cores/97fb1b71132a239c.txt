@@ -1,0 +1,35 @@
+quant/2020年度精选策略/50 简单配对交易.txt
+from jqdata import *
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.rz_stock = '601988.XSHG'
+    g.rq_stock = '002048.XSHE'
+    g.p_mean = 2.8539
+    g.p_std = 0.00149
+    g.beta = 0.0567
+
+def handle_data(context, data):
+    weekday = context.current_dt.isoweekday()
+    rz_stock = g.rz_stock
+    rq_stock = g.rq_stock
+    data1 = attribute_history(rz_stock, 1, '1d', ['close'])['close'][0]
+    data2 = attribute_history(rq_stock, 1, '1d', ['close'])['close'][0]
+    portf = data1 - g.beta * data2
+    ava_margin = context.portfolio.subportfolios[0].available_margin
+    short_closeable_rz = context.portfolio.short_positions[g.rz_stock].closeable_amount
+    short_closeable_rq = context.portfolio.short_positions[g.rq_stock].closeable_amount
+    long_closeable_rz = context.portfolio.long_positions[g.rz_stock].closeable_amount
+    long_closeable_rq = context.portfolio.long_positions[g.rq_stock].closeable_amount
+    if portf > g.p_mean * (1 + 2 * g.p_std):
+        order(rz_stock, -long_closeable_rz, side='long')
+        marginsec_close(rq_stock, short_closeable_rq)
+    if portf < g.p_mean * (1 - 2 * g.p_std) and ava_margin > 0:
+        order(rz_stock, 50000, side='long')
+        marginsec_open(rq_stock, 50000 * g.beta)
+
+def after_market_close(context):
+    p = context.portfolio.subportfolios[0]

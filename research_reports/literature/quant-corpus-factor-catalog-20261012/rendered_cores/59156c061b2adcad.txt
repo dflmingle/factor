@@ -1,0 +1,77 @@
+quant/2021年度精选策略/91.欧奈尔 RPS选股战法回测.txt
+from jqdata import *
+from kuanke.wizard import *
+import numpy as np
+import pandas as pd
+import talib
+import datetime
+
+def initialize(context):
+    g.rps_period = 120
+    g.max_stock_num = 5
+    g.filter_over_increase_percent = 0.5
+    g.min_rps = 85
+    g.security_universe_index = ['000300.XSHG']
+    g.watch_list = get_security_universe(context, g.security_universe_index, [])
+    g.check_out_list = []
+    g.cur_stock_num = 0
+    run_daily(before_market_open, time='before_open')
+    run_daily(market_open, time='14:25', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.check_out_list = []
+    g.check_out_list = rps_select(context, g.watch_list)
+
+def rps_select(context, stock_list):
+    stock_dict = {}
+    over_increase_list = []
+    for stock in stock_list:
+        rps_data = get_bars(stock, count=g.rps_period, unit='1d', fields=['close'], include_now=False)
+        increase = rps_data['close'][-1] / rps_data['close'][0] - 1
+        if increase > g.filter_over_increase_percent:
+            over_increase_list.append(stock)
+        stock_dict[stock] = increase
+    a = sorted(stock_dict.items(), key=lambda x: x[1], reverse=True)
+    rank = 1
+    g.rps_dict = stock_dict
+    rps_list = []
+    for x in a:
+        rps = (1 - rank / len(g.watch_list)) * 100
+        rps_list.append((x[0], rps))
+        rank += 1
+    select_num = 10
+    final_list = []
+    for x in rps_list:
+        if x[1] < g.min_rps:
+            break
+        if x[0] not in over_increase_list:
+            select_num -= 1
+            final_list.append(x[0])
+    return final_list
+
+def market_open(context):
+    buy_list = g.check_out_list
+    for stock in context.portfolio.positions.keys():
+        sell(context, stock)
+    for stock in buy_list:
+        buy(context, stock)
+
+def buy(context, security):
+    g.cur_stock_num = len(context.portfolio.positions)
+    if g.cur_stock_num >= g.max_stock_num:
+        return
+    cash = context.portfolio.available_cash
+    if cash < 100:
+        return
+    if cash > 0:
+        remaining_stock_num = g.max_stock_num - g.cur_stock_num
+        cash_for_stock = 1 / remaining_stock_num * cash
+        if security not in context.portfolio.positions.keys():
+            order_value(security, cash_for_stock)
+
+def sell(context, security):
+    if n_day_chg_xiaoyu(security, 90, 0.3) and situation_filter_xiaoyu_ma(security, 'close', 100) and (context.portfolio.positions[security].closeable_amount > 0):
+        order_target(security, 0)
+'EXACT_REVIEWED_FUNCTION get_security_universe sha256=5ac9f63b0cae6931ac7fe3118b32518d45cb11da34a0a50cd6da4c4235ffbc0b source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

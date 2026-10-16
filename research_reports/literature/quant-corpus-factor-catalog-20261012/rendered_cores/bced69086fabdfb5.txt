@@ -1,0 +1,16 @@
+quant/聚宽2025年精选/38ETF策略之核心资产轮动（线性增加权重）.txt
+import numpy as np
+import pandas as pd
+'EXACT_REVIEWED_FUNCTION initialize sha256=54c29a9a5ffc18cfb219ec015b00cb4c6233cb1056003de3f8f1beb580af9ecd source=quant/2024年度精选策略1/3.【回顾3】ETF策略之核心资产轮动.txt'
+'EXACT_REVIEWED_FUNCTION MOM sha256=174693b88eb01535878f65658678664ad3ff22c8b07f95ef421544a7c0f9e7e8 source=quant/聚宽2025年精选/14安全摸狗策略.txt'
+
+def get_rank(etf_pool):
+    score_list = []
+    for etf in etf_pool:
+        score = MOM(etf)
+        score_list.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': score_list})
+    df = df.sort_values(by='score', ascending=False)
+    rank_list = list(df.index)
+    return rank_list
+'EXACT_REVIEWED_FUNCTION trade sha256=d5c519cbbe37c9e6851479a377fa76773477011dcb553bdf0297abf3af0fad33 source=quant/聚宽2025年精选/14安全摸狗策略.txt'

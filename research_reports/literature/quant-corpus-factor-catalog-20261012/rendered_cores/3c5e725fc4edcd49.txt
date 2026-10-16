@@ -1,0 +1,232 @@
+quant/量化策略/量化策略/实盘2026/Ptrade/pt版07ETF动量加EPO平衡策略.txt
+import numpy as np
+import pandas as pd
+import math
+import datetime
+from scipy.linalg import solve
+
+def initialize(context):
+    g.stock_num = 3
+    g._lambda = 10
+    g.w = 0.2
+    g.m_days = 34
+    g.optim_window = 1000
+    g.position_pct = 1.0
+    g.etf_pool = ['512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512660.XSHG', '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG']
+    set_universe(g.etf_pool)
+    g.is_real = is_trade()
+    if g.is_real:
+        run_daily(context, trade, time='09:31')
+
+def handle_data(context, data):
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 9 and current_dt.minute == 31:
+        trade(context, data)
+
+def is_first_trading_day_of_month(date):
+    first_day = date.replace(day=1)
+    try:
+        first_trading_day_str = get_trading_day_by_date(first_day.strftime('%Y%m%d'), 0)
+        return date.strftime('%Y%m%d') == first_trading_day_str
+    except Exception:
+        try:
+            prev_day = get_trading_day_by_date(date.strftime('%Y%m%d'), -1)
+            if prev_day:
+                prev_date = datetime.datetime.strptime(prev_day, '%Y%m%d').date()
+                if prev_date.month != date.month:
+                    return True
+            return False
+        except:
+            return date.day == 1
+
+def trade(context, data=None):
+    if not is_first_trading_day_of_month(context.blotter.current_dt):
+        return
+    target_list, score_df = get_rank(g.etf_pool)
+    if not target_list:
+        positions = get_positions()
+        for code, pos in positions.items():
+            if pos.amount != 0:
+                order_target_value(code, 0)
+        return
+    target_list = target_list[:g.stock_num]
+    for etf in target_list:
+        pass
+    positions = get_positions()
+    for code, pos in positions.items():
+        if pos.amount != 0 and code not in target_list:
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+            if sellable <= 0:
+                continue
+            order_target_value(code, 0)
+            if not g.is_real and data is not None:
+                try:
+                    price = data[code].open
+                except:
+                    price = None
+        elif pos.amount != 0 and code in target_list:
+            pass
+    end_date = context.blotter.current_dt
+    weights = run_optimization(target_list, end_date)
+    if weights is None:
+        return
+    if g.is_real:
+        total_buy_cash = context.portfolio.cash * g.position_pct
+        if total_buy_cash <= 0:
+            return
+        for i, etf in enumerate(target_list):
+            target_value = total_buy_cash * weights[i]
+            snapshot = get_snapshot(etf)
+            price = snapshot.get(etf, {}).get('last_px', None) if snapshot else None
+            if price is None or price <= 0:
+                continue
+            min_amount = price * 100
+            if target_value < min_amount:
+                continue
+            order_target_value(etf, target_value)
+    else:
+        total_value = context.portfolio.portfolio_value * g.position_pct
+        if total_value <= 0:
+            return
+        for i, etf in enumerate(target_list):
+            target_value = total_value * weights[i]
+            price = None
+            if data is not None:
+                if etf in data:
+                    price = data[etf].open
+                else:
+                    short_code = etf.replace('.XSHG', '.SS').replace('.XSHE', '.SZ')
+                    if short_code in data:
+                        price = data[short_code].open
+            if price is None or price <= 0:
+                continue
+            min_amount = price * 100
+            if target_value < min_amount:
+                continue
+            order_target_value(etf, target_value)
+
+def get_rank(etf_pool):
+    scores = []
+    for etf in etf_pool:
+        hist = get_history(g.m_days, '1d', 'close', etf, fq='pre', is_dict=True)
+        if etf not in hist:
+            scores.append(-np.inf)
+            continue
+        data_arr = hist[etf]
+        if len(data_arr) < g.m_days:
+            scores.append(-np.inf)
+            continue
+        try:
+            close_arr = data_arr['close']
+        except (KeyError, ValueError):
+            close_arr = np.array([x[1] for x in data_arr])
+        close_arr = close_arr[~np.isnan(close_arr)]
+        if len(close_arr) < g.m_days:
+            scores.append(-np.inf)
+            continue
+        y = np.log(close_arr)
+        n = len(y)
+        x = np.arange(n)
+        slope, intercept = np.polyfit(x, y, 1)
+        annualized_returns = math.pow(math.exp(slope), 250) - 1
+        residuals = y - (slope * x + intercept)
+        ss_res = np.sum(residuals ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - ss_res / ss_tot if ss_tot != 0 else 0
+        score = annualized_returns * r_squared
+        scores.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': scores})
+    df = df.sort_values('score', ascending=False).dropna()
+    filtered = [etf for etf in df.index if df.loc[etf, 'score'] > 0]
+    return (filtered, df)
+
+def epo(x, signal, lambda_, method='anchored', w=0.2, anchor=None, normalize=True):
+    n = x.shape[1]
+    vcov = x.cov()
+    corr = x.corr()
+    I = np.eye(n)
+    std = np.sqrt(np.diag(vcov))
+    V = np.diag(std ** 2)
+    s = signal.values if isinstance(signal, pd.Series) else signal
+    a = anchor
+    shrunk_cor = (1 - w) * corr.values + w * I
+    cov_tilde = np.diag(std) @ shrunk_cor @ np.diag(std)
+    inv_shrunk_cov = solve(cov_tilde, np.eye(n))
+    if method == 'anchored':
+        gamma = np.sqrt(a.T @ cov_tilde @ a) / np.sqrt(s.T @ inv_shrunk_cov @ cov_tilde @ inv_shrunk_cov @ s)
+        epo_weights = inv_shrunk_cov @ ((1 - w) * gamma * s + w * V @ a)
+    else:
+        epo_weights = 1 / lambda_ * inv_shrunk_cov @ s
+    if normalize:
+        epo_weights = np.maximum(epo_weights, 0)
+        if np.sum(epo_weights) > 0:
+            epo_weights = epo_weights / np.sum(epo_weights)
+    return epo_weights
+
+def run_optimization(stocks, end_date):
+    if len(stocks) == 0:
+        return None
+    price_dict = get_history(g.optim_window, '1d', 'close', stocks, fq='pre', is_dict=True)
+    if not price_dict:
+        return None
+    close_series = {}
+    for code in stocks:
+        if code not in price_dict:
+            continue
+        data_arr = price_dict[code]
+        if len(data_arr) < 10:
+            continue
+        try:
+            closes = data_arr['close']
+            if 'datetime' in data_arr.dtype.names:
+                dates = data_arr['datetime']
+            elif 'date' in data_arr.dtype.names:
+                dates = data_arr['date']
+            else:
+                dates = np.array([x[0] for x in data_arr])
+        except (KeyError, ValueError):
+            closes = np.array([x[1] for x in data_arr])
+            dates = np.array([x[0] for x in data_arr])
+        date_objs = []
+        for d in dates:
+            try:
+                date_str = str(int(d))
+                date_objs.append(datetime.datetime.strptime(date_str, '%Y%m%d'))
+            except:
+                date_objs.append(d)
+        close_series[code] = pd.Series(closes, index=date_objs)
+    if not close_series:
+        return None
+    close_df = pd.DataFrame(close_series).dropna(how='all')
+    if close_df.empty or len(close_df) < 10:
+        return None
+    returns = close_df.pct_change().dropna()
+    if len(returns) < 2:
+        return None
+    returns = returns.dropna(axis=1, how='all')
+    if returns.shape[1] != len(stocks):
+        if returns.shape[1] == 0:
+            return None
+    try:
+        cov_matrix = returns.cov()
+        d = np.diag(cov_matrix.values)
+        if np.any(np.isnan(d)):
+            anchor = np.ones(len(returns.columns)) / len(returns.columns)
+        else:
+            with np.errstate(divide='ignore'):
+                inv_std = 1.0 / np.sqrt(d)
+                inv_std[np.isinf(inv_std)] = 0
+            if np.sum(inv_std) == 0:
+                anchor = np.ones(len(returns.columns)) / len(returns.columns)
+            else:
+                anchor = inv_std / np.sum(inv_std)
+    except Exception as e:
+        anchor = np.ones(len(returns.columns)) / len(returns.columns)
+    signal = returns.mean()
+    weights = epo(x=returns, signal=signal, lambda_=g._lambda, method='anchored', w=g.w, anchor=anchor, normalize=True)
+    return weights

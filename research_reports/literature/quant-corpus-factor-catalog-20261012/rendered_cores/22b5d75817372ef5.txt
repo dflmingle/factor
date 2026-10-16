@@ -1,0 +1,249 @@
+quant/2024年度精选策略2/46.韶华研究之十二--还算可以的竞价研究.txt
+from jqdata import *
+from kuanke.wizard import *
+from six import BytesIO
+from jqlib.technical_analysis import *
+from sklearn.linear_model import LinearRegression
+import numpy as np
+import pandas as pd
+import time
+
+def initialize(context):
+    set_params()
+    set_variables()
+    set_backtest()
+    run_daily(before_market_open, time='7:00')
+    run_daily(call_auction, time='09:27')
+    run_daily(market_open, time='09:30')
+    run_daily(market_close, time='14:55')
+
+def set_params():
+    g.index = 'all'
+    g.long_dura = 88
+    g.medium_dura = 44
+    g.short_dura = 22
+    g.rps_ratio = 0.1
+
+def set_variables():
+    g.stocknum = 4
+    g.poolnum = 1 * g.stocknum
+    g.shiftdays = 1
+    g.day_count = 0
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=c6fb428ea9d9bdf783e06211cbf8c2ef3984fc4e57acbedab754e8fe4fea5334 source=quant/2024年度精选策略1/34.韶华研究之十八，201系列.txt'
+
+def before_market_open(context):
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    all_data = get_current_data()
+    g.list_classA = []
+    g.list_classB = []
+    g.list_classC = []
+    if g.day_count % g.shiftdays == 0:
+        g.adjustpositions = True
+        g.day_count += 1
+    else:
+        g.day_count += 1
+        g.adjustpositions = False
+        return
+    num1, num2, num3, num4, num5, num6 = (0, 0, 0, 0, 0, 0)
+    start_time = time.time()
+    if g.index == 'all':
+        stocklist = list(get_all_securities(['stock']).index)
+    elif g.index == 'zz':
+        stocklist = get_index_stocks('000300.XSHG', date=None) + get_index_stocks('000905.XSHG', date=None) + get_index_stocks('000852.XSHG', date=None)
+    else:
+        stocklist = get_index_stocks(g.index, date=None)
+    num1 = len(stocklist)
+    stocklist = [stockcode for stockcode in stocklist if not all_data[stockcode].paused]
+    stocklist = [stockcode for stockcode in stocklist if not all_data[stockcode].is_st]
+    stocklist = [stockcode for stockcode in stocklist if '退' not in all_data[stockcode].name]
+    stocklist = [stockcode for stockcode in stocklist if (today_date - get_security_info(stockcode).start_date).days > 365]
+    num2 = len(stocklist)
+    end_time = time.time()
+    start_time = time.time()
+    list_rps_s = get_rps_filter(context, stocklist, lastd_date, g.short_dura, 0.1)
+    list_rps_m = get_rps_filter(context, stocklist, lastd_date, g.medium_dura, 0.1)
+    list_rps_l = get_rps_filter(context, stocklist, lastd_date, g.long_dura, 0.1)
+    g.list_A = list(set(list_rps_s).intersection(list_rps_m, list_rps_l))
+    end_time = time.time()
+    start_time = time.time()
+    g.list_B = get_pre_filter(context, g.list_A, lastd_date)
+    end_time = time.time()
+
+def call_auction(context):
+    current_data = get_current_data()
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    start_time = time.time()
+    g.list_B = get_auction_filter(context, g.list_B, 1000000)
+    end_time = time.time()
+    g.buy_list = list(get_score_filter(context, g.list_B).keys())[:g.stocknum]
+    if len(g.buy_list) == 0:
+        return
+
+def market_open(context):
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    current_data = get_current_data()
+    if len(g.buy_list) == 0:
+        return
+    else:
+        cash = context.portfolio.total_value / g.stocknum
+        for stockcode in g.buy_list:
+            buy_stock(context, stockcode, cash)
+            if len(context.portfolio.positions) >= g.stocknum - 1:
+                return
+
+def market_close(context):
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    current_data = get_current_data()
+    for stockcode in context.portfolio.positions:
+        if current_data[stockcode].paused == True:
+            continue
+        if current_data[stockcode].last_price != current_data[stockcode].high_limit:
+            sell_stock(context, stockcode, 0)
+            continue
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'
+
+def get_rps_filter(context, stocklist, check_date, duration, ratio):
+    poollist = []
+    df_price = get_price(stocklist, count=duration, end_date=check_date, skip_paused=True, panel=False)
+    df_rps = df_price.groupby('code').apply(lambda x: x.iloc[-1].close / x.iloc[0].close)
+    df_rps = df_rps.sort_values(ascending=False)
+    df_rps = df_rps.dropna()
+    poollist = df_rps.index.tolist()
+    poollist = poollist[:int(len(stocklist) * ratio)]
+    return poollist
+
+def get_pre_filter(context, stocklist, check_date):
+    poollist = []
+    stocklist = get_up_filter(context, stocklist, 250, 1)
+    stocklist = get_down_filter(context, stocklist, 250, 0)
+    stocklist = get_reds_filter(context, stocklist, 60, 31)
+    for stockcode in stocklist:
+        df_price = get_price(stockcode, end_date=check_date, frequency='daily', fields=['pre_close', 'open', 'high_limit', 'high', 'low', 'close'], count=2)
+        if df_price.close.values[0] == df_price.high_limit.values[0] or df_price.high.values[-1] != df_price.high_limit.values[-1]:
+            continue
+        df_price = get_price(stockcode, end_date=check_date, frequency='daily', fields=['pre_close', 'open', 'high_limit', 'high', 'low', 'close', 'volume'], count=41)
+        df_late40 = pd.DataFrame(columns=['lb', 'yby_c', 'yby_o'])
+        df_late40.lb = df_price.volume / df_price.volume.shift(1)
+        df_late40.yby_c = df_price.close / df_price.open.shift(1)
+        df_late40.yby_o = df_price.open / df_price.close.shift(1)
+        df_late40 = pd.concat([df_price, df_late40], axis=1)
+        if len(df_late40[(df_late40.close > df_late40.pre_close) & (df_late40.lb > 1)]) < 3:
+            continue
+        df_late10 = df_late40.iloc[-10:, :]
+        if len(df_late10[(df_late10.close < df_late10.open) & (df_late10.yby_c < 1) & (df_late10.yby_o > 1) & (df_late10.lb > 1)]) != 0:
+            continue
+        poollist.append(stockcode)
+    return poollist
+
+def get_auction_filter(context, stocklist, money_limit):
+    current_data = get_current_data()
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    poollist = []
+    df_auction = get_call_auction(stocklist, start_date=today_date, end_date=today_date, fields=['time', 'current', 'volume', 'money'])
+    df_auction = df_auction[df_auction.money > money_limit].sort_values(['money'], ascending=False)
+    for i in range(len(df_auction)):
+        stockcode = df_auction.code.values[i]
+        price = df_auction.current.values[i]
+        df_price = get_price(stockcode, end_date=lastd_date, frequency='daily', fields=['close'], count=7)
+        close_max = df_price.close.values.max()
+        if price < close_max:
+            continue
+        poollist.append(stockcode)
+    return poollist
+
+def get_score_filter(context, stocklist):
+    current_data = get_current_data()
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    back10_date = get_trade_days(end_date=lastd_date, count=10)[9]
+    back5_date = get_trade_days(end_date=lastd_date, count=6)[5]
+    back20_date = get_trade_days(end_date=lastd_date, count=21)[20]
+    score_sets = {}
+    for stockcode in stocklist:
+        score = 0
+        MA10_last = MA(stockcode, check_date=lastd_date, timeperiod=10)
+        MA20_last = MA(stocklist, check_date=lastd_date, timeperiod=20)
+        MA30_last = MA(stocklist, check_date=lastd_date, timeperiod=30)
+        MA10_back = MA(stockcode, check_date=back10_date, timeperiod=10)
+        MA20_back = MA(stocklist, check_date=back10_date, timeperiod=20)
+        MA30_back = MA(stocklist, check_date=back10_date, timeperiod=30)
+        if MA10_back[stockcode] / MA20_back[stockcode] < MA10_last[stockcode] / MA20_last[stockcode] and MA10_back[stockcode] / MA20_back[stockcode] > 1 and (MA20_back[stockcode] / MA30_back[stockcode] < MA20_last[stockcode] / MA30_last[stockcode]) and (MA20_back[stockcode] / MA30_back[stockcode] > 1):
+            score += 10
+        elif MA10_back[stockcode] / MA20_back[stockcode] < MA10_last[stockcode] / MA20_last[stockcode] and MA10_back[stockcode] / MA20_back[stockcode] > 1 or (MA20_back[stockcode] / MA30_back[stockcode] < MA20_last[stockcode] / MA30_last[stockcode] and MA20_back[stockcode] / MA30_back[stockcode] > 1):
+            score += 5
+        df_price = get_price(stockcode, end_date=lastd_date, frequency='daily', fields=['pre_close', 'high_limit', 'low_limit', 'high', 'low', 'close'], count=60)
+        df_late5 = df_price.iloc[-5:, :]
+        if len(df_late5[df_late5.low > df_late5.pre_close]):
+            score += 10
+        df_late20 = df_price.iloc[-20:-6, :]
+        if len(df_late20[df_late20.low > df_late20.pre_close]):
+            score += 20
+        df_late60 = df_price.iloc[:-21, :]
+        if len(df_late60[df_late60.low > df_late60.pre_close]):
+            score += 30
+        df_d20 = df_price.iloc[-20:, :]
+        if len(df_d20[df_d20.low == df_d20.high_limit]) != 0:
+            score -= 20
+        if len(df_price[df_price.close == df_price.low_limit]) != 0:
+            score -= 20
+        score_sets[stockcode] = score
+    return score_sets
+
+def get_reds_filter(context, stocklist, check_duration, reds_num):
+    all_data = get_current_data()
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    poollist = []
+    trd_days = get_trade_days(end_date=lastd_date, count=check_duration)
+    s_trd_days = pd.Series(range(len(trd_days)), index=trd_days)
+    back_date = trd_days[0]
+    start_time = time.time()
+    df_price = get_price(stocklist, end_date=lastd_date, frequency='1d', fields=['pre_close', 'open', 'close', 'high', 'high_limit', 'low_limit', 'paused'], skip_paused=False, fq='pre', count=check_duration, panel=False, fill_paused=True)
+    df_reds = df_price[(df_price.close > df_price.pre_close) & (df_price.paused == 0)].set_index('time')
+    df_reds['ith'] = s_trd_days
+    code_set = set(df_reds.code.values)
+    poollist = [stockcode for stockcode in code_set if len(df_reds[df_reds.code == stockcode]) >= reds_num]
+    end_time = time.time()
+    return poollist
+
+def get_down_filter(context, stocklist, check_duration, down_num):
+    all_data = get_current_data()
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    poollist = []
+    trd_days = get_trade_days(end_date=lastd_date, count=check_duration)
+    s_trd_days = pd.Series(range(len(trd_days)), index=trd_days)
+    back_date = trd_days[0]
+    start_time = time.time()
+    df_price = get_price(stocklist, end_date=lastd_date, frequency='1d', fields=['pre_close', 'open', 'close', 'high', 'high_limit', 'low_limit', 'paused'], skip_paused=False, fq='pre', count=check_duration, panel=False, fill_paused=True)
+    df_down = df_price[(df_price.close == df_price.low_limit) & (df_price.paused == 0)].set_index('time')
+    df_down['ith'] = s_trd_days
+    code_set = set(df_down.code.values)
+    downlist = [stockcode for stockcode in code_set if len(df_down[df_down.code == stockcode]) > down_num]
+    poollist = list(set(stocklist).difference(set(downlist)))
+    end_time = time.time()
+    return poollist
+
+def get_up_filter(context, stocklist, check_duration, up_num):
+    all_data = get_current_data()
+    today_date = context.current_dt.date()
+    lastd_date = context.previous_date
+    poollist = []
+    trd_days = get_trade_days(end_date=lastd_date, count=check_duration)
+    s_trd_days = pd.Series(range(len(trd_days)), index=trd_days)
+    back_date = trd_days[0]
+    start_time = time.time()
+    df_price = get_price(stocklist, end_date=lastd_date, frequency='1d', fields=['pre_close', 'open', 'close', 'high', 'high_limit', 'low_limit', 'paused'], skip_paused=False, fq='pre', count=check_duration, panel=False, fill_paused=True)
+    df_up = df_price[(df_price.close == df_price.high_limit) & (df_price.paused == 0)].set_index('time')
+    df_up['ith'] = s_trd_days
+    code_set = set(df_up.code.values)
+    poollist = [stockcode for stockcode in code_set if len(df_up[df_up.code == stockcode]) >= up_num]
+    end_time = time.time()
+    return poollist
+'EXACT_REVIEWED_FUNCTION buy_stock sha256=a71aa13ba41665d4869f52ee2b53c317d2643bf46a84182d0709ae990898ef03 source=quant/2024年度精选策略1/34.韶华研究之十八，201系列.txt'
+'EXACT_REVIEWED_FUNCTION sell_stock sha256=3458e9bf174c10480dd4f2199ec31fb843d787a627b630b6552dd0db29f4088b source=quant/2024年度精选策略1/34.韶华研究之十八，201系列.txt'

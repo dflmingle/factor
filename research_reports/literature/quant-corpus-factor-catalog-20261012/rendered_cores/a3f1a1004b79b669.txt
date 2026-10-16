@@ -1,0 +1,38 @@
+quant/聚宽2025年精选/82回报社区——基于Gyro老师策略的思考.txt
+"""EXACT_REVIEWED_FUNCTION initialize sha256=bcb33653d84f8fa0ee0ff1ddb986bfd00c521f5168e854dbb64fc40c3199a066 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt"""
+'EXACT_REVIEWED_FUNCTION after_code_changed sha256=16d0e6df02a6d1ceaf077eba2f4ca9b16d249f50b07e58a0c4149af8b2e3c624 source=quant/2022年度精选策略/100.实战型小盘价值策略--14年30倍.txt'
+
+def before_trading_start(context):
+    """EXACT_REVIEWED_FUNCTION sum_func sha256=07f87e5d54201e8b41b29ce4501898cb22caac95239cec08d70fc7ed2a62fe6d source=quant/2022年度精选策略/100.实战型小盘价值策略--14年30倍.txt"""
+    stk_sh = get_index_stocks('000001.XSHG')
+    stk_sz = get_index_stocks('399106.XSHE')
+    allstocks = stk_sh + stk_sz
+    df = get_fundamentals(query(valuation.code, valuation.market_cap, valuation.pb_ratio, valuation.pe_ratio, valuation.pcf_ratio).filter(valuation.code.in_(allstocks), valuation.pb_ratio > 0, valuation.pe_ratio > 0, valuation.pcf_ratio > 0)).dropna()
+    df['point'] = df[['market_cap', 'pb_ratio', 'pe_ratio', 'pcf_ratio']].rank().T.apply(sum_func)
+    df = df.sort_index(by='point').head(g.choicenum)
+    stocks = list(df['code'])
+    g.weight = dict(zip(stocks, generate_arithmetic_series(g.choicenum)))
+
+def generate_arithmetic_series(n):
+    if n != 1:
+        common_difference = 2 / (n - 1) / n
+        series = [(n - i - 1) * common_difference for i in range(n)]
+        return series
+    else:
+        return [1]
+
+def handle_data(context, data):
+    current_data = get_current_data()
+    for stock in context.portfolio.positions.keys():
+        if stock not in g.weight:
+            order_target(stock, 0)
+    for stock in g.weight.keys():
+        position = g.weight[stock] * context.portfolio.total_value
+        if stock not in context.portfolio.positions:
+            order_target_value(stock, position)
+        else:
+            t = context.portfolio.long_positions[stock].transact_time
+            p = get_price(stock, count=1, end_date=t)['open'][0]
+            np = current_data[stock].day_open
+            if np / p > 1.1 and context.portfolio.long_positions[stock].value > position or (np / p < 0.9 and context.portfolio.long_positions[stock].value < position):
+                order_target_value(stock, position)

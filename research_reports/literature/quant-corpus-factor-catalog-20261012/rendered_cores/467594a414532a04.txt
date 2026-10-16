@@ -1,0 +1,93 @@
+quant/聚宽2025年精选/61BiLSTM for ETF.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import pandas as pd
+import torch
+import torch.nn as nn
+from tqdm import tqdm
+from sklearn.preprocessing import MinMaxScaler
+
+def initialize(context):
+    g.stock_num = 3
+    g.hold_list = []
+    run_daily(prepare_stock_list, '9:05')
+    run_weekly(weekly_adjustment, 1, '9:30')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=dbfa5f4bbe75d660f4d8a806f8a04ac35254b992951a45b9beb367b730b4258c source=quant/聚宽2025年精选/48投资回报率ROIC中等市值.txt'
+model_path = '机器学习/model_baseline_BiLSTM.pt'
+import io
+buffer = io.BytesIO(read_file(model_path))
+
+class BiLSTM(nn.Module):
+
+    def __init__(self):
+        super(BiLSTM, self).__init__()
+        self.n_class = 6
+        self.n_hidden = 10
+        self.lstm = nn.LSTM(input_size=self.n_class, hidden_size=self.n_hidden, bidirectional=True)
+        self.fc = nn.Linear(self.n_hidden * 2, 1)
+
+    def forward(self, X):
+        batch_size = X.shape[0]
+        input = X.transpose(0, 1)
+        hidden_state = torch.randn(1 * 2, batch_size, self.n_hidden)
+        cell_state = torch.randn(1 * 2, batch_size, self.n_hidden)
+        outputs, (_, _) = self.lstm(input, (hidden_state, cell_state))
+        outputs = outputs[-1]
+        model = self.fc(outputs)
+        return model
+model_t1 = BiLSTM()
+model_t1.load_state_dict(torch.load(buffer))
+model_t1.eval()
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    today = context.current_dt
+    initial_list = get_all_securities('etf', yesterday).index.tolist()
+    initial_list = filter_new_stock(context, initial_list)
+    tensor_list = []
+    ID = []
+    for i in initial_list:
+        df = attribute_history(i, 60, '1d')
+        if (df['volume'] < 10000000).any() or df.isna().any().any():
+            pass
+        else:
+            scaler = MinMaxScaler()
+            normalized_data = scaler.fit_transform(df)
+            normalized_df = pd.DataFrame(normalized_data, columns=df.columns)
+            df_tensor = torch.Tensor(normalized_df.values)
+            tensor_list.append(df_tensor)
+            ID.append(i)
+    stacked_tensor = torch.stack(tensor_list)
+    with torch.no_grad():
+        output1 = model_t1(stacked_tensor)
+    data = {'ID': ID, 'score': output1.squeeze().tolist()}
+    df = pd.DataFrame(data)
+    top_N_rows = df.nlargest(g.stock_num, 'score')
+    top_N_IDs = top_N_rows['ID'].tolist()
+    return top_N_IDs
+
+def weekly_adjustment(context):
+    target_list = get_stock_list(context)
+    for stock in g.hold_list:
+        if stock not in target_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if stock not in list(context.portfolio.positions.keys()):
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def filter_new_stock(context, stock_list):
+    yesterday = context.previous_date
+    return [stock for stock in stock_list if not yesterday - get_security_info(stock).start_date < datetime.timedelta(days=375 * 3)]

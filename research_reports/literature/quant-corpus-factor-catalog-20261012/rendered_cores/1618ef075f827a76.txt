@@ -1,0 +1,110 @@
+quant/聚宽2025年精选/8国九条后中小板微盘小改，年化135.40.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+from datetime import time, date
+from jqdata import finance
+
+def initialize(context):
+    g.trading_signal = True
+    g.run_stoploss = True
+    g.filter_audit = False
+    g.adjust_num = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.pass_months = [1, 4]
+    g.limitup_stocks = []
+    g.min_mv = 10
+    g.max_mv = 100
+    g.stock_num = 4
+    g.stoploss_list = []
+    g.other_sale = []
+    g.stoploss_strategy = 3
+    g.stoploss_limit = 0.09
+    g.stoploss_market = 0.05
+    g.highest = 50
+    g.money_etf = '511880.XSHG'
+    run_daily(prepare_stock_list, '9:05')
+    run_daily(trade_afternoon, time='14:00', reference_security='399101.XSHE')
+    run_daily(stop_loss, time='10:00')
+    run_daily(close_account, '14:50')
+    run_weekly(weekly_adjustment, 2, '10:00')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=8b1f13eee34091ecc54b9c92b16277ec1168a54023a674cb24e0dcdf099a490a source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+
+def get_stock_list(context):
+    final_list = []
+    MKT_index = '399101.XSHE'
+    initial_list = filter_stocks(context, get_index_stocks(MKT_index))
+    q = query(valuation.code).filter(valuation.code.in_(initial_list), valuation.market_cap.between(g.min_mv, g.max_mv), income.np_parent_company_owners > 0, income.net_profit > 0, income.operating_revenue > 100000000.0).order_by(valuation.market_cap.asc()).limit(g.stock_num * 3)
+    df = get_fundamentals(q)
+    if g.filter_audit:
+        before_audit_filter = len(df)
+        df['audit'] = df['code'].apply(lambda x: filter_audit(context, x))
+        df_audit = df[df['audit'] == True]
+    final_list = df['code'].tolist()
+    if final_list:
+        last_prices = history(1, unit='1d', field='close', security_list=final_list)
+        return [stock for stock in final_list if stock in g.hold_list or last_prices[stock][-1] <= g.highest]
+    else:
+        return [g.money_etf]
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=b3761c41817d2be7b472915fdb8577443d6682712bc95befa92f74be94c2b11e source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=d3da64fa68fe5af41df3c6dfe50f7d58461f46e96e397818662010626e18a567 source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+'EXACT_REVIEWED_FUNCTION check_remain_amount sha256=415330636c9acf9b52d989c2335da43ad577d7b490b2c75c5dd638e3cb32d242 source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+'EXACT_REVIEWED_FUNCTION trade_afternoon sha256=a238ed6460b3549634c04c4a8158c14a2b335fdc67abf5db8639109422ac93b0 source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+
+def stop_loss(context):
+    if g.run_stoploss:
+        current_positions = context.portfolio.positions
+        if g.stoploss_strategy == 1 or g.stoploss_strategy == 3:
+            for stock in current_positions.keys():
+                price = current_positions[stock].price
+                avg_cost = current_positions[stock].avg_cost
+                if price >= avg_cost * 2:
+                    order_target_value(stock, 0)
+                    g.other_sale.append(stock)
+                elif price < avg_cost * (1 - g.stoploss_limit):
+                    order_target_value(stock, 0)
+                    g.stoploss_list.append(stock)
+        if g.stoploss_strategy == 2 or g.stoploss_strategy == 3:
+            stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close', 'open'], count=1, panel=False)
+            down_ratio = (1 - stock_df['close'] / stock_df['open']).mean()
+            if down_ratio >= g.stoploss_market:
+                g.stoploss_list.append(stock)
+                for stock in current_positions.keys():
+                    order_target_value(stock, 0)
+
+def adjust_stock_num(context):
+    ma_para = 10
+    today = context.previous_date
+    index_df = get_price('399101.XSHE', end_date=today, count=ma_para, fields='close', frequency='daily')
+    ma = index_df['close'].mean()
+    last_row = index_df['close'].iloc[-1]
+    diff = last_row - ma
+    result = 3 if diff >= 500 else 3 if 200 <= diff < 500 else 4 if -200 <= diff < 200 else 5 if -500 <= diff < -200 else 6
+    return result
+'EXACT_REVIEWED_FUNCTION filter_stocks sha256=14234735e9b875376734ad8e0f72714229833900d7bd680c6c6e42d81c143a13 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+
+def filter_audit(context, code):
+    lstd = context.previous_date
+    last_year = lstd.replace(year=lstd.year - 3, month=1, day=1)
+    q = query(finance.STK_AUDIT_OPINION.code, finance.STK_AUDIT_OPINION.report_type).filter(finance.STK_AUDIT_OPINION.code == code, finance.STK_AUDIT_OPINION.pub_date >= last_year)
+    df = finance.run_query(q)
+    df['report_type'] = df['report_type'].astype(str)
+    contains_nums = df['report_type'].str.contains('2|3|4|5')
+    return not contains_nums.any()
+'EXACT_REVIEWED_FUNCTION buy_security sha256=a20a173621a6ddd41f9f80bacb87ed24c614627f122c3a25c80af77713a0b658 source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+
+def today_is_between(context):
+    month = context.current_dt.month
+    if month in g.pass_months:
+        code = '399303.XSHE'
+        close = history(count=3, unit='1d', field='close', security_list=[code], df=False, skip_paused=False, fq='none')[code]
+        if close[-1] > close[-2] * 0.995 and close[-1] > close[-3] * 0.994:
+            return True
+        return False
+    else:
+        return True
+'EXACT_REVIEWED_FUNCTION close_account sha256=d6909a30e46070353c71830f79026247359f958f4cadfb6e88b2a2a208059d5e source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=f229df512eb347633849a5ac3024b4305832c343903d3395709c0e080583ab1d source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'

@@ -1,0 +1,70 @@
+quant/2024年度精选策略1/47.随机森林量价多因子选股 短线交易.txt
+from jqdata import *
+from jqlib.optimizer import *
+from jqfactor import Factor
+import numpy as np
+import pandas as pd
+from six import BytesIO
+df = pd.read_csv(BytesIO(read_file('predict.csv')), index_col=0)
+df2 = pd.read_csv(BytesIO(read_file('target.csv')), index_col=0)
+mae_df = df - df2
+mae_df = mae_df.abs().rolling(10).mean()
+mae_df = mae_df.shift(2)
+top = 5
+indexlist = df['2022-08':].index.tolist()
+dict_position = {}
+for x in indexlist:
+    temp = df.loc[x].sort_values(ascending=False).head(top).index.tolist()
+    dict_position[x] = temp
+
+def before_market_open(context):
+    if g.wait_list:
+        optimized_weight = portfolio_optimizer(date=context.previous_date, securities=g.wait_list, target=MinVariance(count=240), constraints=[WeightConstraint(low=0.9, high=1.0)], bounds=[], default_port_weight_range=[0.0, 1.0], ftol=1e-09, return_none_if_fail=True)
+        g.buy = optimized_weight.sort_values(ascending=False)
+    else:
+        g.buy = pd.Series(dtype=float)
+
+def after_market_close(context):
+    now = context.current_dt.date()
+    if str(now) in dict_position:
+        g.wait_list = dict_position[str(now)]
+    else:
+        g.wait_list = []
+
+def initialize(context):
+    g.benchmark = '000300.XSHG'
+    g.wait_list = []
+    g.buy = pd.Series(dtype=float)
+    context.f = True
+    factor_analysis_initialize(context)
+    set_stockpool(context)
+    run_daily(set_stockpool, time='before_open', reference_security='000300.XSHG')
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(sell, time='14:59', reference_security='000300.XSHG')
+    run_daily(buy, time='09:30', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def set_stockpool(context):
+    stocks2 = get_index_stocks('000300.XSHG')
+    paused_series = get_price(stocks2, end_date=context.current_dt, count=1, fields='paused')['paused'].iloc[0]
+    g.stock_pool = paused_series[paused_series == False].index.tolist()
+
+def factor_analysis_initialize(context):
+    g.sell = pd.Series(dtype=float)
+    g.buy = pd.Series(dtype=float)
+    g.d = context.previous_date
+
+def buy(context):
+    long_cash = context.portfolio.total_value
+    if not g.buy.empty:
+        for s in g.buy.index:
+            order_target_value(s, g.buy.loc[s] * 0.5 * long_cash)
+
+def sell(context):
+    for s in context.portfolio.positions.keys():
+        order_target_value(s, 0)
+
+def high_limit_filter(context, security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not current_data[stock].last_price == current_data[stock].high_limit]
+    return security_list

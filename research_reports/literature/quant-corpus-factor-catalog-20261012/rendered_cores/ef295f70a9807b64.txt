@@ -1,0 +1,102 @@
+quant/2021年度精选策略/41.均线黏合，突破前三十个交易日最高点选股法.txt
+from jqdata import *
+import jqdata
+import numpy as np
+import pandas as pd
+import datetime
+
+def get_stocks_tobuy(context):
+    date1 = str(context.current_dt)[0:10]
+    stock_list1 = get_index_stocks('000001.XSHG') + get_index_stocks('399106.XSHE')
+    stock_list1 = delisted_filter(stock_list1)
+    stock_list1 = st_filter(stock_list1)
+    df = get_fundamentals(query(valuation.code, valuation.market_cap, income.total_operating_revenue).filter(valuation.circulating_market_cap > 20, valuation.pe_ratio > 0, valuation.code.in_(stock_list1)).order_by(valuation.market_cap.desc()))
+    stock_list1 = df.code.tolist()
+    close = get_price(stock_list1, end_date=date1, frequency='daily', fields='close', count=250)['close']
+    close_12days = get_price(stock_list1, end_date=date1, frequency='daily', fields='close', count=12)['close'].iloc[-30:1, :]
+    Open = get_price(stock_list1, end_date=date1, frequency='daily', fields='open', count=1)['open'].T
+    Open.columns = ['open']
+    close13 = close.rolling(13).mean().iloc[-1, :].T
+    close34 = close.rolling(34).mean().iloc[-1, :].T
+    close55 = close.rolling(55).mean().iloc[-1, :].T
+    close13_1 = close.rolling(13).mean().iloc[-10, :].T
+    close34_1 = close.rolling(34).mean().iloc[-10, :].T
+    close55_1 = close.rolling(55).mean().iloc[-10, :].T
+    close13_2 = close.rolling(13).mean().iloc[-19, :].T
+    close34_2 = close.rolling(34).mean().iloc[-19, :].T
+    close55_2 = close.rolling(55).mean().iloc[-19, :].T
+    close250 = close.rolling(250).mean().iloc[-1, :].T
+    highest = close_12days.max()
+    lowest = close_12days.min()
+    All = pd.concat([close.iloc[-1, :], Open, highest, lowest, close13, close34, close55, close250, close13_1, close34_1, close55_1, close13_2, close34_2, close55_2], axis=1)
+    All.columns = ['close', 'open', 'highest', 'lowest', 'close13', 'close34', 'close55', 'close250', 'close13_1', 'close34_1', 'close55_1', 'close13_2', 'close34_2', 'close55_2']
+    stock_list = stock_list = All[((All['highest'] - All['lowest']) / All['close'] < 0.2) & (All['close'] > All['highest']) & (All['close13'] > All['close34']) & (All['close34'] > All['close55']) & (All['close'] >= All['open']) & (abs((All['close34_1'] - All['close13_1']) / All['close13_1']) <= 0.03) & (abs((All['close55_1'] - All['close34_1']) / All['close34_1']) <= 0.03) & (abs((All['close55_1'] - All['close13_1']) / All['close13_1']) <= 0.03) & (abs((All['close34_2'] - All['close13_2']) / All['close13_2']) <= 0.03) & (abs((All['close55_2'] - All['close34_2']) / All['close34_2']) <= 0.03) & (abs((All['close55_2'] - All['close13_2']) / All['close13_2']) <= 0.03)]
+    df = [x for x in stock_list.index.tolist() if x not in g.previous_buylist.keys()]
+    return df
+
+def delisted_filter(stock_list):
+    current_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not '退' in current_data[stock].name]
+    return stock_list
+
+def st_filter(stock_list):
+    current_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not current_data[stock].is_st]
+    return stock_list
+
+def after_trading_end(context):
+    for stock in list(g.previous_buylist.keys()):
+        if g.previous_buylist[stock] >= 30:
+            del g.previous_buylist[stock]
+        else:
+            g.previous_buylist[stock] += 1
+    stock_list = get_stocks_tobuy(context)
+    to_buy = stock_list
+    g.my_stock_today = to_buy
+    if len(to_buy) > 0:
+        pass
+    temp = []
+    for stock in context.portfolio.positions.keys():
+        temp.append(stock)
+    if len(temp) > 0:
+        date1 = str(context.current_dt)[0:10]
+        close = get_price(temp, end_date=date1, frequency='daily', fields='close', count=16)['close']
+        close13_1 = close.rolling(13).mean().iloc[-1, :].T
+        close13_2 = close.rolling(13).mean().iloc[-2, :].T
+        close13_3 = close.rolling(13).mean().iloc[-3, :].T
+        close_1 = close.iloc[-1, :].T
+        close_2 = close.iloc[-2, :].T
+        close_3 = close.iloc[-3, :].T
+        stock_hold = pd.concat([close_1, close_2, close_3, close13_1, close13_2, close13_3], axis=1)
+        stock_hold.columns = ['close1', 'close2', 'close3', 'close13_1', 'close13_2', 'close13_3']
+        to_sell = stock_hold[(stock_hold['close1'] < stock_hold['close13_1']) & (stock_hold['close2'] < stock_hold['close13_2']) & (stock_hold['close3'] < stock_hold['close13_3'])]
+        if len(to_sell) > 0:
+            g.stock_tosell = to_sell.index.tolist()
+
+def initialize(context):
+    g.stock_tosell = []
+    g.previous_buylist = {}
+    g.my_stock_today = []
+    run_daily(buy_stock, time='09:31', reference_security='000300.XSHG')
+
+def sell_stock(context):
+    for stock in g.stock_tosell:
+        order_target_value(stock, 0)
+    g.stock_tosell = []
+    return
+
+def buy_stock(context):
+    sell_stock(context)
+    buynum = len(context.portfolio.positions.keys()) + len(g.my_stock_today)
+    if len(context.portfolio.positions.keys()) <= 6:
+        if len(g.my_stock_today) > 0:
+            buynum = 6
+            target_to_buy = context.portfolio.total_value / buynum
+            for stock in g.my_stock_today:
+                cash = context.portfolio.available_cash
+                if cash / target_to_buy < 0.1:
+                    break
+                order_target_value(stock, target_to_buy)
+                g.previous_buylist[stock] = 0
+    g.my_stock_today = []
+    return

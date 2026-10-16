@@ -1,0 +1,187 @@
+quant/聚宽2025年精选/59追板策略，今年收益已翻倍，低操作低回撤高收益可实盘.txt
+import psutil
+from jqdata import *
+from jqfactor import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+import sys
+import gc
+from datetime import datetime
+from datetime import timedelta
+
+def initialize(context):
+    g.columns = ['日期', '代码', '名称', '类型', '原因', '总市值', '流通市值', '总成交额', '总成交量', '平均成交价', '换手率', '左压比', '封顶量比', '开盘量比', '开盘委比', '开盘涨幅', '买入价格']
+    g.logdf = pd.DataFrame(columns=g.columns)
+    g.is_huice = True
+    if g.is_huice:
+        g.excel_name = 'myFile/追首日涨停/' + str(context.current_dt)[:10] + ' by ' + str(datetime.now())[:-7] + '.csv'
+    else:
+        g.excel_name = 'myFile/追首日涨停/实盘日志 by ' + str(datetime.now())[:-7] + '.csv'
+    write_file(g.excel_name, g.logdf.to_csv(index=False))
+    g.selltime1 = '11:25:00'
+    g.selltime2 = '14:50:00'
+    g.target_list = []
+    run_daily(get_stock_list, '00:00:10')
+    if g.is_huice:
+        run_daily(write_excel, '16:00:10')
+    else:
+        run_daily(get_stock_list, '16:00:10')
+    run_daily(buy, '09:26:00')
+    run_daily(sell, time=g.selltime1)
+    run_daily(sell, time=g.selltime2)
+
+def write_excel(context):
+    if len(g.logdf) == 0:
+        return
+    write_file(g.excel_name, g.logdf.to_csv(header=False, index=False), append=True)
+    g.logdf = pd.DataFrame(columns=g.columns)
+
+def get_stock_list(context):
+    date = get_the_day(context)
+    date = transform_date(date, 'str')
+    date_1 = get_shifted_date(date, -1, 'T')
+    date_2 = get_shifted_date(date, -2, 'T')
+    initial_list = prepare_stock_list(date)
+    hl_list = get_hl_stock(initial_list, date)
+    hl1_list = get_ever_hl_stock(initial_list, date_1)
+    hl2_list = get_ever_hl_stock(initial_list, date_2)
+    elements_to_remove = set(hl1_list + hl2_list)
+    hl_list = [stock for stock in hl_list if stock not in elements_to_remove]
+    buy_str = ''
+    g.target_list = []
+    for stock in hl_list:
+        if nobuy(stock, context, date):
+            continue
+        name = get_security_info(stock, date).display_name
+        g.target_list.append(stock)
+        buy_str += f'{stock}, {name};'
+    if context.current_dt.time() > dt.time(15):
+        write_excel(context)
+
+def buy(context):
+    qualified_stocks = []
+    current_data = get_current_data()
+    date_now = context.current_dt.strftime('%Y-%m-%d')
+    mid_time1 = ' 09:15:00'
+    end_times1 = ' 09:25:01'
+    start = date_now + mid_time1
+    end = date_now + end_times1
+    for s in g.target_list:
+        bumailiyou = ''
+        name = get_security_info(s, date_now).display_name
+        volume_data = attribute_history(s, 1, '1d', fields=['close', 'volume'], skip_paused=True)
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        if auction_data.empty:
+            volume_rate = 0
+            current_ratio = 0
+            bumailiyou += '停牌，'
+        else:
+            volume_rate = auction_data['volume'][0] / volume_data['volume'][0] * 100
+            current_ratio = (auction_data['current'][0] / volume_data['close'][0] - 1) * 100
+        if volume_rate < 3:
+            bumailiyou += '开盘量比，'
+        if current_ratio <= 0 or current_ratio >= 6:
+            bumailiyou += '开盘涨幅，'
+        if bumailiyou == '':
+            qualified_stocks.append(s)
+        else:
+            log_data = {'日期': str(context.current_dt)[:10], '代码': s, '名称': name, '类型': '放弃', '原因': bumailiyou, '开盘量比': round(volume_rate, 2), '开盘涨幅': round(current_ratio, 2), '买入价格': 0 if auction_data.empty else auction_data['current'][0]}
+            add_to_logdf(context, log_data)
+    if len(qualified_stocks) != 0:
+        value = context.portfolio.available_cash / len(qualified_stocks)
+        for s in qualified_stocks:
+            log_data = {'日期': str(context.current_dt)[:10], '代码': s, '名称': get_security_info(s, date_now).display_name, '买入价格': 0 if current_data[s].paused else current_data[s].day_open, '类型': '放弃'}
+            if current_data[s].paused:
+                log_data['原因'] = '停牌,'
+                continue
+            if value / current_data[s].day_open < 100:
+                log_data['原因'] = '资金不足，'
+            else:
+                order_value(s, value)
+                log_data['类型'] = '买入'
+            add_to_logdf(context, log_data)
+
+def sell(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    for s in list(context.portfolio.positions):
+        if context.portfolio.positions[s].closeable_amount == 0 or current_data[s].last_price == current_data[s].high_limit or current_data[s].last_price == current_data[s].low_limit:
+            continue
+        if str(context.current_dt)[-8:] == g.selltime1 and current_data[s].last_price > 1 * context.portfolio.positions[s].avg_cost:
+            order_target_value(s, 0)
+        elif str(context.current_dt)[-8:] == g.selltime2:
+            order_target_value(s, 0)
+
+def nobuy(stock, context, theDay):
+    bumailiyou = ''
+    name = get_security_info(stock, theDay).display_name
+    the_day_data = get_price(stock, count=1, end_date=theDay, frequency='1d', fields=['close', 'volume', 'money'], skip_paused=True)
+    avg_price_increase_value = the_day_data['money'][0] / the_day_data['volume'][0] / the_day_data['close'][0] * 100
+    if avg_price_increase_value < 96:
+        bumailiyou = '平均成交价，'
+    if the_day_data['money'][0] > 1900000000.0 or the_day_data['money'][0] < 700000000.0:
+        bumailiyou += '总成交额，'
+    turnover_ratio_data = get_valuation(stock, start_date=theDay, end_date=theDay, fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+    if turnover_ratio_data.empty:
+        bumailiyou += '总市值，'
+    else:
+        if turnover_ratio_data['market_cap'][0] < 70:
+            bumailiyou += '总市值，'
+        if turnover_ratio_data['circulating_market_cap'][0] > 520:
+            bumailiyou += '流通市值，'
+    zy_rate = calculate_zy(stock, theDay)
+    if zy_rate <= 0.9:
+        bumailiyou += '左压比，'
+    log_data = {'日期': get_shifted_date(theDay, 1, 'T')[:10], '代码': stock, '名称': name, '类型': '放弃', '原因': bumailiyou, '平均成交价': round(avg_price_increase_value, 2), '总成交额': round(the_day_data['money'][0] / 100000000.0, 2), '左压比': round(zy_rate, 2)}
+    if not turnover_ratio_data.empty:
+        log_data['换手率'] = round(turnover_ratio_data['turnover_ratio'][0], 2)
+        log_data['总市值'] = round(turnover_ratio_data['market_cap'][0], 2)
+        log_data['流通市值'] = round(turnover_ratio_data['circulating_market_cap'][0], 2)
+    if bumailiyou != '':
+        add_to_logdf(context, log_data)
+    else:
+        log_data['类型'] = '预备'
+    del log_data
+    return bumailiyou != ''
+
+def add_to_logdf(context, log_data):
+    if not g.is_huice:
+        pass
+    if context.current_dt.time() < dt.time(15):
+        log_data_df = pd.DataFrame(log_data, index=[0])
+        log_data_df = log_data_df.reindex(columns=g.columns, fill_value='')
+        g.logdf.loc[len(g.logdf)] = log_data_df.iloc[0]
+
+def get_the_day(context):
+    theDay = context.previous_date
+    if context.current_dt.time() > dt.time(15):
+        theDay = transform_date(context.current_dt, 'str')[:10]
+    return theDay
+
+def get_entrust_rate(auction_data):
+    buy_cols = auction_data.iloc[:, 0:5].sum().sum()
+    sell_cols = auction_data.iloc[:, 5:10].sum().sum()
+    entrust_rate = round((buy_cols - sell_cols) / (buy_cols + sell_cols) * 100, 2)
+    return entrust_rate
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=af3d460f1664c95ce103c45e4aa82266d06e53a12e8d79da1097ddbc84e6bd04 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=36b3efa3d55d18be5badb0efab22bc0fa45e13e211c4aa2afaa9e89d284cfe91 source=quant/聚宽2025年精选/21【原创】年化123涨停弱转强竞价战法.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=56e537db6fd28b7921a9ea3d0d02ce5d54a0b27871c0225470ed712658edcd3c source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def calculate_zy(s, theDay):
+    high_prices = get_price(s, count=100, end_date=theDay, fields=['high'], skip_paused=True)['high']
+    prev_high = high_prices.iloc[-1]
+    zyts_0 = next((i - 1 for i, high in enumerate(high_prices[-3::-1], 2) if high >= prev_high), 100)
+    zyts = zyts_0 + 5
+    volume_data = get_price(s, end_date=theDay, count=zyts, frequency='1d', fields=['volume'], skip_paused=True)
+    if len(volume_data) < 2:
+        return 0
+    return volume_data['volume'][-1] / max(volume_data['volume'][:-1].dropna())
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=1b44687e21b10ff448ccffd8adc7bcbc28701bc3e2f9bc81b42cad20cd893c18 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_ever_hl_stock sha256=45bb1a1d6b3d5e40a076be53828a9ca4de25e0c32fe6bf06fb079ce1fc970b75 source=quant/聚宽2025年精选/16集合竞价三合一，今年收益1067.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_count_df sha256=696c4e8a4997343a84c8e7a5b8252c7661feaf6aede50f6e911dd8a94cd767ce source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_index_increase_ratio sha256=58ad834eeff7a1436edacee1f8299ab365b34d5a17ce0b5d1a995356a2d48ea2 source=quant/聚宽2025年精选/16集合竞价三合一，今年收益1067.txt'

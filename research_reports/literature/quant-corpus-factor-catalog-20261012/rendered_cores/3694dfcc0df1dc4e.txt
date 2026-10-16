@@ -1,0 +1,34 @@
+quant/2023年度精选策略/74.勾股神器2代码40行，年化一百点.txt
+from jqdata import *
+import talib, numpy
+
+def initialize(context):
+    context.bx_cash = {}
+    context.BENCH = '000300.XSHG'
+    context.pool = get_index_stocks(context.BENCH)
+    run_daily(bx_strategy, time='open')
+
+def bx_cashflow(context, threshold=0):
+    table = finance.STK_HK_HOLD_INFO
+    q = query(table.day, table.code, table.share_ratio).filter(table.link_id.in_(['310001', '310002']), table.day.in_([context.previous_date]))
+    df = finance.run_query(q)
+    df_top = df[df['share_ratio'] > threshold]
+    return df_top.set_index('code')['share_ratio'].to_dict()
+
+def bx_strategy(context, trade_limit=0.3, ratio=3):
+    bx_dict = bx_cashflow(context, ratio)
+    holds = list(context.portfolio.positions)
+    for security in bx_dict:
+        if security in context.bx_cash and security in context.pool:
+            change = bx_dict[security] - context.bx_cash[security]
+            if abs(change) < trade_limit:
+                continue
+            if change < -trade_limit and security in holds:
+                order_target(security, 0)
+            if change > trade_limit and security not in holds:
+                a = get_bars(security, unit='1d', count=100, fields=['close'])['close']
+                rsi = talib.RSI(numpy.array(a))[-1]
+                if len(holds) >= 10 or rsi < 40 or rsi > 80:
+                    continue
+                order_value(security, context.portfolio.total_value * 0.2)
+    context.bx_cash = bx_dict

@@ -1,0 +1,45 @@
+quant/2022年度精选策略/48.买不到710亿爆款基金怎么办？自己做一个量化价值成长策略吧.txt
+from jqdata import *
+
+def initialize(context):
+    g.roe_thres = [0.0, 1000.0]
+    g.pb_thres = [0.0, 10.0]
+    g.stocknum = 20
+    run_monthly(period, 1, time='open', reference_security='000300.XSHG')
+    run_monthly(after_market_close, 1, time='close', reference_security='000300.XSHG')
+
+def period(context):
+    if context.current_dt.month in [1, 4, 7, 11]:
+        sc_universe = get_index_stocks('000906.XSHG')
+        df_suspended = get_price(sc_universe, end_date=context.current_dt, frequency='daily', fields=['paused'], skip_paused=False, count=1)['paused'].T
+        df_suspended.columns = ['is_suspended']
+        sc_universe = df_suspended[df_suspended['is_suspended'] == 0].index
+        q = query(valuation.day, valuation.code, valuation.pb_ratio, indicator.pubDate, indicator.statDate, indicator.inc_return).filter(valuation.code.in_(sc_universe)).order_by(valuation.pb_ratio.asc())
+        df = get_fundamentals(q)
+        df.dropna()
+        df['roe_yearly'] = df.apply(lambda x: 4 * x['inc_return'] if datetime.datetime.strptime(x['statDate'], '%Y-%m-%d').month != 12 else x['inc_return'], axis=1)
+        df = df[(df.pb_ratio > g.pb_thres[0]) & (df.pb_ratio < g.pb_thres[1])]
+        df = df[(df.roe_yearly > g.roe_thres[0]) & (df.roe_yearly < g.roe_thres[1])]
+        df['pb_score'] = (df['pb_ratio'] - df['pb_ratio'].std()) / df['pb_ratio'].mean()
+        df['roe_score'] = (df['roe_yearly'] - df['roe_yearly'].std()) / df['roe_yearly'].mean()
+        df['total_score'] = df['pb_score'] - df['roe_score']
+        df = df.sort('total_score', ascending=True)
+        df.reset_index(drop=True, inplace=True)
+        df = df[0:g.stocknum]
+        target_list = list(df['code'])
+        for stock in context.portfolio.positions:
+            if stock not in target_list:
+                order_target(stock, 0)
+        buylist = list(set(target_list) - set(context.portfolio.positions.keys()))
+        if len(buylist) > 0:
+            position_per_stk = context.portfolio.available_cash / len(buylist)
+            for stock in buylist:
+                order_value(stock, position_per_stk)
+        for stock in context.portfolio.positions:
+            pass
+
+def after_market_close(context):
+    if context.current_dt.month in [1, 4, 7, 11]:
+        trades = get_trades()
+        for _trade in trades.values():
+            pass

@@ -1,0 +1,69 @@
+quant/2023年度精选策略/91.致敬市场--4 解析细节.txt
+import pandas as pd
+import datetime as dt
+from six import BytesIO
+
+def initialize(context):
+    g.index = '399311.XSHE'
+
+def after_code_changed(context):
+    unschedule_all()
+    run_monthly(update_stocks, 1, 'open')
+    run_monthly(trader, 1, '14:30')
+    run_monthly(report_porfolio, -1, 'after_close')
+    g.file_name = 'iEpsilon_portfolio.csv'
+    g.stocks = pd.Series()
+    g.position_num = 100
+    update_stocks(context)
+
+def update_stocks(context):
+    if context.run_params.type == 'sim_trade' and len(g.stocks) == 0:
+        fData = read_file(g.file_name)
+        ptable = pd.read_csv(BytesIO(fData)).set_index('code')
+        g.stocks = 0.01 * ptable.weight
+    elif context.current_dt.month == 5:
+        g.stocks = choice_stocks(context)
+
+def choice_stocks(context):
+    stocks = get_index_stocks(g.index)
+    last_year = context.current_dt.year - 1
+    q = query(indicator.code, indicator.pubDate, indicator.inc_return.label('ROE'), indicator.inc_total_revenue_year_on_year.label('grow')).filter(income.code.in_(stocks), indicator.inc_return > 10, indicator.inc_total_revenue_year_on_year > 0)
+    df = get_fundamentals(q, statDate=str(last_year)).dropna().set_index('code')
+    stocks = df.index.tolist()
+    h = history(241, '1d', 'close', stocks).dropna(axis=1)
+    r = h.pct_change()[1:]
+    h = history(241, '1d', 'close', g.index)
+    rx = h[g.index].pct_change()[1:]
+    cvar = pd.Series()
+    for s in r.columns:
+        cm = cov(r[s], rx)
+        cvar[s] = cm[0, 1]
+    cvar = cvar.sort_values(ascending=True)
+    stocks = cvar.index.tolist()
+    df = df.loc[stocks]
+    df['covar'] = 100 * 240 * cvar
+    pd.set_option('display.max_rows', len(df) + 1)
+    weight = pd.Series(1.0 / g.position_num, index=cvar.index.tolist())
+    return weight
+
+def trader(context):
+    cdata = get_current_data()
+    for s in context.portfolio.positions:
+        if s not in g.stocks.index and (not cdata[s].paused):
+            order_target(s, 0)
+    for s in g.stocks.index:
+        poisition_size = g.stocks[s] * context.portfolio.total_value
+        if s not in context.portfolio.positions and context.portfolio.available_cash > poisition_size and (not cdata[s].paused):
+            order_value(s, poisition_size)
+
+def report_porfolio(context):
+    cdata = get_current_data()
+    tvalue = context.portfolio.total_value
+    ptable = pd.DataFrame(columns=['name', 'volume', 'weight'])
+    ptable.index.name = 'code'
+    for s in context.portfolio.positions:
+        ps = context.portfolio.positions[s]
+        ptable.loc[s] = [cdata[s].name, ps.total_amount, 100 * ps.value / tvalue]
+    ptable = ptable.sort_values(by='weight', ascending=False)
+    pd.set_option('display.max_rows', len(ptable) + 1)
+    write_file(g.file_name, ptable.to_csv())

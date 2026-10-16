@@ -1,0 +1,96 @@
+quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt
+"""
+================================================================================
+总体回测前
+================================================================================
+"""
+
+def initialize(context):
+    set_params()
+    set_variables()
+    set_backtest()
+    g.long_day = 60
+    g.short_day = 120
+
+def set_params():
+    g.tc = 15
+    g.N = 4
+    g.security = ['000001.XSHE', '000002.XSHE', '000006.XSHE', '000007.XSHE', '000009.XSHE']
+
+def set_variables():
+    return
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'\n================================================================================\n每天开盘前\n================================================================================\n'
+
+def before_trading_start(context):
+    set_slip_fee(context)
+
+def set_slip_fee(context):
+    pass
+'\n================================================================================\n每天交易时\n================================================================================\n'
+
+def handle_data(context, data):
+    capital_unit = context.portfolio.portfolio_value / g.N
+    toSell = signal_stock_sell(context, data)
+    toBuy = signal_stock_buy(context, data)
+    for i in range(len(g.security)):
+        if toSell[i] == 1:
+            order_target_value(g.security[i], 0)
+    for i in range(len(g.security)):
+        if toBuy[i] == 1:
+            order_target_value(g.security[i], capital_unit)
+    if not 1 in toBuy or 1 in toSell:
+        pass
+
+def signal_stock_sell(context, data):
+    sell = [0] * len(g.security)
+    for i in range(len(g.security)):
+        ema_long_pre, ema_long_now = get_EMA(g.security[i], g.long_day, data)
+        ema_short_pre, ema_short_now = get_EMA(g.security[i], g.short_day, data)
+        if ema_short_now < ema_long_now and ema_short_pre > ema_long_pre and (context.portfolio.positions[g.security[i]].sellable_amount > 0):
+            sell[i] = 1
+    return sell
+
+def signal_stock_buy(context, data):
+    buy = [0] * len(g.security)
+    for i in range(len(g.security)):
+        ema_long_pre, ema_long_now = get_EMA(g.security[i], g.long_day, data)
+        ema_short_pre, ema_short_now = get_EMA(g.security[i], g.short_day, data)
+        if ema_short_now > ema_long_now and ema_short_pre < ema_long_pre and (context.portfolio.positions[g.security[i]].sellable_amount == 0):
+            buy[i] = 1
+    return buy
+
+def get_MA(security_code, days):
+    a = attribute_history(security_code, days, '1d', 'close')
+    sum = 0
+    for i in range(1, days + 1):
+        sum += a['close'][-i]
+    return sum / days
+
+def get_EMA(security_code, days, data):
+    if days == 1:
+        t = attribute_history(security_code, 2, '1d', 'close')
+        return (t['close'][-2], t['close'][-1])
+    else:
+        if 'EMAs' not in dir(g):
+            g.EMAs = {}
+        key = '%s%d' % (security_code, days)
+        if key in g.EMAs:
+            alpha = (days - 1.0) / (days + 1.0)
+            EMA_pre = g.EMAs[key]
+            EMA_now = EMA_pre * alpha + data[security_code].close * (1.0 - alpha)
+            g.EMAs[key] = EMA_now
+            return (EMA_pre, EMA_now)
+        else:
+            ma = get_MA(security_code, days)
+            if not isnan(ma):
+                g.EMAs[key] = ma
+                return (float('nan'), ma)
+            else:
+                return (float('nan'), float('nan'))
+'\n================================================================================\n每天收盘后\n================================================================================\n'
+
+def after_trading_end(context):
+    trades = get_trades()
+    for _trade in trades.values():
+        pass

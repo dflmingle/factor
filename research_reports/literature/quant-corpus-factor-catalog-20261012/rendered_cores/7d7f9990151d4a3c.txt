@@ -1,0 +1,96 @@
+quant/2024年度精选策略2/64.ETF轮动策略升级-增加盘中止损.txt
+from jqdata import *
+import pandas as pd
+import talib as ta
+import smtplib
+from email.header import Header
+from email.mime.text import MIMEText
+import prettytable as pt
+
+def initialize(context):
+    g.purchases = []
+    g.sells = []
+    set_params()
+    run_daily(before_market_open, time='21:00', reference_security='000300.XSHG')
+    run_daily(get_signal, time='21:00')
+    run_daily(ETF_trade, time='9:32')
+    g.checktime = '13:30'
+    run_daily(hold_check, time=g.checktime)
+'EXACT_REVIEWED_FUNCTION hold_check sha256=785743e5216f6477fc7df6db940ada1be799775318847bf28683f9f3fdc24e06 source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+
+def set_params():
+    g.target_market = '000300.XSHG'
+    g.moment_period = 13
+    g.ma_period = 10
+    g.type_num = 1
+    g.ETF_targets = {'000300.XSHG': '510300.XSHG', '399006.XSHE': '399006.XSHE', '512690.XSHG': '512690.XSHG', '512480.XSHG': '512480.XSHG', '515700.XSHG': '515700.XSHG', '512760.XSHG': '512760.XSHG', '516780.XSHG': '516780.XSHG', '515220.XSHG': '515220.XSHG', '516880.XSHG': '516880.XSHG', '515210.XSHG': '515210.XSHG', '512880.XSHG': '512880.XSHG', '512660.XSHG': '512660.XSHG', '159992.XSHE': '159992.XSHE', '588050.XSHG': '588050.XSHG', '518880.XSHG': '518880.XSHG', '501018.XSHG': '501018.XSHG', '161226.XSHE': '161226.XSHE', '159985.XSHE': '159985.XSHE', '159981.XSHE': '159981.XSHE', '159980.XSHE': '159980.XSHE', '513100.XSHG': '513100.XSHG', '513030.XSHG': '513030.XSHG', '513520.XSHG': '513520.XSHG', '164824.XSHE': '164824.XSHE'}
+    g.local_stocks = ['510300.XSHG', '159915.XSHE', '512690.XSHG', '512480.XSHG', '515700.XSHG', '515760.XSHG', '516780.XSHG', '515220.XSHG', '516880.XSHG', '515210.XSHG', '512880.XSHG', '512660.XSHG', '159992.XSHE', '588050.XSHG', '513100.XSHG', '164824.XSHE', '513030.XSHG', '513520.XSHG', '159980.XSHE', '159981.XSHE', '159985.XSHE', '161226.XSHE', '518880.XSHG', '501018.XSHG']
+    stocks_info = '\n股票池:\n'
+    for security in g.ETF_targets.values():
+        s_info = get_security_info(security)
+        stocks_info += '【%s】%s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.start_date)
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=60742145da37b5c16a3a7403ded56f62abe327abe20b53cbbfedaeb84fec8b6d source=quant/2024年度精选策略2/16.ETF轮动策略升级-多类别-低回撤.txt'
+'EXACT_REVIEWED_FUNCTION ETF_trade sha256=265c622705c038ca9e26b9b1c1b378eb01273221072ffed9ee3a0b9c7275e411 source=quant/2024年度精选策略2/16.ETF轮动策略升级-多类别-低回撤.txt'
+
+def get_signal(context):
+    g.df_etf = pd.DataFrame(columns=['基金代码', '基金名称', '涨幅', '均线状态', '股数'])
+    g.df_local_stocks = pd.DataFrame(columns=['基金代码', '基金名称', '涨幅', '均线状态', '股数'])
+    g.df_global_stocks = pd.DataFrame(columns=['基金代码', '基金名称', '涨幅', '均线状态', '股数'])
+    g.df_local_futures = pd.DataFrame(columns=['基金代码', '基金名称', '涨幅', '均线状态', '股数'])
+    g.df_global_futures = pd.DataFrame(columns=['基金代码', '基金名称', '涨幅', '均线状态', '股数'])
+    g.df_reits = pd.DataFrame(columns=['基金代码', '基金名称', '涨幅', '均线状态', '股数'])
+    total_value = context.portfolio.total_value
+    current_data = get_current_data()
+    current_time = context.current_dt
+    for mkt_idx in g.ETFList:
+        security = g.ETFList[mkt_idx]
+        etf_name = get_security_info(security).display_name
+        price_data = get_price(security, end_date=current_time, frequency='1d', fields=['close', 'high', 'low'], count=g.moment_period + 1)
+        now_close = price_data['close'][-1]
+        previous_close = price_data['close'][-g.moment_period]
+        ma_filter = ta.MA(price_data.close.values, g.ma_period)[-1]
+        ma_status = now_close - ma_filter
+        moment = (now_close - previous_close) / previous_close * 100
+        amount = int(total_value / now_close / g.type_num / 100) * 100
+        g.df_etf = g.df_etf.append({'基金代码': security, '基金名称': etf_name, '涨幅': moment, '均线状态': ma_status, '股数': amount}, ignore_index=True)
+    g.df_etf.sort_values(by='涨幅', axis=0, ascending=False, inplace=True)
+    tb = pt.PrettyTable()
+    tb.add_column('Index', g.df_etf.index)
+    tb.add_column('ETF Code', list(g.df_etf['基金代码']))
+    tb.add_column('Name', list(g.df_etf['基金名称']))
+    tb.add_column('Moment', list(g.df_etf['涨幅'].values.round(2)))
+    tb.add_column('Ma_Status', list(g.df_etf['均线状态'].values.round(2)))
+    tb.add_column('Amount', list(g.df_etf['股数']))
+    g.df_etf_buy = g.df_etf.copy()
+    g.df_etf_buy = g.df_etf_buy[g.df_etf_buy['涨幅'] > 0]
+    g.df_etf_buy = g.df_etf_buy[g.df_etf_buy['均线状态'] > 0]
+    g.df_local_stocks = g.df_etf_buy.loc[g.df_etf_buy['基金代码'].isin(g.local_stocks)]
+    g.holdings = set(context.portfolio.positions.keys())
+    g.targets = []
+    if len(g.df_local_stocks) > 0:
+        g.targets.append(g.df_local_stocks.iloc[0]['基金代码'])
+    content = '交易计划：\n'
+    g.sells = [i for i in g.holdings if i not in g.targets]
+    g.purchases = [i for i in g.targets if i not in list(g.holdings)]
+    if len(g.sells) > 0:
+        df_sells = g.df_etf.loc[g.df_etf['基金代码'].isin(g.sells)]
+        tb = pt.PrettyTable()
+        tb.add_column('ETF Code', list(df_sells['基金代码']))
+        tb.add_column('Name', list(df_sells['基金名称']))
+        str_more = '\n计划卖出: \n' + str(tb)
+        content = content + str_more
+    if len(g.purchases) > 0:
+        df_purchase = g.df_etf.loc[g.df_etf['基金代码'].isin(g.purchases)]
+        tb = pt.PrettyTable()
+        tb.add_column('Index', df_purchase.index)
+        tb.add_column('ETF Code', list(df_purchase['基金代码']))
+        tb.add_column('Diaplay Name', list(df_purchase['基金名称']))
+        tb.add_column('Amount', list(df_purchase['股数']))
+        str_more = '\n计划买入：\n' + str(tb)
+        content = content + str_more
+    if len(g.sells) == 0 and len(g.purchases) == 0:
+        str_more = '\n无交易计划: \n'
+        content = content + str_more
+    title = str(current_time)[:10] + '_ETF_轮动交易计划'
+    return

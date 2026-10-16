@@ -1,0 +1,31 @@
+quant/2022年度精选策略/4.自带仓位控制的股息率策略，超稳.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+'EXACT_REVIEWED_FUNCTION initialize sha256=fe407274d3aee43998c806388a7e6ccaf61f4596fbf1c0e543cb70b7e98ead37 source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+'EXACT_REVIEWED_FUNCTION main sha256=0b81e7171416763fb5cb9bd8742aa9d99cd285227f2d11e649802fd750d9a22a source=quant/2021年度精选策略/70.超稳的股息率+均线选股策略.txt'
+'EXACT_REVIEWED_FUNCTION getBigStocks sha256=0f5f7fe4e9bf6f962563edf7eccdbe84e3529dcfe2f2e38b7759ce99905cadaf source=quant/2021年度精选策略/70.超稳的股息率+均线选股策略.txt'
+'EXACT_REVIEWED_FUNCTION controlReport sha256=f0cada4a28a46735205320b99ba35434148626e85e2d9ad9999b500fcf287e89 source=quant/2021年度精选策略/70.超稳的股息率+均线选股策略.txt'
+'EXACT_REVIEWED_FUNCTION setSmallStocks sha256=b1c58ffc77c13f70a414c17330a012204bd9610cb357f236f900cbf090cb083b source=quant/2021年度精选策略/70.超稳的股息率+均线选股策略.txt'
+
+def orderStock(context):
+    bfive = g.bfive
+    bten = g.bten
+    all_value = context.portfolio.total_value
+    for sell_code in context.portfolio.long_positions.keys():
+        if sell_code not in bfive:
+            order_target_value(sell_code, 0)
+    for buy_code in bten:
+        if buy_code not in context.portfolio.long_positions.keys():
+            cash_value = context.portfolio.available_cash
+            buy_value = all_value / g.stock_num
+            if cash_value > buy_value / 2:
+                order_target_value(buy_code, buy_value)
+'EXACT_REVIEWED_FUNCTION set_param sha256=610591fb4072bfcf235e86291f5e61e6c5afcc3f9a448461d76ac259c14ee962 source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+
+def giveScore():
+    pass
+
+def cc_industry(stock_list):
+    pass
+'EXACT_REVIEWED_FUNCTION moreinfo sha256=2cda4bf8bb1d5cfaa69d31347723d92d1421b768733ff1110628d7f887481de8 source=quant/2022年度精选策略/13.利用股息率长线选股【超稳】.txt'

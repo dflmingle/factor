@@ -1,0 +1,21 @@
+quant/2021年度精选策略/34.套利三年，我的本金翻了10倍.txt
+code = 'C8888.XDCE'
+start_date = datetime.date(2015, 1, 5)
+end_date = datetime.date(2019, 6, 10)
+price_df = get_price(code, start_date=start_date, end_date=end_date, frequency='daily', fields=['open', 'high', 'low', 'close'], skip_paused=False, fq='pre', count=None)
+code2 = 'CS8888.XDCE'
+price_df2 = get_price(code2, start_date=start_date, end_date=end_date, frequency='daily', fields=['open', 'high', 'low', 'close'], skip_paused=False, fq='pre', count=None)
+import statsmodels.api as sm
+x = price_df.close
+y = price_df2.close
+coint_result = sm.tsa.stattools.coint(x, y)
+pvalue = coint_result[1]
+X = sm.add_constant(x)
+result = sm.OLS(y, X).fit()
+coef = result.params[1]
+fig, ax = plt.subplots(figsize=(16, 9))
+plot(coef * price_df.close - price_df2.close)
+
+def zscore(series):
+    return (series - series.mean()) / np.std(series)
+plot(zscore(coef * price_df.close - price_df2.close))

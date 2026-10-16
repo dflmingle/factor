@@ -1,0 +1,206 @@
+quant/聚宽2025年精选/71（乱改一版）股票加“钱粮”ETF组合.txt
+from jqdata import *
+from jqfactor import get_factor_values
+import numpy as np
+import pandas as pd
+from scipy.optimize import minimize
+
+def initialize(context):
+    g.stock_num = 10
+    g.etf = []
+    g.commodity_etf = ['162411.XSHE', '518880.XSHG', '159985.XSHE']
+    g.qdii_etf = []
+    g.no_trading_today_signal = False
+    g.limit_up_list = []
+    g.hold_list = []
+    g.stock_rate = 0.4
+    g.qdii_rate = 0.3
+    g.risk_management = -0.0382
+    run_daily(prepare_stock_list, '9:05')
+    run_monthly(Trader_stocks, 1, '9:35')
+    run_monthly(Trader_etf, 1, time='14:55')
+    run_daily(rec, time='15:01')
+    run_daily(check_limit_up, '14:00')
+    run_daily(close_account, '14:30')
+    run_daily(risk_management, '13:00')
+
+def risk_management(context):
+    """EXACT_REVIEWED_FUNCTION get_close_price sha256=bfeb75b846dd71d934c2e0d5c19c571057c3dbc10e1bd46d0d7fc17339047381 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt"""
+    for stock in context.portfolio.positions.keys():
+        fuying = context.portfolio.positions[stock].price / context.portfolio.positions[stock].avg_cost - 1
+        current_data = get_current_data()
+        price1d = get_close_price(stock, 1)
+        nosell_1 = context.portfolio.positions[stock].price >= current_data[stock].high_limit
+        if fuying < g.risk_management and (not nosell_1):
+            position = context.portfolio.positions[stock]
+            close_position(position)
+
+def Trader_etf(context):
+    total_value = context.portfolio.total_value
+    commodity_etf_trade(context, total_value * (1 - g.stock_rate - g.qdii_rate))
+    qdii_etf_trade(context, total_value * g.qdii_rate)
+
+def commodity_etf_trade(context, total_value):
+    end_date = context.previous_date
+    if end_date.year < 2020:
+        g.commodity_etf = ['162411.XSHE', '518880.XSHG', '511010.XSHG']
+    else:
+        g.commodity_etf = ['162411.XSHE', '518880.XSHG', '159985.XSHE']
+    weights = run_optimization(g.commodity_etf, end_date)
+    if weights is None:
+        return
+    index = 0
+    for w in weights:
+        value = total_value * w
+        order_target_value(g.commodity_etf[index], value)
+        index += 1
+
+def qdii_etf_trade(context, total_value):
+    end_date = context.previous_date
+    g.qdii_etf = filter_DQII_etf(context)
+    g.qdii_etf = g.qdii_etf[:10]
+    weights = run_optimization(g.qdii_etf, end_date)
+    if weights is None:
+        return
+    index = 0
+    for w in weights:
+        value = total_value * w
+        order_target_value(g.qdii_etf[index], value)
+        index += 1
+
+def Trader_stocks(context):
+    if g.no_trading_today_signal == False:
+        today = context.current_dt
+        if today.month in [1, 4]:
+            target_list_small_cap = []
+        else:
+            target_list_small_cap = get_stock_list(context)
+            target_list_small_cap = target_list_small_cap[0:g.stock_num]
+        target_list_Dividend_stock = choice_try_A(context)
+        target_list_Dividend_stock = target_list_Dividend_stock[0:g.stock_num]
+        target_list = list(set(target_list_small_cap + target_list_Dividend_stock))
+        for stock in g.hold_list:
+            if stock not in target_list and stock not in g.high_limit_list and (stock not in g.etf):
+                position = context.portfolio.positions[stock]
+                close_position(position)
+        g.etf = set(g.qdii_etf + g.commodity_etf)
+        position_count = len(context.portfolio.positions)
+        hold_stock_num = position_count - len(g.etf)
+        free_stock_position = position_count - hold_stock_num
+        target_num = len(target_list)
+        if target_num > hold_stock_num:
+            value = min(context.portfolio.cash, context.portfolio.total_value * g.stock_rate) / free_stock_position
+            for stock in target_list:
+                if context.portfolio.positions[stock].total_amount == 0:
+                    if value > 1000:
+                        if open_position(stock, value):
+                            if len(context.portfolio.positions) == target_num + len(g.etf):
+                                break
+                    else:
+                        break
+
+def filter_DQII_etf(context):
+    lofs = get_all_securities(['etf'])
+    lofs = lofs[lofs['start_date'] < context.previous_date]
+    lofs = lofs[lofs['end_date'] > context.current_dt.date()]
+    lofs = lofs.index.tolist()
+    current_data = get_current_data()
+    lofs = [stock for stock in lofs if ('德' in current_data[stock].name or '纳' in current_data[stock].name or '法' in current_data[stock].name or ('DAX' in current_data[stock].name) or ('标' in current_data[stock].name) or ('英' in current_data[stock].name) or ('日' in current_data[stock].name) or ('印' in current_data[stock].name) or ('越' in current_data[stock].name) or ('225' in current_data[stock].name)) and '中' not in current_data[stock].name and ('企' not in current_data[stock].name)]
+    net_value = get_extras('unit_net_value', lofs, end_date=context.previous_date, df=True, count=1).T
+    net_value.columns = ['unit_net_value']
+    close = history(count=1, unit='1d', field='close', security_list=lofs).T
+    volume = history(count=1, unit='1d', field='volume', security_list=lofs).T
+    volume = volume[volume > 1000000]
+    close = close[close.index.isin(volume.index)]
+    close.columns = ['close']
+    val = net_value.join(close)
+    val['score'] = val['close'] / val['unit_net_value']
+    val = val[val['score'] > 0]
+    val = val[val['score'] < 1.1]
+    val = val.sort_values(by='score', ascending=False)
+    buy_list = val.index.tolist()
+    return buy_list
+
+def portfolio_variance(weights, cov_matrix):
+    return np.dot(weights.T, np.dot(cov_matrix * 250, weights))
+
+def optimize_portfolio(returns):
+    cov_matrix = returns.cov()
+    num_assets = len(returns.columns)
+    w_min = 1 / np.power(num_assets, 2)
+    w_max = 0.9
+    init_weights = np.array([1 / num_assets] * num_assets)
+    weight_sum_constraint = {'type': 'eq', 'fun': lambda weights: np.sum(weights) - 1}
+    bnds = tuple(((w_min, w_max) for x in range(num_assets)))
+    result = minimize(portfolio_variance, init_weights, method='SLSQP', args=cov_matrix, bounds=bnds, constraints=weight_sum_constraint)
+    return result.x
+
+def run_optimization(stocks, end_date):
+    prices = get_price(stocks, count=250, end_date=end_date, frequency='daily', fields=['close'])['close']
+    returns = prices.pct_change().dropna()
+    weights = optimize_portfolio(returns)
+    return weights
+'EXACT_REVIEWED_FUNCTION get_factor_filter_list sha256=d2a9b2f11b098fe6a814caab77d0389616c292bd321ddd2ca6000dc629da87af source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    initial_list = get_all_securities().index.tolist()
+    initial_list = filter_new_stock(context, initial_list)
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_st_stock(initial_list)
+    initial_list = filter_paused_stock(initial_list)
+    initial_list = filter_limitup_stock(context, initial_list)
+    initial_list = filter_limitdown_stock(context, initial_list)
+    price_list1 = get_factor_filter_list(context, initial_list, 'price_no_fq', True, 0, 0.1)
+    df = get_price(initial_list, start_date=yesterday, end_date=yesterday, fields=['close'], fq='pre', panel=False)
+    df = df.sort_values(by='close', ascending=True)
+    price_list2 = list(df.code)[int(0 * len(df)):int(0.1 * len(df))]
+    q = query(valuation.code, valuation.circulating_market_cap, indicator.eps).filter(valuation.code.in_(price_list1)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q, date=yesterday)
+    df = df[df['eps'] > 0]
+    final_list = list(df.code)[:15]
+    return final_list
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=a4b7e1e7b1e0491b22da89fc63a468d55b035d0350cb5aebef454cb19c514cf0 source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+
+def choice_try_A(context):
+    yesterday = context.previous_date
+    stocks = get_all_securities().index.tolist()
+    stocks = filter_new_stock(context, stocks)
+    stocks = filter_kcbj_stock(stocks)
+    stocks = filter_st_stock(stocks)
+    stocks = filter_paused_stock(stocks)
+    stocks = filter_limitup_stock(context, stocks)
+    stocks = filter_limitdown_stock(context, stocks)
+    stocks = get_dividend_ratio_filter_list(context, stocks, False, 0, 0.1)
+    df = get_fundamentals(query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(stocks), valuation.pe_ratio.between(0, 25), indicator.inc_return > 3, indicator.inc_total_revenue_year_on_year > 5, indicator.inc_net_profit_year_on_year > 11, valuation.pe_ratio / indicator.inc_net_profit_year_on_year > 0.08, valuation.pe_ratio / indicator.inc_net_profit_year_on_year < 1.9))
+    stocks = list(df.code)
+    return stocks
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=8f3f9bbb828a332f2c16935917d374b2d4406be4a3b488fa841eae8402f7d115 source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=e1156ef5376990f768d29303164d87a15e602d5861ac54d0fb47bf5120261b3c source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def close_account(context):
+    if g.no_trading_today_signal == True:
+        if len(g.hold_list) != 0:
+            for stock in g.hold_list:
+                if stock not in g.etf:
+                    position = context.portfolio.positions[stock]
+                    close_position(position)
+'EXACT_REVIEWED_FUNCTION get_dividend_ratio_filter_list sha256=38bd0f889a1c3ac16e6d1096b39c06e0aa4623de9d7967b12e2a27f0062063ec source=quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def rec(context):
+    _cent = context.portfolio.positions_value / context.portfolio.total_value
+    _cent = int(_cent * 10000) / 10000
+    formatted_cent = '{:.2%}'.format(_cent)
+    stock_list = context.portfolio.positions.keys()
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=c55d81f9ae93e9528bed6bbf6d7d9504dd411d50e2d5fd0c8e639642b4fd584e source=quant/2023年度精选策略/21.截止到21年12月依然有效的小市值适配因子.txt'

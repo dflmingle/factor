@@ -1,0 +1,122 @@
+quant/2021年度精选策略/92.敢于直接实盘的—八仙过海V2.txt
+from jqdata import *
+import pandas as pd
+import talib
+
+def initialize(context):
+    set_params()
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(get_signal, time='14:30')
+
+def set_params():
+    g.use_dynamic_target_market = True
+    g.target_market = '000300.XSHG'
+    g.empty_keep_stock = '511880.XSHG'
+    g.signal = 'BUY'
+    g.lag = 60
+    g.buy = []
+    g.ETFList = []
+    g.cang = {}
+    g.allCang = 0
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def before_market_open(context):
+    ETF_targets = ['162605.XSHE', '161903.XSHE', '161005.XSHE', '163417.XSHE', '163402.XSHE', '163415.XSHE', '501054.XSHG', '162703.XSHE']
+    yesterday = context.previous_date
+    list_date = get_before_after_trade_days(yesterday, g.lag)
+    g.ETFList = []
+    all_funds = get_all_securities(types='fund', date=yesterday)
+    for symbol in ETF_targets:
+        if symbol in all_funds.index:
+            if all_funds.loc[symbol].start_date <= list_date:
+                g.ETFList.append(symbol)
+    return
+
+def ETFtrade(context):
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            if stock == g.empty_keep_stock:
+                continue
+            order_target(stock, 0)
+    elif g.signal == 'BUY':
+        if g.empty_keep_stock in context.portfolio.positions:
+            order_target(g.empty_keep_stock, 0)
+        holdings = set(context.portfolio.positions.keys())
+        targets = set(g.buy)
+        sells = holdings - targets
+        for code in sells:
+            order_target(code, 0)
+        ratio = len(targets)
+        if ratio > 0:
+            cash = context.portfolio.total_value
+            adjusts = holdings & targets
+            for code in adjusts:
+                order_target_value(code, cash * g.cang[code])
+            purchases = targets - holdings
+            for code in purchases:
+                order_target_value(code, cash * g.cang[code])
+        current_returns = 100 * context.portfolio.returns
+    order_target_value(g.empty_keep_stock, context.portfolio.available_cash)
+
+def get_signal(context):
+    current_data = get_current_data()
+    fen = 1.0 / len(g.ETFList)
+    g.cang = 0
+    df_etf = pd.DataFrame(columns=['基金代码', '周期涨幅'])
+    mZhangfu = 0
+    g.buy = []
+    g.cang = {}
+    g.allCang = 0
+    for mkt_idx in g.ETFList:
+        security = mkt_idx
+        close_data = attribute_history(security, g.lag, '1d', ['close'], df=False)
+        zhangfu = 0
+        current_price = current_data[security].last_price
+        ma_n5 = close_data['close'][-5:].mean()
+        ma_n10 = close_data['close'][-10:].mean()
+        ma_n20 = close_data['close'][-20:].mean()
+        ma_n30 = close_data['close'][-30:].mean()
+        ma_n60 = close_data['close'][-60:].mean()
+        index = 0
+        if current_price > ma_n5:
+            index += 0.3
+        if current_price > ma_n10:
+            index += 0.25
+        if current_price > ma_n20:
+            index += 0.2
+        if current_price > ma_n30:
+            index += 0.15
+        if current_price > ma_n60:
+            index += 0.1
+        cang = 0
+        if index == 1:
+            cang = fen
+        elif index > 0:
+            cang = index * 0.3 * fen
+        if index > 0:
+            g.buy.append(security)
+            g.cang[security] = cang
+            g.allCang += cang
+        df_etf = df_etf.append({'基金代码': security, '周期涨幅': zhangfu}, ignore_index=True)
+        mZhangfu += zhangfu
+    if len(g.buy) == 0:
+        g.signal = 'CLEAR'
+        ETFtrade(context)
+        return
+    g.signal = 'BUY'
+    ETFtrade(context)
+    return
+
+def GetMACD(stock, period, isIncludNow=True):
+    bars = get_bars(stock, 100, period, ['close'], include_now=isIncludNow)
+    close = array(bars['close'])
+    macd_tmp = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
+    DIF = macd_tmp[0]
+    DEA = macd_tmp[1]
+    MACD = macd_tmp[2]
+    return (DIF[-1], DEA[-1], MACD[-1] * 2)
+
+def GetKDJ(stock, period, isIncludNow=True):
+    bars = get_bars(stock, 100, period, ['close'], include_now=isIncludNow)
+    close = array(bars['close'])
+    kdj = talib.KDJ()

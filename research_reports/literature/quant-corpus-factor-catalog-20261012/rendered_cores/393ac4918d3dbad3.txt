@@ -1,0 +1,244 @@
+quant/2023年度精选策略/62.3年复合200+%收益+超低回撤11%以内，无惧大跌.txt
+from jqdata import *
+import pandas as pd
+import talib
+import numpy
+import sys
+
+def initialize(context):
+    set_params()
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(get_signal_back, time='09:58')
+    run_daily(get_signal, time='14:37')
+    run_daily(ETFtradeSell, time='14:38')
+    run_daily(ETFtradeBuy, time='14:39')
+    run_daily(before_market_close, time='14:53')
+
+def set_params():
+    g.ispython3 = sys.version_info >= (3, 0)
+    g.use_dynamic_target_market = True
+    g.target_market = '000300.XSHG'
+    g.empty_keep_stock = '511880.XSHG'
+    g.signal = 'WAIT'
+    g.emotion_rate = 0
+    g.lag = 6
+    g.lag0 = 7
+    g.lag1 = 13
+    g.lag2 = 13
+    g.emptyforthreeday = 10.6
+    g.emptyforallday = 31
+    g.emptymaxday = 3
+    g.emptyholdday = 0
+    g.buy = []
+    g.ETF_targets = {'399001.XSHE': '150019.XSHE', '162605.XSHE': '162605.XSHE', '000016.XSHG': '510050.XSHG', '000010.XSHG': '510180.XSHG', '000015.XSHG': '510880.XSHG', '399324.XSHE': '159905.XSHE', '399673.XSHE': '159949.XSHE', '000300.XSHG': '510300.XSHG', '000905.XSHG': '510500.XSHG', '399906.XSHE': '515800.XSHG', '159966.XSHE': '159966.XSHE', '159967.XSHE': '159967.XSHE', '511380.XSHG': '511380.XSHG', '513500.XSHG': '513500.XSHG', '513100.XSHG': '513100.XSHG', '510900.XSHG': '510900.XSHG', '512160.XSHG': '512160.XSHG'}
+    stocks_info = '\n股票池:\n'
+    for security in g.ETF_targets.values():
+        s_info = get_security_info(security)
+        stocks_info += '【%s】%s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.start_date)
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def before_market_open(context):
+    if g.emptyholdday > 0:
+        g.emptyholdday = g.emptyholdday - 1
+    yesterday = context.previous_date
+    list_date = get_before_after_trade_days(yesterday, g.lag1)
+    g.ETFList = {}
+    all_funds = get_all_securities(types='fund', date=yesterday)
+    for idx in g.ETF_targets:
+        symbol = g.ETF_targets[idx]
+        if symbol in all_funds.index:
+            if all_funds.loc[symbol].start_date <= list_date:
+                g.ETFList[idx] = symbol
+    return
+
+def ETFtradeSell(context):
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            if stock == g.empty_keep_stock:
+                continue
+            order_target(stock, 0)
+    elif g.signal == 'BUY':
+        if g.empty_keep_stock != '' and g.empty_keep_stock in context.portfolio.positions:
+            order_target(g.empty_keep_stock, 0)
+        holdings = set(context.portfolio.positions.keys())
+        targets = set(g.buy)
+        sells = holdings - targets
+        for code in sells:
+            order_target(code, 0)
+
+def ETFtradeSell_back(context):
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            if stock == g.empty_keep_stock:
+                continue
+            order_target(stock, 0)
+
+def ETFtradeBuy(context):
+    if g.emptyholdday > 0 and g.emptyholdday <= g.emptymaxday:
+        return
+    if g.signal == 'BUY':
+        if g.empty_keep_stock != '' and g.empty_keep_stock in context.portfolio.positions:
+            order_target(g.empty_keep_stock, 0)
+        holdings = set(context.portfolio.positions.keys())
+        targets = set(g.buy)
+        ratio = len(targets)
+        cash = context.portfolio.total_value / ratio
+        adjusts = holdings & targets
+        for code in adjusts:
+            if abs(cash - context.portfolio.positions[code].value) > 5000:
+                order_target_value(code, cash)
+        purchases = targets - holdings
+        for code in purchases:
+            order_target_value(code, cash)
+    if len(context.portfolio.positions) == 0 and g.empty_keep_stock and (g.empty_keep_stock != ''):
+        order_target_value(g.empty_keep_stock, context.portfolio.available_cash)
+
+def get_signal(context):
+    buyold = g.buy
+    if len(g.ETFList) == 0:
+        before_market_open(context)
+    df_etf = pd.DataFrame(columns=['基金代码', '对应指数', '周期涨幅', '均线差值', '最新涨幅', '今日涨幅'])
+    current_data = get_current_data()
+    for mkt_idx in g.ETFList:
+        security = g.ETFList[mkt_idx]
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_price = current_data[security].last_price
+        cp_increase = (current_price / close_data['close'][g.lag2 - g.lag1] - 1) * 100
+        cp_increase_2 = (current_price / close_data['close'][-2] - 1) * 100
+        curr_increase = (current_price / close_data['close'][-1] - 1) * 100
+        ma_n1 = close_data['close'].mean()
+        pre_price = (current_price / ma_n1 - 1) * 100
+        df_etf = df_etf.append({'基金代码': security, '对应指数': mkt_idx, '周期涨幅': cp_increase, '均线差值': pre_price, '最新涨幅': cp_increase_2, '今日涨幅': curr_increase}, ignore_index=True)
+    if len(df_etf) == 0:
+        g.signal = 'CLEAR'
+        return
+    if g.ispython3:
+        df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+    else:
+        df_etf.sort('周期涨幅', ascending=False, inplace=True)
+    useidx = -1
+    for i in range(0, len(df_etf['对应指数'])):
+        if df_etf['周期涨幅'].iloc[i] >= 1 and df_etf['均线差值'].iloc[i] >= 0.1 and (df_etf['最新涨幅'].iloc[i] < g.emptyforthreeday) and (df_etf['最新涨幅'].iloc[i] > -g.emptyforthreeday * 0.5) and (df_etf['今日涨幅'].iloc[i] > -g.emptyforthreeday * 0.2) and (df_etf['今日涨幅'].iloc[i] < g.emptyforthreeday * 0.6) and (df_etf['周期涨幅'].iloc[i] < g.emptyforallday) and (df_etf['周期涨幅'].iloc[i] >= g.emptyforallday * 0.1):
+            useidx = i
+            break
+    if useidx < 0:
+        g.signal = 'CLEAR'
+        return
+    if g.use_dynamic_target_market:
+        g.target_market = df_etf['对应指数'].iloc[useidx]
+    red_etf_count = 0
+    green_etf_count = 0
+    for idx in df_etf['最新涨幅'].index:
+        if df_etf['最新涨幅'].iloc[idx] > 0:
+            red_etf_count = red_etf_count + 1
+        else:
+            green_etf_count = green_etf_count + 1
+    if EmotionMonitor() == -1 or EmotionMonitorNewZZ500() == -1:
+        g.signal = 'CLEAR'
+        return
+    if sum(df_etf['周期涨幅']) < 0.1 and green_etf_count > red_etf_count * 1.34:
+        g.signal = 'CLEAR'
+        g.emptyholdday = 1
+        return
+    if df_etf['周期涨幅'].iloc[useidx] < 0.1 or df_etf['均线差值'].iloc[useidx] < 0:
+        g.signal = 'CLEAR'
+        return
+    g.buy = [df_etf['基金代码'].iloc[useidx]]
+    for j in range(0, len(buyold)):
+        for i in range(0, len(df_etf['对应指数'])):
+            if df_etf['基金代码'].iloc[i] == buyold[j] and i < 5 and (useidx != i) and (df_etf['今日涨幅'].iloc[i] > g.emptyforthreeday * 0.01) and (df_etf['最新涨幅'].iloc[i] > g.emptyforthreeday * 0.1):
+                g.buy = g.buy + [buyold[j]]
+                break
+    g.signal = 'BUY'
+    return
+
+def get_signal_back(context):
+    current_data = get_current_data()
+    for stock in context.portfolio.positions.keys():
+        currs = context.portfolio.positions[stock]
+        currper = (currs.price - currs.avg_cost) / currs.avg_cost * 100
+        if currs.closeable_amount > 0:
+            close_data = attribute_history(stock, 3, '1d', ['close'], df=False)
+            current_price = current_data[stock].last_price
+            curr_increase = (current_price / close_data['close'][-1] - 1) * 100
+            two_increase = (current_price / close_data['close'][-2] - 1) * 100
+            zz500ret = EmotionMonitorNewZZ500()
+            if zz500ret == -1:
+                order_target_value(stock, 0)
+            elif currper > g.emptyforthreeday or two_increase > g.emptyforthreeday * 0.6 or curr_increase > g.emptyforthreeday * 0.4:
+                order_target_value(stock, 0)
+                g.emptyholdday = g.emptymaxday
+            elif currper < -g.emptyforthreeday * 0.6 or two_increase < -g.emptyforthreeday * 0.4 or curr_increase < -g.emptyforthreeday * 0.2:
+                order_target_value(stock, 0)
+    return
+
+def EmotionMonitor():
+    _cnt = g.lag0 + max(g.lag, 3)
+    volume = attribute_history(security=g.target_market, count=_cnt, unit='1d', fields='volume')['volume']
+    v_ma_lag0 = talib.MA(np.array(volume), g.lag0)
+    g.emotion_rate = round((volume[-1] / v_ma_lag0[-1] - 1) * 100, 2)
+    vol_diff = volume - v_ma_lag0
+    if vol_diff[-1] >= 0:
+        ret_val = 1 if (vol_diff[-3:] >= 0).all() else 0
+    else:
+        ret_val = -1 if (vol_diff[-g.lag:] < 0).all() else 0
+    return ret_val
+
+def EmotionMonitorHS300():
+    _cnt = g.lag0 + max(g.lag, 3)
+    volume = attribute_history(security='000300.XSHG', count=_cnt, unit='1d', fields='volume')['volume']
+    v_ma_lag0 = talib.MA(np.array(volume), g.lag0)
+    g.emotion_rate = round((volume[-1] / v_ma_lag0[-1] - 1) * 100, 2)
+    vol_diff = volume - v_ma_lag0
+    if vol_diff[-1] >= 0:
+        ret_val = 1 if (vol_diff[-3:] >= 0).all() else 0
+    else:
+        ret_val = -1 if (vol_diff[-g.lag:] < 0).all() else 0
+    return ret_val
+
+def before_market_close(context):
+    orders = get_open_orders()
+    for _order in orders.values():
+        cancel_order(_order)
+    orders = get_orders(status=OrderStatus.held)
+    for _order in orders.values():
+        pass
+    for stock in context.portfolio.positions.keys():
+        currs = context.portfolio.positions[stock]
+        currper = (currs.price - currs.avg_cost) / currs.avg_cost
+        if currs.closeable_amount > 0:
+            pass
+    return
+
+def EmotionMonitorNewZZ500():
+    dpsecurity = '000905.XSHG'
+    lag = 8
+    lag0 = 9
+    ret_val = 0
+    _cnt = lag0 + max(lag, 1)
+    close = attribute_history(security=dpsecurity, count=_cnt, unit='1d', fields='close')['close']
+    v_ma_lag0 = talib.MA(np.array(close), lag0)
+    g.emotion_rate = round((close[-1] / v_ma_lag0[-1] - 1) * 100, 2)
+    vol_diff = close - v_ma_lag0
+    if vol_diff[-1] >= 0:
+        ret_val = 1 if (vol_diff[-3:] >= 0).all() else 0
+    else:
+        ret_val = -1 if (vol_diff[-lag:] < 0).all() else 0
+    current_data = get_current_data()
+    current_price = current_data[dpsecurity].last_price
+    curr_increase = (current_price / close[-1] - 1) * 100
+    if curr_increase < -1.1:
+        ret_val = -2
+    return ret_val
+
+def after_code_changed(context):
+    unschedule_all()
+    set_params()
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(get_signal_back, time='09:58')
+    run_daily(get_signal, time='14:37')
+    run_daily(ETFtradeSell, time='14:38')
+    run_daily(ETFtradeBuy, time='14:39')
+    run_daily(before_market_close, time='14:53')
+    before_market_open(context)
+    return

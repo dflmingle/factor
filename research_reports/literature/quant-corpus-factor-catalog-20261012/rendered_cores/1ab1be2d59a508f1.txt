@@ -1,0 +1,256 @@
+quant/量化策略/量化策略/实盘2026/Ptrade/pt版08多因子成长小市值轮动策略.txt
+import numpy as np
+import pandas as pd
+import datetime
+
+def initialize(context):
+    set_fixed_slippage(0.0)
+    g.stock_num = 5
+    g.smallcap_pool_size = 50
+    g.limit_days = 40
+    g.hold_list = []
+    g.history_hold_list = []
+    g.not_buy_again_list = []
+    g.high_limit_list = []
+    g.target_list = []
+    g.is_real = is_trade()
+    if g.is_real:
+        run_daily(prepare_before_trading, time='09:05')
+        run_daily(weekly_adjustment, time='09:30')
+        run_daily(check_limit_up, time='14:00')
+        run_daily(print_position_info, time='15:10')
+
+def before_trading_start(context, data):
+    prepare_before_trading(context)
+
+def prepare_before_trading(context):
+    g.hold_list = [p.sid for p in context.portfolio.positions.values() if p.amount != 0]
+    g.history_hold_list.append(g.hold_list)
+    if len(g.history_hold_list) > g.limit_days:
+        g.history_hold_list = g.history_hold_list[-g.limit_days:]
+    temp_set = set()
+    for hold_list in g.history_hold_list:
+        temp_set.update(hold_list)
+    g.not_buy_again_list = list(temp_set)
+    g.high_limit_list = []
+    if g.hold_list:
+        yesterday_str = context.previous_date.strftime('%Y%m%d')
+        for stock in g.hold_list:
+            try:
+                close_df = get_price(stock, end_date=yesterday_str, frequency='1d', fields='close', count=1, fq=None)
+                high_df = get_price(stock, end_date=yesterday_str, frequency='1d', fields='high_limit', count=1, fq=None)
+                if close_df is not None and (not close_df.empty) and (high_df is not None) and (not high_df.empty):
+                    if isinstance(close_df, pd.DataFrame):
+                        close_val = close_df['close'].iloc[-1]
+                    else:
+                        close_val = close_df['close'][-1]
+                    if isinstance(high_df, pd.DataFrame):
+                        high_val = high_df['high_limit'].iloc[-1]
+                    else:
+                        high_val = high_df['high_limit'][-1]
+                    if abs(close_val - high_val) < 0.001:
+                        g.high_limit_list.append(stock)
+            except Exception as e:
+                continue
+    g.target_list = select_target_stocks(context)
+
+def handle_data(context, data):
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.weekday() == 0 and current_dt.hour == 9 and (current_dt.minute == 31):
+        weekly_adjustment(context)
+    if current_dt.hour == 14 and current_dt.minute == 0:
+        check_limit_up(context)
+
+def select_target_stocks(context):
+    yesterday = context.previous_date
+    yesterday_str = yesterday.strftime('%Y%m%d')
+    all_stocks = get_Ashares(date=yesterday_str)
+    if not all_stocks:
+        all_stocks = get_Ashares(date=None)
+        if not all_stocks:
+            return []
+    filtered = filter_stock_by_status(all_stocks, ['ST', 'HALT', 'DELISTING'])
+    filtered = [s for s in filtered if not s.startswith('688')]
+    filtered = filter_new_stock(context, filtered)
+    if not filtered:
+        return []
+    try:
+        df_marketcap = get_fundamentals(filtered, 'valuation', fields='float_value', date=yesterday_str, is_dataframe=True)
+        if df_marketcap.empty:
+            return []
+        df_marketcap.dropna(inplace=True)
+        df_marketcap = df_marketcap.sort_values('float_value', ascending=True)
+        smallcap_stocks = df_marketcap.head(g.smallcap_pool_size).index.tolist()
+    except Exception as e:
+        return []
+    if not smallcap_stocks:
+        return []
+    df_rev = get_fundamentals(smallcap_stocks, 'growth_ability', fields='operating_revenue_grow_rate', date=yesterday_str, is_dataframe=True)
+    fields_ms = ['operating_revenue_grow_rate', 'total_profit_grow_rate', 'net_profit_grow_rate', 'np_parent_company_yoy']
+    df_ms = get_fundamentals(smallcap_stocks, 'growth_ability', fields=fields_ms, date=yesterday_str, is_dataframe=True)
+    df_pe = get_fundamentals(smallcap_stocks, 'valuation', fields='pe_ttm', date=yesterday_str, is_dataframe=True)
+    df_ny = get_fundamentals(smallcap_stocks, 'growth_ability', fields='net_profit_grow_rate', date=yesterday_str, is_dataframe=True)
+    df_all = pd.DataFrame(index=smallcap_stocks)
+    if not df_rev.empty:
+        df_all['rev_growth'] = df_rev['operating_revenue_grow_rate']
+    if not df_ms.empty:
+        df_ms['ms_score'] = 0.1 * df_ms['operating_revenue_grow_rate'] + 0.35 * df_ms['total_profit_grow_rate'] + 0.15 * df_ms['net_profit_grow_rate'] + 0.4 * df_ms['np_parent_company_yoy']
+        df_all['ms_score'] = df_ms['ms_score']
+    if not df_pe.empty and (not df_ny.empty):
+        df_peg = df_pe.join(df_ny, how='inner')
+        df_peg = df_peg[(df_peg['pe_ttm'] > 0) & (df_peg['net_profit_grow_rate'] > 0)]
+        if not df_peg.empty:
+            df_peg['peg'] = df_peg['pe_ttm'] / df_peg['net_profit_grow_rate']
+            df_all['peg'] = df_peg['peg']
+    required_cols = ['rev_growth', 'ms_score', 'peg']
+    df_all = df_all.dropna(subset=required_cols)
+    if df_all.empty:
+        return []
+    for col in ['rev_growth', 'ms_score']:
+        df_all[f'{col}_rank'] = df_all[col].rank(pct=True) * 100
+    df_all['peg_inv'] = 1 / df_all['peg']
+    df_all['peg_rank'] = df_all['peg_inv'].rank(pct=True) * 100
+    df_all['final_score'] = (df_all['rev_growth_rank'] + df_all['ms_score_rank'] + df_all['peg_rank']) / 3
+    df_all = df_all.sort_values('final_score', ascending=False)
+    candidate_list = df_all.index.tolist()
+    candidate_list = filter_paused_stock(candidate_list, context)
+    recent_limit = get_recent_limit_up_stock(context, candidate_list, g.limit_days)
+    black = [s for s in g.not_buy_again_list if s in recent_limit]
+    candidate_list = [s for s in candidate_list if s not in black]
+    target_list = candidate_list[:g.stock_num]
+    if len(target_list) < g.stock_num:
+        remaining = [s for s in smallcap_stocks if s not in target_list]
+        if remaining:
+            for stock in remaining:
+                if len(target_list) >= g.stock_num:
+                    break
+                if stock in recent_limit:
+                    continue
+                target_list.append(stock)
+    return target_list[:g.stock_num]
+
+def filter_new_stock(context, stock_list):
+    yesterday = context.previous_date
+    result = []
+    for stock in stock_list:
+        try:
+            info_dict = get_stock_info(stock, field='listed_date')
+            if info_dict and stock in info_dict:
+                stock_info = info_dict[stock]
+                listed_date_str = stock_info.get('listed_date')
+                if listed_date_str:
+                    try:
+                        if '-' in listed_date_str:
+                            listed_date = datetime.datetime.strptime(listed_date_str, '%Y-%m-%d').date()
+                        else:
+                            listed_date = datetime.datetime.strptime(listed_date_str, '%Y%m%d').date()
+                        days_diff = (yesterday - listed_date).days
+                        if days_diff >= 100:
+                            result.append(stock)
+                        continue
+                    except:
+                        pass
+            result.append(stock)
+        except Exception as e:
+            result.append(stock)
+    return result
+
+def weekly_adjustment(context):
+    target_list = g.target_list
+    if not target_list:
+        return
+    current_hold = [p.sid for p in context.portfolio.positions.values() if p.amount != 0]
+    for stock in current_hold:
+        if stock not in target_list and stock not in g.high_limit_list:
+            if check_limit(stock)[stock] != -1:
+                order_target_value(stock, 0)
+    position_count = len([p for p in context.portfolio.positions.values() if p.amount != 0])
+    target_num = len(target_list)
+    if target_num > position_count:
+        cash_per_stock = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            pos = context.portfolio.positions.get(stock)
+            if pos is None or pos.amount == 0:
+                if check_limit(stock)[stock] != 1:
+                    order_target_value(stock, cash_per_stock)
+
+def check_limit_up(context):
+    if not g.high_limit_list:
+        return
+    for stock in g.high_limit_list:
+        limit_status = check_limit(stock)[stock]
+        if limit_status == 1 or limit_status == 2:
+            pass
+        else:
+            order_target_value(stock, 0)
+
+def filter_paused_stock(stock_list, context):
+    if not stock_list:
+        return []
+    halt_status = get_stock_status(stock_list, 'HALT')
+    return [s for s in stock_list if not halt_status.get(s, False)]
+
+def filter_limitup_stock(stock_list, context):
+    result = []
+    current_hold = [p.sid for p in context.portfolio.positions.values() if p.amount != 0]
+    for stock in stock_list:
+        if stock in current_hold:
+            result.append(stock)
+            continue
+        limit_status = check_limit(stock)[stock]
+        if limit_status == 1 or limit_status == 2:
+            continue
+        result.append(stock)
+    return result
+
+def filter_limitdown_stock(stock_list, context):
+    result = []
+    current_hold = [p.sid for p in context.portfolio.positions.values() if p.amount != 0]
+    for stock in stock_list:
+        if stock in current_hold:
+            result.append(stock)
+            continue
+        limit_status = check_limit(stock)[stock]
+        if limit_status == -1 or limit_status == -2:
+            continue
+        result.append(stock)
+    return result
+
+def get_recent_limit_up_stock(context, stock_list, recent_days):
+    end_date_str = context.previous_date.strftime('%Y%m%d')
+    result = []
+    for stock in stock_list:
+        try:
+            df = get_price(stock, end_date=end_date_str, frequency='1d', fields=['close', 'high_limit'], count=recent_days, fq=None)
+            if df is None or df.empty:
+                continue
+            if not isinstance(df, pd.DataFrame):
+                continue
+            if 'close' not in df.columns or 'high_limit' not in df.columns:
+                continue
+            for i in range(len(df)):
+                if abs(df['close'].iloc[i] - df['high_limit'].iloc[i]) < 0.001:
+                    result.append(stock)
+                    break
+        except Exception as e:
+            continue
+    return result
+
+def get_current_price(stock, context):
+    df = get_price(stock, end_date=context.blotter.current_dt.strftime('%Y%m%d'), frequency='1m', fields='close', count=1, fq=None)
+    if df is not None and (not df.empty):
+        if isinstance(df, pd.DataFrame):
+            return df['close'].iloc[-1]
+        else:
+            return df['close'][-1]
+    return None
+
+def print_position_info(context):
+    trades = get_trades()
+    for trade in trades.values():
+        pass
+    for pos in context.portfolio.positions.values():
+        if pos.amount != 0:
+            pass

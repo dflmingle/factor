@@ -1,0 +1,58 @@
+quant/2021年度精选策略/86.北上詹姆斯.txt
+from jqdata import *
+import random
+import pandas as pd
+import numpy as np
+import datetime as dt
+
+def initialize(context):
+    g.max_stock_count = 15
+    g.back_trade_days = 40
+    g.top_money_in = []
+    g.window = 150
+    g.stdev_n = 2
+    g.mf, g.upper, g.lower = (None, None, None)
+    run_daily(before_market_open, time='07:00')
+    run_daily(reblance, '9:30')
+
+def before_market_open(context):
+    pre_date = (context.current_dt - datetime.timedelta(1)).strftime('%Y-%m-%d')
+    g.mf, g.upper, g.lower = get_boll(pre_date)
+
+def get_boll(end_date):
+    table = finance.STK_ML_QUOTA
+    q = query(table.day, table.quota_daily, table.quota_daily_balance).filter(table.link_id.in_(['310001', '310002']), table.day <= end_date).order_by(table.day)
+    money_df = finance.run_query(q)
+    money_df['net_amount'] = money_df['quota_daily'] - money_df['quota_daily_balance']
+    money_df = money_df.groupby('day')[['net_amount']].sum().iloc[-g.window:]
+    mid = money_df['net_amount'].mean()
+    stdev = money_df['net_amount'].std()
+    upper = mid + g.stdev_n * stdev
+    lower = mid - g.stdev_n * stdev
+    mf = money_df['net_amount'].iloc[-1]
+    return (mf, upper, lower)
+
+def calc_change(context):
+    table = finance.STK_HK_HOLD_INFO
+    q = query(table.day, table.name, table.code, table.share_ratio).filter(table.link_id.in_(['310001', '310002']), table.day.in_([context.previous_date]))
+    df = finance.run_query(q)
+    return df.sort_values(by='share_ratio', ascending=False)[:g.max_stock_count]['code'].values
+
+def reblance(context):
+    if g.mf >= g.upper:
+        s_change_rank = calc_change(context)
+        final = list(s_change_rank)
+        current_hold_funds_set = set(context.portfolio.positions.keys())
+        if set(final) != current_hold_funds_set:
+            need_buy = set(final).difference(current_hold_funds_set)
+            need_sell = current_hold_funds_set.difference(final)
+            cash_per_fund = context.portfolio.total_value / g.max_stock_count * 0.99
+            for fund in need_sell:
+                order_target(fund, 0)
+            for fund in need_buy:
+                order_value(fund, cash_per_fund)
+    elif g.mf <= g.lower:
+        current_hold_funds_set = set(context.portfolio.positions.keys())
+        if len(current_hold_funds_set) != 0:
+            for fund in current_hold_funds_set:
+                order_target(fund, 0)

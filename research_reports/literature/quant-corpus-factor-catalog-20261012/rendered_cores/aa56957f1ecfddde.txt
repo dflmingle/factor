@@ -1,0 +1,132 @@
+quant/2024年度精选策略1/55.Ahfu的大市值价值投资加自定义邮箱推送.txt
+from jqdata import *
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+import base64
+
+def initialize(context):
+    g.buy_stock_count = 5
+    g.check_out_lists = []
+    g.high_limit_list = []
+    g.hold_list = []
+    g.open_gmail = False
+    g.gmail_host = 'smtp.163.com'
+    g.gmail_port = 25
+    g.gmail_sender = 'xxxx@163.com'
+    g.gmail_authcode = 'xxxx'
+    g.gmail_receivers = ['xxxx@163.com', 'xxxx@qq.com']
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_monthly(before_market_open, 1, time='9:05', reference_security='000300.XSHG')
+    run_monthly(my_trade, 1, time='9:30', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:30', reference_security='000300.XSHG')
+    run_monthly(send_to_mail, -1, time='15:10', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=a4b7e1e7b1e0491b22da89fc63a468d55b035d0350cb5aebef454cb19c514cf0 source=quant/2024年度精选策略1/11.低价小盘简单有效.txt'
+'EXACT_REVIEWED_FUNCTION my_trade sha256=f5730f58311a8561a441bcf80452ae25a9ff89ff61f5d7fd020bf7fa413c8eb7 source=quant/2024年度精选策略1/16.大市值价值投资，从2005年至今超额稳定.txt'
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=2c2c5c41aefcab8c1589457e8bd44c08f417ac1164cb90b035060de59a695d0d source=quant/2024年度精选策略1/16.大市值价值投资，从2005年至今超额稳定.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def adjust_position(context, buy_stocks):
+    sellbuystocklist = []
+    advlist_s = []
+    for stock in g.hold_list:
+        if stock not in buy_stocks and stock not in g.high_limit_list:
+            position = context.portfolio.positions[stock]
+            sellbuystocklist.append(stock)
+            advlist_s.append('卖出' + str(position.total_amount) + '股')
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    if g.buy_stock_count > position_count:
+        value = context.portfolio.cash / (g.buy_stock_count - position_count)
+        for stock in buy_stocks:
+            if stock not in context.portfolio.positions:
+                if open_position(stock, value):
+                    sellbuystocklist.append(stock)
+                    advlist_s.append('买入' + str(context.portfolio.positions[stock].total_amount) + '股')
+                    if len(context.portfolio.positions) == g.buy_stock_count:
+                        break
+    send_mail(context, sellbuystocklist, advlist_s, '大市值价值投资-调仓通知', '调仓通知')
+'EXACT_REVIEWED_FUNCTION get_name sha256=5962c5550eaeef9c56518bc6a302956b01f81706d62dced703e0cc191948ea26 source=quant/2021年度精选策略/99.最新龙回头5.0速度优化版+风险控制版本.txt'
+
+def check_limit_up(context):
+    now_time = context.current_dt
+    nothighlist = []
+    advlist = []
+    if g.high_limit_list != []:
+        for stock in g.high_limit_list:
+            current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close', 'high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            if current_data.iloc[0, 0] < current_data.iloc[0, 1]:
+                position = context.portfolio.positions[stock]
+                nothighlist.append(stock)
+                advlist.append('卖出' + str(position.total_amount) + '股')
+                close_position(position)
+        send_mail(context, nothighlist, advlist, '大市值价值投资-调仓通知', '涨停打开，卖出')
+
+def before_market_open(context):
+    g.check_out_lists = []
+    current_data = get_current_data()
+    check_date = context.previous_date - datetime.timedelta(days=200)
+    all_stocks = list(get_all_securities(date=check_date).index)
+    all_stocks = [stock for stock in all_stocks if not (current_data[stock].day_open == current_data[stock].high_limit or current_data[stock].day_open == current_data[stock].low_limit or current_data[stock].paused or current_data[stock].is_st or ('ST' in current_data[stock].name) or ('*' in current_data[stock].name) or ('退' in current_data[stock].name) or stock.startswith('30') or stock.startswith('68') or stock.startswith('8') or stock.startswith('4'))]
+    q = query(valuation.code, valuation.market_cap, valuation.pe_ratio, income.total_operating_revenue).filter(valuation.pb_ratio < 1, cash_flow.subtotal_operate_cash_inflow > 1000000.0, indicator.adjusted_profit > 1000000.0, indicator.roa > 0.15, indicator.inc_net_profit_year_on_year > 0, valuation.code.in_(all_stocks)).order_by(indicator.roa.desc()).limit(g.buy_stock_count * 3)
+    check_out_lists = list(get_fundamentals(q).code)
+    check_out_lists = check_out_lists[:g.buy_stock_count]
+    g.check_out_lists = check_out_lists
+    advlist_t = []
+    for sss in check_out_lists:
+        advlist_t.append('可买')
+    send_mail(context, check_out_lists, advlist_t, '大市值价值投资-本月筛选', '本月筛选股票')
+
+def send_mail(context, stocklist, advlist, title, info, sumup=''):
+    if g.open_gmail == False:
+        return False
+    host = g.gmail_host
+    port = g.gmail_port
+    sender = g.gmail_sender
+    authcode = g.gmail_authcode
+    receivers = g.gmail_receivers
+    stockstr = ''
+    cont = 1
+    for stock in stocklist:
+        stockcode = stock.split('.')[0]
+        price_now = attribute_history(stock, 1, '1m', 'close')['close'][0]
+        stockstr = stockstr + '<p>' + str(cont) + '. ' + get_security_info(stock).display_name + ': ' + stock + '  最新价：' + str(price_now) + '</p>' + '<p>' + advlist[cont - 1] + '  ' + '<a href="https://gushitong.baidu.com/stock/ab-' + stockcode + '">查看📖' + '</a></p>'
+        cont = cont + 1
+    mail_msg = '<p><strong>' + info + '</strong></p>' + '<p>' + str(context.current_dt) + '</p>' + '<p>股票列表: </p>' + stockstr + sumup
+    try:
+        smtp = smtplib.SMTP(host, port)
+        smtp.login(sender, authcode)
+        for tomail in receivers:
+            message = MIMEText(mail_msg, 'html', 'utf-8')
+            fromnick = sender[:sender.find('@')]
+            fromnicknamebase64 = base64.b64encode(bytes(fromnick, 'utf-8'))
+            fromnickname64str = str(fromnicknamebase64, 'utf-8')
+            message['From'] = Header('"=?utf-8?B?' + fromnickname64str + '=?=" <' + sender + '>')
+            message['Subject'] = Header(title, 'utf-8')
+            nickname = tomail[:tomail.find('@')]
+            nicknamebase64 = base64.b64encode(bytes(nickname, 'utf-8'))
+            nickname64str = str(nicknamebase64, 'utf-8')
+            message['To'] = Header('"=?utf-8?B?' + nickname64str + '=?=" <' + tomail + '>')
+            smtp.sendmail(sender, [tomail], message.as_string())
+    except smtplib.SMTPException:
+        pass
+    finally:
+        smtp.quit()
+
+def send_to_mail(context):
+    stocklist = []
+    advlist = []
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount
+        stocklist.append(securities)
+        advlist.append('成本价:{}'.format(format(cost, '.2f')) + ',现价:{}'.format(price) + ',收益率:{}%'.format(format(ret, '.2f')) + ',持仓(股):{}'.format(amount) + ',市值:{}'.format(format(value, '.2f')))
+    sumup = '<p>' + '总资产:{}'.format(format(context.portfolio.total_value, '.2f')) + ',可用资金:{}'.format(format(context.portfolio.available_cash, '.2f')) + ',累计收益:{}'.format(format((context.portfolio.total_value / context.portfolio.inout_cash - 1) * 100, '.2f')) + '%</p>'
+    send_mail(context, stocklist, advlist, '大市值价值投资-每周总结报告', '每周总结', sumup)

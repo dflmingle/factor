@@ -1,0 +1,91 @@
+quant/2024年度精选策略2/90.大师策略——柯林·麦克连成长价值优势投资法.txt
+from jqdata import *
+
+def initialize(context):
+    run_monthly(market_open, monthday=1, reference_security='000300.XSHG')
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=c28f361a54ae58fa45086f5fada58af5567aab5a448671ae63b7f557f5cb4d3c source=quant/2020年度精选策略/77 RSRS大盘择时优化.txt'
+
+def market_open(context):
+    if context.current_dt.month in [5, 9, 11]:
+        stock_list = cheek_stock(context)
+        rebalance_position(context, stock_list)
+    else:
+        pass
+
+def cheek_stock(context):
+    t1, t2, t3, t4 = statDate_value(context)
+    temp_list = filter_st_paused(context)
+
+    def REVENUE_value(i, date, stocks):
+        df = get_fundamentals(query(indicator.code, indicator.inc_revenue_year_on_year).filter(indicator.code.in_(stocks), indicator.inc_revenue_year_on_year > 0), statDate=date)
+        df.rename(columns={'inc_revenue_year_on_year': 'inc_revenue_year_on_year' + str(i)}, inplace=True)
+        return df
+    df11 = REVENUE_value(1, t1, temp_list)
+    df12 = REVENUE_value(2, t2, temp_list)
+    df1 = df11.merge(df12, on='code')
+    df1 = df1[df1['inc_revenue_year_on_year1'] > df1['inc_revenue_year_on_year2']]
+    stock1 = set(df1.code.values)
+    y = int(context.current_dt.year)
+    if context.current_dt.month >= 5:
+        dt1, dt2, dt3 = (str(y - 1), str(y - 2), str(y - 3))
+    else:
+        dt1, dt2, dt3 = (str(y - 2), str(y - 3), str(y - 4))
+
+    def FCF(i, date, stocks):
+        df = get_fundamentals(query(cash_flow.code, cash_flow.net_operate_cash_flow, cash_flow.fix_intan_other_asset_acqui_cash).filter(cash_flow.code.in_(stocks)), statDate=date)
+        df['fix_intan_other_asset_acqui_cash'].fillna(value=0, inplace=True)
+        df['FCF'] = df['net_operate_cash_flow'] - df['fix_intan_other_asset_acqui_cash']
+        df = df[df['FCF'] > 0]
+        return set(df['code'].values)
+    df21 = FCF(1, dt1, stock1)
+    df22 = FCF(2, dt2, stock1)
+    df23 = FCF(3, dt3, stock1)
+    stock2 = list(df21 & df22 & df23)
+
+    def Operating_profit_margin(i, date, stocks):
+        df = get_fundamentals(query(indicator.code, indicator.operation_profit_to_total_revenue).filter(indicator.code.in_(stocks), indicator.operation_profit_to_total_revenue > 10), statDate=date)
+        return df
+    df31 = Operating_profit_margin(1, t1, stock2)
+    df32 = Operating_profit_margin(2, t2, stock2)
+    df33 = Operating_profit_margin(3, t3, stock2)
+    df34 = Operating_profit_margin(4, t4, stock2)
+    stock3 = list(set(df31['code']) & set(df32['code']) & set(df33['code']) & set(df34['code']))
+
+    def available_capital_1(i, date, stocks):
+        df = get_fundamentals(query(indicator.code, income.operating_profit, balance.total_owner_equities, balance.total_non_current_liability, balance.non_current_liability_in_one_year).filter(indicator.code.in_(stocks)), statDate=date)
+        df['non_current_liability_in_one_year'].fillna(value=0, inplace=True)
+        df['a1'] = df['total_owner_equities'] + df['total_non_current_liability'] + df['non_current_liability_in_one_year']
+        df['ratio' + str(i)] = df['operating_profit'] / df['a1']
+        dfx = df[['code', 'ratio' + str(i)]]
+        return dfx
+    d41 = available_capital_1(1, t1, stock3)
+    d42 = available_capital_1(2, t2, stock3)
+    d43 = available_capital_1(3, t3, stock3)
+    d44 = available_capital_1(4, t4, stock3)
+    df4 = d41.merge(d42, on='code')
+    df4 = df4.merge(d43, on='code')
+    df4 = df4.merge(d44, on='code')
+    df4['ratio'] = df4['ratio1'] + df4['ratio2'] + df4['ratio3'] + df4['ratio4']
+    stock4 = df4[df4['ratio'] >= 0.08]['code'].values
+
+    def effective_tax(date, stocks):
+        df = get_fundamentals(query(indicator.code, income.total_profit, income.income_tax_expense).filter(indicator.code.in_(stocks)), statDate=date)
+        df['tax_ratio'] = df['income_tax_expense'] / df['total_profit']
+        dfx = df[df['tax_ratio'] >= 0.05]
+        return dfx.code.values
+    stock5 = effective_tax(dt1, stock4)
+    return stock5
+
+def rebalance_position(context, stock_list):
+    current_holding = context.portfolio.positions.keys()
+    stocks_to_sell = list(set(current_holding) - set(stock_list))
+    bulk_orders(stocks_to_sell, 0)
+    total_value = context.portfolio.total_value
+    if len(stock_list) == 0:
+        pass
+    else:
+        bulk_orders(stock_list, total_value / len(stock_list))
+'EXACT_REVIEWED_FUNCTION bulk_orders sha256=7a569c82218867a94e8afd66cc31b630ab63cec081a4badcf17a4be9364994c0 source=quant/2024年度精选策略2/72.随机森林 - 多因子模型.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_paused sha256=5379d96930dfe08c0431759f9dedd72bf0a29f71cea5877917a1ced88619df61 source=quant/2021年度精选策略/35.精选价值策略.txt'
+'EXACT_REVIEWED_FUNCTION statDate_value sha256=ed81091372ad09d207e50b8121da5bc97f27b5ee6c289173d54722e4a3e6ce73 source=quant/2021年度精选策略/35.精选价值策略.txt'
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'

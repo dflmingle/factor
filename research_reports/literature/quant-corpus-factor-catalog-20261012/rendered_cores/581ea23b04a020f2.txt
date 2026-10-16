@@ -1,0 +1,147 @@
+quant/2021年度精选策略/96.分享一个简单的选股器.txt
+import math
+import talib
+import numpy as np
+from jqdata import *
+from talib import MA_Type
+from functools import reduce
+from jqlib.technical_analysis import *
+from jqlib.alpha101 import *
+
+def get_bigger_than_val_counter(close, n, value_list):
+    np_close = np.array(close[-n:])
+    np_value = np.array(value_list[-n:])
+    np_value = np_value * 0.98
+    diff = np_close - np_value
+    return sum(diff > 0)
+
+def get_ma(close, timeperiod=5):
+    return talib.SMA(close, timeperiod)
+
+def get_avg_price(close, day: int):
+    return get_ma(close, day)[-1]
+
+def get_macd(close):
+    diff, dea, macd = talib.MACDEXT(close, fastperiod=12, fastmatype=1, slowperiod=26, slowmatype=1, signalperiod=9, signalmatype=1)
+    macd = macd * 2
+    return (diff, dea, macd)
+
+def get_max_price(high_values, day):
+    return high_values[-day:].max()
+
+def get_min_price(low_values, day):
+    return low_values[-day:].min()
+
+def is_multiple_stocks(volume, days=5):
+    vol = volume[-1]
+    for i in range(2, days + 2):
+        if volume[-i] * 2 > vol:
+            return False
+    return True
+
+def get_std_percentage(var_list):
+    v_array = np.array(var_list)
+    ratio = (v_array - np.median(v_array)) / np.median(v_array)
+    ratio_p2 = ratio * ratio
+    ratio = ratio_p2.sum() / len(v_array)
+    return np.sqrt(ratio)
+
+def get_avg_array(avg_list):
+    ratio = 0
+    count = len(avg_list)
+    for i in range(1, count):
+        if avg_list[-i - 1] < avg_list[-i]:
+            return 0
+        ratio += (avg_list[-i - 1] - avg_list[-i]) / avg_list[-i]
+    return ratio
+
+def get_stocks_score(tick_list, data_frame, pass_time):
+    score = {}
+    avg_score = {}
+    for code in tick_list:
+        high = data_frame[data_frame['code'] == code]['high'].values
+        low = data_frame[data_frame['code'] == code]['low'].values
+        close = data_frame[data_frame['code'] == code]['close'].values
+        avg_list = np.array([get_ma(close, 10), get_ma(close, 20), get_ma(close, 30), get_ma(close, 60)])
+        box_ratio = 0
+        for i in range(2, 32):
+            box_ratio += get_std_percentage(avg_list.T[-i])
+        array_ratio = 0
+        for i in range(1, 6):
+            array_ratio += get_avg_array(avg_list.T[-i])
+        avg_score[code] = array_ratio
+        score[code] = box_ratio - array_ratio
+    tick_list.clear()
+    score = sorted(score.items(), key=lambda kv: (kv[1], kv[0]), reverse=False)
+    for key in score:
+        sec_info = get_security_info(key[0])
+        tick_list.append(key[0])
+    return tick_list
+
+def select_ticks(check_date):
+    tick_list = get_fundamentals(query(valuation.code).filter(valuation.turnover_ratio > 3, valuation.turnover_ratio <= 10).order_by(valuation.turnover_ratio.desc()), date=check_date)['code'].values
+    tick_list = list(tick_list)
+    stock_base = get_all_securities(['stock'])
+    filter_list = []
+    for code in tick_list:
+        s_days = datetime.datetime.strptime(str(stock_base.loc[code]['start_date']), '%Y-%m-%d')
+        c_days = datetime.datetime.strptime(str(check_date), '%Y-%m-%d')
+        if (c_days - s_days).days < 365:
+            filter_list.append(code)
+    for code in filter_list:
+        tick_list.remove(code)
+    filter_list = []
+    for code in tick_list:
+        if stock_base.loc[code]['display_name'].find('ST') != -1:
+            filter_list.append(code)
+    for code in filter_list:
+        tick_list.remove(code)
+    if len(tick_list) == 0:
+        return tick_list
+    filter_list = []
+    df = get_price(tick_list, count=130, end_date=check_date, panel=False)
+    for code in tick_list:
+        tdf = df[df['code'] == code]
+        low = tdf['low'].values
+        open = tdf['open'].values
+        high = tdf['high'].values
+        close = tdf['close'].values
+        volume = tdf['volume'].values
+        if not is_multiple_stocks(volume, 5):
+            filter_list.append(code)
+            continue
+        if close[-1] < open[-1]:
+            filter_list.append(code)
+            continue
+        if close[-1] - open[-1] < high[-1] - close[-1]:
+            filter_list.append(code)
+            continue
+        if open[-1] > close[-2] * 1.05:
+            filter_list.append(code)
+            continue
+        if close[-1] < close[-2] * 1.05:
+            filter_list.append(code)
+            continue
+        avg60_list = get_ma(close, 60)
+        count = get_bigger_than_val_counter(close, 11, avg60_list)
+        if count < 7:
+            filter_list.append(code)
+            continue
+        count = get_bigger_than_val_counter(close, 4, avg60_list)
+        if count < 3:
+            filter_list.append(code)
+            continue
+        min30 = get_min_price(close, 30)
+        if min30 * 1.25 < close[-1]:
+            filter_list.append(code)
+            continue
+        min5 = get_min_price(close, 5)
+        if min5 * 1.13 < close[-1]:
+            filter_list.append(code)
+            continue
+    for code in filter_list:
+        tick_list.remove(code)
+    tick_list = get_stocks_score(tick_list, df, check_date)
+    return tick_list
+check_date = '2020-08-21'
+security_list = select_ticks(check_date)

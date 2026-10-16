@@ -1,0 +1,85 @@
+quant/2020年度精选策略/81 申万行业轮动策略.txt
+"""
+策略思路：
+选股：统计申万一级行业指数，每月固定时间选取涨幅最大的指数，
+选取指数成分股中流通市值最大的5只股票作为操作标的
+择时：每月第一个交易日进行买卖操作，默认开盘卖出不在股票池中股票，买入选出的股票
+仓位：平均分配仓位
+"""
+import pandas as pd
+import numpy as np
+from jqdata import jy
+import jqdata
+
+def initialize(context):
+    g.days = 10
+    g.trade_days = 0
+    g.max_hold_stocknum = 5
+    g.buy_list = []
+    g.trade = False
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    if g.trade_days % g.days == 0:
+        g.trade = True
+        date = context.previous_date
+        s_date = ShiftTradingDay(date, -g.days)
+        hy_df = get_hy_pct(s_date, date)
+        temp_list = get_industry_stocks(hy_df.index[0], date=date)
+        all_data = get_current_data()
+        temp_list = [stock for stock in temp_list if not all_data[stock].paused]
+        g.buy_list = get_check_stocks_sort(context, temp_list)
+    g.trade_days += 1
+
+def market_open(context):
+    if g.trade:
+        sell(context, g.buy_list)
+        buy(context, g.buy_list)
+        g.trade = False
+
+def buy(context, buy_lists):
+    Num = g.max_hold_stocknum - len(context.portfolio.positions.keys())
+    buy_lists = buy_lists[:Num]
+    if len(buy_lists) > 0:
+        cash = context.portfolio.total_value / (g.max_hold_stocknum * 1.0)
+        for s in buy_lists:
+            order_value(s, cash)
+'EXACT_REVIEWED_FUNCTION sell sha256=b425ee610b0224776cd8cf72e2521ba497a81d23d6a55c58f8c1c8b57c0e76c9 source=quant/2020年度精选策略/07 穿越牛熊基业长青的价值精选策略.txt'
+
+def get_check_stocks_sort(context, check_out_lists):
+    df = get_fundamentals(query(valuation.circulating_cap, valuation.code).filter(valuation.code.in_(check_out_lists)), date=context.previous_date)
+    df = df.sort('circulating_cap', ascending=0)
+    out_lists = list(df['code'].values)[:g.max_hold_stocknum]
+    return out_lists
+
+def get_hy_pct(date_s, date):
+    sw_hy = jqdata.get_industries(name='sw_l1')
+    sw_hy_dict = {}
+    for i in sw_hy.index:
+        value = get_SW_index(i, start_date=date_s, end_date=date)
+        sw_hy_dict[i] = value
+    pl_hy = pd.Panel(sw_hy_dict)
+    pl = pl_hy.transpose(2, 1, 0)
+    pl = pl.loc[['PrevClosePrice', 'OpenPrice', 'HighPrice', 'LowPrice', 'ClosePrice', 'TurnoverVolume', 'TurnoverValue'], :, :]
+    pl_pct = (pl.iloc[:, -1, :] / pl.iloc[:, -2, :] - 1) * 100
+    pl_pct_5 = (pl.iloc[:, -1, :] / pl.iloc[:, -1 - g.days, :] - 1) * 100
+    df_fin = pd.concat([pl_pct['ClosePrice'], pl_pct_5['ClosePrice']], axis=1)
+    df_fin.columns = ['涨跌幅%', 'n日涨跌幅%']
+    return df_fin.sort('n日涨跌幅%', ascending=0)
+
+def ShiftTradingDay(date, shift=5):
+    tradingday = jqdata.get_all_trade_days()
+    shiftday_index = list(tradingday).index(date) + shift
+    return tradingday[shiftday_index]
+
+def get_SW_index(SW_index=801010, start_date='2017-01-31', end_date='2018-01-31'):
+    index_list = ['PrevClosePrice', 'OpenPrice', 'HighPrice', 'LowPrice', 'ClosePrice', 'TurnoverVolume', 'TurnoverValue', 'TurnoverDeals', 'ChangePCT', 'UpdateTime']
+    jydf = jy.run_query(query(jy.SecuMain).filter(jy.SecuMain.SecuCode == str(SW_index)))
+    link = jydf[jydf.SecuCode == str(SW_index)]
+    rows = jydf[jydf.SecuCode == str(SW_index)].index.tolist()
+    result = link['InnerCode'][rows]
+    df = jy.run_query(query(jy.QT_SYWGIndexQuote).filter(jy.QT_SYWGIndexQuote.InnerCode == str(result[0]), jy.QT_SYWGIndexQuote.TradingDay >= start_date, jy.QT_SYWGIndexQuote.TradingDay <= end_date))
+    df.index = df['TradingDay']
+    df = df[index_list]
+    return df

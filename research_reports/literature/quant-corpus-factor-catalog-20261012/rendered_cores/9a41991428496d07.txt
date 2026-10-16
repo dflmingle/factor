@@ -1,0 +1,332 @@
+quant/聚宽2025年精选/93.234板介入-2023年14倍-无未来.txt
+from jqlib.technical_analysis import *
+from jqfactor import *
+from jqdata import *
+import datetime as dt
+import pandas as pd
+import MySQLdb
+
+def initialize(context):
+    pd.set_option('display.max_columns', None)
+    g.max_free_market_cap = 50
+    g.max_actual_turnover_ratio = 30
+    g.max_turnover_ratio = 30
+    g.max_LB_1d = 1.875
+
+def after_code_changed(context):
+    unschedule_all()
+    g.ps = 1
+    g.target_list = []
+    g.strategy = '首板低开200'
+    g.sort = True
+    g.jqfactor = 'VOL5'
+    run_daily(get_stock_list, '09:25')
+    run_daily(sell_234_if_open_lower_than_96pct, '09:30')
+    run_daily(sell_if_open_lower_than_92pct, '09:30')
+    run_daily(buy_all_cluo, '09:30')
+    run_daily(sell_lt, '11:29:00')
+    run_daily(sell_lt, '14:52:00')
+
+def sell_lt(context):
+    date = transform_date(context.previous_date, 'str')
+    hold_list = context.portfolio.positions.keys()
+    current_data = get_current_data()
+    stock_list = []
+    for s in hold_list:
+        if not current_data[s].last_price == current_data[s].high_limit:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                start_date = transform_date(context.portfolio.positions[s].init_time, 'str')
+                target_date = get_shifted_date(start_date, 2, 'T')
+                current_date = transform_date(context.current_dt, 'str')
+                cost = context.portfolio.positions[s].avg_cost
+                price = context.portfolio.positions[s].price
+                ret = 100 * (price / cost - 1)
+                if current_date >= target_date or ret > 0:
+                    order_target_value(s, 0)
+
+def get_stock_list(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    initial_list = prepare_stock_list(date)
+    date_1d = transform_date(context.previous_date, 'str')
+    date_2d = get_shifted_date(date_1d, -1, days_type='T')
+    date_3d = get_shifted_date(date_2d, -1, days_type='T')
+    date_4d = get_shifted_date(date_3d, -1, days_type='T')
+    date_5d = get_shifted_date(date_4d, -1, days_type='T')
+    hl_list_1d = filter_yzb(get_hl_stock(initial_list, date_1d), date_1d)
+    hl_list_2d = get_hl_stock(initial_list, date_2d)
+    hl_list_3d = get_hl_stock(initial_list, date_3d)
+    hl_list_4d = get_hl_stock(initial_list, date_4d)
+    hl_list_5d = get_hl_stock(initial_list, date_5d)
+    stock_list = list(set(hl_list_1d).intersection(set(hl_list_2d)).intersection(set(hl_list_3d)).intersection(set(hl_list_4d)) - set(hl_list_5d))
+    stock_list.extend(list(set(hl_list_1d).intersection(set(hl_list_2d)).intersection(set(hl_list_3d)) - set(hl_list_4d) - set(hl_list_5d)))
+    stock_list.extend(list(set(hl_list_1d).intersection(set(hl_list_2d)) - set(hl_list_3d) - set(hl_list_4d) - set(hl_list_5d)))
+    if len(stock_list) > 0:
+        df = get_continue_count_df1(stock_list, date_4d, 90)
+        df = df[df['count'] < 4]
+        df = df[df['count'] > 0]
+        stock_list = list(df.index)
+    stock_list = [s for s in stock_list[:] if HSL([s], date_1d)[0][s] < g.max_turnover_ratio]
+    stock_list = [s for s in stock_list[:] if get_money(s, 1) < get_money(s, 2) * g.max_LB_1d]
+    stock_list_with_low_actual_turnover_ratio = []
+    for s in stock_list[:]:
+        free_market_cap, actual_turnover_ratio = get_free_market_cap_and_actual_turnover_ratio(s, date_1d)
+        if actual_turnover_ratio < g.max_actual_turnover_ratio:
+            stock_list_with_low_actual_turnover_ratio.append(s)
+        else:
+            pass
+    if len(stock_list) > 0:
+        if len(stock_list) > 1:
+            stock_list = sort_stocks_by_free_market_cap(context, stock_list)
+            g.target_list = stock_list
+        else:
+            g.target_list = stock_list
+    else:
+        g.target_list = []
+
+def get_circulating_market_cap(context, security_code):
+    q = query(valuation).filter(valuation.code == security_code)
+    df = get_fundamentals(q, context.previous_date)
+    return df['circulating_market_cap'][0]
+
+def sort_stocks_by_market_cap(context, stock_list):
+    if len(stock_list) <= 0:
+        return []
+    q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap).filter(valuation.code.in_(stock_list)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q)
+    stock_list = list(df['code'])
+    return stock_list
+
+def sort_stocks_by_actual_turnover_ratio(context, stock_list):
+    if len(stock_list) < 1:
+        return []
+    free_market_cap_list = []
+    actual_turnover_ratio_list = []
+    for stock in stock_list:
+        free_market_cap, actual_turnover_ratio = get_free_market_cap_and_actual_turnover_ratio(stock, context.previous_date)
+        free_market_cap_list.append(free_market_cap)
+        actual_turnover_ratio_list.append(actual_turnover_ratio)
+    combined_data = list(zip(stock_list, actual_turnover_ratio_list))
+    sorted_data = sorted(combined_data, key=lambda x: x[1], reverse=False)
+    stock_list_sorted_by_actual_turnover_ratio = [item[0] for item in sorted_data]
+    return stock_list_sorted_by_actual_turnover_ratio
+
+def sort_stocks_by_free_market_cap(context, stock_list):
+    if len(stock_list) < 1:
+        return []
+    free_market_cap_list = []
+    actual_turnover_ratio_list = []
+    for stock in stock_list:
+        free_market_cap, actual_turnover_ratio = get_free_market_cap_and_actual_turnover_ratio(stock, context.previous_date)
+        free_market_cap_list.append(free_market_cap)
+        actual_turnover_ratio_list.append(actual_turnover_ratio)
+    combined_data = list(zip(stock_list, free_market_cap_list))
+    sorted_data = sorted(combined_data, key=lambda x: x[1], reverse=False)
+    stock_list_sorted_by_free_market_cap = [item[0] for item in sorted_data]
+    return stock_list_sorted_by_free_market_cap
+
+def get_free_market_cap_and_actual_turnover_ratio(stk, pub_date_str):
+    prices_df = get_price(stk, end_date=pub_date_str, count=1, frequency='daily', fields=['close', 'volume'], skip_paused=False, fq='pre')
+    q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap).filter(valuation.code.in_([stk]))
+    market_cap_df = get_fundamentals(q, date=pub_date_str)
+    circulating_market_cap = market_cap_df['circulating_market_cap'].iloc[0]
+    circulating_turnover_ratio = 100 * prices_df['volume'].iloc[0] / circulating_market_cap / 100000000.0
+    capitalization = 100000000.0 * market_cap_df['market_cap'].iloc[0] / prices_df['close'].iloc[0]
+    q = query(finance.STK_SHAREHOLDER_TOP10.code, finance.STK_SHAREHOLDER_TOP10.shareholder_name, finance.STK_SHAREHOLDER_TOP10.share_number, finance.STK_SHAREHOLDER_TOP10.share_ratio, finance.STK_SHAREHOLDER_TOP10.pub_date).filter(finance.STK_SHAREHOLDER_TOP10.code == stk, finance.STK_SHAREHOLDER_TOP10.pub_date < pub_date_str).order_by(finance.STK_SHAREHOLDER_TOP10.pub_date.desc()).limit(20)
+    shareholder_df = finance.run_query(q)
+    if len(shareholder_df) < 1:
+        return (circulating_market_cap, circulating_turnover_ratio)
+    shareholder_df = shareholder_df.dropna()
+    shareholder_df['pub_date'] = pd.to_datetime(shareholder_df['pub_date'])
+    latest_annual_report_date = shareholder_df['pub_date'].max()
+    shareholder_df = shareholder_df[shareholder_df['pub_date'] >= latest_annual_report_date]
+    shareholder_df = shareholder_df.sort_values(by='share_ratio', ascending=False)
+    if len(shareholder_df) < 1:
+        return (circulating_market_cap, circulating_turnover_ratio)
+    else:
+        pass
+    sum_share_ratio_large_than_5_pct = shareholder_df.loc[shareholder_df['share_ratio'] > 5, 'share_number'].sum()
+    effective_capitalization = capitalization - sum_share_ratio_large_than_5_pct
+    if effective_capitalization < 0:
+        return (circulating_market_cap, circulating_turnover_ratio)
+    free_market_cap = effective_capitalization * prices_df['close'].iloc[0] / 100000000.0
+    actual_turnover_ratio = 100 * prices_df['volume'].iloc[0] / effective_capitalization
+    min_floating_cap = min(circulating_market_cap, free_market_cap)
+    max_turnover_ratio = max(circulating_turnover_ratio, actual_turnover_ratio)
+    if free_market_cap > circulating_market_cap:
+        pass
+    return (min_floating_cap, max_turnover_ratio)
+
+def get_free_market_cap(stk, pub_date_str):
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_([stk]))
+    market_cap_df = get_fundamentals(q, date=pub_date_str)
+    q = query(finance.STK_SHAREHOLDER_TOP10.code, finance.STK_SHAREHOLDER_TOP10.shareholder_name, finance.STK_SHAREHOLDER_TOP10.share_number, finance.STK_SHAREHOLDER_TOP10.share_ratio, finance.STK_SHAREHOLDER_TOP10.pub_date).filter(finance.STK_SHAREHOLDER_TOP10.code == stk, finance.STK_SHAREHOLDER_TOP10.pub_date < pub_date_str).order_by(finance.STK_SHAREHOLDER_TOP10.pub_date.desc()).limit(40)
+    shareholder_df = finance.run_query(q)
+    if len(shareholder_df) < 1:
+        return (10000, 100)
+    shareholder_df = shareholder_df.dropna()
+    if len(shareholder_df) < 1:
+        return (10000, 100)
+    else:
+        latest_annual_report_date = shareholder_df['pub_date'].max()
+        shareholder_df = shareholder_df[shareholder_df['pub_date'] >= latest_annual_report_date]
+    prices_df = get_price(stk, end_date=pub_date_str, count=1, frequency='daily', fields=['close'], skip_paused=False, fq='pre')
+    capitalization = 100000000.0 * market_cap_df['market_cap'].iloc[0] / prices_df['close'].iloc[0]
+    sum_share_number = shareholder_df.loc[shareholder_df['share_ratio'] > 5, 'share_number'].sum()
+    effective_capitalization = capitalization - sum_share_number
+    if effective_capitalization < 0:
+        return 0
+    free_market_cap = effective_capitalization * prices_df['close'].iloc[0] / 100000000.0
+    return free_market_cap
+'EXACT_REVIEWED_FUNCTION get_hot_concept sha256=9ff956452dd0266717251258b62c8dbaa438dcaba1ff13d67121d9071930cfe6 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_concept_stock sha256=1663c7b81d39ee616fac85d7e01ad8c584870561cf3c4f417e290013a450381b source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+
+def sort_stocks_by_market_cap(context, stock_list):
+    if len(stock_list) <= 0:
+        return []
+    q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap).filter(valuation.code.in_(stock_list)).order_by(valuation.market_cap.asc())
+    df = get_fundamentals(q)
+    stock_list = list(df['code'])
+    return stock_list
+
+def sort_stocks_by_factor_df(context, stock_list, jqfactor, sort):
+    if len(stock_list) != 0:
+        yesterday = context.previous_date
+        score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+        df = pd.DataFrame(index=stock_list, data={'score': score_list}).dropna()
+        df = df.sort_values(by='score', ascending=sort)
+    else:
+        df = pd.DataFrame(index=[], data={'score': []})
+    return df
+
+def prepare_stock_list(date):
+    initial_list = get_all_securities('stock', date).index.tolist()
+    initial_list = filter_cykcbj_stock(initial_list)
+    initial_list = filter_new_stock(initial_list, date)
+    initial_list = filter_st_stock(initial_list, date)
+    initial_list = filter_paused_stock(initial_list, date)
+    return initial_list
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=4fa3a13fa8a42f2598513c30bcd6ac8c221537b7ab0b591e828808e85244da98 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def get_continue_count_df1(hl_list, date, watch_days):
+
+    def get_continue_count_list(lst):
+        lst0 = [0] + lst
+        lst1 = lst0.copy()
+        for i in range(1, len(lst0)):
+            if lst0[i] == 1 and lst0[i - 1] != 0:
+                lst1[i] = lst0[i] + lst1[i - 1]
+        lst2 = lst1.copy()
+        for i in range(len(lst1) - 1):
+            if lst1[i] < lst1[i + 1]:
+                lst2[i] = 0
+        return lst2[1:]
+    df = get_price(hl_list, end_date=date, frequency='daily', fields=['close', 'high_limit'], count=watch_days, panel=False, fill_paused=False, skip_paused=False).dropna()
+    df = pd.DataFrame(columns=['count'], data=df.groupby('code').apply(lambda df: max([0] + [i for i in list(get_continue_count_list(list(np.where(df['close'] == df['high_limit'], 1, 0)))) if i > 1])))
+    return df
+
+def get_stock_ret_df(stock_list, sd, fq1, field1, ed, fq2, field2):
+    start_price = get_price(stock_list, end_date=sd, frequency=fq1, fields=[field1], count=1, panel=False, fill_paused=True)
+    end_price = get_price(stock_list, end_date=ed, frequency=fq2, fields=[field2], count=1, panel=False, fill_paused=True).drop(columns=['code'])
+    df = pd.concat([start_price, end_price], axis=1)
+    df['ret'] = end_price[field2] / start_price[field1] - 1
+    df = df.set_index('code')
+    return df
+
+def get_relative_position_df(stock_list, date, watch_days):
+    if len(stock_list) != 0:
+        df = get_price(stock_list, end_date=date, fields=['high', 'low', 'close'], count=watch_days, fill_paused=False, skip_paused=False, panel=False).dropna()
+        close = df.groupby('code').apply(lambda df: df.iloc[-1, -1])
+        high = df.groupby('code').apply(lambda df: df['high'].max())
+        low = df.groupby('code').apply(lambda df: df['low'].min())
+        result = pd.DataFrame()
+        result['rp'] = (close - low) / (high - low)
+        result = result.dropna()
+        return result
+    else:
+        return pd.DataFrame(columns=['rp'])
+
+def buy_all_cluo(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    remaining_ps = g.ps - len(context.portfolio.positions)
+    target_list = g.target_list
+    if len(target_list) > 0:
+        if remaining_ps > 0:
+            value = context.portfolio.available_cash / remaining_ps
+            target_list = target_list[0:remaining_ps]
+            for s in target_list:
+                if len(context.portfolio.positions) < 2 and context.portfolio.available_cash / current_data[s].last_price > 100:
+                    if current_data[s].last_price == current_data[s].high_limit:
+                        order_value(s, value, LimitOrderStyle(current_data[s].day_open))
+                    else:
+                        order_value(s, value, MarketOrderStyle(current_data[s].day_open))
+
+def sell_if_open_lower_than_92pct(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    stock_list = list(context.portfolio.positions)
+    df = get_price(stock_list, end_date=date, frequency='daily', fields=['close'], count=1, panel=False, fill_paused=False, skip_paused=True).set_index('code') if len(stock_list) != 0 else pd.DataFrame()
+    for s in list(context.portfolio.positions):
+        if context.portfolio.positions[s].closeable_amount != 0 and current_data[s].day_open / df.loc[s]['close'] < 0.92:
+            order_target_value(s, 0)
+
+def sell_234_if_open_lower_than_96pct(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    stock_list = list(context.portfolio.positions)
+    df = get_price(stock_list, end_date=date, frequency='daily', fields=['close'], count=1, panel=False, fill_paused=False, skip_paused=True).set_index('code') if len(stock_list) != 0 else pd.DataFrame()
+    for s in list(context.portfolio.positions):
+        if context.portfolio.positions[s].closeable_amount != 0 and current_data[s].day_open / df.loc[s]['close'] < 0.96:
+            order_target_value(s, 0)
+
+def sell_if_profit_and_not_HL(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    for s in list(context.portfolio.positions):
+        if context.portfolio.positions[s].closeable_amount != 0 and current_data[s].last_price < current_data[s].high_limit and (current_data[s].last_price > context.portfolio.positions[s].avg_cost):
+            order_target_value(s, 0)
+
+def sell_if_not_HL(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    for s in list(context.portfolio.positions):
+        if context.portfolio.positions[s].closeable_amount != 0 and current_data[s].last_price < current_data[s].high_limit:
+            order_target_value(s, 0)
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=cc5170b437b6e4dfa16ff48d4f9d14ff4634058918cbe24e0152163b569e1063 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def filter_cykcbj_stock(initial_list):
+    return [stock for stock in initial_list if stock[0] != '4' and stock[0] != '8' and (stock[:2] != '68') and (stock[0] != '3')]
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def filter_yzb(stock_list, date):
+    stock_list1 = []
+    for stock in stock_list:
+        df = get_price(stock, end_date=date, frequency='1d', fields=['close', 'high', 'low', 'high_limit', 'open'], skip_paused=True, count=1)
+        if df['low'][0] != df['high'][0]:
+            stock_list1.append(stock)
+    return stock_list1
+
+def remove_black_listed_stock(stock_list):
+    for stock in stock_list[:]:
+        if stock[:6] == '002989' or stock[:6] == '000017' or stock[:6] == '000963':
+            stock_list.remove(stock)
+    return stock_list
+
+def open_position(context, security, value):
+    order = order_target_value_(security, value)
+    if order != None and order.filled > 0:
+        return True
+    return False
+'EXACT_REVIEWED_FUNCTION close_position sha256=f57bde25b015ee53e340a92f368b48e0dbf107a02c840e20275567ec8d63a77e source=quant/2021年度精选策略/15.小市值策略之再优化，年化接近翻倍.txt'
+
+def get_historical_high(stock_code, N_days=120):
+    return attribute_history(stock_code, N_days, '1d', 'high', df=False)['high'].max()
+
+def get_money(stock_code, N_days_ago=1):
+    return attribute_history(stock_code, N_days_ago, '1d', 'money', df=False)['money'][-N_days_ago]
+'EXACT_REVIEWED_FUNCTION log_stocks_bought sha256=df92f424425d43da2bec4109a029de18a9339f81e9828898e5d1057ddf9be66b source=quant/聚宽2025年精选/42国九条：三年分红5千万以下且占净利润30以下将被ST.txt'

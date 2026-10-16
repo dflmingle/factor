@@ -1,0 +1,90 @@
+quant/2021年度精选策略/68.蒋老师吐槽了之后，我也想说说对ETF轮动策略的看法.txt
+from jqdata import *
+import pandas as pd
+import talib
+'EXACT_REVIEWED_FUNCTION initialize sha256=22a39f08ca783669e41300c50acf4a0d917da125470683c7bb168459b7c72973 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def set_params():
+    g.MonitorSwitch = True
+    g.use_dynamic_target_market = True
+    g.target_market = '399001.XSHE'
+    g.signal = 'BUY'
+    g.emotion_rate = 0
+    g.lag = 6
+    g.lag0 = 7
+    g.lag1 = 13
+    g.lag2 = 13
+    g.buy = []
+    g.ETF_targets = {'399632.XSHE': '159901.XSHE', '000300.XSHG': '510300.XSHG', '000016.XSHG': '510050.XSHG', '000010.XSHG': '510180.XSHG', '000015.XSHG': '510880.XSHG', '399324.XSHE': '159905.XSHE', '399006.XSHE': '159915.XSHE', '000905.XSHG': '510500.XSHG'}
+    stocks_info = '\n股票池:\n'
+    for security in g.ETF_targets.values():
+        s_info = get_security_info(security)
+        stocks_info += '【%s】%s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.start_date)
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=df7898cf1d386cc5ea26f7eee0c5389402d179f145d1c9bd8af7caf30e36d4d5 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def ETFtrade(context):
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            order_target(stock, 0)
+    elif g.signal == 'BUY':
+        holdings = set(context.portfolio.positions.keys())
+        targets = set(g.buy)
+        sells = holdings - targets
+        for code in sells:
+            order_target(code, 0)
+        ratio = len(targets)
+        cash = context.portfolio.total_value / ratio
+        adjusts = holdings & targets
+        for code in adjusts:
+            if abs(cash - context.portfolio.positions[code].value) > 5000:
+                order_target_value(code, cash)
+        purchases = targets - holdings
+        for code in purchases:
+            order_target_value(code, cash)
+        current_returns = 100 * context.portfolio.returns
+
+def get_signal(context):
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            order_target(stock, 0)
+    df_etf = pd.DataFrame(columns=['基金代码', '对应指数', '周期涨幅', '均线差值'])
+    current_data = get_current_data()
+    for mkt_idx in g.ETFList:
+        security = g.ETFList[mkt_idx]
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_price = current_data[security].last_price
+        cp_increase = (current_price / close_data['close'][g.lag2 - g.lag1] - 1) * 100
+        ma_n1 = close_data['close'].mean()
+        pre_price = (current_price / ma_n1 - 1) * 100
+        df_etf = df_etf.append({'基金代码': security, '对应指数': mkt_idx, '周期涨幅': cp_increase, '均线差值': pre_price}, ignore_index=True)
+    if len(df_etf) == 0:
+        g.signal = 'CLEAR'
+        return
+    df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+    if g.use_dynamic_target_market:
+        g.target_market = df_etf['对应指数'].iloc[-1]
+    if EmotionMonitor() == -1:
+        g.signal = 'CLEAR'
+        return
+    if df_etf['周期涨幅'].iloc[0] < 0.1 or df_etf['均线差值'].iloc[0] < 0:
+        g.signal = 'CLEAR'
+        return
+    g.buy = [df_etf['基金代码'].iloc[0]]
+    g.signal = 'BUY'
+    return
+
+def EmotionMonitor():
+    if g.MonitorSwitch == False:
+        return 1
+    _cnt = g.lag0 + max(g.lag, 3)
+    volume = attribute_history(security=g.target_market, count=_cnt, unit='1d', fields='volume')['volume']
+    v_ma_lag0 = talib.MA(volume, g.lag0)
+    g.emotion_rate = round((volume[-1] / v_ma_lag0[-1] - 1) * 100, 2)
+    vol_diff = volume - v_ma_lag0
+    if vol_diff[-1] >= 0:
+        ret_val = 1 if (vol_diff[-3:] >= 0).all() else 0
+    else:
+        ret_val = -1 if (vol_diff[-g.lag:] < 0).all() else 0
+    return ret_val
+'EXACT_REVIEWED_FUNCTION after_trading_end sha256=748f31e4628f9b9d6e2b8cdf801a53cb2b99bb3dfe04a3a125ef8eac67247776 source=quant/2020年度精选策略/92 多因子选股策略.txt'

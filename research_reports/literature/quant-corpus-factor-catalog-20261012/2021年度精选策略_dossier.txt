@@ -1,0 +1,983 @@
+quant/2021年度精选策略/0.回测提速十倍,过滤ST,退市,停牌,新股优化方法.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+21: valuation.code
+23: valuation.market_cap<500
+
+quant/2021年度精选策略/10.多因子选股.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: EBIT -> ebit_ev (EBIT/EV proxy; EBIT standalone differs) | gross_profit_margin -> gross_margin | inc_net_profit_year_on_year -> growth_profit | inc_operation_profit_year_on_year -> growth_operating_profit | inc_revenue_year_on_year -> growth_sales | inc_total_revenue_year_on_year -> growth_sales | market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | net_profit_margin -> net_margin | net_profit_to_total_revenue -> net_margin | pb_ratio -> book_market | pcf_ratio -> cf_yield | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa | roe -> roe
+Recipes: 
+31: 'MC':valuation.market_cap, # 总市值
+32: 'TA':balance.total_assets, # 总资产
+36: 'GPM':indicator.gross_profit_margin, # 毛利率
+37: 'NPM':indicator.net_profit_margin, # 净利率
+38: 'AP':balance.accounts_payable,  #应付账款
+39: 'APE':balance.advance_peceipts, #预收账款
+40: 'AR':balance.account_receivable, #应收账款
+41: 'APA':balance.advance_payment, #预付账款
+42: #'APAR':balance.accounts_payable / balance.account_receivable,
+43: #'APARP':(balance.accounts_payable + balance.advance_peceipts) / (balance.account_receivable + balance.advance_payment),
+48: 'INV':balance.inventories, #存货
+52: 'PE':valuation.pe_ratio, # PE 市盈率
+53: 'PB':valuation.pb_ratio, # PB 市净率
+54: 'PR':valuation.pcf_ratio, # PR 市现率
+55: 'PS':valuation.ps_ratio, # PS 市销率
+56: 'EPS':indicator.eps, # 净资产收益率(扣除非经常损益)(%)
+60: 'GP':indicator.gross_profit_margin * income.operating_revenue, # 毛利润
+64: 'EV':valuation.market_cap + balance.shortterm_loan+balance.non_current_liability_in_one_year+balance.longterm_loan+balance.bonds_payable+balance.longterm_account_payable - cash_flow.cash_and_equivalents_at_end,
+66: 'TOE':balance.total_owner_equities, # 股东权益合计(元)
+70: 'NOCF/MC':cash_flow.net_operate_cash_flow / valuation.market_cap, #经营活动产生的现金流量净额/总市值
+71: 'OTR':indicator.ocf_to_revenue, #经营活动产生的现金流量净额/营业收入(%)
+74: 'GPOA':indicator.gross_profit_margin * income.operating_revenue / balance.total_assets,  #毛利润 / 总资产 = 毛利率*营业收入 / 总资产
+75: 'ROA':indicator.roa, # ROA
+76: 'ROE':indicator.roe, # ROE
+
+quant/2021年度精选策略/11.多因子选股策略——基于传统分析.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: EBIT -> ebit_ev (EBIT/EV proxy; EBIT standalone differs) | gross_profit_margin -> gross_margin | inc_net_profit_year_on_year -> growth_profit | inc_operation_profit_year_on_year -> growth_operating_profit | inc_revenue_year_on_year -> growth_sales | inc_total_revenue_year_on_year -> growth_sales | market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | net_profit_margin -> net_margin | net_profit_to_total_revenue -> net_margin | pb_ratio -> book_market | pcf_ratio -> cf_yield | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa | roe -> roe
+Recipes: 
+30: 'MC':valuation.market_cap, # 总市值
+31: 'TA':balance.total_assets, # 总资产
+35: 'GPM':indicator.gross_profit_margin, # 毛利率
+36: 'NPM':indicator.net_profit_margin, # 净利率
+37: 'AP':balance.accounts_payable,  #应付账款
+38: 'APE':balance.advance_peceipts, #预收账款
+39: 'AR':balance.account_receivable, #应收账款
+40: 'APA':balance.advance_payment, #预付账款
+41: #'APAR':balance.accounts_payable / balance.account_receivable,
+42: #'APARP':(balance.accounts_payable + balance.advance_peceipts) / (balance.account_receivable + balance.advance_payment),
+47: 'INV':balance.inventories, #存货
+51: 'PE':valuation.pe_ratio, # PE 市盈率
+52: 'PB':valuation.pb_ratio, # PB 市净率
+53: 'PR':valuation.pcf_ratio, # PR 市现率
+54: 'PS':valuation.ps_ratio, # PS 市销率
+55: 'EPS':indicator.eps, # 净资产收益率(扣除非经常损益)(%)
+59: 'GP':indicator.gross_profit_margin * income.operating_revenue, # 毛利润
+63: 'EV':valuation.market_cap + balance.shortterm_loan+balance.non_current_liability_in_one_year+balance.longterm_loan+balance.bonds_payable+balance.longterm_account_payable - cash_flow.cash_and_equivalents_at_end,
+65: 'TOE':balance.total_owner_equities, # 股东权益合计(元)
+69: 'NOCF/MC':cash_flow.net_operate_cash_flow / valuation.market_cap, #经营活动产生的现金流量净额/总市值
+70: 'OTR':indicator.ocf_to_revenue, #经营活动产生的现金流量净额/营业收入(%)
+73: 'GPOA':indicator.gross_profit_margin * income.operating_revenue / balance.total_assets,  #毛利润 / 总资产 = 毛利率*营业收入 / 总资产
+74: 'ROA':indicator.roa, # ROA
+75: 'ROE':indicator.roe, # ROE
+
+quant/2021年度精选策略/12.机器学习用于量化分析.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: EBIT -> ebit_ev (EBIT/EV proxy; EBIT standalone differs) | MACD -> macd_scaled (cross-stock adaptation) | asset_turnover -> asset_turnover | cash_to_current_liability -> cash_current_liability (PIT input proxy) | circulating_market_cap -> small_size (total_mv adaptation) | gross_income_ratio -> gross_margin | gross_profit_margin -> gross_margin | inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | net_operate_cash_flow_ttm -> cf_yield | net_profit_growth_rate -> growth_profit | net_profit_to_total_operate_revenue_ttm -> net_margin (proxy) | net_profit_to_total_revenue -> net_margin | operating_revenue_growth_rate -> growth_sales | pb_ratio -> book_market | pcf_ratio -> cf_yield | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa | roe -> roe | total_asset_turnover_rate -> asset_turnover
+Recipes: 
+100: q = query(valuation.code,
+101: valuation.market_cap,#市值
+102: valuation.circulating_market_cap,
+103: valuation.pe_ratio, #市盈率（TTM）
+104: valuation.pb_ratio, #市净率（TTM）
+105: valuation.pcf_ratio, #CFP
+106: valuation.ps_ratio, #PS
+107: balance.total_assets,
+108: balance.total_liability,
+109: balance.development_expenditure, #RD
+110: balance.dividend_payable,
+111: balance.fixed_assets,
+112: balance.total_non_current_liability,
+116: indicator.net_profit_to_total_revenue, #净利润/营业总收入
+117: indicator.inc_revenue_year_on_year,  #营业收入增长率（同比）
+118: indicator.inc_net_profit_year_on_year,#净利润增长率（同比）
+119: indicator.roe,
+120: indicator.roa,
+121: indicator.gross_profit_margin #销售毛利率GPM
+186: factor_data = get_factor_values(securities=securities,                                     factors=factor_list,                                     count=1,                                     end_date=date)
+285: df_q_factor = get_fundamentals(q.filter(valuation.code.in_(securities)), date = date)
+549: traindf=traindf.sort_values(by=['pchg'],ascending=False)
+595: testdf=testdf.sort_values(by=['pchg'],ascending=False)
+674: corr_matrix = data.corr()
+
+quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size | pb_ratio -> book_market
+Recipes: 
+112: df = get_fundamentals(query(valuation.code).filter(valuation.pb_ratio.between(g.pbmin, g.pbmax)
+113: ).order_by(valuation.circulating_market_cap.asc()).limit(1000)).dropna()
+128: valuation.code, valuation.market_cap, valuation.circulating_market_cap
+129: ).filter(valuation.code.in_(stock_list)
+130: ).order_by(valuation.circulating_market_cap.asc()).limit(100))
+
+quant/2021年度精选策略/14.FOF养老成长基金-v2.0.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/15.小市值策略之再优化，年化接近翻倍.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+48: q = query(valuation.code).filter(
+49: valuation.code.in_(check_out_lists)
+50: ).order_by(
+51: valuation.circulating_market_cap.asc()
+
+quant/2021年度精选策略/16.缠论工具（笔， 线段）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/17.基金跟随策略，19年年化60%.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+234: security_list = financial_data_filter_dayu(security_list, indicator.roe, 0)
+236: security_list = financial_data_filter_dayu(security_list, valuation.pe_ratio, 0)
+239: security_list = financial_data_filter_dayu(security_list, valuation.circulating_market_cap	, 50)
+360: a = a.sort_values(['score'],ascending = True)
+365: a = a.sort_values(['score'],ascending = False)
+479: df1 = finance.run_query(query(finance.FUND_PORTFOLIO_STOCK).filter(finance.FUND_PORTFOLIO_STOCK.symbol==stock_t,finance.FUND_PORTFOLIO_STOCK.pub_date<today,finance.FUND_PORTFOLIO_STOCK.pub_date>yesmonth).order_by(finance.FUND_PORTFOLIO_STOCK.pub_date.desc()))
+481: df2 = finance.run_query(query(finance.FUND_PORTFOLIO_STOCK).filter(finance.FUND_PORTFOLIO_STOCK.symbol==stock_t,finance.FUND_PORTFOLIO_STOCK.pub_date<before_2month_end,finance.FUND_PORTFOLIO_STOCK.pub_date>before_2month_start).order_by(finance.FUND_PORTFOLIO_STOCK.pub_date.desc()))
+487: fund_df = fund_df.sort_values(by=['quarter1'],ascending = False)
+
+quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+211: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2021年度精选策略/19.简单到发指的股指策略(2013到现在收益10949%).txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/2.板块轮动打分与热度追踪.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+103: # 可以修改收益率计算公式改变排名规则
+121: # 可以修改收益率计算公式改变排名规则
+164: df_top = df.sort_values(by='return_'+str(days), ascending=False).head(top_count)
+187: df= pd.DataFrame({"scores": s_scores, "top": s_tops,"score":s_score}, index=s_tops.index).sort_values(by='score',ascending=False).head(industry_top_count)
+
+quant/2021年度精选策略/20.冲天炮最高板策略，收益惊呆了我.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/21.策略coding吐槽帖——以“网红”ETF轮动为例.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+204: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2021年度精选策略/22.“开弓”ETF轮动模型——改.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+58: g.codes = pd.Series(jz_pj).sort_values(ascending=False).index[0]
+
+quant/2021年度精选策略/23.玩趋势交易的看进来~~~~2.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+35: return pd.Series.rolling(stock_data,window=A).mean()
+
+quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+43: check_out_lists = list(h.sort_values(by='close').index[:g.buy_stock_count * 4])
+44: # 	q = query(valuation.code).filter(
+45: # 		valuation.code.in_(check_out_lists)
+46: # 	).order_by(
+47: # 		valuation.circulating_market_cap.asc()
+
+quant/2021年度精选策略/25.基本不耍六毛的ETF轮动策略.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+134: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+181: ret_val = list(s_h.sort_values(ascending=False)[:6].index)  # 前6
+210: ret_val = mmf_rate.sort_values(ascending=False).index[0]  # 涨幅最大的
+
+quant/2021年度精选策略/26.稳定高回报周期股策略2.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield
+Recipes: 
+38: valuation.pe_ratio > 0,  # PE [0,25]
+39: valuation.pe_ratio < 25,
+40: balance.total_liability / balance.total_assets < 0.9  # 资产负债率 < 90%
+80: q_cap = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(list(df_fin.index)))
+86: df_pe = df_pe.sort_values(by='pe', ascending=True).reset_index(drop=False)
+89: df_pe = df_pe.sort_values(by='hb', ascending=False).reset_index(drop=True)
+92: df_pe = df_pe.sort_values(by='tb', ascending=False).reset_index(drop=True)
+96: df_pe = df_pe.sort_values(by='s', ascending=False).reset_index(drop=True)
+160: indicator.adjusted_profit,  # 扣非净利润
+161: balance.bill_receivable,  # 应收票据
+162: balance.account_receivable,  # 应收账款
+163: balance.advance_peceipts,  # 预收账款
+166: # balance.total_assets,  # 资产总计
+167: # balance.total_liability,  # 负债合计
+168: # balance.shortterm_loan,  # “短期借款”
+169: # balance.longterm_loan,  # “长期借款”
+170: # balance.non_current_liability_in_one_year,  # “一年内到期的非流动性负债”
+171: # balance.bonds_payable  # “应付债券”、
+176: lqt = qt.filter(balance.code.in_(stat_date_stocks[stat_date]))
+
+quant/2021年度精选策略/27.基于RSRS的趋势交易与网格交易相结合的尝试.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: MACD -> macd_scaled (cross-stock adaptation) | cash_to_current_liability -> cash_current_liability (PIT input proxy) | gross_income_ratio -> gross_margin | gross_profit_margin -> gross_margin | market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | net_operate_cash_flow_ttm -> cf_yield | net_profit_growth_rate -> growth_profit | pb_ratio -> book_market | pcf_ratio -> cf_yield | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa | roe -> roe | total_asset_turnover_rate -> asset_turnover
+Recipes: 
+18: from jqfactor import get_factor_values
+22: from jqfactor import get_factor_values
+215: q = query(valuation,balance,cash_flow,income,indicator).filter(valuation.code.in_(stock))
+218: factor_data=get_factor_values(stock,['roe_ttm',
+289: tmp_adjusted_dividend = get_fundamentals(query(indicator.code, indicator.adjusted_profit, \
+291: filter(indicator.code.in_(stock)), date = i)
+311: his_temp_data = get_fundamentals(query(valuation.code, income.operating_revenue,income.net_profit,\
+312: cash_flow.net_operate_cash_flow,indicator.roe).
+313: filter(valuation.code.in_(stock)), date = his_date)
+336: temp_beta, temp_stockalpha = stats.linregress(SZ_pchg, stock_pchg[i])[:2]
+354: q = query(valuation.code,valuation.turnover_ratio).filter(valuation.code.in_(stock))
+390: S=df.sort_values(by = 'market_cap')[:int(LoS/3)].index
+391: B=df.sort_values(by = 'market_cap')[int(LoS-LoS/3):].index
+394: L=df.sort_values(by = 'BTM')[:int(LoS/3)].index
+395: H=df.sort_values(by = 'BTM')[int(LoS-LoS/3):].index
+479: test_sample_predict = test_sample_predict.sort_values(by='XGB_predict_0',ascending = False)
+
+quant/2021年度精选策略/29.北上资金（北向资金港资外资）因子分析与策略分享.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+17: from jqfactor import get_factor_values
+20: from jqfactor import get_factor_values
+
+quant/2021年度精选策略/3.一个简单而持续稳定的懒人超额收益策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+27: weight = weight.sort_values(by='weight', ascending=False).head(10)
+
+quant/2021年度精选策略/30.ETF宽基轮动修改版-1.0.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+101: df.sort_values(by='涨幅',ascending=False,inplace=True) # 按照涨幅排序
+
+quant/2021年度精选策略/31.RSRS择时+货币基金--6年8倍行业周期股策略.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield
+Recipes: 
+112: q_cap=query(valuation.code,valuation.pe_ratio,valuation.market_cap).filter(valuation.code.in_(list(df.index)))
+131: q_profit=query(balance.code,balance.statDate,
+132: balance.total_liability,balance.total_assets
+133: ).filter(balance.code.in_(ll))
+143: # rets=df_fin[df_fin['code']==code].sort_values(by='statDate',ascending=False).reset_index(drop=True)
+176: q_cap=query(valuation.code,valuation.market_cap).filter(valuation.code.in_(list(df_pe.code)))
+315: indicator.adjusted_profit,#扣非净利润
+316: balance.bill_receivable,#应收票据
+317: balance.account_receivable,#应收账款
+318: balance.advance_peceipts,#预收账款
+321: balance.total_assets,# 资产总计
+322: balance.total_liability,# 负债合计
+323: balance.shortterm_loan,#“短期借款”
+324: balance.longterm_loan,#“长期借款”
+325: balance.non_current_liability_in_one_year,#“一年内到期的非流动性负债”
+326: balance.bonds_payable#“应付债券”、
+334: lqt=qt.filter(balance.code.in_(stat_date_stocks[stat_date]))
+
+quant/2021年度精选策略/32.北向资金A股择时策略（5年16倍）.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+102: ).order_by(table.day)
+
+quant/2021年度精选策略/33.【研报复现】基于风险溢价的沪深300择时-目前依然有效.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: 
+Recipes: 
+80: guxilv=finance.run_query(query(finance.SW1_DAILY_VALUATION).filter(finance.SW1_DAILY_VALUATION.code=='801780').order_by(finance.SW1_DAILY_VALUATION.date.desc()).limit(2000))
+82: huigou = bond.run_query(query(bond.REPO_DAILY_PRICE).filter(bond.REPO_DAILY_PRICE.name=='GC182').order_by(bond.REPO_DAILY_PRICE.date.desc()).limit(2000))
+124: final_df["guxi1"] = final_df["dividend_ratio"].rolling(60).mean()
+125: final_df["lilv1"] = final_df["nihuigou"].rolling(60).mean()
+127: final_df["guxi2"] = final_df["dividend_ratio"].rolling(3).mean()
+128: final_df["lilv2"] = final_df["nihuigou"].rolling(30).mean()
+
+quant/2021年度精选策略/34.套利三年，我的本金翻了10倍.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/35.精选价值策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_revenue_year_on_year -> growth_sales | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+112: valuation.circulating_market_cap,
+113: valuation.pe_ratio,
+114: valuation.code
+116: valuation.code.in_(check_out_lists)
+117: ).order_by(
+119: valuation.circulating_market_cap.desc()
+129: 5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+142: valuation.code,
+143: valuation.circulating_market_cap,
+145: valuation.code.in_(temp_list)
+153: balance.total_current_assets,
+154: balance.total_current_liability,
+155: balance.code).filter(
+156: valuation.code.in_(temp_list)
+168: indicator.code,
+169: indicator.roe
+171: indicator.code.in_(l2)
+199: valuation.code.in_(stocks)
+212: #5.近四季营收成长率介于0%至50%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+215: indicator.code,
+216: indicator.inc_revenue_year_on_year
+218: indicator.code.in_(l2),
+219: indicator.inc_revenue_year_on_year>6,
+220: indicator.inc_revenue_year_on_year<50
+
+quant/2021年度精选策略/36.市场底部特征研究.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: market_cap -> small_size | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+83: df['count']=[len(get_fundamentals(query(valuation.code,valuation.pb_ratio).filter(valuation.pb_ratio<1),date=i)) for i in df.index]
+114: df.sort_values('stat_month',inplace=True)
+122: d=get_fundamentals(query(valuation.code,
+123: valuation.day,
+124: valuation.market_cap
+303: sub_new=get_fundamentals(query(valuation.code,
+304: valuation.pe_ratio).filter(
+305: valuation.code.in_(list(df3.index))),date=d)
+308: all_pe=get_fundamentals(query(valuation.code,
+309: valuation.pe_ratio).filter(
+310: valuation.code.in_(list(df.index))),date=d)
+391: #         jy.SecuMain.SecuCode.in_(code)).order_by(jy.SecuMain.SecuCode))
+461: #     pe_df.sort_values(['PE百分位(%)'],ascending=True,inplace=True)
+462: #     pb_df.sort_values(['PB百分位(%)'],ascending=True,inplace=True)
+514: dfy=dfx.rank(axis=1)
+
+quant/2021年度精选策略/37.处置效应的CGO因子（行为金融学因子）.txt
+turnover-survival cost basis, actual raw VWAP converted to qfq; original risk neutralization removed
+Related atoms: market_cap -> small_size
+Recipes: cgo100_low
+103: q = query(valuation.code,valuation.turnover_ratio).filter(valuation.code.in_(code_list))
+231: df = get_fundamentals(query(valuation).filter(valuation.code.in_(code_list)).order_by(valuation.code))
+
+quant/2021年度精选策略/38.python搭建简单交易系统.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: market_cap -> small_size | pb_ratio -> book_market | roe -> roe
+Recipes: 
+395: #计算公式 前n-1天资金的最大值 减 第n天的资金 除以 第n天的资金
+587: valuation.code,  # valuation.symbol,
+589: valuation.pb_ratio,  # valuation.pb,
+590: valuation.capitalization,  # 总股本
+591: valuation.market_cap,  # 总市值
+593: indicator.eps,  # income.basic_eps,
+594: indicator.roe,  # profit_one_season.roe,
+596: indicator.operating_profit,  # income_one_season.profit_from_operations,
+597: indicator.inc_operation_profit_annual  # growth_one_season.opt_profit_growth_ratio
+600: valuation.code == stock
+632: df12 = df12.sort_values("outvalue_ratio", ascending=False)
+636: df_value = df_value.sort_values("market_cap", ascending=True)
+639: df_value = df_value.sort_values("outvalue_ratio", ascending=False)
+649: df_double = df12.sort_values('double_time', ascending=True)
+677: q = query(valuation.code,
+679: # balance.total_equity,
+680: indicator.eps,  # income.basic_eps, #
+681: valuation.pb_ratio,  # valuation.pb,#
+682: valuation.market_cap,  #
+683: indicator.operating_profit,  # income_one_season.profit_from_operations, #
+684: valuation.capitalization,  #
+685: indicator.roe,  # profit_one_season.roe,  #
+686: indicator.inc_operation_profit_annual,  # growth_one_season.opt_profit_growth_ratio,#
+687: indicator.inc_net_profit_annual     # growth_one_season.net_profit_growth_ratio)\
+
+quant/2021年度精选策略/39.因子分析系列文章（八）：多因子策略（多元线性回归）.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | pb_ratio -> book_market | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+215: q = query(valuation.code,
+216: valuation.market_cap, # 总市值(亿元)
+217: balance.total_assets / balance.total_liability, # 杠杆率
+218: indicator.inc_net_profit_year_on_year, # 净利润同比增长率（质量成长）
+219: indicator.inc_revenue_year_on_year, # 营业收入同比增长率（规模成长）
+220: indicator.roe / valuation.pb_ratio, # PB-ROE
+221: valuation.pe_ratio / indicator.inc_net_profit_year_on_year, # PEG
+224: valuation.pe_ratio / indicator.inc_net_profit_year_on_year>0,
+225: valuation.pe_ratio / indicator.inc_net_profit_year_on_year<1,
+226: valuation.code.in_(sample))
+
+quant/2021年度精选策略/4.红利搬砖，年化29%.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+52: valuation.code,
+53: valuation.market_cap, #单位，亿元
+55: valuation.code.in_(stocks),
+56: valuation.pb_ratio > 0,
+57: valuation.pe_ratio > 0,
+88: sdf = sdf.sort_values(by='div_ratio', ascending=False)
+
+quant/2021年度精选策略/40.基于遗传算法挖掘因子2.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+83: df.sort_values(by = 'y_pred',ascending = True,inplace = True)
+165: temp[str(i)] = df2.corr('spearman').iloc[1,0]
+183: value = np.array(pd.Series(data.flatten()).rolling(window).sum().tolist())
+202: value = np.array(pd.Series(data.flatten()).rolling(window).mean().tolist())
+219: value = np.array(pd.Series(data.flatten()).rolling(window).std().tolist())
+235: value = np.array(pd.Series(data.flatten()).rolling(window).apply(_rolling_rank).tolist())
+254: value = pd.Series(data.flatten()).rolling(window).apply(np.argmin) + 1
+268: value = pd.Series(data.flatten()).rolling(window).apply(np.argmax) + 1
+283: value = np.array(pd.Series(data.flatten()).rolling(window).min().tolist())
+300: value = np.array(pd.Series(data.flatten()).rolling(window).max().tolist())
+423: best_programs_dict = best_programs_dict.sort_values(by='fitness')
+552: df1 = data['open'].rank(axis='columns')
+553: df2 = data['volume'].rank(axis='columns')
+
+quant/2021年度精选策略/41.均线黏合，突破前三十个交易日最高点选股法.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+30: valuation.code, valuation.market_cap,income.total_operating_revenue
+32: valuation.circulating_market_cap > 20,
+33: valuation.pe_ratio > 0,
+34: valuation.code.in_(stock_list1)
+35: ).order_by(
+37: valuation.market_cap.desc()
+54: close13 = close.rolling(13).mean().iloc[-1,:].T
+55: close34 = close.rolling(34).mean().iloc[-1,:].T
+56: close55 = close.rolling(55).mean().iloc[-1,:].T
+58: close13_1 = close.rolling(13).mean().iloc[-10,:].T
+59: close34_1 = close.rolling(34).mean().iloc[-10,:].T
+60: close55_1 = close.rolling(55).mean().iloc[-10,:].T
+62: close13_2 = close.rolling(13).mean().iloc[-19,:].T
+63: close34_2 = close.rolling(34).mean().iloc[-19,:].T
+64: close55_2 = close.rolling(55).mean().iloc[-19,:].T
+70: #close55pre = close.rolling(55).mean().iloc[-10,:].T
+71: close250 = close.rolling(250).mean().iloc[-1,:].T
+150: close13_1 = close.rolling(13).mean().iloc[-1,:].T
+151: close13_2 = close.rolling(13).mean().iloc[-2,:].T
+152: close13_3 = close.rolling(13).mean().iloc[-3,:].T
+
+quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | roe -> roe
+Recipes: 
+55: g.factors=["market_cap","roe"] # 用户选出来的因子
+59: g.factors=["market_cap","development_expenditure","roe"] # 用户选出来的因子
+96: g.q = query(valuation,balance,cash_flow,income,indicator).filter(valuation.code.in_(g.all_stocks))
+
+quant/2021年度精选策略/43.ETF资源收集整合（附代码与excel表格）.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/44.借助JqData搭建简易回测框架.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+249: x = np.cov(ben_data_income, _df_income)
+310: _df = _df.sort_values(by=['年化收益','最大回撤', 'alpha', '夏普比率', 'beta', '胜率'],
+
+quant/2021年度精选策略/45.市场宽度.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/46.大盘股也能穿越牛熊市.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+121: stmt = query(valuation).filter(valuation.code == symbol)
+359: security_list = financial_data_filter_xiaoyu(security_list, valuation.pe_ratio, 300)
+366: valuation.circulating_market_cap:('asc',1),
+389: a = a.sort_values(['score'],ascending = True)
+394: a = a.sort_values(['score'],ascending = False)
+
+quant/2021年度精选策略/47.高收益低回撤的小市值策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+41: q = query(valuation.code).filter(
+42: valuation.circulating_market_cap < 100
+44: valuation.code.in_(check_out_lists)
+45: ).order_by(
+46: valuation.circulating_market_cap.asc()
+
+quant/2021年度精选策略/49.根据北上资金买股票的最佳持股时间探讨.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+58: df_cap=get_fundamentals(query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(stock_list)),date=date)
+
+quant/2021年度精选策略/5.价值低波（下）--十年十倍（2020拜年）.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+107: valuation.code,
+108: valuation.pb_ratio,
+109: valuation.pe_ratio
+111: valuation.code.in_(stocks),
+112: valuation.pb_ratio > 0,
+113: valuation.pe_ratio > 0,
+114: valuation.pe_ratio < 20,
+115: valuation.pb_ratio / valuation.pe_ratio > 0.1,
+116: ).order_by(
+117: valuation.pe_ratio.asc()
+153: g.weight = weight.sort_values(ascending = True)
+
+quant/2021年度精选策略/50.昨日炸板股策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/51.北上资金持股比选股策略（北向、港资、外资）.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: pe_ratio -> earnings_yield
+Recipes: 
+131: ).order_by(finance.STK_HK_HOLD_INFO.share_ratio.desc())
+135: valuation.day,
+136: valuation.code,
+137: valuation.pe_ratio,
+138: valuation.capitalization,
+139: valuation.circulating_cap
+141: valuation.code.in_(stock_list),
+142: valuation.day.in_(trade_days)
+143: ).order_by(valuation.day.desc())
+147: df_valuation = df_valuation.drop(['circulating_cap', 'capitalization'], axis=1)
+154: result = result.sort_values(by=['day', 'market_share_ratio'], ascending = False).reset_index(drop = True)
+156: result = result.sort_values(by=['day', 'circulation_share_ratio'], ascending = False).reset_index(drop = True)
+
+quant/2021年度精选策略/52.根据北上资金买A股策略Python3版（北向、港资、外资）.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+56: df = df.sort_values(by = ['net'] , axis = 0, ascending = False)
+62: df_cap=get_fundamentals(query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(stock_list)),date=date)
+67: df_cap=df_cap.sort_values('rate',ascending=False)
+
+quant/2021年度精选策略/53.基于大盘PE标准差偏离度的聪明基金定投策略.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+219: ).order_by(finance.STK_EXCHANGE_TRADE_INFO.date.desc()).limit(count)
+
+quant/2021年度精选策略/54.价值投资策略-大盘择时.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_revenue_year_on_year -> growth_sales | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+255: df = get_fundamentals(query(valuation.circulating_cap,valuation.pe_ratio,valuation.code).filter(valuation.code.in_(check_out_lists)),date=context.previous_date)
+309: #5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+345: q = query(valuation.code, income.statDate, income.pubDate).filter(valuation.code.in_(pool))
+357: q = query(valuation.code,valuation.code,valuation.circulating_market_cap,balance.total_current_assets,balance.total_current_liability,\
+358: indicator.roe,cash_flow.net_operate_cash_flow,cash_flow.net_invest_cash_flow,indicator.inc_revenue_year_on_year,indicator.eps
+367: nq = q.filter(valuation.code.in_(stat_date_stocks[sd]))
+
+quant/2021年度精选策略/55.价值投资改进版-6年9.5倍.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_revenue_year_on_year -> growth_sales | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+103: df = get_fundamentals(query(valuation.circulating_cap,valuation.pe_ratio,valuation.code).filter(valuation.code.in_(check_out_lists)),date=context.previous_date)
+114: 5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+168: #5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+204: q = query(valuation.code, income.statDate, income.pubDate).filter(valuation.code.in_(pool))
+216: q = query(valuation.code,valuation.code,valuation.circulating_market_cap,balance.total_current_assets,balance.total_current_liability,\
+217: indicator.roe,cash_flow.net_operate_cash_flow,cash_flow.net_invest_cash_flow,indicator.inc_revenue_year_on_year,indicator.eps
+226: nq = q.filter(valuation.code.in_(stat_date_stocks[sd]))
+
+quant/2021年度精选策略/56.大盘一路向上时，追总龙头2个月3倍.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/57.股指期货套利，这段时间都没有交易分享给大家.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/58.严格资金管理，股指期货套利.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/59.【复现】RSRS择时改进.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+34: #         ret_std = self.price_df['ret'].rolling(self.N).std()
+35: #         ret_quantile = ret_std.rolling(self.M).apply(
+36: #             lambda x: x.rank(pct=True)[-1], raw=False)
+253: singal_df['RSRS'].rolling(M).mean()
+254: ) / singal_df['RSRS'].rolling(M).std()
+275: passiv_z = (passiv_df['beta'] - passiv_df['beta'].rolling(M).mean()
+276: ) / passiv_df['beta'].rolling(M).std()
+357: ret_std = self.price_df['ret'].rolling(self.N,min_periods=1).apply(np.nanstd,raw=False)
+358: ret_quantile = ret_std.rolling(self.M).apply(
+359: lambda x: x.rank(pct=True)[-1], raw=False)
+
+quant/2021年度精选策略/6.iAlpha 基金投资策略.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/60.【分享】对RSRS模型的一次修改.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+172: # 2019年光大证券更新了RSRS的计算公式,使得RSRS(这里的RSRS指的是**RSRS_passivation**)能过更好的对抗震荡行情:
+280: ma = pd.concat([close.rolling(i).mean() for i in periods], axis=1)
+302: ret_quantile = LR_ser.rolling(M).apply(
+303: lambda x: x.rank(pct=True)[-1], raw=False)
+
+quant/2021年度精选策略/61.【复现】扩散指标择时.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+
+quant/2021年度精选策略/62.【复现】北向资金交易能力一定强吗.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+183: north_factor = (s - l) / north_flow.rolling(params['long_period']).std()
+
+quant/2021年度精选策略/63.【复现】华泰证券-波动率和换手率构建牛熊指标.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+136: close_df[col] = close_df['pct'].rolling(periods).std()
+189: y2 = close_df['close'].rolling(250).corr(close_df['std_250'])
+275: index_daily_df[col] = index_daily_df['turnover_rate_f'].rolling(
+443: q_circulating_cap = query(valuation.code,
+444: valuation.circulating_cap).filter(valuation.code.in_(security))
+589: turnover_ma = df['turnover_rate_f'].rolling(n).mean()
+590: std = df['pct_chg'].rolling(n).std(ddof=0)
+949: df['MA_20'] = df['SINGAL'].rolling(20).mean()
+950: df['MA_60'] = df['SINGAL'].rolling(60).mean()
+967: df['MA_20'] = df['SINGAL'].rolling(20).mean()
+968: std_arr = df['SINGAL'].rolling(20).std()
+
+quant/2021年度精选策略/64.【复现】C-VIX 中国版 VIX 编制手册.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+250: df_use = df_use.sort_values('date')
+389: min_con = df.sort_values('diff').iloc[0]
+438: m_k = temp_df.sort_values('diff').index[0]
+
+quant/2021年度精选策略/65.【分享】多因子指数增强.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/66.【复现】A股日内动量效应（一）半小时 涨跌幅间的规律.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+126: corr_df = ret.pivot(index='day', columns='frequency').corr()
+
+quant/2021年度精选策略/67.RSRS择时改进-【成交量加权-钝化-右偏】.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/68.蒋老师吐槽了之后，我也想说说对ETF轮动策略的看法.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+182: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2021年度精选策略/69.（12.3更新v1.2）朱虽自用1号（神虽顶底+趋势）.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+46: y=c_list[i]*2/(_n+1)+(1-2/(_n+1))*y_list[-1] #这是ema的计算公式
+
+quant/2021年度精选策略/7.股债波动平衡.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/70.超稳的股息率+均线选股策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+38: valuation.pe_ratio>0,
+66: ).order_by(finance.STK_XR_XD.report_date.desc()).limit(12))
+85: qcap=query(valuation.market_cap).filter(valuation.code==code)
+102: df=df.sort_values(by='gxl',ascending=False).head(g.stock_num*16)
+105: df=df.sort_values(by='gxl2',ascending=False).head(g.stock_num*8)
+106: df=df.sort_values(by='gxl3',ascending=False).head(g.stock_num*4)
+107: df=df.sort_values(by='gxl',ascending=False).head(g.stock_num*2)
+
+quant/2021年度精选策略/71.【股指策略】【研报复现】周内与日内结合CTA.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/72.【股指期货】收盘折溢价策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/73.基于期权PCR与标的波动率价差的股指期货套利.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+149: g.corr = a.corr(b)<-0.75
+150: g.corr_ = a.corr(b_)<-0.75
+163: # print(a.corr(b))
+164: # print(a.corr(b_))
+
+quant/2021年度精选策略/74.迪马克TD趋势反转指标.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/75.最近2年年化100%以上回撤12%的打板策略-验证策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/76.日内交易策略R-breaker - 300346.XSHE.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/77.超强单因子策略（EBIT,EV）.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: EBIT -> ebit_ev (EBIT/EV proxy; EBIT standalone differs) | market_cap -> small_size
+Recipes: ebit_ev
+11: from jqfactor import get_factor_values
+51: factor_data = get_factor_values(securities=security, \
+77: df_list1=df_list.sort_values(by=['EBIT/EV'],ascending=False)
+
+quant/2021年度精选策略/78.机器学习模型大比拼!.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: ARBR -> arbr26 (AR-BR atom; source learned bounds differ) | MACD -> macd_scaled (cross-stock adaptation) | asset_turnover -> asset_turnover | cash_to_current_liability -> cash_current_liability (PIT input proxy) | circulating_market_cap -> small_size (total_mv adaptation) | gross_income_ratio -> gross_margin | gross_profit_margin -> gross_margin | inc_net_profit_year_on_year -> growth_profit | inc_revenue_year_on_year -> growth_sales | market_cap -> small_size | net_operate_cash_flow_ttm -> cf_yield | net_profit_growth_rate -> growth_profit | net_profit_to_total_operate_revenue_ttm -> net_margin (proxy) | net_profit_to_total_revenue -> net_margin | operating_revenue_growth_rate -> growth_sales | pb_ratio -> book_market | pcf_ratio -> cf_yield | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa | roe -> roe | total_asset_turnover_rate -> asset_turnover
+Recipes: 
+57: q = query(valuation.code,
+58: valuation.market_cap,#市值
+59: valuation.circulating_market_cap,
+60: valuation.pe_ratio, #市盈率（TTM）
+61: valuation.pb_ratio, #市净率（TTM）
+62: valuation.pcf_ratio, #CFP
+63: valuation.ps_ratio, #PS
+64: balance.total_assets,
+65: balance.total_liability,
+66: balance.fixed_assets,
+67: balance.total_non_current_liability,
+70: indicator.net_profit_to_total_revenue, #净利润/营业总收入
+71: indicator.inc_revenue_year_on_year,  #营业收入增长率（同比）
+72: indicator.inc_net_profit_year_on_year,#净利润增长率（同比）
+73: indicator.roe,
+74: indicator.roa,
+75: indicator.gross_profit_margin #销售毛利率GPM
+84: # get_factor_values()中的参数factors
+85: jqfactor_list = ['current_ratio',
+202: factor_data = get_factor_values(securities=stocklist,
+296: q_new = q.filter(valuation.code.in_(stocklist))
+447: data = data.sort_values(by='return', ascending=False)
+687: df = df.sort_values('predict', ascending=False)
+1427: (group1_all+1).cumprod().iloc[-1,:].sort_values()
+
+quant/2021年度精选策略/79.【多因子选股模型框架】(单因子各项指标评分细则).txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: gross_profit_margin -> gross_margin | market_cap -> small_size | pb_ratio -> book_market | pe_ratio -> earnings_yield | ps_ratio -> sales_yield | roa -> roa
+Recipes: 
+39: valuation.code,
+41: indicator.roa,
+42: indicator.gross_profit_margin,
+44: indicator.gross_profit_margin * income.operating_revenue / balance.total_assets,
+45: valuation.pb_ratio,
+46: valuation.ps_ratio,
+47: valuation.pe_ratio,
+48: valuation.turnover_ratio,
+50: valuation.code.in_(g.stocklist)
+68: df.iloc[:,i] = df.iloc[:,i].rank()
+71: df.iloc[:,i] = df.iloc[:,i].rank(ascending=False)
+73: g.buylist = list(df.sum(axis=1).sort_values(ascending=False)[:g.num].index)
+
+quant/2021年度精选策略/8.因子分析 营业利润TTM.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+39: from jqfactor import get_factor_values
+190: factor_data = get_factor_values(securities=stock_list, factors=[factor],start_date=fdate, end_date=fdate)[factor].T
+1504: cols_3 = all_returns.iloc[-1].sort_values(ascending=False).index[:3].tolist()
+1565: cols_4 = indu_returns.iloc[-1].sort_values(ascending=False).index[:4].tolist()
+1574: indu_text = indu_returns.iloc[-1].sort_values(ascending=False).index[0]
+
+quant/2021年度精选策略/80.公募基金抱团.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: market_cap -> small_size
+Recipes: 
+73: fund_value_sort = df.sort_values(by='values', ascending=False)
+84: security_list = all_data.groupby(all_data['symbol']).sum().sort_values(by='proportion', ascending=False).iloc[0:50]
+
+quant/2021年度精选策略/81.无杠杆，稳定盈利的etf轮动，06年开始3000%收益.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+189: g.df.sort_values(by='周期涨幅%',ascending=False,inplace=True) # 按照涨幅排序
+
+quant/2021年度精选策略/82.无需先验知识，动态选择的etf轮动策略，更具鲁棒性.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+51: g.ETF.sort_values(by='成交量', ascending=False, inplace=True)  # 按照成交量排序
+224: g.df.sort_values(by='周期涨幅%',ascending=False,inplace=True) # 按照涨幅排序
+
+quant/2021年度精选策略/83.识别趋势震荡之神器 MESA最大熵谱分析（一）：滤波器建立.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/84.ETF网格交易策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/85.易方达中小盘（魔改版）.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/86.北上詹姆斯.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+53: ).order_by(table.day)
+71: return df.sort_values(by='share_ratio',ascending=False)[:g.max_stock_count]['code'].values
+
+quant/2021年度精选策略/87.穿越牛熊基业长青的价值精选策略（小资本也有大作为）.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | inc_revenue_year_on_year -> growth_sales | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield | roe -> roe
+Recipes: 
+141: df = get_fundamentals(query(valuation.circulating_cap,valuation.pe_ratio,valuation.code).filter(valuation.code.in_(check_out_lists)),date=context.previous_date)
+154: 5.近四季营收成长率介于6%至30%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+207: #5.近四季营收成长率介于0%至50%（）。    'IRYOY':indicator.inc_revenue_year_on_year, # 营业收入同比增长率(%)
+243: q = query(valuation.code, income.statDate, income.pubDate).filter(valuation.code.in_(pool))
+255: q = query(valuation.code,valuation.code,valuation.circulating_market_cap,balance.total_current_assets,balance.total_current_liability,\
+256: indicator.roe,cash_flow.net_operate_cash_flow,cash_flow.net_invest_cash_flow,indicator.inc_revenue_year_on_year,indicator.eps
+265: nq = q.filter(valuation.code.in_(stat_date_stocks[sd]))
+
+quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+98: slope, intercept = np.polyfit(x, y, 1)
+145: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2021年度精选策略/89.2020年效果很好的策略-龙回头策略v3.0.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+17: valuation.code
+19: valuation.market_cap<500
+
+quant/2021年度精选策略/9.持续跑赢大盘-真蓝筹v2(资金容量千万以上).txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+175: valuation.code,
+176: valuation.pb_ratio,
+177: valuation.pe_ratio,
+179: valuation.code.in_(stocks),
+180: valuation.pb_ratio > 0,
+181: valuation.pe_ratio > 0,
+189: valuation.code,
+190: valuation.market_cap,
+191: (valuation.market_cap/valuation.pe_ratio).label('earn'),
+193: valuation.code.in_(stocks)
+
+quant/2021年度精选策略/90.超稳+翻倍，贝塔值只有0.048的期指策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+191: g.corr = a.corr(b)<-0.65
+192: g.corr_ = a.corr(b_)<-0.65
+
+quant/2021年度精选策略/91.欧奈尔 RPS选股战法回测.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/92.敢于直接实盘的—八仙过海V2.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/93北向Boll带_ETF组合宝付费策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+182: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+237: finance.STK_ML_QUOTA.link_id == 310001).order_by(
+240: finance.STK_ML_QUOTA.link_id == 310002).order_by(
+306: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2021年度精选策略/94.小资金短线策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+46: g.security = list (factor.sort_values('sum').iloc[2:5].index)
+63: average = np.array (series.rolling (window=12).mean())
+
+quant/2021年度精选策略/95.冲天炮最高板策略迭代.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/96.分享一个简单的选股器.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+126: valuation.code
+128: valuation.turnover_ratio > 3,
+129: valuation.turnover_ratio <= 10,
+130: ).order_by (
+132: valuation.turnover_ratio.desc()
+
+quant/2021年度精选策略/97.稳定高回报周期股策略2-RSRS择时.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | net_operate_cash_flow -> cf_yield (TTM adaptation) | pe_ratio -> earnings_yield
+Recipes: 
+19: 排序指标：rank(动态市盈率)+0.5rank(1/扣非净利润环比)+0.3rank(1/扣非净利润同比)
+182: valuation.pe_ratio > 0,  # PE [0,25]
+183: valuation.pe_ratio < 25,
+184: balance.total_liability / balance.total_assets < 0.9  # 资产负债率 < 90%
+224: q_cap = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(list(df_fin.index)))
+230: df_pe = df_pe.sort_values(by='pe', ascending=True).reset_index(drop=False)
+233: df_pe = df_pe.sort_values(by='hb', ascending=False).reset_index(drop=True)
+236: df_pe = df_pe.sort_values(by='tb', ascending=False).reset_index(drop=True)
+241: df_pe = df_pe.sort_values(by='s', ascending=False).reset_index(drop=True)
+279: indicator.adjusted_profit,  # 扣非净利润
+280: balance.bill_receivable,  # 应收票据
+281: balance.account_receivable,  # 应收账款
+282: balance.advance_peceipts,  # 预收账款
+285: # balance.total_assets,  # 资产总计
+286: # balance.total_liability,  # 负债合计
+287: # balance.shortterm_loan,  # “短期借款”
+288: # balance.longterm_loan,  # “长期借款”
+289: # balance.non_current_liability_in_one_year,  # “一年内到期的非流动性负债”
+290: # balance.bonds_payable  # “应付债券”、
+295: lqt = qt.filter(balance.code.in_(stat_date_stocks[stat_date]))
+
+quant/2021年度精选策略/98.追涨大师（超额142）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2021年度精选策略/99.最新龙回头5.0速度优化版+风险控制版本.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+

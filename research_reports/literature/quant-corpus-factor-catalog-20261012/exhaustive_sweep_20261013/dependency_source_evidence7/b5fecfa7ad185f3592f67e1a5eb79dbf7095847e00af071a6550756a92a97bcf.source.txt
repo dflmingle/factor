@@ -1,0 +1,255 @@
+from jqdata import *
+
+# 初始化全局变量
+def initialize(context):
+    # 设置中小板指数为股票池
+    g.security_universe_index = '399101.XSHE'
+    g.buy_stock_count = 5  # 买入股票数量
+    g.last_hold_stocks = []  # 记录上一次持仓
+    
+    # 设置交易参数
+    set_option('use_real_price', True)
+    set_slippage(PriceRelatedSlippage(0.002))
+    
+    # 股票类每笔交易时的手续费是：买入时佣金万分之三，卖出时佣金万分之三加千分之一印花税, 每笔交易佣金最低扣5块钱
+    set_order_cost(OrderCost(close_tax=0.001, open_commission=0.0003, close_commission=0.0003, min_commission=5),
+                   type='stock')
+    # 每日开盘后运行
+    #run_daily(my_trade, time='open')
+    run_weekly(my_trade, weekday=1, time='open')
+    #run_monthly(my_trade, monthday=1, time='9:30')
+    run_daily(log_hold, time='15:00')  # 收盘后记录持仓
+
+def my_trade(context):
+    log.info('=' * 50)
+    log.info('交易日: %s' % context.current_dt)
+    
+    # 1. 获取中小板成分股
+    check_out_lists = get_index_stocks(g.security_universe_index)
+    #check_out_lists = get_all_securities(types=['stock'], date=None)
+    log.info('中小板成分股数量: %d' % len(check_out_lists))
+    
+    # 2. 按流通市值排序，取最小的15只作为初选
+    q = query(
+        valuation.code, 
+        valuation.circulating_market_cap
+    ).filter(
+        valuation.code.in_(check_out_lists)
+    ).order_by(
+        valuation.circulating_market_cap.asc()
+    ).limit(
+        g.buy_stock_count * 3
+    )
+    
+    df = get_fundamentals(q)
+    if df is None or len(df) == 0:
+        log.warning('未获取到基本面数据')
+        return
+    
+    log.info('初选股票数量: %d' % len(df))
+    #log.info('初选股票详情:')
+    #for idx, row in df.iterrows():
+    #    log.info('  股票: %s, 流通市值: %.2f亿' % (
+    #        row['code'], row['circulating_market_cap']
+    #    ))
+    
+    check_out_lists = list(df['code'])
+    
+    # 3. 过滤股票
+    original_count = len(check_out_lists)
+    check_out_lists = filter_st_stock(check_out_lists)
+    st_filtered_count = original_count - len(check_out_lists)
+    
+    original_count = len(check_out_lists)
+    check_out_lists = filter_paused_stock(check_out_lists)
+    paused_filtered_count = original_count - len(check_out_lists)
+    
+    log.info('过滤情况: ST股过滤 %d 只, 停牌股过滤 %d 只' % (
+        st_filtered_count, paused_filtered_count
+    ))
+    
+    # 4. 取前N只
+    if len(check_out_lists) < g.buy_stock_count:
+        log.warning('可用股票不足 %d 只，实际可用 %d 只' % (
+            g.buy_stock_count, len(check_out_lists)
+        ))
+    
+    target_stocks = check_out_lists[:g.buy_stock_count]
+    
+    log.info('最终选股结果(%d只):' % len(target_stocks))
+    for stock in target_stocks:
+        current_data = get_current_data()[stock]
+        log.info('  %s - %s' % (stock, current_data.name))
+    
+    # 5. 记录并执行调仓
+    log_trade_info(context, target_stocks)
+    adjust_position(context, target_stocks)
+    
+    # 更新持仓记录
+    g.last_hold_stocks = list(context.portfolio.positions.keys())
+
+# 记录交易信息
+def log_trade_info(context, target_stocks):
+    # 当前持仓
+    current_hold = list(context.portfolio.positions.keys())
+    
+    # 计算调入和调出
+    new_stocks = [s for s in target_stocks if s not in current_hold]
+    sell_stocks = [s for s in current_hold if s not in target_stocks]
+    
+    log.info('-' * 30)
+    log.info('当前持仓: %s' % current_hold)
+    log.info('目标持仓: %s' % target_stocks)
+    
+    if new_stocks:
+        log.info('本次调入股票(%d只): %s' % (len(new_stocks), new_stocks))
+        for stock in new_stocks:
+            current_data = get_current_data()[stock]
+            log.info('  %s - %s' % (stock, current_data.name))
+    
+    if sell_stocks:
+        log.info('本次调出股票(%d只): %s' % (len(sell_stocks), sell_stocks))
+        for stock in sell_stocks:
+            current_data = get_current_data()[stock]
+            log.info('  %s - %s' % (stock, current_data.name))
+    
+    if not new_stocks and not sell_stocks:
+        log.info('持仓无变化')
+
+# 过滤ST股
+def filter_st_stock(stock_list):
+    if not stock_list:
+        return []
+    
+    current_data = get_current_data()
+    result = []
+    filtered = []
+    
+    for stock in stock_list:
+        try:
+            if not current_data[stock].is_st and 'ST' not in current_data[stock].name:
+                result.append(stock)
+            else:
+                filtered.append(stock)
+        except:
+            result.append(stock)
+    
+    if filtered:
+        log.debug('过滤ST股: %s' % filtered)
+    
+    return result
+
+# 过滤停牌股
+def filter_paused_stock(stock_list):
+    if not stock_list:
+        return []
+    
+    current_data = get_current_data()
+    result = []
+    filtered = []
+    
+    for stock in stock_list:
+        try:
+            if not current_data[stock].paused:
+                result.append(stock)
+            else:
+                filtered.append(stock)
+        except:
+            result.append(stock)
+    
+    if filtered:
+        log.debug('过滤停牌股: %s' % filtered)
+    
+    return result
+
+# 调仓函数
+def adjust_position(context, stock_list):
+    log.info('开始调仓...')
+    
+    # 卖出不在目标组合中的持仓
+    for stock in context.portfolio.positions:
+        if stock not in stock_list:
+            current_data = get_current_data()[stock]
+            position = context.portfolio.positions[stock]
+            
+            log.info('卖出: %s - %s, 持仓数量: %d, 当前价: %.2f' % (
+                stock, current_data.name,
+                position.total_amount,
+                position.price
+            ))
+            order_target(stock, 0)
+    
+    # 等权重买入目标股票
+    if len(stock_list) > 0:
+        weight = 1.0 / len(stock_list)
+        total_value = context.portfolio.total_value
+        
+        log.info('总资产: %.2f元, 每只股票目标权重: %.2f%%' % (
+            total_value, weight * 100
+        ))
+        
+        for stock in stock_list:
+            # 获取当前持仓
+            current_position = context.portfolio.positions.get(stock, None)
+            current_amount = current_position.total_amount if current_position else 0
+            
+            # 计算目标市值和数量
+            target_value = total_value * weight
+            current_data = get_current_data()[stock]
+            current_price = current_data.last_price
+            
+            if current_price > 0:
+                target_amount = int(target_value / current_price / 100) * 100
+                
+                # 交易逻辑
+                if target_amount > current_amount:
+                    # 买入
+                    buy_amount = target_amount - current_amount
+                    if buy_amount > 0:
+                        log.info('买入: %s - %s, 数量: %d, 价格: %.2f, 目标市值: %.2f' % (
+                            stock, current_data.name,
+                            buy_amount, current_price,
+                            target_value
+                        ))
+                        order(stock, buy_amount)
+                elif target_amount < current_amount:
+                    # 卖出多余部分
+                    sell_amount = current_amount - target_amount
+                    if sell_amount > 0:
+                        log.info('调整卖出: %s - %s, 数量: %d, 价格: %.2f' % (
+                            stock, current_data.name,
+                            sell_amount, current_price
+                        ))
+                        order(stock, -sell_amount)
+            else:
+                log.warning('股票 %s 价格异常，跳过交易' % stock)
+
+# 记录持仓
+def log_hold(context):
+    log.info('-' * 30)
+    log.info('收盘持仓统计:')
+    
+    if not context.portfolio.positions:
+        log.info('当前无持仓')
+        return
+    
+    total_value = context.portfolio.total_value
+    log.info('总资产: %.2f元' % total_value)
+    log.info('持仓股票详情:')
+    
+    for stock, position in context.portfolio.positions.items():
+        current_data = get_current_data()[stock]
+        stock_value = position.total_amount * position.price
+        weight = stock_value / total_value * 100 if total_value > 0 else 0
+        
+        log.info('  %s - %s:' % (stock, current_data.name))
+        log.info('    持仓数量: %d, 当前价: %.2f' % (
+            position.total_amount, position.price
+        ))
+        log.info('    持仓市值: %.2f元, 权重: %.2f%%' % (
+            stock_value, weight
+        ))
+        log.info('    累计盈亏: %.2f元 (%.2f%%)' % (
+            position.closeable_amount * (position.price - position.avg_cost),
+            (position.price / position.avg_cost - 1) * 100 if position.avg_cost > 0 else 0
+        ))

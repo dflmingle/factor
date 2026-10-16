@@ -1,0 +1,93 @@
+quant/2021年度精选策略/53.基于大盘PE标准差偏离度的聪明基金定投策略.txt
+from jqdata import *
+from jqlib.technical_analysis import *
+import numpy as np
+import datetime
+
+def initialize(context):
+    g.benchmark = '000300.XSHG'
+    g.stdpeH = 1.5
+    g.stdpeL = 1.2
+    g.now_pe = 1
+
+def after_code_changed(context):
+    g.security = '510300.XSHG'
+    g.weeks = 50
+    run_daily(before_market_open, time='before_open', reference_security=g.security)
+    run_weekly(market_open, -2, time='open', reference_security=g.security)
+    run_daily(after_market_close, time='after_close', reference_security=g.security)
+    run_weekly(code_run_weekly, 1, time='before_open')
+    run_monthly(wages_monthily, 6, time='before_open')
+
+def before_market_open(context):
+    g.date = date = context.previous_date
+    previous_date = context.previous_date
+
+def market_open(context):
+    qtt = QuantTiming(context.previous_date, g.security)
+    g.now_pe = qtt.now()
+    target_weeks = qtt.how_many_weeks()
+    if target_weeks < 0:
+        target_value = context.portfolio.positions_value + context.portfolio.positions_value / target_weeks
+        order_target_value(g.security, target_value)
+    elif target_weeks > 0:
+        target_value = context.portfolio.positions_value + context.portfolio.available_cash / target_weeks
+        order_target_value(g.security, target_value)
+    else:
+        pass
+
+def after_market_close(context):
+    trades = get_trades()
+    for _trade in trades.values():
+        pass
+    if g.now_pe > g.stdH:
+        g.pe_status = '高估'
+    elif g.now_pe < g.stdL:
+        g.pe_status = '低估'
+    else:
+        g.pe_status = '合理'
+    g.last_pe = g.now_pe
+
+def code_run_weekly(context):
+    qtt = QuantTiming(context.previous_date, g.security)
+    g.stdpeH, g.stdpeL = qtt.std()
+    g.stdH = g.stdpeH
+    g.stdL = g.stdpeL
+
+def wages_monthily(context):
+    inout_cash(5000, pindex=0)
+
+class QuantTiming:
+
+    def __init__(self, date, security):
+        self.date = date
+        self.security = security
+
+    def how_many_weeks(self):
+        if g.now_pe > g.stdH:
+            weeks = g.weeks / ((g.stdH - g.now_pe) / g.stdH * 100)
+        elif g.now_pe < g.stdL:
+            weeks = g.weeks * (1 - (g.stdL - g.now_pe) / g.stdL * 5)
+            if weeks <= 0:
+                weeks = 1
+        else:
+            weeks = g.weeks
+        return weeks
+
+    def Q(self, count):
+        q = query(finance.STK_EXCHANGE_TRADE_INFO).filter(finance.STK_EXCHANGE_TRADE_INFO.date <= self.date, finance.STK_EXCHANGE_TRADE_INFO.exchange_code == '322002').order_by(finance.STK_EXCHANGE_TRADE_INFO.date.desc()).limit(count)
+        df = finance.run_query(q)
+        DF = df[['date', 'pe_average', 'turnover_ratio']]
+        DF = DF.copy()
+        DF['V'] = DF.apply(lambda x: np.log10(x.pe_average), axis=1)
+        return DF
+
+    def std(self):
+        section = self.Q(2500).V
+        mean = section.mean()
+        median = section.median()
+        std = section.std()
+        return (median + 0.05 * std, median - 0.25 * std)
+
+    def now(self):
+        return self.Q(1).V[0]

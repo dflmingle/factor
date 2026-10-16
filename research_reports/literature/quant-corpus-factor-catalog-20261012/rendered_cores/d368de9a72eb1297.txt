@@ -1,0 +1,126 @@
+quant/量化策略/量化策略/首板向上趋势策略2026/01-涨停板接力策略-25年166-24年260-23年24-22年672.txt
+from jqdata import *
+from jqfactor import *
+import pandas as pd
+from datetime import datetime, timedelta, date
+
+def initialize(context):
+    g.slippage = 3 / 10000
+    g.commission_rate = 3 / 10000
+    g.stamp_tax = 0.001
+    g.avg_price_upper_limit = 0.07
+    g.sbgk_min_money = 550000000.0
+    g.sbgk_max_money = 2000000000.0
+    g.min_high_open_ratio = 1.0
+    g.max_high_open_ratio = 1.06
+    g.max_4d_increase = 0.28
+    g.min_open_close_ratio = -0.05
+    g.avg_loss_upper_limit = -0.04
+    g.rzq_min_money = 300000000.0
+    g.rzq_max_money = 1900000000.0
+    g.min_weak_ratio = 0.98
+    g.max_weak_ratio = 1.09
+    g.min_market_cap = 70
+    g.max_market_cap = 500
+    g.auction_vol_ratio = 0.03
+    g.volume_break_ratio = 0.9
+    g.left_pressure_buffer = 5
+    g.new_stock_days = 50
+    g.ma_lookback_days = 4
+    g.auction_start_time = ' 09:15:00'
+    g.auction_end_time = ' 09:26:00'
+    g.left_pressure_history_days = 101
+'EXACT_REVIEWED_FUNCTION after_code_changed sha256=f7f00dd0f60334a04f6d25f222b0986f9abcfe1f8e3652eb9d7bbf7273008250 source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+'EXACT_REVIEWED_FUNCTION after_trading_end sha256=6dcd36f98c4a4fac3fc06f2f5fc29a54c4021d42a35862a06725a9a91dc157e1 source=quant/2022年度精选策略/52.用指数战胜指数，ETF二八轮动对冲模型.txt'
+'EXACT_REVIEWED_FUNCTION set_stockpool sha256=059ef38f78cf691cb2ee2cd728778fef41d8ae3f5d8e23a9923ff9eaf6a80d88 source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+'EXACT_REVIEWED_FUNCTION buy sha256=0b861778ce00ff6269cb63cdd8df8a081a506fd1a3cec5be0e6fe3e765d11e0c source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+
+def sell(context):
+    stime = context.current_dt.strftime('%H%M')
+    current_data = get_current_data()
+    for s in list(context.portfolio.positions):
+        close_data = attribute_history(s, g.ma_lookback_days, '1d', ['close'])
+        M4 = close_data['close'].mean()
+        MA5 = (M4 * g.ma_lookback_days + current_data[s].last_price) / (g.ma_lookback_days + 1)
+        position = context.portfolio.positions[s]
+        if position.closeable_amount != 0 and current_data[s].last_price < current_data[s].high_limit and (current_data[s].last_price > 1 * position.avg_cost):
+            order_target_value(s, 0)
+            ret = 100 * (position.price / position.avg_cost - 1)
+        if position.closeable_amount != 0 and current_data[s].last_price < MA5:
+            order_target_value(s, 0)
+            ret = 100 * (position.price / position.avg_cost - 1)
+
+def get_stock_list(context):
+    target_list, target_list2 = prepare_stock_list(context)
+    qualified_stocks = []
+    sbgk_stocks = []
+    rzq_stocks = []
+    current_data = get_current_data()
+    date_now = context.current_dt.strftime('%Y-%m-%d')
+    start = date_now + g.auction_start_time
+    end = date_now + g.auction_end_time
+    for s in target_list:
+        prev_day_data = attribute_history(s, 1, '1d', fields=['close', 'volume', 'money'], skip_paused=True)
+        avg_price_increase_value = prev_day_data['money'][0] / prev_day_data['volume'][0] / prev_day_data['close'][0] * 1.1 - 1
+        if avg_price_increase_value < g.avg_price_upper_limit or prev_day_data['money'][0] < g.sbgk_min_money or prev_day_data['money'][0] > g.sbgk_max_money:
+            continue
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date, fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < g.min_market_cap or turnover_ratio_data['circulating_market_cap'][0] > g.max_market_cap:
+            continue
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        if auction_data.empty or auction_data['volume'][0] / prev_day_data['volume'][-1] < g.auction_vol_ratio:
+            continue
+        current_ratio = auction_data['current'][0] / prev_day_data['close'][-1]
+        if current_ratio <= g.min_high_open_ratio or current_ratio >= g.max_high_open_ratio:
+            continue
+        hst = attribute_history(s, g.left_pressure_history_days, '1d', fields=['high', 'volume'], skip_paused=True)
+        prev_high = hst['high'].iloc[-1]
+        zyts_0 = next((i - 1 for i, high in enumerate(hst['high'][-3::-1], 2) if high >= prev_high), 100)
+        zyts = zyts_0 + g.left_pressure_buffer
+        volume_data = hst['volume'][-zyts:]
+        if len(volume_data) < 2 or volume_data[-1] <= max(volume_data[:-1]) * g.volume_break_ratio:
+            continue
+        sbgk_stocks.append(s)
+    for s in target_list2:
+        prev_day_data = attribute_history(s, 4, '1d', fields=['open', 'close', 'volume', 'money'], skip_paused=True)
+        increase_ratio = (prev_day_data['close'][-1] - prev_day_data['close'][0]) / prev_day_data['close'][0]
+        if increase_ratio > g.max_4d_increase:
+            continue
+        open_close_ratio = (prev_day_data['close'][-1] - prev_day_data['open'][-1]) / prev_day_data['open'][-1]
+        if open_close_ratio < g.min_open_close_ratio:
+            continue
+        avg_price_increase_value = prev_day_data['money'][-1] / prev_day_data['volume'][-1] / prev_day_data['close'][-1] - 1
+        if avg_price_increase_value < g.avg_loss_upper_limit or prev_day_data['money'][-1] < g.rzq_min_money or prev_day_data['money'][-1] > g.rzq_max_money:
+            continue
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date, fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < g.min_market_cap or turnover_ratio_data['circulating_market_cap'][0] > g.max_market_cap:
+            continue
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        if auction_data.empty or auction_data['volume'][0] / prev_day_data['volume'][-1] < g.auction_vol_ratio:
+            continue
+        current_ratio = auction_data['current'][0] / (current_data[s].high_limit / 1.1)
+        if current_ratio <= g.min_weak_ratio or current_ratio >= g.max_weak_ratio:
+            continue
+        hst = attribute_history(s, g.left_pressure_history_days, '1d', fields=['high', 'volume'], skip_paused=True)
+        prev_high = hst['high'].iloc[-1]
+        zyts_0 = next((i - 1 for i, high in enumerate(hst['high'][-3::-1], 2) if high >= prev_high), 100)
+        zyts = zyts_0 + g.left_pressure_buffer
+        volume_data = hst['volume'][-zyts:]
+        if len(volume_data) < 2 or volume_data[-1] <= max(volume_data[:-1]) * g.volume_break_ratio:
+            continue
+        rzq_stocks.append(s)
+    qualified_stocks = sbgk_stocks + rzq_stocks
+    if qualified_stocks:
+        pass
+    return qualified_stocks
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=72f108a64fd94b9eecfc91435812c6cba6482de45579d59ccdf5a54c0ccfd28a source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=542976dac6f398144dd826a36cecea34d8406c593c6253afe6b0b1ccbebb81fd source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+'EXACT_REVIEWED_FUNCTION get_ever_hl_stock sha256=35eaa7e0b914cba4b034f7f36a940c8e9de8aa220af5e5eea829802194b98adb source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+'EXACT_REVIEWED_FUNCTION get_ever_hl_stock2 sha256=0bafd32a32c0126a84dd04354b96431282a07653bdb6ebbfc188ff8693cec4d6 source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+
+def filter_new_stock(initial_list, date, days=None):
+    if days is None:
+        days = g.new_stock_days
+    return [stock for stock in initial_list if get_security_info(stock).start_date < date - timedelta(days=days)]
+'EXACT_REVIEWED_FUNCTION filter_st_paused_stock sha256=fb8e5cc80e08790ddbdeb36545aecaf48e1481568144516803d4a617e21e1944 source=quant/聚宽2025年精选/13首板高开-低开-弱转强混合策略（今年收益1138.61）.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'

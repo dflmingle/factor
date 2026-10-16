@@ -1,0 +1,27 @@
+quant/2020年度精选策略/55 中小板-中证500配对交易.txt
+import numpy as np
+import pandas as pd
+'EXACT_REVIEWED_FUNCTION initialize sha256=507bbc3c7a2e4f1e57807f9c530a607b5733d4e37a9f594d7ecae19d990d4ec8 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def set_params():
+    g.security1 = '510220.XSHG'
+    g.security2 = '510500.XSHG'
+    g.benchmark = '510500.XSHG'
+    g.regression_ratio = 1
+    g.p = 0.5
+    g.q = 0.5
+    g.test_days = 120
+'EXACT_REVIEWED_FUNCTION set_variables sha256=6ded6274641fd07238f598e7f596a71c56df500c3cc74dd0651ea9421dc9acb5 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION handle_data sha256=b0214c76e571c8debd0bec6cbf2926a7125c1d19808e9185064a60a2c7b94c8f source=quant/2020年度精选策略/13 招行_海天配对策略-改进版.txt'
+'EXACT_REVIEWED_FUNCTION z_test sha256=26b92f21f90998b18b2558d9560aea200278e4a81818d92be7a2accfa22f763e source=quant/2020年度精选策略/13 招行_海天配对策略-改进版.txt'
+
+def get_signal():
+    z_score = z_test()
+    if z_score > 2.1:
+        return 'buy1'
+    if z_score < -2.1:
+        return 'buy2'
+    if -1.95 <= z_score <= 1.95:
+        return 'mid'
+'EXACT_REVIEWED_FUNCTION change_positions sha256=200c6ad6a2e70555743b5daf6e67e4fba242d5675247aae6686455c789db66f8 source=quant/2020年度精选策略/13 招行_海天配对策略-改进版.txt'

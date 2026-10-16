@@ -1,0 +1,447 @@
+quant/2024年度精选策略1/99.波动率交易的前言——期权定价.txt
+import datetime
+import jqdata as jq
+import numpy as np
+import pandas as pd
+from scipy.stats import norm
+from scipy.optimize import root
+from scipy.optimize import minimize
+
+def get_option_ticks(option_list, minute, frequency='1m'):
+    fields = ['time', 'current', 'position', 'volume', 'a1_p', 'b1_p', 'a1_v', 'b1_v']
+    t = int(frequency[:-1])
+    opt_ticks = []
+    for opt in option_list:
+        ticks = pd.DataFrame(get_ticks(opt, start_dt=minute - datetime.timedelta(seconds=int(60 * t)), end_dt=minute, fields=fields), columns=fields)
+        if len(ticks) > 0:
+            ticks.loc[:, 'code'] = opt
+            opt_ticks.append(ticks)
+    if len(opt_ticks) > 0:
+        opt_ticks = pd.concat(opt_ticks, axis=0).reset_index(drop=True).sort_values('time', ascending=True)
+    else:
+        opt_ticks = pd.DataFrame()
+    return opt_ticks
+underlying_code = '000300.XSHG'
+date = '2021-10-18'
+date_zero = datetime.date(2021, 10, 18)
+minute = datetime.datetime(2021, 10, 18, 14, 30, 0)
+contract = jq.opt.run_query(query(jq.opt.OPT_CONTRACT_INFO).filter(jq.opt.OPT_CONTRACT_INFO.underlying_symbol == underlying_code).filter(jq.opt.OPT_CONTRACT_INFO.list_date <= date).filter(jq.opt.OPT_CONTRACT_INFO.last_trade_date >= date)).set_index('code')
+contract = contract[contract.contract_type == 'CO']
+option_list = contract.index.tolist()
+ticks = get_option_ticks(option_list, minute).sort_values('time')
+ticks = ticks.groupby('code').tail(1).set_index('code')
+underlying = {'future_code': {}, 'future_price': {}, 'spot_price': {}}
+for i in option_list:
+    underlying['future_code'][i] = 'IF' + i[2:6] + '.CCFX'
+    underlying['spot_price'][i] = get_price(underlying_code, start_date=minute, end_date=minute, frequency='30m', fields='close').iloc[0, 0]
+    try:
+        underlying['future_price'][i] = get_price(underlying['future_code'][i], start_date=minute, end_date=minute, frequency='30m', fields='close').iloc[0, 0]
+    except:
+        pass
+risk_free = 0.0232
+q = 0
+common = list(set(ticks.index) & set(contract.index))
+maturity_days = contract.loc[common, 'expire_date'] - date_zero
+maturity = maturity_days / datetime.timedelta(days=365)
+maturity_days = maturity * 365
+maturity_days.name = 'maturity_days'
+maturity.name = 'maturity'
+underlying = pd.DataFrame(underlying).loc[common, :]
+moneyness = np.log(underlying.future_price.fillna(underlying.spot_price) / contract.exercise_price).loc[common]
+moneyness_spot = np.log(underlying.spot_price / contract.exercise_price).loc[common]
+moneyness.name = 'moneyness'
+moneyness_spot.name = 'moneyness_spot'
+contract_ticks = pd.concat([underlying, contract.loc[common, ['exercise_price', 'expire_date']], maturity_days, maturity, moneyness, moneyness_spot, ticks.loc[common, :]], axis=1).sort_values('maturity', axis=0)
+contract_ticks
+
+def bsm(s0, sigma, t, r, q, strike, model='black', out_put='greeks'):
+    discount = np.exp(-r * t)
+    if model == 'black':
+        d1 = (np.log(s0 / strike) + 0.5 * sigma ** 2 * t) / (sigma * np.sqrt(t))
+    elif model == 'bsm':
+        d1 = (np.log(s0 / strike) + (r - q + 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
+    d2 = d1 - sigma * np.sqrt(t)
+    p = norm.cdf(d2)
+    if out_put == 'greeks':
+        call = {}
+        call['delta'] = norm.cdf(d1)
+        call['gamma'] = norm.pdf(d1) / (s0 * sigma * np.sqrt(t))
+        call['vega'] = s0 * np.sqrt(t) * norm.pdf(d1)
+        call['rho'] = strike * t * discount * p
+        call['theta'] = -(s0 * norm.pdf(d1) * sigma / (2 * np.sqrt(t))) - r * strike * discount * p
+        call['dcdk'] = discount * p
+        put = {}
+        put['delta'] = call['delta'] - 1
+        put['gamma'] = call['gamma']
+        put['vega'] = call['vega']
+        put['rho'] = strike * t * discount * (1 - p)
+        put['theta'] = -(s0 * norm.pdf(d1) * sigma / (2 * np.sqrt(t))) + r * strike * discount * (1 - p)
+        put['dcdk'] = discount * (1 - p)
+        if model == 'bsm':
+            call['value'] = s0 * call['delta'] - strike * discount * p
+            put['value'] = strike * discount * (1 - p) + s0 * put['delta']
+        elif model == 'black':
+            call['value'] = discount * (s0 * call['delta'] - strike * p)
+            put['value'] = discount * (strike * (1 - p) + s0 * put['delta'])
+        return [call, put]
+    elif out_put == 'call':
+        if model == 'bsm':
+            call = s0 * norm.cdf(d1) - strike * discount * p
+        elif model == 'black':
+            call = discount * (s0 * norm.cdf(d1) - strike * p)
+        return call
+    elif out_put == 'put':
+        if model == 'bsm':
+            put = strike * discount * (1 - p) + s0 * (norm.cdf(d1) - 1)
+        elif model == 'black':
+            put = discount * (strike * (1 - p) + s0 * (norm.cdf(d1) - 1))
+        return put
+
+def implied_vol_call(s0, k, T, r, q, market_price, contract_type, model='black'):
+    if contract_type == 'CO':
+        iv = root(lambda iv: bsm(s0, iv, T, r, q, k, model, out_put='call') / market_price - 1, x0=1, tol=0.001)
+    elif contract_type == 'PO':
+        iv = root(lambda iv: bsm(s0, iv, T, r, q, k, model, out_put='put') / market_price - 1, x0=1, tol=0.001)
+    return iv
+contract_ticks = contract_ticks.to_dict()
+contract_ticks['a1_iv'] = {}
+contract_ticks['b1_iv'] = {}
+contract_type = 'CO'
+for i in contract_ticks['a1_p']:
+    if str(contract_ticks['future_price'][i]) == 'nan':
+        solve_a = implied_vol_call(contract_ticks['spot_price'][i], contract_ticks['exercise_price'][i], contract_ticks['maturity'][i], risk_free, q, contract_ticks['a1_p'][i], contract_type, model='bsm')
+        solve_b = implied_vol_call(contract_ticks['spot_price'][i], contract_ticks['exercise_price'][i], contract_ticks['maturity'][i], risk_free, q, contract_ticks['b1_p'][i], contract_type, model='bsm')
+    else:
+        solve_a = implied_vol_call(contract_ticks['future_price'][i], contract_ticks['exercise_price'][i], contract_ticks['maturity'][i], risk_free, q, contract_ticks['a1_p'][i], contract_type)
+        solve_b = implied_vol_call(contract_ticks['future_price'][i], contract_ticks['exercise_price'][i], contract_ticks['maturity'][i], risk_free, q, contract_ticks['b1_p'][i], contract_type)
+    contract_ticks['a1_iv'][i] = solve_a.x[0]
+    contract_ticks['b1_iv'][i] = solve_b.x[0]
+contract_ticks = pd.DataFrame(contract_ticks)
+initial_iv = {}
+for g in contract_ticks.groupby('expire_date'):
+    initial_iv[g[0]] = g[1].set_index('exercise_price').loc[:, ['a1_iv', 'b1_iv']].mean(axis=1).sort_index()
+pd.DataFrame(initial_iv).T
+
+def exclude_basic_arbitrage(contract_ticks):
+    contract_ticks.loc[:, 'lower_boundary'] = contract_ticks.loc[:, 'future_price'].fillna(contract_ticks.loc[:, 'spot_price'] * np.exp(-risk_free * contract_ticks.loc[:, 'maturity'])) - contract_ticks.loc[:, 'exercise_price']
+    contract_ticks.loc[:, 'lower_boundary'] = contract_ticks.loc[:, 'lower_boundary'].where(contract_ticks.loc[:, 'lower_boundary'] > 0, 0)
+    return contract_ticks.sort_values('maturity')
+contract_ticks = exclude_basic_arbitrage(contract_ticks)
+contract_ticks
+
+def exclude_arbitrage(contract_ticks, contract_type='CO', iv_boundary=0.1, adj=0.4):
+    maturity_set = contract_ticks.expire_date.drop_duplicates().sort_values().tolist()
+    spot = contract_ticks.spot_price.iloc[0]
+    ask = {}
+    bid = {}
+    for h in contract_ticks.groupby('expire_date'):
+        ask[h[0]] = h[1][h[1].b1_iv > iv_boundary].set_index('exercise_price').a1_p
+        bid[h[0]] = h[1][h[1].b1_iv > iv_boundary].set_index('exercise_price').loc[:, ['lower_boundary', 'b1_p']].max(axis=1)
+    bid = pd.DataFrame(bid).sort_index().T.sort_index().T
+    sample = pd.Series(bid.loc[:, maturity_set].count(axis=1).index).sort_values()
+    left = sample[sample <= spot].tolist()
+    right = sample[sample >= spot].tolist()
+    atmr = min(right)
+    atml = max(left)
+    left = left + [atmr]
+    right = [atml] + right
+    sample_t = bid.columns.tolist()
+    ask = pd.DataFrame(ask).loc[sample, sample_t]
+    bid = bid.loc[sample, :]
+    mid = ((bid + ask) / 2).to_dict()
+    for t in mid:
+        ind_t = sample_t.index(t)
+        scale_left = pd.Series(bid[t]).loc[left].dropna().index.tolist()
+        if len(scale_left) >= 3:
+            for k3 in scale_left[::-1]:
+                ind = scale_left.index(k3)
+                k2 = scale_left[ind - 1]
+                k1 = scale_left[ind - 2]
+                mid[t][k1] = max(mid[t][k1], adj + 2 * mid[t][k2] - mid[t][k3])
+                if scale_left.index(k1) == 0:
+                    break
+        scale_right = pd.Series(bid[t]).loc[right].dropna().index.tolist()
+        if len(scale_right) >= 3:
+            for k3 in scale_right:
+                ind = scale_right.index(k3)
+                k2 = scale_right[ind + 1]
+                k1 = scale_right[ind + 2]
+                mid[t][k1] = max(min(mid[t][k1], mid[t][k2]), adj + 2 * mid[t][k2] - mid[t][k3])
+                if scale_right.index(k1) == len(scale_right) - 1:
+                    break
+    return pd.DataFrame(mid)
+mid = exclude_arbitrage(contract_ticks)
+
+def svi_iv(mid, contract_ticks, risk_free, q=0, contract_type='CO'):
+    iv = {}
+    solve = {}
+    success = {}
+    columns = mid.columns.tolist()
+    spot = contract_ticks.spot_price.iloc[0]
+    for t in mid.columns:
+        future = contract_ticks.future_price[contract_ticks.expire_date == t].iloc[0]
+        maturity = contract_ticks.maturity[contract_ticks.expire_date == t].iloc[0]
+        if columns.index(t) > 0:
+            sub_mid = mid.loc[:, t][mid.loc[:, t].fillna(0) > mid.iloc[:, columns.index(t) - 1]]
+        else:
+            sub_mid = mid.loc[:, t].dropna()
+        iv[t] = {}
+        solve[t] = {}
+        success[t] = {}
+        for k in sub_mid.index:
+            if str(future) == 'nan':
+                solve[t][k] = implied_vol_call(spot, k, maturity, risk_free, q, sub_mid.loc[k], contract_type, model='bsm')
+            else:
+                solve[t][k] = implied_vol_call(future, k, maturity, risk_free, q, sub_mid.loc[k], contract_type)
+            success[t][k] = solve[t][k].success
+            if solve[t][k].success == True:
+                iv[t][k] = solve[t][k].x[0]
+    return [pd.DataFrame(iv), pd.DataFrame(success), solve]
+iv_matrix, success, solve = svi_iv(mid, contract_ticks, risk_free)
+iv_matrix.T
+
+def svi(moneyness, param):
+    a, b, rho, m, sig = param
+    return a + b * (rho * (moneyness - m) + np.sqrt((moneyness - m) ** 2 + sig ** 2))
+
+def loss_svi(iv, moneyness, param):
+    a, b, rho, m, sig = param
+    svi_para = svi(moneyness, param)
+    if b < 0 or abs(rho) >= 1 or svi_para.min() < 0 or (sig < 0):
+        return 10000
+    else:
+        return (iv ** 2 - svi_para).pow(2).mean()
+
+def calibrate_svi(contract_ticks, iv_matrix, para0=[0, 0.5, 0, 0, 0.05]):
+    svi_calibrated = {}
+    moneyness = {}
+    atm = {}
+    spot = contract_ticks.spot_price.iloc[0]
+    for t in iv_matrix.columns:
+        future = contract_ticks.future_price[contract_ticks.expire_date == t].iloc[0]
+        iv = iv_matrix.loc[:, t].dropna()
+        if str(future) == 'nan':
+            moneyness[t] = np.log(pd.Series(iv_matrix.index, index=iv_matrix.index) / spot)
+            atm[t] = spot
+        else:
+            moneyness[t] = np.log(pd.Series(iv_matrix.index, index=iv_matrix.index) / future)
+            atm[t] = future
+        svi_calibrated[t] = minimize(lambda param: loss_svi(iv_matrix.loc[:, t].dropna(), moneyness[t].loc[iv.index], param), para0)
+    return [svi_calibrated, pd.DataFrame(moneyness), atm]
+svi_calibrated, moneyness, atm = calibrate_svi(contract_ticks, iv_matrix)
+para = {}
+for i in svi_calibrated:
+    para[i] = pd.Series(svi_calibrated[i].x, index=['a', 'b', 'rho', 'm', 'sig'])
+para = pd.DataFrame(para)
+para
+iv_svi = {}
+for i in svi_calibrated:
+    iv_svi[i] = pd.Series(svi(moneyness.loc[:, i], svi_calibrated[i].x) ** 0.5, index=moneyness.index)
+iv_svi = pd.DataFrame(iv_svi)
+iv_svi.plot()
+t = 0
+pd.DataFrame({'svi': iv_svi.iloc[:, t], 'mid_iv': iv_matrix.iloc[:, t]}).dropna().plot(title=str(iv_matrix.iloc[:, 0].name))
+from scipy.interpolate import make_interp_spline
+
+def get_local_vol(underlying, days, min_qoute, r, q=0, model='black'):
+    dt = t / min(100, days)
+    ds = (underlying - min_qoute) / 1000
+    t_grid, s_grid = np.meshgrid(dt * np.arange(min(100, days) + 1), ds * np.arange(2001))
+    s_grid += min_qoute
+    t_grid[:, 0] += t_grid[:, 1] / 100
+    iv_svi = {}
+    iv_svi_up = {}
+    iv_svi_down = {}
+    for i in svi_calibrated:
+        iv_svi[i] = pd.Series(svi(np.log(s_grid[:, 0] / underlying), svi_calibrated[i].x), s_grid[:, 0])
+        iv_svi_up[i] = pd.Series(svi(np.log((s_grid[:, 0] + dt) / underlying), svi_calibrated[i].x), index=s_grid[:, 0])
+        iv_svi_down[i] = pd.Series(svi(np.log((s_grid[:, 0] - dt) / underlying), svi_calibrated[i].x), index=s_grid[:, 0])
+    iv_svi = pd.DataFrame(iv_svi)
+    iv_svi_up = pd.DataFrame(iv_svi_up)
+    iv_svi_down = pd.DataFrame(iv_svi_down)
+    maturities = contract_ticks.dropna().set_index('expire_date').maturity.drop_duplicates()
+    interp = make_interp_spline(maturities, iv_svi.loc[:, maturities.index].T)
+    interp_longer = interp(t_grid[0, :] + dt).T
+    interp = interp(t_grid[0, :]).T
+    interp_up = make_interp_spline(maturities, iv_svi_up.loc[:, maturities.index].T)(t_grid[0, :]).T
+    interp_down = make_interp_spline(maturities, iv_svi_down.loc[:, maturities.index].T)(t_grid[0, :]).T
+    div2_dk2 = (interp_up - 2 * interp + interp_down) / ds ** 2
+    div_dt = (interp_longer - interp) / dt
+    div_dk = 0.5 * (interp_up - interp + (interp - interp_down)) / ds
+    if model == 'black':
+        d1 = (np.log(underlying / s_grid) + 0.5 * interp ** 2 * t_grid) / (interp * np.sqrt(t_grid))
+        lv = (div_dt + interp / t_grid) / (s_grid ** 2 * (div2_dk2 - d1 * np.sqrt(t_grid) * div_dk ** 2 + (1 / (s_grid * np.sqrt(t_grid)) + d1 * div_dk) ** 2 / interp))
+    elif model == 'bsm':
+        d1 = (np.log(underlying / s_grid) + (r - q + 0.5 * interp ** 2) * t_grid) / (interp * np.sqrt(t_grid))
+        lv = (div_dt + interp / t_grid + 2 * s_grid * (r - q) * div_dk) / (s_grid ** 2 * (div2_dk2 - d1 * np.sqrt(t_grid) * div_dk ** 2 + (1 / (s_grid * np.sqrt(t_grid)) + d1 * div_dk) ** 2 / interp))
+    return [s_grid, t_grid, lv * 2, ds, dt, interp]
+from scipy import linalg
+
+def ifd_bs_call(strike, s_grid, ds, t, dt, sigma, r, q=0, model='black'):
+    call = np.zeros_like(s_grid)
+    call[:, len(call.T) - 1] = s_grid[:, len(call.T) - 1] - strike
+    call[:, len(call.T) - 1][call[:, len(call.T) - 1] < 0] = 0
+    call[-1, :] = s_grid[-1, len(call.T) - 1] - strike
+    call[0, :] = 0
+    vet = (s_grid[:, 0] - min_qoute) / ds + 1
+    for i in range(len(s_grid.T) - 1, 0, -1):
+        if type(sigma) == float:
+            sig = 0
+        else:
+            sig = sigma[:, i]
+        if model == 'black':
+            a = -0.5 * (sig * vet) ** 2 * dt
+            b = 1 + (r + (sig * vet) ** 2) * dt
+            c = -0.5 * (sig * vet) ** 2 * dt
+        elif model == 'bsm':
+            a = 0.5 * ((r - q) * vet - (sig * vet) ** 2) * dt
+            b = 1 + (r + (sig * vet) ** 2) * dt
+            c = -0.5 * ((r - q) * vet + (sig * vet) ** 2) * dt
+        mat = (np.diag(b) + np.column_stack((np.row_stack((np.zeros(len(a[1:])), np.diag(a[1:]))), np.zeros(len(a)))) + np.column_stack((np.zeros(len(c)), np.row_stack((np.diag(c[:-1]), np.zeros(len(c[:-1])))))))[1:-1, 1:-1]
+        plus = np.zeros_like(call[1:-1, i])
+        plus[0] = a[1] * call[0, i]
+        plus[-1] = c[-2] * call[-1, i]
+        call[1:-1, i - 1] = linalg.solve(mat, call[1:-1, i] - plus)
+    return call
+spot = contract_ticks.spot_price.iloc[0]
+min_qoute = 0.2
+strike = 4850
+model = 'black'
+for g in contract_ticks.dropna().groupby('expire_date'):
+    underlying = g[1].future_price.iloc[0]
+    t = g[1].maturity.iloc[0]
+    days = int(round(365 * t))
+    s_grid, t_grid, lv, ds, dt, interp = get_local_vol(underlying, days, min_qoute, risk_free)
+    r = risk_free
+    sigma = np.sqrt(np.where(lv > 0, lv, lv[lv > 0].min()))
+    sigma1 = 0.168 + np.zeros_like(s_grid)
+    call = ifd_bs_call(strike, s_grid, ds, t, dt, sigma, risk_free)
+    call1 = ifd_bs_call(strike, s_grid, ds, t, dt, sigma1, risk_free)
+    break
+from scipy.integrate import quad
+
+def heston93_char_func(u, T, r, q, kappa_v, theta_v, sigma_v, rho, v0):
+    c1 = kappa_v * theta_v
+    c2 = -np.sqrt((rho * sigma_v * u * 1j - kappa_v) ** 2 - (-u * 1j - u ** 2) * sigma_v ** 2)
+    c3 = (kappa_v - rho * sigma_v * u * 1j + c2) / (kappa_v - rho * sigma_v * u * 1j - c2)
+    h1 = (r - q) * u * 1j * T + c1 / sigma_v ** 2 * ((kappa_v - rho * sigma_v * u * 1j + c2) * T - 2 * np.log((1 - c3 * np.exp(c2 * T)) / (1 - c3)))
+    h2 = (kappa_v - rho * sigma_v * u * 1j + c2) / sigma_v ** 2 * ((1 - np.exp(c2 * T)) / (1 - c3 * np.exp(c2 * T)))
+    return np.exp(h1 + h2 * v0)
+
+def heston93_int_func(u, s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0):
+    char_value = heston93_char_func(u - 1j * 0.5, T, r, q, kappa_v, theta_v, sigma_v, rho, v0)
+    int_value = (np.exp(1j * u * np.log(s0 / k)) * char_value).real / (u ** 2 + 0.25)
+    return int_value
+
+def heston93_vanilla_call(s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0):
+    int_value = quad(lambda u: heston93_int_func(u, s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0), 0, np.inf, limit=250)[0]
+    call_value = max(0, s0 * np.exp(-q * T) - np.exp(-(r + q) * T / 2) * np.sqrt(s0 * k) * int_value / np.pi)
+    return call_value
+
+def merton76_char_func(u, T, r, sigma, lamb, mu, delta):
+    omega = r - q - 0.5 * sigma ** 2 - lamb * (np.exp(mu + 0.5 * delta ** 2) - 1)
+    char_value = np.exp((1j * u * omega - 0.5 * (u * sigma) ** 2 + lamb * (np.exp(1j * u * mu - u ** 2 * delta ** 2 * 0.5) - 1)) * T)
+    return char_value
+
+def merton76_int_func(u, s0, k, T, r, q, sigma, lamb, mu, delta):
+    char_value = merton76_char_func(u - 1j * 0.5, T, r, sigma, lamb, mu, delta)
+    int_value = (np.exp(1j * u * (np.log(s0 / k) + (r - q) * T)) * char_value).real / (u ** 2 + 0.25)
+    return int_value
+
+def merton76_vanilla_call(s0, k, T, r, q, sigma, lamb, mu, delta):
+    int_value = quad(lambda u: merton76_int_func(u, s0, k, T, r, q, sigma, lamb, mu, delta), 0, np.inf, limit=250)[0]
+    call_value = max(0, s0 * np.exp(-q * T) - np.exp(-(r + q) * T / 2) * np.sqrt(s0 * k) * int_value / np.pi)
+    return call_value
+
+def merton76_bcc_char_func(u, T, lamb, mu, delta):
+    omega = -lamb * (np.exp(mu + 0.5 * delta ** 2) - 1)
+    char_value = np.exp((1j * u * omega + lamb * (np.exp(1j * u * mu - u ** 2 * delta ** 2 * 0.5) - 1)) * T)
+    return char_value
+
+def bcc97_char_func(u, T, r, q, kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta):
+    bcc1 = heston93_char_func(u, T, r, kappa_v, theta_v, sigma_v, rho, v0)
+    bcc2 = merton76_bcc_char_func(u, T, lamb, mu, delta)
+    return bcc1 * bcc2
+
+def bcc97_int_func(u, s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta):
+    char_value = bcc97_char_func(u - 1j * 0.5, T, r, q, kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta)
+    int_value = (np.exp(1j * u * (np.log(s0 / k) + (r - q) * T)) * char_value).real / (u ** 2 + 0.25)
+    return int_value
+
+def bcc97_vanilla_call(s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta):
+    int_value = quad(lambda u: bcc97_int_func(u, s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta), 0, np.inf, limit=250)[0]
+    call_value = max(0, s0 * np.exp(-q * T) - np.exp(-(r + q) * T / 2) * np.sqrt(s0 * k) * int_value / np.pi)
+    return call_value
+heston93_char_func(1, underlying.iloc[0], risk_free, 0, 0.54, 0.04, 1, -0.7, 0.4)
+
+def heston93_error(underlying, market_price, maturity, param, r, q=0):
+    kappa_v, theta_v, sigma_v, rho, v0 = param
+    mse = {}
+    if kappa_v <= 0 or theta_v < 0.01 or sigma_v <= 0 or (abs(rho) >= 1) or (v0 <= 0):
+        return 10000000.0
+    else:
+        for i in market_price.columns:
+            if i not in underlying.index:
+                continue
+            if type(underlying) == float:
+                s0 = underlying
+            else:
+                s0 = underlying[i]
+            T = maturity[i]
+            sub_market = market_price.loc[:, i].dropna()
+            for k in sub_market.index:
+                mse[i, k] = heston93_vanilla_call(s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0) / sub_market[k] - 1
+    return (pd.Series(mse) ** 2).mean()
+
+def merton76_error(underlying, market_price, sigma, maturity, param, r, q=0):
+    lamb, mu, delta = param
+    mse = {}
+    if lamb < 0 or mu < -0.5 or delta < 0:
+        return 10000000.0
+    else:
+        for i in market_price.columns:
+            if i not in underlying.index:
+                continue
+            if type(underlying) == float:
+                s0 = underlying
+            else:
+                s0 = underlying[i]
+            T = maturity[i]
+            sub_market = market_price.loc[:, i].dropna()
+            for k in sub_market.index:
+                if k in sigma.index:
+                    mse[i, k] = merton76_vanilla_call(s0, k, T, r, q, sigma.loc[k, i], lamb, mu, delta) / sub_market[k] - 1
+    return (pd.Series(mse) ** 2).mean()
+
+def bcc97_error(underlying, market_price, maturity, param, r, q=0):
+    [kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta] = param
+    para_init = pd.Series({'kappa_v': kappa_v, 'theta_v': theta_v, 'sigma_v': sigma_v, 'rho': rho, 'v0': v0, 'lamb': lamb, 'mu': mu, 'delta': delta})
+    mse = {}
+    if kappa_v <= 0 or theta_v < 0.01 or sigma_v <= 0 or (abs(rho) >= 1) or (v0 <= 0) or (lamb < 0) or (mu < -0.5) or (mu > 0.1) or (delta < 0):
+        return 10000000.0
+    else:
+        for i in market_price.columns:
+            if i not in underlying.index:
+                continue
+            if type(underlying) == float:
+                s0 = underlying
+            else:
+                s0 = underlying[i]
+            T = maturity[i]
+            sub_market = market_price.loc[:, i].dropna()
+            for k in sub_market.index:
+                mse[i, k] = bcc97_vanilla_call(s0, k, T, r, q, kappa_v, theta_v, sigma_v, rho, v0, lamb, mu, delta) / sub_market[k] - 1
+        mse = pd.Series(mse) ** 2
+        penalty = np.sqrt((pd.Series({'kappa_v': kappa_v, 'theta_v': theta_v, 'sigma_v': sigma_v, 'rho': rho, 'v0': v0, 'lamb': lamb, 'mu': mu, 'delta': delta}) - para_init).sum() ** 2)
+    return mse.mean() + penalty
+underlying = contract_ticks.dropna().set_index('expire_date').future_price.drop_duplicates()
+maturity = contract_ticks.set_index('expire_date').maturity.drop_duplicates()
+heston93_vanilla_call(underlying.iloc[0], maturity.iloc[0], underlying.iloc[0], risk_free, 0, 0.54, 0.04, 1, -0.7, 0.4)
+from scipy.optimize import brute
+from scipy.optimize import minimize
+heston0 = brute(lambda param: heston93_error(underlying, mid, maturity, param, risk_free), ((1, 21, 1), (0.01, 0.09, 0.01), (0.1, 0.51, 0.1), (-0.5, 0.1, 0.1), (0.01, 0.161, 0.02)))
+merton0 = brute(lambda param: merton76_error(underlying, mid, iv_matrix, maturity, param, risk_free), ((0.1, 1.1, 0.25), (-0.5, -0.09, 0.2), (0.01, 0.52, 0.16)))
+heston = minimize(lambda param: heston93_error(underlying, mid, maturity, param, r=risk_free, q=risk_free), heston0)
+merton = minimize(lambda param: merton76_error(underlying, mid, iv_matrix, maturity, param, r=risk_free, q=risk_free), merton0)
+bcc0 = list(heston.x) + list(merton.x)
+bcc = minimize(lambda param: bcc97_error(underlying, mid, maturity, param, r=risk_free, q=risk_free), bcc0)

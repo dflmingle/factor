@@ -1,0 +1,95 @@
+quant/2021年度精选策略/71.【股指策略】【研报复现】周内与日内结合CTA.txt
+from jqdata import *
+
+def initialize(context):
+    mkt = 2
+    g.leverage = 3
+    g.multiplier = 300
+    if mkt == 50 or mkt == 1:
+        g.benchmark = '000016.XSHG'
+        g.ins = 'IH'
+    elif mkt == 300 or mkt == 2:
+        g.benchmark = '000300.XSHG'
+        g.ins = 'IF'
+    elif mkt == 500 or mkt == 3:
+        g.benchmark = '000905.XSHG'
+        g.ins = 'IC'
+        g.multiplier = 200
+    g.trade_days = list(get_all_trade_days())
+    g.flag = ''
+    g.week_signal = ''
+    run_daily(before_market_open, time='09:00', reference_security='IF8888.CCFX')
+    run_daily(on_close, time='10:00', reference_security='IF8888.CCFX')
+    run_daily(on_open, time='14:59', reference_security='IF8888.CCFX')
+
+def before_market_open(context):
+    g.main = get_dominant_future(g.ins)
+    today = context.current_dt.date()
+    g.nextday = g.trade_days[g.trade_days.index(today) + 1]
+    g.skip = True if (g.nextday - today).days > 3 else False
+
+def close_position(context):
+    code = context.portfolio.positions.keys()
+    g.flag = ''
+    for c in code:
+        order_target(c, 0)
+    code = context.portfolio.short_positions.keys()
+    for c in code:
+        order_target(c, 0, None, 'short')
+
+def reverse_position(context):
+    posi = context.portfolio.positions
+    for p in posi.values():
+        code = p.security
+        qty = p.total_amount
+        order_target(code, 0)
+
+def on_close(context):
+    if g.flag == 'long' and g.week_signal == 'short':
+        reverse_position(context)
+        g.flag = ''
+
+def on_open(context):
+    if g.flag == 'short':
+        close_position(context)
+    cash = context.portfolio.available_cash
+    df = attribute_history(g.main, 60, '1m', ['close', 'volume'])
+    future = df.close.values
+    close_pre2 = attribute_history(g.benchmark, 2, '1d', 'close').close.values[0]
+    index = attribute_history(g.benchmark, 15, '1m', 'close').close.values
+    signal = 'long' if index[-1] > close_pre2 else 'short'
+    weekday = g.nextday.weekday()
+    if signal == 'long' and weekday == 0:
+        g.week_signal = 'long'
+    elif signal == 'short':
+        if weekday in [0, 3]:
+            g.week_signal = 'short'
+        elif weekday == 1:
+            g.week_signal = 'long'
+    df.volume /= df.volume.sum()
+    settle = (df.close * df.volume).sum()
+    close = df.close[-1]
+    if g.skip:
+        close_position(context)
+        return
+    qty = min(int(cash / close / g.multiplier * g.leverage), 20)
+    date = str(context.current_dt.date())
+    start = date + ' 14:00:00'
+    start2 = date + ' 14:30:00'
+    end = date + ' 14:59:00'
+    t = get_ticks(g.main, start_dt=start2, end_dt=end, fields=['a1_v', 'b1_v'])
+    buy = t['b1_v'].sum()
+    sell = t['a1_v'].sum()
+    imba = 2 * (buy - sell) / (buy + sell)
+    f1 = 1 if settle > close else 0
+    f2 = 1 if imba > 0 else 0
+    f3 = 1 if index[0] - index[-1] - (future[-15] - future[-1]) < 0 else 0
+    if g.flag != 'long' and (f1 + f2 + f3 > 1 or g.week_signal == 'long'):
+        g.flag = 'long'
+        order(g.main, qty)
+    elif g.flag == 'long' and ~(f1 + f2 + f3 > 1 or g.week_signal == 'long'):
+        close_position(context)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+
+def get_CCFX_end_date(future_code):
+    return get_security_info(future_code).end_date

@@ -1,0 +1,250 @@
+quant/2021年度精选策略/11.多因子选股策略——基于传统分析.txt
+import pandas as pd
+from jqdata import *
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import datetime
+import pickle
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+import warnings
+warnings.filterwarnings('ignore')
+import matplotlib
+matplotlib.rcParams['font.family'] = 'serif'
+matplotlib.rcParams['axes.unicode_minus'] = False
+fac_dict = {'MC': valuation.market_cap, 'TA': balance.total_assets, 'TOR': income.total_operating_revenue, 'GPM': indicator.gross_profit_margin, 'NPM': indicator.net_profit_margin, 'AP': balance.accounts_payable, 'APE': balance.advance_peceipts, 'AR': balance.account_receivable, 'APA': balance.advance_payment, 'OPM': income.operating_profit / income.operating_revenue, 'INV': balance.inventories, 'OC': income.operating_cost, 'PE': valuation.pe_ratio, 'PB': valuation.pb_ratio, 'PR': valuation.pcf_ratio, 'PS': valuation.ps_ratio, 'EPS': indicator.eps, 'BEPS': income.basic_eps, 'GP': indicator.gross_profit_margin * income.operating_revenue, 'OP': income.operating_profit, 'OR': income.operating_revenue, 'NP': income.net_profit, 'EV': valuation.market_cap + balance.shortterm_loan + balance.non_current_liability_in_one_year + balance.longterm_loan + balance.bonds_payable + balance.longterm_account_payable - cash_flow.cash_and_equivalents_at_end, 'TOE': balance.total_owner_equities, 'EBIT': income.net_profit + income.financial_expense + income.income_tax_expense, 'TOC': income.total_operating_cost, 'NOCF/MC': cash_flow.net_operate_cash_flow / valuation.market_cap, 'OTR': indicator.ocf_to_revenue, 'GPOA': indicator.gross_profit_margin * income.operating_revenue / balance.total_assets, 'ROA': indicator.roa, 'ROE': indicator.roe, 'INC': indicator.inc_return, 'AP': indicator.adjusted_profit, 'OP': indicator.operating_profit, 'VCP': indicator.value_change_profit, 'ETTR': indicator.expense_to_total_revenue, 'OPTTR': indicator.operation_profit_to_total_revenue, 'NPTTR': indicator.net_profit_to_total_revenue, 'OETTR': indicator.operating_expense_to_total_revenue, 'GETTR': indicator.ga_expense_to_total_revenue, 'FETTR': indicator.financing_expense_to_total_revenue, 'OPTP': indicator.operating_profit_to_profit, 'IPTP': indicator.invesment_profit_to_profit, 'GSASTR': indicator.goods_sale_and_service_to_revenue, 'OTR': indicator.ocf_to_revenue, 'OTOP': indicator.ocf_to_operating_profit, 'ITRYOY': indicator.inc_total_revenue_year_on_year, 'ITRA': indicator.inc_total_revenue_annual, 'IRYOY': indicator.inc_revenue_year_on_year, 'IRA': indicator.inc_revenue_annual, 'IOPYOY': indicator.inc_operation_profit_year_on_year, 'IOPA': indicator.inc_operation_profit_annual, 'INPYOY': indicator.inc_net_profit_year_on_year, 'INPA': indicator.inc_net_profit_annual, 'INPTSYOY': indicator.inc_net_profit_to_shareholders_year_on_year, 'INPTSA': indicator.inc_net_profit_to_shareholders_annual, 'INPTSA': indicator.inc_net_profit_to_shareholders_annual, 'ROIC': (income.net_profit + income.financial_expense + income.income_tax_expense) / (balance.total_owner_equities + balance.shortterm_loan + balance.non_current_liability_in_one_year + balance.longterm_loan + balance.bonds_payable + balance.longterm_account_payable), 'OPTT': income.operating_profit / income.total_profit, 'TP/TOR': income.total_profit / income.total_operating_revenue, 'OP/TOR': income.operating_profit / income.total_operating_revenue, 'NP/TOR': income.net_profit / income.total_operating_revenue, 'NP': income.net_profit, 'DER': balance.total_liability / balance.equities_parent_company_owners, 'FCFF/TNCL': (cash_flow.net_operate_cash_flow - cash_flow.net_invest_cash_flow) / balance.total_non_current_liability, 'NOCF/TL': cash_flow.net_operate_cash_flow / balance.total_liability, 'TCA/TCL': balance.total_current_assets / balance.total_current_liability, 'TOR/TA': income.total_operating_revenue / balance.total_assets, 'TOR/FA': income.total_operating_revenue / balance.fixed_assets, 'TOR/TCA': income.total_operating_revenue / balance.total_current_assets, 'LTL/OC': balance.longterm_loan / income.operating_cost, 'TL/TA': balance.total_liability / balance.total_assets, 'TL/TOE': balance.total_liability / balance.total_owner_equities, '': income.operating_revenue}
+'EXACT_REVIEWED_FUNCTION get_quanter_form_pubdate sha256=23d6c84f7f31b96c738f11891be992fb8750167ce772d880642291ffce18cf2b source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION get_date_from_quanter sha256=84ea8fbc86b4c5ff44f7d2ae6efbf17e32cbbdffb7112fd9dc182d9048bfd550 source=quant/2021年度精选策略/10.多因子选股.txt'
+quanter = get_quanter_form_pubdate('2018-08-25')
+date = get_date_from_quanter('2018q3')
+date
+current_date = datetime.datetime.now()
+current_date = current_date - datetime.timedelta(1)
+current_date = datetime.datetime.strftime(current_date, '%Y-%m-%d')
+quanter_date = get_quanter_form_pubdate(current_date)
+year = int(quanter_date[:4])
+quanter = int(quanter_date[-1])
+scale_factors = ['MC', 'TA', 'TOR']
+comptitiveness_factors_origin = ['AP', 'APE', 'AR', 'APA']
+comptitiveness_factors_use = ['GPM', 'NPM']
+comptitiveness_factors = comptitiveness_factors_origin + comptitiveness_factors_use
+operating_factors = ['OPM']
+growth_factors_origin = ['EPS', 'NP']
+growth_factors_use = ['IRYOY', 'IRA']
+growth_factors = growth_factors_origin + growth_factors_use
+valuation_factors = ['PE', 'PS', 'EPS']
+factor_list = scale_factors + comptitiveness_factors + operating_factors + growth_factors + valuation_factors
+factor_list = list(set(factor_list))
+date = '2018-10-20'
+start_date = '2015-01-01'
+end_date = '2019-12-31'
+TIME_WINDOW = [30, 60, 90]
+SELECT_STOCKS_NUM = 5
+WEIGHT = [2, 1, 1, 2, 1]
+YEAR = 2018
+QUATER = 2
+N = 3
+buy_date = '2018-09-01'
+sell_date = '2019-03-31'
+INDUSTRY_CODE = '801140'
+INDUSTRY_RULE = 'sw_l1'
+'EXACT_REVIEWED_FUNCTION get_stock_industry sha256=2a101ece60b04f469523e4e8a34e3dd19da8467ac1214b78585f81788f40dbc1 source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION get_fundamental_data sha256=23286d95d0601185ee00c7a33b509a5803a9ae3e202c24c18f8958823900a56c source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION get_stocks_fundamentals sha256=4f6bf079d17ac61cea5a3ee70b5ff6e4b2810892746a9e5ff8ba98bc69df13cf source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION get_tradeday_list sha256=09738207b2ec48d3d4d607ead6a64175c6be52463d0c9e49df360d3296201550 source=quant/2021年度精选策略/10.多因子选股.txt'
+industry_stocks = get_industry_stocks(INDUSTRY_CODE, date)
+fund = get_fundamental_data(factor_list, date, industry_stocks)
+
+def get_stocks_fundamentals(stocks, fac_list, date, pubdate=False):
+    if len(stocks) > 4:
+        if stocks[-5] == '.':
+            stocks = [stocks]
+    if pubdate == False:
+        q = query(valuation.code)
+        for fac in fac_list:
+            q = q.add_column(fac_dict[fac])
+        q = q.filter(valuation.code.in_(stocks))
+        if len(date) == 6:
+            fund_data = get_fundamentals(q, statDate=date)
+        else:
+            fund_data = get_fundamentals(q, date)
+        fund_data.columns = ['code'] + fac_list
+        fund_data = fund_data.set_index('code')
+    else:
+        q = query(valuation.code, cash_flow.pubDate)
+        for fac in fac_list:
+            q = q.add_column(fac_dict[fac])
+        q = q.filter(valuation.code.in_(stocks))
+        if len(date) == 6:
+            fund_data = get_fundamentals(q, statDate=date)
+        else:
+            fund_data = get_fundamentals(q, date)
+        fund_data.columns = ['code', 'pubdate'] + fac_list
+        fund_data = fund_data.set_index('code')
+    return fund_data
+'EXACT_REVIEWED_FUNCTION rank_in_industry sha256=7366fa8f448cc9fd0422d3917afd5d2b6a08040546552de850c27fb45f2e4ed7 source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION stand_in_industry sha256=f5e81934d0120c8ec8ec484e6a8fdc7621129a4b331f33c83f8112eaf99f63d1 source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION outlier_processing sha256=17edbc78205a4cb5e6c56a6eebdf41920fab14d298d6a1916c6f55291b1938ec source=quant/2021年度精选策略/10.多因子选股.txt'
+fund = get_stocks_fundamentals(industry_stocks, factor_list, date)
+scale_df = fund[scale_factors]
+scale_rank = rank_in_industry(scale_df)
+scale_stand = stand_in_industry(scale_df)
+comptitiveness_df = fund[comptitiveness_factors]
+comptitiveness_df['APARP'] = (comptitiveness_df['AP'] + comptitiveness_df['APE']) / (comptitiveness_df['AR'] + comptitiveness_df['APA'])
+comptitiveness_factors_new = comptitiveness_factors_use + ['APARP']
+comptitiveness_df = comptitiveness_df[comptitiveness_factors_new]
+comptitiveness_rank = rank_in_industry(comptitiveness_df)
+comptitiveness_stand = stand_in_industry(comptitiveness_df)
+'EXACT_REVIEWED_FUNCTION caculate_inventories_days sha256=7eec36ae4dbdbe7f9601eeddd1526ad0a1b1f585f6720b4ad78b2cb62c0af43e source=quant/2021年度精选策略/10.多因子选股.txt'
+trun_days = caculate_inventories_days(industry_stocks, current_date)
+operating_df = fund[operating_factors]
+operating_df = pd.concat([operating_df, trun_days], axis=1)
+operating_rank = rank_in_industry(operating_df, [1, -1])
+operating_stand = stand_in_industry(operating_df)
+'EXACT_REVIEWED_FUNCTION caculate_growth_rate sha256=97d09922b52edecc3e589d30dbf37a3e4d78afad81d41421b22650fa4c7cdc1c source=quant/2021年度精选策略/10.多因子选股.txt'
+growth_yoy, growth_hb = caculate_growth_rate(industry_stocks, current_date, growth_factors_origin)
+growth_df_use = fund[growth_factors_use]
+growth_df = pd.concat([growth_df_use, growth_yoy], axis=1)
+growth_rank = rank_in_industry(growth_df)
+growth_stand = stand_in_industry(growth_df)
+valuation_df = fund[valuation_factors]
+valuation_rank = rank_in_industry(valuation_df)
+valuation_stand = stand_in_industry(valuation_df)
+
+def get_all_dimension_fund(stocks, date, fac_list=factor_list):
+    fund = get_stocks_fundamentals(stocks, fac_list, date)
+    scale_df = fund[scale_factors]
+    scale_rank = rank_in_industry(scale_df, pro_name='scale_')
+    scale_stand = stand_in_industry(scale_df, pro_name='std_')
+    comptitiveness_df = fund[comptitiveness_factors]
+    comptitiveness_df['APARP'] = (comptitiveness_df['AP'] + comptitiveness_df['APE']) / (comptitiveness_df['AR'] + comptitiveness_df['APA'])
+    comptitiveness_factors_new = comptitiveness_factors_use + ['APARP']
+    comptitiveness_df = comptitiveness_df[comptitiveness_factors_new]
+    comptitiveness_rank = rank_in_industry(comptitiveness_df, pro_name='comptitiveness_')
+    comptitiveness_stand = stand_in_industry(comptitiveness_df, pro_name='std_')
+    trun_days = caculate_inventories_days(stocks, date)
+    operating_df = fund[operating_factors]
+    operating_df = pd.concat([operating_df, trun_days], axis=1)
+    operating_rank = rank_in_industry(operating_df, [1, -1], pro_name='operating_')
+    operating_stand = stand_in_industry(operating_df, pro_name='std_')
+    growth_yoy, growth_hb = caculate_growth_rate(stocks, date, growth_factors_origin)
+    growth_df_use = fund[growth_factors_use]
+    growth_df = pd.concat([growth_df_use, growth_yoy], axis=1)
+    growth_rank = rank_in_industry(growth_df, pro_name='growth_')
+    growth_stand = stand_in_industry(growth_df, pro_name='std_')
+    valuation_df = fund[valuation_factors]
+    valuation_rank = rank_in_industry(valuation_df, pro_name='valuation_')
+    valuation_stand = stand_in_industry(valuation_df, pro_name='std_')
+    l = [scale_rank, scale_stand, comptitiveness_rank, comptitiveness_stand, operating_rank, operating_stand, growth_rank, growth_stand, valuation_rank, valuation_stand]
+    res = pd.concat(l, axis=1)
+    return res
+'EXACT_REVIEWED_FUNCTION get_year_quater sha256=676148236d2ed8ccdcf87c2498f522ba61bac1c1c0e5a298157e3db11e7c3601 source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION get_next_tradeday sha256=ddc2b285ed511cf84e46c8965a02c452d87771b4fd359bee8b6b3b2b1cb7d5f5 source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION get_future_data sha256=c1ebe3e3ed6c37c591b97726d751afde7a70cc0b16ecfd86b37a3a530e8c8d7a source=quant/2021年度精选策略/10.多因子选股.txt'
+'EXACT_REVIEWED_FUNCTION caculate_future_profit sha256=771b5b1e8f12bf4a8ab464e04a4e616f64c2c10f9131139fbc37b6ff4cb8df99 source=quant/2021年度精选策略/10.多因子选股.txt'
+
+def get_history_fund_and_profit(industry_stocks, date, factor_list, time_window=90):
+    if date[4] == 'q':
+        industry_date = get_date_from_quanter(date)
+    else:
+        industry_date = date
+    f = get_stocks_fundamentals(industry_stocks, ['PE'], date, pubdate=True)
+    pubdate = f['pubdate']
+    pubdate_stocks = list(pubdate.index)
+    industry_stocks = list(set(industry_stocks) & set(pubdate_stocks))
+    if len(industry_stocks) == 0:
+        return None
+    profit_l = []
+    for stock in industry_stocks:
+        pubdate_stock = pubdate.ix[stock]
+        pubdate_next_day = get_next_tradeday(pubdate_stock)
+        profit = caculate_future_profit(stock, pubdate_next_day, time_window)
+        profit_l.append(profit)
+    profit_df = pd.concat(profit_l)
+    profit_df.index = industry_stocks
+    profit_df.name = 'profit'
+    fund = get_all_dimension_fund(industry_stocks, date, fac_list=factor_list)
+    res = pd.concat([fund, profit_df], axis=1)
+    return res
+
+def get_industry_quanter_fund_profit_data(industry_rule, factor_list, time_window):
+    industries = get_industries(industry_rule)
+    industry_code_list = list(industries.index)
+    quanter_list = get_year_quater(start_date, end_date)
+    industry_name = industries['name'].values
+    industry_dic = {}
+    for industry_code in industry_code_list:
+        industry_stocks = get_industry_stocks(industry_code)
+        res_dic = {}
+        for quanter_date in quanter_list:
+            quanter_fund_profit = get_history_fund_and_profit(industry_stocks, quanter_date, factor_list, TIME_WINDOW)
+            res_dic[quanter_date] = quanter_fund_profit
+        industry_dic[industry_code] = res_dic
+        with open('traditional_data_' + str(industry_code) + '.pkl', 'wb') as pk:
+            pickle.dump(res_dic, pk)
+    return industry_dic
+with open('traditional_data.pkl', 'wb') as pk:
+    pickle.dump(all_data, pk)
+with open('traditional_data.pkl', 'rb') as pk:
+    res_dic = pickle.load(pk)
+len(res_dic)
+keys = list(res_dic.keys())
+key_industry_code = keys[0]
+industry_fund = res_dic[key_industry_code]
+key_quanter = list(industry_fund.keys())
+quanter_s = key_quanter[0]
+test_fund_select = industry_fund[quanter_s]
+select_factor = ['scale_score', 'comptitiveness_score', 'operating_score', 'growth_score', 'valuation_score']
+test_fund_select = test_fund_select[select_factor]
+test_fund_select.head()
+'EXACT_REVIEWED_FUNCTION draw_radar sha256=56616ab61b46577d3800c4867b042b489511ae3d34af60cd62c2e1115dc6ab25 source=quant/2021年度精选策略/10.多因子选股.txt'
+sample = test_fund_select.iloc[1]
+labels = np.array(['规模', '竞争力', '经营能力', '成长性', '估值'])
+draw_radar(labels, sample)
+
+def stocks_select_traditional(data, weights, select_num):
+    data_weights = (data * weights).sum(axis=1)
+    data_weights = data_weights.sort_values(ascending=False)
+    stocks = list(data_weights.index[:select_num])
+    return stocks
+weights = [2, 1, 1, 2, 1]
+select_stocks = stocks_select_traditional(test_fund_select, weights, select_num=SELECT_STOCKS_NUM)
+'EXACT_REVIEWED_FUNCTION caculate_select_stocks_profit sha256=b898c1faa781eaf92b13815c2f3e0c7f10cfa752b4638e05259831d7a76cf5ea source=quant/2021年度精选策略/10.多因子选股.txt'
+caculate_select_stocks_profit(select_stocks, quanter_s, TIME_WINDOW, res_format='rel')
+
+def get_res_data(res_dic, weight, select_stocks_num, time_window):
+    select_factor = ['scale_score', 'comptitiveness_score', 'operating_score', 'growth_score', 'valuation_score']
+    industry_code_keys = list(res_dic.keys())
+    industry_code_dic = {}
+    for ic_key in industry_code_keys:
+        industry_fund = res_dic[ic_key]
+        quanter_keys = list(industry_fund.keys())
+        quanter_l = []
+        for q_key in quanter_keys:
+            fund_s = industry_fund[q_key]
+            if isinstance(fund_s, pd.DataFrame):
+                fund_select = fund_s[select_factor]
+                select_stocks = stocks_select_traditional(fund_select, WEIGHT, select_num=SELECT_STOCKS_NUM)
+                profit = caculate_select_stocks_profit(select_stocks, q_key, TIME_WINDOW, res_format='rel')
+                quanter_l.append(profit)
+            else:
+                continue
+        if len(quanter_l) != 0:
+            quanter_df = pd.concat(quanter_l, axis=1)
+            industry_code_dic[ic_key] = quanter_df
+    return industry_code_dic
+with open('profit_res.pkl', 'wb') as pk:
+    pickle.dump(industry_code_dic, pk)
+with open('profit_res.pkl', 'rb') as pk:
+    industry_code_dic = pickle.load(pk)
+industry_code_keys = list(industry_code_dic.keys())
+industries = get_industries('sw_l1')
+industry_name = industries['name'].values
+length = len(industry_code_keys)
+hang = int(length / 4) + 1
+figure = plt.figure(figsize=(30, 30))
+for i in range(length):
+    name = industry_name[i]
+    code = industry_code_keys[i]
+    t = industry_code_dic[code]
+    t_mean = t.mean(axis=1)

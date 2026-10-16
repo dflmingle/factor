@@ -1,0 +1,65 @@
+quant/2022年度精选策略/1.易方达二八轮动测试.txt
+import jqdata
+import time
+import datetime
+
+def set_params():
+    g.N = 11
+    g.rise_threshold = 0
+    g.signal_time = '15:00'
+    g.ratio = 0.8
+
+def initialize(context):
+    set_params()
+    set_backtest()
+    g.fund_list = ['000016.XSHG', '000016.XSHG', '399006.XSHE', '399006.XSHE', '000012.XSHG', '000012.XSHG']
+    run_monthly(monthly, 1, g.signal_time)
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def monthly(context):
+    signal = yfdebld_signal(context, g.fund_list, g.N, g.rise_threshold)
+    trade(context, signal, g.fund_list, g.ratio)
+    trade_bond(context, g.fund_list, 1)
+    return
+
+def trade(context, signal, security_round_list, ratio):
+    security_round_num = int(len(security_round_list) / 2)
+    total_value = context.portfolio.total_value
+    for i in range(security_round_num):
+        if i != signal - 1:
+            stk = security_round_list[i * 2 + 1]
+            if stk in context.portfolio.positions.keys():
+                if i == security_round_num - 1:
+                    target_value = (1 - ratio) * context.portfolio.total_value
+                else:
+                    target_value = 0
+                order_target_value(stk, target_value, None)
+    if signal == 3:
+        return
+    stk = security_round_list[(signal - 1) * 2 + 1]
+    target_value = context.portfolio.total_value * g.ratio
+    order_value(stk, target_value, None)
+    return
+
+def trade_bond(context, security_round_list, ratio):
+    security_round_num = int(len(security_round_list) / 2)
+    stk = security_round_list[security_round_num * 2 - 1]
+    cash = context.portfolio.available_cash * ratio
+    order_value(stk, cash, None)
+    return
+
+def yfdebld_signal(context, fund_list, N, rise_threshold):
+    price_rise = [0, 0]
+    security_round_num = int(len(fund_list) / 2)
+    for i in range(security_round_num - 1):
+        stk = fund_list[i * 2]
+        his_data = attribute_history(stk, N, '1d', ['close'], skip_paused=True)
+        price_rise[i] = his_data['close'][-1] / his_data['close'][-N] - 1
+    diff_price_rise = price_rise[0] - price_rise[1]
+    if diff_price_rise > rise_threshold and price_rise[0] > 0:
+        signal = 1
+    elif diff_price_rise < -rise_threshold and price_rise[1] > 0:
+        signal = 2
+    else:
+        signal = 3
+    return signal

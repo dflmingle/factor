@@ -1,0 +1,84 @@
+quant/2022年度精选策略/11.林奇PEG选股轮动，十年20倍，有止损模块.txt
+import statsmodels.api as sm
+from pandas.stats.api import ols
+
+def initialize(context):
+    set_parameter(context)
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    trade_func(context)
+    run_weekly(trade_func, 1, '09:30')
+
+def set_parameter(context):
+    g.stock_num = 10
+    g.stock_pos = 0
+    g.danger = False
+    g.danger_days = 0
+    g.maxCash = 0
+    g.security = '000300.XSHG'
+    g.days = 0
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=41bbb8550ef735e58035ca93c214ac6803f15160cda674a77f5144285b48e792 source=quant/2020年度精选策略/05 兄台且慢，去天台排队不如看看这个策略先.txt'
+
+def handle_data(context, data):
+    ma1 = data['000001.XSHG'].mavg(1, 'close')
+    ma5 = data['000001.XSHG'].mavg(5, 'close')
+    ma10 = data['000001.XSHG'].mavg(10, 'close')
+    ma20 = data['000001.XSHG'].mavg(20, 'close')
+    ma30 = data['000001.XSHG'].mavg(30, 'close')
+    ma60 = data['000001.XSHG'].mavg(60, 'close')
+    if ma1 > ma60:
+        g.danger = False
+    elif ma1 < ma60:
+        g.danger = True
+        for security, v in context.portfolio.positions.items():
+            order_target(security, 0)
+
+def trade_func(context):
+    if g.danger:
+        return
+    df = get_fundamentals(query(valuation.code, valuation.pb_ratio, indicator.roe, valuation.pe_ratio, indicator.eps).filter(indicator.eps > 0, valuation.pb_ratio > 0, valuation.pe_ratio > 0))
+    df.index = df['code'].values
+    current_dt = context.current_dt
+    last_year_date = current_dt + timedelta(days=-365)
+    last_year_df = get_fundamentals(query(valuation.code, valuation.pb_ratio, indicator.roe, valuation.pe_ratio, indicator.eps).filter(indicator.eps > 0, valuation.pb_ratio > 0, valuation.pe_ratio > 0), date=last_year_date)
+    last_year_df.index = last_year_df['code'].values
+    df['last_year_eps'] = last_year_df['eps']
+    df['eps_grouth'] = df['eps'] - df['last_year_eps']
+    df = df[df['eps_grouth'] > 0]
+    df = df[(df['eps'] > 0) & (df['pe_ratio'] > 0)]
+    df['g'] = df['eps_grouth'] / df['last_year_eps']
+    df['peg'] = df['pe_ratio'] / df['g'] / 100
+    df = df.sort('peg', ascending=True)[:g.stock_num]
+    pool = df.index
+    pool = paused_filter(pool)
+    pool = delisted_filter(pool)
+    pool = st_filter(pool)
+    if len(pool) == 0:
+        return
+    cash = context.portfolio.total_value / len(pool)
+    hold_stock = context.portfolio.positions.keys()
+    for s in hold_stock:
+        if s not in pool:
+            order_target(s, 0)
+    for s in pool:
+        order_target_value(s, cash)
+
+def f_sum(x):
+    point = sum(x)
+    return point
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+
+def paused_filter(security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not current_data[stock].paused]
+    return security_list
+
+def delisted_filter(security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not '退' in current_data[stock].name]
+    return security_list
+
+def st_filter(security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not current_data[stock].is_st]
+    return security_list

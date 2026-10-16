@@ -1,0 +1,171 @@
+quant/聚宽2025年精选/83大小外择时小市值.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import talib
+import warnings
+from jqlib.technical_analysis import *
+warnings.filterwarnings('ignore')
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 3
+    g.highest = 50
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.bought_stocks = {}
+    g.foreign_ETF = ['518880.XSHG', '513030.XSHG', '513100.XSHG', '164824.XSHE', '159866.XSHE']
+    run_daily(prepare_stock_list, '9:05')
+    run_monthly(singal, 1, '9:00')
+    run_weekly(clear, 1, '9:30')
+    run_weekly(monthly_adjustment, 1, '9:30')
+    run_daily(stop_loss, '14:00')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+'EXACT_REVIEWED_FUNCTION clear sha256=a0361c19f2c06e1139be6bca15755f30106243171e44a3eee38f1bdf60c70e67 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+
+def stop_loss(context):
+    if not hasattr(g, 'bought_stocks'):
+        g.bought_stocks = {}
+    num = 0
+    now_time = context.current_dt
+    if g.yesterday_HL_list != []:
+        for stock in g.yesterday_HL_list:
+            current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close', 'high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            if current_data.iloc[0, 0] < current_data.iloc[0, 1]:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+                num = num + 1
+    SS = []
+    S = []
+    for stock in g.hold_list:
+        if stock in list(context.portfolio.positions.keys()):
+            if context.portfolio.positions[stock].price < context.portfolio.positions[stock].avg_cost * 0.85:
+                order_target_value(stock, 0)
+                num = num + 1
+            else:
+                S.append(stock)
+                NOW = (context.portfolio.positions[stock].price - context.portfolio.positions[stock].avg_cost) / context.portfolio.positions[stock].avg_cost
+                SS.append(np.array(NOW))
+    if num >= 1:
+        if len(SS) > 0:
+            num = 3
+            min_values = sorted(SS)[:num]
+            min_indices = [SS.index(value) for value in min_values]
+            min_strings = [S[index] for index in min_indices]
+            cash = context.portfolio.cash / num
+            for ss in min_strings:
+                order_value(ss, cash)
+                if ss not in g.bought_stocks:
+                    g.bought_stocks[ss] = cash
+'EXACT_REVIEWED_FUNCTION filter_roic sha256=3e5fd9a06f827ba6eb35c6841a939748e540bb01c8af82740a56de92757b550e source=quant/聚宽2025年精选/48投资回报率ROIC中等市值.txt'
+'EXACT_REVIEWED_FUNCTION filter_highprice_stock sha256=7a3fb5cac3d26460c3e06c592a8b0035c3f0561fa0904da62a1e1f7a5d336742 source=quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt'
+'EXACT_REVIEWED_FUNCTION filter_highprice_stock2 sha256=975cb8f5e219103eeb26e209277c06d36c46bbb3fdd8edb6f1108d27d83834e0 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+'EXACT_REVIEWED_FUNCTION get_recent_limit_up_stock sha256=6f96d6fbb6791ab81d101d45811a024a55f8d46cbafc2e879a01c1e7ebc93174 source=quant/2024年度精选策略1/2.“7年40倍”策略扩容到50只.txt'
+'EXACT_REVIEWED_FUNCTION get_recent_down_up_stock sha256=fc8af56adadc88639f339040dc0405f096bbc868ef4f64f93de95a3dd8bfd870 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_list sha256=78d9158428ce8eef69d44506651711158375b79dfc011bc8bac7f618afb6e381 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_list_2 sha256=d431c0208d49f16fe1d0b9bac01bcb0b229dc1209a3cf6f0b29e1a6aec17fb64 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+'EXACT_REVIEWED_FUNCTION SMALL sha256=9c808d86b16888a38fadbca8a4b4d5ac6661aff9bd8e4c07aa381ffeabaa43f6 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+
+def BIG(context, choice):
+    BIG_stock_list = get_fundamentals(query(valuation.code).filter(valuation.code.in_(choice), valuation.pe_ratio_lyr.between(0, 30), valuation.ps_ratio.between(0, 8), valuation.pcf_ratio < 10, indicator.eps > 0.3, indicator.roe > 0.1, indicator.net_profit_margin > 0.1, indicator.gross_profit_margin > 0.3, indicator.inc_revenue_year_on_year > 0.25).order_by(valuation.market_cap.desc()).limit(g.stock_num)).set_index('code').index.tolist()
+    return BIG_stock_list
+
+def ROIC_BIG(context, choice):
+    final_list = get_fundamentals(query(valuation.code, valuation.market_cap, valuation.pe_ratio, income.total_operating_revenue).filter(valuation.pb_ratio < 1, valuation.market_cap > 50, cash_flow.subtotal_operate_cash_inflow > 1000000.0, indicator.adjusted_profit > 1000000.0, indicator.roa > 0.15, indicator.inc_net_profit_year_on_year > 0, valuation.code.in_(choice)).order_by(indicator.roa.desc()).limit(g.stock_num)).set_index('code').index.tolist()
+    return final_list
+
+def BM(context, choice):
+    BM_list = get_fundamentals(query(valuation.code).filter(valuation.code.in_(choice), valuation.market_cap.between(100, 900), valuation.pb_ratio.between(0, 10), valuation.pcf_ratio < 4, indicator.eps > 0.3, indicator.roe > 0.2, indicator.net_profit_margin > 0.1, indicator.inc_revenue_year_on_year > 0.2, indicator.inc_operation_profit_year_on_year > 0.1).order_by(valuation.market_cap.asc()).limit(g.stock_num)).set_index('code').index.tolist()
+    return BM_list
+
+def singal(context):
+    today = context.current_dt
+    dt_last = context.previous_date
+    N = 10
+    B_stocks = get_index_stocks('000300.XSHG', dt_last)
+    B_stocks = filter_kcbj_stock(B_stocks)
+    B_stocks = filter_st_stock(B_stocks)
+    B_stocks = filter_new_stock(context, B_stocks)
+    S_stocks = get_index_stocks('399101.XSHE', dt_last)
+    S_stocks = filter_kcbj_stock(S_stocks)
+    S_stocks = filter_st_stock(S_stocks)
+    S_stocks = filter_new_stock(context, S_stocks)
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(B_stocks)).order_by(valuation.circulating_market_cap.desc())
+    df = get_fundamentals(q, date=dt_last)
+    Blst = list(df.code)[:20]
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(S_stocks)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q, date=dt_last)
+    Slst = list(df.code)[:20]
+    B_ratio = get_price(Blst, end_date=dt_last, frequency='1d', fields=['close'], count=N, panel=False).pivot(index='time', columns='code', values='close')
+    change_BIG = (B_ratio.iloc[-1] / B_ratio.iloc[0] - 1) * 100
+    A1 = np.array(change_BIG)
+    A1 = np.nan_to_num(A1)
+    B_mean = np.mean(A1)
+    S_ratio = get_price(Slst, end_date=dt_last, frequency='1d', fields=['close'], count=N, panel=False).pivot(index='time', columns='code', values='close')
+    change_SMALL = (S_ratio.iloc[-1] / S_ratio.iloc[0] - 1) * 100
+    A1 = np.array(change_SMALL)
+    A1 = np.nan_to_num(A1)
+    S_mean = np.mean(A1)
+    if B_mean > S_mean and B_mean > 0:
+        if B_mean > 5:
+            g.singal = 'small'
+        else:
+            g.singal = 'big'
+    elif B_mean < S_mean and S_mean > 0:
+        g.singal = 'small'
+    else:
+        g.singal = 'etf'
+
+def monthly_adjustment(context):
+    today = context.current_dt
+    dt_last = context.previous_date
+    target_list = []
+    if g.singal == 'big':
+        B_stocks = get_index_stocks('000300.XSHG', dt_last)
+        B_stocks = filter_kcbj_stock(B_stocks)
+        B_stocks = filter_st_stock(B_stocks)
+        B_stocks = boll_filter(B_stocks, dt_last)
+        B_stocks = filter_new_stock(context, B_stocks)
+        choice = B_stocks
+        target_list1 = ROIC_BIG(context, choice)
+        target_list2 = BIG(context, choice)
+        target_list3 = BM(context, choice)
+        target_list = target_list3 + target_list1 + target_list2
+        target_list = list(set(target_list))
+    elif g.singal == 'small':
+        S_stocks = get_index_stocks('399101.XSHE', dt_last)
+        S_stocks = filter_kcbj_stock(S_stocks)
+        S_stocks = filter_st_stock(S_stocks)
+        S_stocks = filter_new_stock(context, S_stocks)
+        choice = S_stocks
+        target_list = SMALL(context, choice)
+    elif g.singal == 'etf':
+        target_list = g.foreign_ETF
+    target_list = filter_limitup_stock(context, target_list)
+    target_list = filter_limitdown_stock(context, target_list)
+    target_list = filter_paused_stock(target_list)
+    for stock in g.hold_list:
+        if stock not in target_list and stock not in g.yesterday_HL_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if stock not in list(context.portfolio.positions.keys()):
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+'EXACT_REVIEWED_FUNCTION boll_filter sha256=b76d57febe04da964128b2bf2c004f6b36254eedfb8ab8f44ad3f080751b3200 source=quant/聚宽2025年精选/64大小外择时小市值3.0.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=5e68dad3789f3dcd9dbc75f23be4ae635975bea8cb208d7f9640cf85a81be542 source=quant/2024年度精选策略1/23.wywy1995大神机器学习策略年化提升35pt.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'

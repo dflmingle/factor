@@ -1,0 +1,51 @@
+quant/2021年度精选策略/89.2020年效果很好的策略-龙回头策略v3.0.txt
+import jqdata
+from jqlib.technical_analysis import *
+import operator
+import datetime
+import talib
+import numpy as np
+import pandas as pd
+'EXACT_REVIEWED_FUNCTION market_cap sha256=eedf8348b27e1e7b0ffc7048e205250ea718651480913c6ab46d0251f143cb02 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION filter_stock_limit sha256=e01842bddd49eca53be274900914b5b940e6cb65a079573c58730305273ac74e source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+
+def remove_new_stocks(security_list, context):
+    for stock in security_list:
+        days_public = (context.current_dt.date() - get_security_info(stock).start_date).days
+        if days_public < 100:
+            security_list.remove(stock)
+    return security_list
+
+def filter_stock_ST(stock_list):
+    curr_data = get_current_data()
+    for stock in stock_list:
+        if curr_data[stock].is_st or 'ST' in curr_data[stock].name or '*' in curr_data[stock].name or ('退' in curr_data[stock].name):
+            stock_list.remove(stock)
+    return stock_list
+
+def check_stocks(context):
+    g.check_out_lists = market_cap()
+    g.check_out_lists = remove_new_stocks(g.check_out_lists, context)
+    g.check_out_lists = filter_stock_ST(g.check_out_lists)
+    longhu = get_billboard_list(stock_list=g.check_out_lists, end_date=None, count=30)
+    finallist = []
+    for stock in g.check_out_lists:
+        if len(longhu[longhu['code'] == stock]) > 0:
+            finallist.append(stock)
+    g.check_out_lists = finallist
+'EXACT_REVIEWED_FUNCTION initialize sha256=bcb33653d84f8fa0ee0ff1ddb986bfd00c521f5168e854dbb64fc40c3199a066 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=97f1a4e1b0e6b78698e5bcd5a290521e4f03556b60f10b8a08331b0eec48c0a9 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION handle_data sha256=8e67f29427a647d87e72e5cac9a2d038cf91c786f095ae51455981047428a7c4 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION selllogic sha256=a13f2dc623f1b76ca9497b38af4ac2b815cc516b49aa72d6a0ada67d7c2c2826 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION decisionOrder sha256=023d0e47327caea808e1355229e8b508e28cda3761fa596f025640d1de52c84c source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION buying sha256=a940fa5e9118652751bc670fc806397d6a2bf8d8a38e00954653008b1587c2ff source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION buy sha256=644e6c015ec71cf79f6f52bbfa4c245f044c76b421aa0c1e3bb432f75cc55fff source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION zhangting sha256=e2f95443c561b557386df8fd5fe1945837765ee981db45240fc34259cf1aebf6 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+
+class CWBotton:
+    """EXACT_REVIEWED_FUNCTION inix sha256=28a3bbc6e1ecb7bb9373ef0de71a42166abbc63708fe0bc4f7dde8e02dec6616 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt"""
+'EXACT_REVIEWED_FUNCTION yingxian sha256=5046872ad3555604d82d6473da34fdde146556159a4557452869a0f11faed995 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION shangyingxian sha256=d95ed5e9a0551974f3969a67790b2574d647450a884795540138c216f4703127 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION Txian sha256=9ca1b08564c46855fddb38d31295c29ee84a41009b761897a230d2fceca1f4a3 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION bdebugprint sha256=ee040797fd3876a3d60320d10d4d32dbaaefb989fd68f5fbe5e4aee6291f7dd3 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+'EXACT_REVIEWED_FUNCTION buyprint sha256=3f13df49f82f79de47a8d6730a6a6ae911e4324177b40a6ffeaf5c4948c3116b source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'

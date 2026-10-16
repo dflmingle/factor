@@ -1,0 +1,161 @@
+quant/2022年度精选策略/44.简单有效的次新投机策略，年化200%+.txt
+import numpy
+import talib
+import urllib2
+
+def initialize(context):
+    g.buy_stock_count = 4
+    g.index = '399678.XSHE'
+    g.black_stock = {}
+    g.trade_stop_day = 0
+    g.index_growth_rate = 0.005
+
+def before_trading_start(context):
+    if context.current_dt.year < 2015 or (context.current_dt.year == 2015 and context.current_dt.month < 7):
+        g.index = '399006.XSHE'
+    else:
+        g.index = '399678.XSHE'
+
+def handle_data(context, data):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == 14 and minute == 0:
+        is_trade, buy_stocks = check_trade_status(context, data)
+        if is_trade:
+            adjust_position(context, data, buy_stocks[:g.buy_stock_count])
+        else:
+            clear_position(context)
+
+def check_trade_status(context, data):
+    trade_status = []
+    buy_stocks = select_stocks(context, data, 10)
+    rise_count = 0
+    for stock in buy_stocks:
+        yes_index = get_current_data()[stock].day_open
+        newest_index = get_close_price(stock, 1, '1m')
+        if newest_index > yes_index:
+            rise_count = rise_count + 1
+    trade_status.append(rise_count < len(buy_stocks) / 2)
+    newest_index = get_close_price(g.index, 1, '1m')
+    open_index = get_current_data()[g.index].day_open
+    yes_index = get_close_price(g.index, 1)
+    if newest_index < yes_index:
+        trade_status.append(newest_index < open_index)
+    indexs = history(50, '1d', 'close', g.index, df=False, skip_paused=True)
+    indexs = list(indexs[g.index])
+    indexs.append(newest_index)
+    avg_10_index = sum(indexs[-10:]) / 10
+    trade_status.append(newest_index < avg_10_index)
+    macdDIFF, macdDEA, macd = MACD_CN(np.array(indexs), 12, 26, 9)
+    trade_status.append(macdDIFF[-1] < macdDIFF[-2])
+    gr_index = get_growth_rate(g.index, 20)
+    trade_status.append(gr_index < g.index_growth_rate)
+    if sum(trade_status) >= 3:
+        return (False, [])
+    else:
+        return (True, buy_stocks)
+'EXACT_REVIEWED_FUNCTION filter_paused_and_st_stock sha256=6137617a27a73c8f2a84bb2011210e45eac77405db4216f9e39bd1613e4246fc source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=4816bfed9587e210ded81c6e288a6b9d00544cc261697b889abe16b77ed6ed1b source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_black_stock(stock_list):
+    return [stock for stock in stock_list if stock not in g.black_stock]
+
+def select_stocks(context, data, count):
+    q = query(valuation.code, valuation.circulating_market_cap).order_by(valuation.circulating_market_cap.asc()).filter(valuation.circulating_market_cap <= 100).limit(100)
+    df = get_fundamentals(q)
+    stock_list = list(df['code'])
+    stock_list = filter_paused_and_st_stock(stock_list)
+    stock_list = filter_gem_stock(context, stock_list)
+    tmpList = []
+    for stock in stock_list:
+        days_public = (context.current_dt.date() - get_security_info(stock).start_date).days
+        if days_public < 365:
+            tmpList.append(stock)
+    stock_list = tmpList
+    filter_stocks = []
+    last_prices = history(1, '1m', 'close', security_list=stock_list)
+    curr_data = get_current_data()
+    for stock in stock_list:
+        if last_prices[stock][-1] < curr_data[stock].high_limit:
+            if last_prices[stock][-1] > curr_data[stock].low_limit:
+                filter_stocks.append(stock)
+    stock_list = filter_stocks
+    stock_list = stock_list[:count]
+    return stock_list
+
+def adjust_position(context, data, buy_stocks):
+    for stock in context.portfolio.positions.keys():
+        last_prices = history(1, '1m', 'close', security_list=context.portfolio.positions.keys())
+        if stock not in buy_stocks:
+            curr_data = get_current_data()
+            if last_prices[stock][-1] < curr_data[stock].high_limit:
+                total_minute = get_today_minute(context)
+                today = attribute_history(stock, 1, unit=str(total_minute) + 'm', fields=('high', 'close'))
+                last_minute_price = history(1, '1m', 'close', security_list=stock)[stock][-1]
+                yes_price = history(1, '1d', 'close', security_list=stock)[stock][-1]
+                if today['close'][-1] > yes_price and today['high'][-1] / yes_price - today['close'][-1] / yes_price <= 0.02:
+                    continue
+                else:
+                    position = context.portfolio.positions[stock]
+                    close_position(context, position)
+    for stock in buy_stocks:
+        position_count = len(context.portfolio.positions)
+        if g.buy_stock_count > position_count:
+            value = context.portfolio.cash / (g.buy_stock_count - position_count)
+            if stock not in context.portfolio.positions:
+                open_position(context, stock, value)
+
+def get_today_minute(context):
+    total_minute = 0
+    if context.current_dt.hour <= 11:
+        total_minute = (context.current_dt.hour - 9) * 60 - 30 + context.current_dt.minute
+    else:
+        total_minute = 120 + (context.current_dt.hour - 13) * 60 + context.current_dt.minute
+    return total_minute
+
+def get_ma(stock, nMa, days):
+    ma_list = []
+    last_prices = history(nMa + days, '1d', 'close', security_list=stock)[stock]
+    for i in range(nMa, nMa + days):
+        ma = sum(last_prices[i - nMa:i])
+        ma_list.append(ma)
+    return ma_list
+'EXACT_REVIEWED_FUNCTION get_growth_rate sha256=69ee8a047ebf0fcf463295b42347e1bc44ff2d61d99a77063317032415ae28ed source=quant/2020年度精选策略/38 一个简单的跟踪聪明钱策略.txt'
+'EXACT_REVIEWED_FUNCTION get_close_price sha256=56b125a180ea7292d5946969e8a1c9b665c5d7a07d5c97a47dc3246c0d5dc925 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def open_position(context, security, value):
+    order = order_target_value_(context, security, value)
+    if order != None and order.filled > 0:
+        return True
+    return False
+
+def close_position(context, position):
+    security = position.security
+    order = order_target_value_(context, security, 0)
+    if order != None:
+        if order.filled > 0:
+            pass
+        if order.status == OrderStatus.held and order.filled == order.amount:
+            return True
+    return False
+
+def clear_position(context):
+    if len(context.portfolio.positions) > 0:
+        stock_weight = {}
+        for stock in context.portfolio.positions.keys():
+            if get_current_data()[stock].paused:
+                continue
+            position = context.portfolio.positions[stock]
+            if close_position(context, position):
+                stock_weight[stock[:6]] = 0
+
+def order_target_value_(context, security, value):
+    if value == 0:
+        pass
+    order_ = order_target_value(security, value)
+    return order_
+
+def MACD_CN(close, fastperiod, slowperiod, signalperiod):
+    macdDIFF, macdDEA, macd = talib.MACDEXT(close, fastperiod=fastperiod, fastmatype=1, slowperiod=slowperiod, slowmatype=1, signalperiod=signalperiod, signalmatype=1)
+    macd = macd * 2
+    return (macdDIFF, macdDEA, macd)

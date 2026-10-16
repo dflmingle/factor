@@ -1,0 +1,381 @@
+quant/量化策略/量化策略/龙头追涨策略2026/02涨停板多头策略-优化版v1.0.txt
+from jqdata import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+import numpy as np
+from jqfactor import *
+
+def initialize(context):
+    g.base_max_stocks = 5
+    g.max_stocks = g.base_max_stocks
+    g.initial_stop_pct = 0.05
+    g.take_profit_levels = [0.2, 0.25]
+    g.take_profit_ratios = [0.8, 0.2]
+    g.max_open_pct = 5.0
+    g.max_buy_price_pct = 0.98
+    g.initial_portfolio_value = None
+    g.highest_prices = {}
+    g.daily_portfolio_values = []
+    g.today_bought_stocks = []
+    run_daily(before_open, time='09:20')
+    run_daily(market_open, time='09:45')
+    run_daily(check_positions, time='10:30')
+    run_daily(check_positions, time='14:00')
+    run_daily(take_profit_check, time='14:50')
+    run_daily(close_summary, time='15:05')
+
+def before_open(context):
+    g.today_bought_stocks = []
+    g.buy_stock_list = select_stocks(context)
+    if g.buy_stock_list:
+        for i, stock in enumerate(g.buy_stock_list[:g.max_stocks], 1):
+            stock_name = get_security_info(stock).display_name
+            df = get_price(stock, end_date=context.previous_date, count=1, fields=['high_limit', 'close'], skip_paused=True)
+            if not df.empty:
+                pass
+
+def check_early_stage(stock, context):
+    try:
+        df = get_price(stock, count=5, end_date=context.previous_date, fields=['close'], skip_paused=True)
+        if len(df) < 5:
+            return False
+        pct_5d = (df['close'].iloc[-1] / df['close'].iloc[0] - 1) * 100
+        if pct_5d >= 20:
+            return False
+        ma20 = MA(stock, context.previous_date, 20, '1d')
+        if stock not in ma20:
+            return False
+        ma20_val = ma20[stock]
+        close = df['close'].iloc[-1]
+        pct_to_ma20 = (close / ma20_val - 1) * 100
+        if pct_to_ma20 >= 10:
+            return False
+        return True
+    except:
+        return False
+
+def check_multi_ma_alignment(context, stock):
+    try:
+        ma5 = MA(stock, context.previous_date, 5, '1d')
+        ma10 = MA(stock, context.previous_date, 10, '1d')
+        ma20 = MA(stock, context.previous_date, 20, '1d')
+        ma60 = MA(stock, context.previous_date, 60, '1d')
+        if stock not in ma5 or stock not in ma10 or stock not in ma20 or (stock not in ma60):
+            return False
+        df = get_price(stock, end_date=context.previous_date, count=1, fields=['close'], skip_paused=True)
+        if df is None or df.empty:
+            return False
+        close_price = df['close'].iloc[0]
+        conditions = [close_price > ma5[stock], ma5[stock] > ma10[stock], ma10[stock] > ma20[stock], ma20[stock] > ma60[stock]]
+        return all(conditions)
+    except Exception as e:
+        return False
+
+def is_recent_multima(stock, context, lookback_days=3):
+    try:
+        cur_date = context.previous_date
+        df = get_price(stock, end_date=cur_date, count=1, fields=['close'], skip_paused=True)
+        if df.empty:
+            return False
+        close = df['close'].iloc[0]
+        ma5 = MA(stock, cur_date, 5, '1d')
+        ma10 = MA(stock, cur_date, 10, '1d')
+        ma20 = MA(stock, cur_date, 20, '1d')
+        ma60 = MA(stock, cur_date, 60, '1d')
+        current_ok = close > ma5[stock] and ma5[stock] > ma10[stock] and (ma10[stock] > ma20[stock]) and (ma20[stock] > ma60[stock])
+        if not current_ok:
+            return False
+        prev_date = cur_date - dt.timedelta(days=lookback_days)
+        df_prev = get_price(stock, end_date=prev_date, count=1, fields=['close'], skip_paused=True)
+        if df_prev.empty:
+            return False
+        close_prev = df_prev['close'].iloc[0]
+        ma5_prev = MA(stock, prev_date, 5, '1d')
+        ma10_prev = MA(stock, prev_date, 10, '1d')
+        ma20_prev = MA(stock, prev_date, 20, '1d')
+        ma60_prev = MA(stock, prev_date, 60, '1d')
+        prev_ok = close_prev > ma5_prev[stock] and ma5_prev[stock] > ma10_prev[stock] and (ma10_prev[stock] > ma20_prev[stock]) and (ma20_prev[stock] > ma60_prev[stock])
+        return not prev_ok
+    except Exception as e:
+        return False
+
+def select_stocks(context):
+    stock_list = get_base_stocks(context)
+    limit_up_stocks = find_limit_up_stocks(context, stock_list)
+    if not limit_up_stocks:
+        return []
+    selected_stocks = []
+    for stock in limit_up_stocks:
+        if not is_recent_multima(stock, context, lookback_days=3):
+            continue
+        if not check_early_stage(stock, context):
+            continue
+        selected_stocks.append(stock)
+    if selected_stocks:
+        selected_stocks = sort_by_market_cap(selected_stocks, context)
+    return selected_stocks
+
+def get_base_stocks(context):
+    stocks = list(get_all_securities(['stock']).index)
+    result = []
+    current_data = get_current_data()
+    for stock in stocks:
+        if stock.startswith('688'):
+            continue
+        sec_info = get_security_info(stock)
+        try:
+            conditions = [not current_data[stock].is_st, not current_data[stock].paused, sec_info.start_date < context.current_dt.date() - dt.timedelta(90), sec_info.end_date > context.current_dt.date()]
+            if all(conditions):
+                result.append(stock)
+        except:
+            continue
+    return result
+
+def find_limit_up_stocks(context, stock_list):
+    if not stock_list:
+        return []
+    batch_size = 100
+    limit_up_stocks = []
+    for i in range(0, len(stock_list), batch_size):
+        batch = stock_list[i:i + batch_size]
+        try:
+            df = get_price(batch, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'volume'], skip_paused=True, fq='pre', count=1, panel=False)
+            if df is not None and (not df.empty):
+                for _, row in df.iterrows():
+                    stock = row['code']
+                    close = row['close']
+                    high_limit = row['high_limit']
+                    volume = row['volume']
+                    if abs(close - high_limit) / high_limit >= 0.001:
+                        continue
+                    hist_df = get_price(stock, end_date=context.previous_date, count=21, fields=['volume'], skip_paused=True)
+                    if len(hist_df) < 20:
+                        continue
+                    avg_volume = hist_df['volume'].iloc[-20:-1].mean()
+                    if avg_volume == 0:
+                        continue
+                    volume_ratio = volume / avg_volume
+                    if volume_ratio < 0.5 or volume_ratio > 3.0:
+                        continue
+                    limit_up_stocks.append(stock)
+        except:
+            continue
+    return limit_up_stocks
+
+def market_open(context):
+    if not g.buy_stock_list:
+        return
+    check_stop_loss(context)
+    available_slots = g.max_stocks - len(context.portfolio.positions)
+    if available_slots <= 0:
+        return
+    buy_list = g.buy_stock_list[:available_slots]
+    bought_count = 0
+    for stock in buy_list:
+        if can_buy(context, stock) and stock not in g.today_bought_stocks:
+            if execute_buy(context, stock):
+                bought_count += 1
+                g.today_bought_stocks.append(stock)
+
+def can_buy(context, stock):
+    if stock in context.portfolio.positions:
+        return False
+    try:
+        current_data = get_current_data()
+        if current_data[stock].paused or current_data[stock].is_st:
+            return False
+        current_price = current_data[stock].last_price
+        day_open = current_data[stock].day_open
+        df = get_price(stock, count=1, end_date=context.previous_date, fields=['close'], skip_paused=True)
+        if df is None or df.empty:
+            return False
+        pre_close = df['close'].iloc[0]
+        open_pct = (day_open / pre_close - 1) * 100
+        high_limit_today = current_data[stock].high_limit
+        low_limit_today = current_data[stock].low_limit
+        conditions = [open_pct <= g.max_open_pct, current_price <= high_limit_today * g.max_buy_price_pct, low_limit_today < current_price < high_limit_today]
+        return all(conditions)
+    except Exception as e:
+        return False
+
+def sort_by_market_cap(stock_list, context):
+    try:
+        yesterday = context.previous_date
+        cap_data = get_factor_values(stock_list, 'market_cap', end_date=yesterday, count=1)
+        if 'market_cap' in cap_data:
+            cap_series = cap_data['market_cap'].iloc[0]
+            cap_series = cap_series.dropna()
+            sorted_stocks = cap_series.sort_values().index.tolist()
+            return sorted_stocks
+    except:
+        pass
+    return stock_list
+
+def execute_buy(context, stock):
+    try:
+        available_cash = context.portfolio.available_cash
+        target_value = available_cash / (g.max_stocks - len(context.portfolio.positions) + 1)
+        if target_value < 10000:
+            target_value = 10000
+        order = order_value(stock, target_value)
+        if order and order.filled > 0:
+            stock_name = get_security_info(stock).display_name
+            g.highest_prices[stock] = order.price
+            return True
+        else:
+            return False
+    except Exception as e:
+        return False
+
+def check_positions(context):
+    if not context.portfolio.positions:
+        return
+    for stock in list(context.portfolio.positions.keys()):
+        position = context.portfolio.positions[stock]
+        if position.total_amount == 0:
+            continue
+        try:
+            current_data = get_current_data()
+            current_price = current_data[stock].last_price
+            if stock in g.highest_prices:
+                if current_price > g.highest_prices[stock]:
+                    g.highest_prices[stock] = current_price
+            if check_stop_loss_signal(context, stock):
+                execute_sell(context, stock, '止损')
+        except:
+            continue
+
+def check_stop_loss_signal(context, stock):
+    try:
+        position = context.portfolio.positions[stock]
+        if position.total_amount == 0:
+            return False
+        current_data = get_current_data()
+        current_price = current_data[stock].last_price
+        cost_price = position.avg_cost
+        initial_stop = current_price < cost_price * (1 - g.initial_stop_pct)
+        return initial_stop
+    except:
+        return False
+
+def take_profit_check(context):
+    if not context.portfolio.positions:
+        return
+    for stock in list(context.portfolio.positions.keys()):
+        try:
+            position = context.portfolio.positions[stock]
+            if position.total_amount == 0:
+                continue
+            current_data = get_current_data()
+            current_price = current_data[stock].last_price
+            cost_price = position.avg_cost
+            profit_pct = (current_price - cost_price) / cost_price
+            sell_signal, sell_shares = check_take_profit(context, stock, profit_pct)
+            if sell_signal:
+                if sell_shares == 0:
+                    execute_sell(context, stock, '止盈(全仓)')
+                elif sell_shares > 0:
+                    execute_partial_sell(context, stock, sell_shares, profit_pct)
+            else:
+                a = 1
+        except:
+            continue
+
+def check_take_profit(context, stock, profit_pct):
+    position = context.portfolio.positions[stock]
+    for i in range(len(g.take_profit_levels) - 1, -1, -1):
+        level = g.take_profit_levels[i]
+        if profit_pct >= level:
+            if i == len(g.take_profit_levels) - 1:
+                return (True, 0)
+            else:
+                sell_shares = int(position.total_amount * g.take_profit_ratios[i])
+                if sell_shares < 100:
+                    sell_shares = 100
+                return (True, sell_shares)
+    return (False, 0)
+
+def execute_partial_sell(context, stock, shares, profit_pct):
+    try:
+        position = context.portfolio.positions[stock]
+        if position.total_amount < shares:
+            shares = position.total_amount
+        if shares <= 0:
+            return
+        target_shares = position.total_amount - shares
+        order = order_target(stock, target_shares)
+        if order and order.filled > 0:
+            stock_name = get_security_info(stock).display_name
+    except Exception as e:
+        pass
+
+def execute_sell(context, stock, reason):
+    try:
+        position = context.portfolio.positions[stock]
+        if position.total_amount == 0:
+            return
+        stock_name = get_security_info(stock).display_name
+        old_amount = position.total_amount
+        old_cost = position.avg_cost
+        order = order_target(stock, 0)
+        if order and order.filled > 0:
+            profit_pct = (order.price - old_cost) / old_cost * 100
+            if stock in g.highest_prices:
+                del g.highest_prices[stock]
+    except Exception as e:
+        pass
+
+def check_stop_loss(context):
+    if not context.portfolio.positions:
+        return
+    for stock in list(context.portfolio.positions.keys()):
+        try:
+            if check_stop_loss_signal(context, stock):
+                execute_sell(context, stock, '止损')
+        except:
+            continue
+
+def close_summary(context):
+    g.daily_portfolio_values.append(context.portfolio.total_value)
+    positions = context.portfolio.positions
+    if positions:
+        total_value = 0
+        for stock in positions:
+            try:
+                position = positions[stock]
+                if position.total_amount == 0:
+                    continue
+                stock_name = get_security_info(stock).display_name
+                current_data = get_current_data()
+                current_price = current_data[stock].last_price
+                position_value = position.total_amount * current_price
+                total_value += position_value
+                profit_pct = (current_price - position.avg_cost) / position.avg_cost * 100
+            except:
+                continue
+        if len(g.daily_portfolio_values) >= 2:
+            daily_return = (g.daily_portfolio_values[-1] - g.daily_portfolio_values[-2]) / g.daily_portfolio_values[-2] * 100
+        if g.initial_portfolio_value and g.initial_portfolio_value > 0:
+            total_return = (context.portfolio.total_value - g.initial_portfolio_value) / g.initial_portfolio_value * 100
+    elif g.initial_portfolio_value and g.initial_portfolio_value > 0:
+        total_return = (context.portfolio.total_value - g.initial_portfolio_value) / g.initial_portfolio_value * 100
+
+def has_recent_golden_cross(stock, context, lookback):
+    try:
+        ma5 = MA(stock, context.previous_date, 5, '1d')
+        ma10 = MA(stock, context.previous_date, 10, '1d')
+        ma20 = MA(stock, context.previous_date, 20, '1d')
+        if stock not in ma5 or stock not in ma10 or stock not in ma20:
+            return False
+        prev_date = context.previous_date - dt.timedelta(days=lookback)
+        ma5_prev = MA(stock, prev_date, 5, '1d')
+        ma10_prev = MA(stock, prev_date, 10, '1d')
+        ma20_prev = MA(stock, prev_date, 20, '1d')
+        if stock not in ma5_prev or stock not in ma10_prev or stock not in ma20_prev:
+            return False
+        cross1 = ma5[stock] > ma10[stock] and ma5_prev[stock] <= ma10_prev[stock]
+        cross2 = ma10[stock] > ma20[stock] and ma10_prev[stock] <= ma20_prev[stock]
+        return cross1 or cross2
+    except Exception as e:
+        return False

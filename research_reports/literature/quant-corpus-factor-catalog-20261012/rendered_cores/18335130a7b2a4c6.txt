@@ -1,0 +1,127 @@
+quant/2021年度精选策略/33.【研报复现】基于风险溢价的沪深300择时-目前依然有效.txt
+from jqdata import *
+import numpy as np
+import pandas as pd
+import datetime as dt
+from six import StringIO
+from dateutil.parser import parse
+import pickle
+import seaborn as sns
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import os
+import statsmodels.api as sm
+import scipy
+import talib as tl
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+from pylab import mpl
+from IPython.core.display import HTML
+import matplotlib.dates as mdate
+mpl.rcParams['font.sans-serif'] = ['SimHei']
+pd.set_option('display.float_format', lambda x: '%.4f' % x)
+plt.rcParams['axes.unicode_minus'] = False
+plt.style.use('ggplot')
+end_date = dt.datetime.now()
+end_date = end_date.strftime('%Y-%m-%d')
+end_date
+guxilv = finance.run_query(query(finance.SW1_DAILY_VALUATION).filter(finance.SW1_DAILY_VALUATION.code == '801780').order_by(finance.SW1_DAILY_VALUATION.date.desc()).limit(2000))
+price = get_price('399300.XSHE', count=2000, end_date=end_date, frequency='daily', fields=['open', 'close'])
+huigou = bond.run_query(query(bond.REPO_DAILY_PRICE).filter(bond.REPO_DAILY_PRICE.name == 'GC182').order_by(bond.REPO_DAILY_PRICE.date.desc()).limit(2000))
+guxilv_df = guxilv[['date', 'dividend_ratio']]
+guxilv_df = guxilv_df.set_index('date')
+nihuigou_df = huigou[['date', 'close']]
+nihuigou_df = nihuigou_df.set_index('date')
+guxilv_df = guxilv_df.sort_index(axis=0, ascending=True)
+nihuigou_df = nihuigou_df.sort_index(axis=0, ascending=True)
+final_df = guxilv_df.copy()
+final_df['nihuigou'] = nihuigou_df['close']
+final_df['dividend_ratio'] = final_df['dividend_ratio'] * 0.92
+final_df['dividend_ratio'] = final_df['dividend_ratio'].fillna(method='pad')
+final_df['nihuigou'] = final_df['nihuigou'].fillna(method='pad')
+price['date'] = price.index
+price.index = pd.to_datetime(price.index)
+final_df['price'] = price['close']
+final_df['guxi1'] = final_df['dividend_ratio'].rolling(60).mean()
+final_df['lilv1'] = final_df['nihuigou'].rolling(60).mean()
+final_df['guxi2'] = final_df['dividend_ratio'].rolling(3).mean()
+final_df['lilv2'] = final_df['nihuigou'].rolling(30).mean()
+
+def get_position(x):
+    pre1_date = final_df['pre1_date'][x]
+    pre2_date = final_df['pre2_date'][x]
+    if type(pre2_date) is float:
+        return 0
+    pre1_date_value = final_df['singal1'][pre1_date]
+    pre2_date_value = final_df['singal1'][pre2_date]
+    if pre1_date_value > pre2_date_value:
+        return 1
+    else:
+        return 0
+final_df['singal1'] = -(final_df['guxi1'] - final_df['lilv1']) * 1.0
+final_df['date'] = final_df.index
+final_df['pre1_date'] = final_df['date'].shift(1)
+final_df['pre2_date'] = final_df['date'].shift(2)
+final_df['positon'] = final_df['date'].apply(get_position)
+final_df['ret'] = final_df['price'].pct_change()
+RET = final_df['ret'] * final_df['positon']
+CUM_RET = (1 + RET).cumprod()
+fig = plt.figure(figsize=(20, 8))
+ax1 = fig.add_subplot(1, 1, 1)
+ax1.plot(final_df['singal1'], color='red', label='singal')
+ax1.set_ylabel('风险溢价')
+ax2 = ax1.twinx()
+ax2.plot(final_df['price'], color='blue', label='hs300')
+ax2.set_ylabel('指数走势')
+fig = plt.figure(figsize=(20, 8))
+ax1 = fig.add_subplot(1, 1, 1)
+ax1.plot(CUM_RET, color='red', label='ret')
+ax1.set_ylabel('净值')
+ax2 = ax1.twinx()
+ax2.plot(final_df['price'], color='blue', label='hs300')
+ax2.set_ylabel('指数走势')
+
+def summary(df):
+
+    def format_x(x):
+        return '{:.2%}'.format(x)
+    summary_dic = {}
+    index_name = '年华收益率,累计收益率,夏普比率,最大回撤,持仓总天数,交易次数,平均持仓天数,获利天数,     亏损天数,胜率(按天),平均盈利率(按天),平均亏损率(按天),平均盈亏比(按天),盈利次数,亏损次数,     单次最大盈利,单次最大亏损,胜率(按此),平均盈利率(按次),平均亏损率(按次),平均盈亏比(按次)'.split(',')
+    RET = df['ret'] * df['positon']
+    CUM_RET = (1 + RET).cumprod()
+    annual_ret = CUM_RET[-1] ** (250 / len(RET)) - 1
+    cum_ret_rate = CUM_RET[-1] - 1
+    max_nv = np.maximum.accumulate(np.nan_to_num(CUM_RET))
+    mdd = -np.min(CUM_RET / max_nv - 1)
+    sharpe_ratio = np.mean(RET) / np.nanstd(RET, ddof=1) * np.sqrt(250)
+    mark = df['positon']
+    pre_mark = np.nan_to_num(df['positon'].shift(-1))
+    trade = (mark >= 1) & (pre_mark < mark)
+    trade_count = np.nansum(trade)
+    total = np.sum(mark)
+    mean_hold = total / trade_count
+    win = np.sum(np.where(RET > 0, 1, 0))
+    lose = np.sum(np.where(RET < 0, 1, 0))
+    win_ratio = win / total
+    mean_win_ratio = np.sum(np.where(RET > 0, RET, 0)) / win
+    mean_lose_ratio = np.sum(np.where(RET < 0, RET, 0)) / lose
+    win_lose = win / lose
+    temp_df = df.copy()
+    diff = temp_df['positon'] != temp_df['positon'].shift(1)
+    temp_df['mark'] = diff.cumsum()
+    temp_df = temp_df.query('positon' + '==1').groupby('mark')['ret'].sum()
+    win_count = np.sum(np.where(temp_df > 0, 1, 0))
+    lose_count = np.sum(np.where(temp_df < 0, 1, 0))
+    max_win = np.max(temp_df)
+    max_lose = np.min(temp_df)
+    win_rat = win_count / len(temp_df)
+    mean_win = np.sum(np.where(temp_df > 0, temp_df, 0)) / len(temp_df)
+    mean_lose = np.sum(np.where(temp_df < 0, temp_df, 0)) / len(temp_df)
+    mean_wine_lose = win_count / lose_count
+    summary_dic['position'] = [format_x(annual_ret), format_x(cum_ret_rate), sharpe_ratio, format_x(mdd), total, trade_count, mean_hold, win, lose, format_x(win_ratio), format_x(mean_win_ratio), format_x(mean_lose_ratio), win_lose, win_count, lose_count, format_x(max_win), format_x(max_lose), format_x(win_rat), format_x(mean_win), format_x(mean_lose), mean_wine_lose]
+    summary_df = pd.DataFrame(summary_dic, index=index_name)
+    summary_df.columns = ['basic']
+    return summary_df

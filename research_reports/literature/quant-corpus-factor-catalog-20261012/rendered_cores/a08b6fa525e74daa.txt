@@ -1,0 +1,18 @@
+quant/2021年度精选策略/6.iAlpha 基金投资策略.txt
+def after_code_changed(context):
+    run_monthly(handle_trader, 11, '9:35')
+    g.funds = ['511260.XSHG', '518880.XSHG', '513500.XSHG', '513100.XSHG', '513050.XSHG', '159928.XSHE', '512010.XSHG', '512770.XSHG']
+
+def handle_trader(context):
+    cur_data = get_current_data()
+    position = context.portfolio.total_value / len(g.funds)
+    for s in context.portfolio.positions:
+        if s not in g.funds:
+            order_target_value(s, 0)
+    for s in g.funds:
+        if s not in context.portfolio.positions:
+            delta = position
+        else:
+            delta = position - context.portfolio.positions[s].value
+        if abs(delta) > max(0.1 * position, 100 * cur_data[s].last_price) and context.portfolio.available_cash > delta and (not cur_data[s].paused):
+            order_value(s, delta)

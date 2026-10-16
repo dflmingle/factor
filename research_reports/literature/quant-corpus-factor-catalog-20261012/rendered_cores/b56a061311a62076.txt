@@ -1,0 +1,129 @@
+quant/2024年度精选策略2/61.简单ETF策略，年化97%.txt
+from jqdata import *
+from jqlib.technical_analysis import *
+import smtplib
+from email.mime.text import MIMEText
+from email.utils import formataddr
+
+def initialize(context):
+    g.all_stks = ['399306.XSHE', '159608.XSHE', '159611.XSHE', '159613.XSHE', '159619.XSHE', '159707.XSHE', '159713.XSHE', '159731.XSHE', '512690.XSHG', '516950.XSHG', '512880.XSHG', '516880.XSHG', '515030.XSHG', '515220.XSHG', '515210.XSHG', '512710.XSHG', '159870.XSHE', '159995.XSHE', '512150.XSHG', '588080.XSHG', '159952.XSHE', '512800.XSHG', '515950.XSHG', '159945.XSHE']
+    g.max_number = 1
+    g.is_sendmail = 0
+    g.mail_subject = 'ETF3.0:'
+    g.mail_sender = ''
+    g.mail_passwd = ''
+    g.mail_receiver = ''
+    g.stks_buy = []
+    g.stks_sell = []
+    g.mail_msg = ''
+    g.money = context.portfolio.starting_cash / g.max_number
+    run_daily(xuangu_buy, time='2:00')
+    run_daily(xuangu_sell, time='3:00')
+    run_daily(buy, time='10:00')
+    run_daily(sell, time='10:00')
+
+def xuangu_buy(context):
+    g.stks_buy = []
+    print_and_mail('-----买入选股-----')
+    for stk in g.all_stks:
+        g.security = stk
+        price_now = ma(n=1)
+        if ma(n=60, ref=2) <= ma(n=60, ref=1) and ma(n=60, ref=1) <= ma(n=60):
+            if price_now < ma(n=60):
+                if ma(n=5, ref=1) < ma(n=5):
+                    g.stks_buy.append(stk)
+    if len(g.stks_buy) > 0:
+        for stk in g.stks_buy:
+            print_and_mail('加入买入池：' + get_name(stk))
+    else:
+        print_and_mail('备选池：无！')
+
+def xuangu_sell(context):
+    g.stks_sell = []
+    print_and_mail('-----卖出选股-----')
+    for stk in context.portfolio.positions.keys():
+        g.security = stk
+        print_and_mail('今日持股：{0},盈亏比：{1:.2%}'.format(get_name(g.security), (ma(n=1) - context.portfolio.positions[stk].avg_cost) / context.portfolio.positions[stk].avg_cost))
+        if cross(20, 10):
+            print_and_mail(str(stk) + ':均线死叉！')
+            g.stks_sell.append(stk)
+    if len(g.stks_sell) > 0:
+        for stk in g.stks_sell:
+            print_and_mail('进入卖出池：' + get_name(stk))
+    else:
+        print_and_mail('卖出池：无！')
+    if len(g.stks_buy) > 0 or len(g.stks_sell) > 0:
+        mail_to(subject=g.mail_subject + str(context.current_dt), msg=g.mail_msg)
+
+def buy(context):
+    print_and_mail('-----买    入-----')
+    if len(g.stks_buy) == 0:
+        return
+    for stk in g.stks_buy:
+        current_data = get_current_data()
+        if current_data[stk].paused == True:
+            print_and_mail(get_name(stk) + ':停牌，放弃买入！')
+            continue
+        if stk in context.portfolio.positions.keys():
+            print_and_mail(get_name(stk) + ':已持仓，放弃买入！')
+            continue
+        if len(context.portfolio.positions) >= g.max_number:
+            print_and_mail('已达到最大持仓数，放弃买入！')
+            continue
+        if context.portfolio.positions.has_key(stk) == False:
+            order_value(stk, g.money)
+            if context.portfolio.positions.has_key(stk) == True:
+                print_and_mail('买入：{0}：总仓位:{1}，均价:{2}'.format(get_name(stk), context.portfolio.positions[stk].total_amount, round(context.portfolio.positions[stk].avg_cost, 2)))
+            else:
+                print_and_mail('{0}:买入不成功！'.format(get_name(stk)))
+
+def sell(context):
+    print_and_mail('-----卖    出-----')
+    if len(g.stks_sell) == 0:
+        pass
+    for stk in g.stks_sell:
+        number_old = context.portfolio.positions[stk].total_amount
+        order_target(stk, 0)
+        if context.portfolio.positions.has_key(stk) == True:
+            number_new = context.portfolio.positions[stk].total_amount
+        else:
+            number_new = 0
+        print_and_mail('卖出：' + get_name(stk) + ':' + str(number_old - number_new) + '股')
+        print_and_mail('--------------')
+    if len(g.stks_buy) > 0 and len(g.stks_sell) > 0:
+        mail_to(subject=g.mail_subject + str(context.current_dt), msg=g.mail_msg)
+'EXACT_REVIEWED_FUNCTION ma sha256=513447d31b8e91ee10ce7bad6870e4985aded5fb5cdda54f53c723fa4b0c71ad source=quant/2021年度精选策略/99.最新龙回头5.0速度优化版+风险控制版本.txt'
+'EXACT_REVIEWED_FUNCTION cross sha256=928d842830fc53c747076338940475b705531504274e71b65340f8b3ca5763f0 source=quant/2021年度精选策略/99.最新龙回头5.0速度优化版+风险控制版本.txt'
+
+def min_max(type='l', n=1):
+    result = 0
+    data = attribute_history(security=g.security, count=n, unit='1d')
+    if type.lower() == 'h':
+        result = data[:]['high'].max()
+    if type.lower() == 'l':
+        result = data[:]['low'].min()
+    return result
+'EXACT_REVIEWED_FUNCTION get_name sha256=5962c5550eaeef9c56518bc6a302956b01f81706d62dced703e0cc191948ea26 source=quant/2021年度精选策略/99.最新龙回头5.0速度优化版+风险控制版本.txt'
+
+def mail_to(subject, msg):
+    if g.is_sendmail == 0:
+        return
+    sender = g.mail_sender
+    passwd = g.mail_passwd
+    receiver = g.mail_receiver
+    msg = MIMEText(str(msg), 'plain', 'utf-8')
+    msg['From'] = formataddr(['花奶牛', sender])
+    msg['To'] = formataddr(['me', receiver])
+    msg['Subject'] = subject
+    try:
+        server = smtplib.SMTP_SSL('smtp.qq.com', 465)
+        server.login(sender, passwd)
+        server.sendmail(sender, [receiver], msg.as_string())
+        server.quit()
+    except Exception:
+        return
+    g.mail_msg = ''
+
+def print_and_mail(msg):
+    g.mail_msg += msg + '\n'
+'EXACT_REVIEWED_FUNCTION get_name sha256=5962c5550eaeef9c56518bc6a302956b01f81706d62dced703e0cc191948ea26 source=quant/2021年度精选策略/99.最新龙回头5.0速度优化版+风险控制版本.txt'

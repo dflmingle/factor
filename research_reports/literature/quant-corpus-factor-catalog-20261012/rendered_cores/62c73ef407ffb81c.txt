@@ -1,0 +1,219 @@
+quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+from datetime import time
+from jqdata import finance
+
+def initialize(context):
+    g.trading_signal = True
+    g.run_stoploss = True
+    g.filter_audit = False
+    g.adjust_num = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.pass_months = [1, 4]
+    g.limitup_stocks = []
+    g.min_mv = 10
+    g.max_mv = 100
+    g.stock_num = 4
+    g.reason_to_sell = {}
+    g.stoploss_strategy = 3
+    g.stoploss_limit = 0.09
+    g.stoploss_market = 0.05
+    g.highest = 50
+    g.etf = '511880.XSHG'
+    run_daily(prepare_stock_list, '9:05')
+    run_daily(trade_afternoon, time='14:00', reference_security='399101.XSHE')
+    run_daily(sell_stocks, time='10:00')
+    run_daily(close_account, '14:50')
+    run_weekly(weekly_adjustment, 2, '10:00')
+
+def prepare_stock_list(context):
+    g.hold_list = []
+    g.limitup_stocks = []
+    for position in list(context.portfolio.positions.values()):
+        stock = position.security
+        g.hold_list.append(stock)
+    if g.hold_list != []:
+        df = get_price(g.hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'low_limit'], count=1, panel=False, fill_paused=False)
+        df = df[df['close'] == df['high_limit']]
+        g.yesterday_HL_list = list(df.code)
+    else:
+        g.yesterday_HL_list = []
+    g.trading_signal = today_is_between(context)
+
+def get_stock_list(context):
+    final_list = []
+    MKT_index = '399101.XSHE'
+    initial_list = filter_stocks(context, get_index_stocks(MKT_index))
+    q = query(valuation.code, valuation.market_cap, income.np_parent_company_owners, income.net_profit, income.operating_revenue).filter(valuation.code.in_(initial_list), valuation.market_cap.between(g.min_mv, g.max_mv), income.np_parent_company_owners > 0, income.net_profit > 0, income.operating_revenue > 100000000.0).order_by(valuation.market_cap.asc()).limit(g.stock_num * 3)
+    df = get_fundamentals(q)
+    if g.filter_audit is True:
+        before_audit_filter = len(df)
+        df['audit'] = df['code'].apply(lambda x: filter_audit(context, x))
+        df_audit = df[df['audit'] == True]
+    final_list = list(df.code)
+    last_prices = history(1, unit='1d', field='close', security_list=final_list)
+    if len(final_list) == 0:
+        return [g.etf]
+    else:
+        return [stock for stock in final_list if stock in g.hold_list or last_prices[stock][-1] <= g.highest]
+
+def weekly_adjustment(context):
+    if g.trading_signal and g.adjust_num:
+        new_num = adjust_stock_num(context)
+        if new_num == 0:
+            buy_security(context, [g.etf], 1)
+        else:
+            if g.stock_num != new_num:
+                g.stock_num = new_num
+            g.target_list = get_stock_list(context)[:g.stock_num]
+            sell_list = [stock for stock in g.hold_list if stock not in g.target_list and stock not in g.yesterday_HL_list]
+            hold_list = [stock for stock in g.hold_list if stock in g.target_list or stock in g.yesterday_HL_list]
+            sell_positions = [context.portfolio.positions[stock] for stock in sell_list]
+            for position in sell_positions:
+                close_position(position)
+            buy_list = [stock for stock in g.target_list if stock not in g.hold_list]
+            buy_security(context, buy_list, len(buy_list))
+            for position in list(context.portfolio.positions.values()):
+                stock = position.security
+    else:
+        buy_security(context, [g.etf], 1)
+
+def check_limit_up(context):
+    now_time = context.current_dt
+    if g.yesterday_HL_list != []:
+        for stock in g.yesterday_HL_list:
+            current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close', 'high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            if current_data.iloc[0, 0] < current_data.iloc[0, 1]:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+                g.reason_to_sell[stock] = 'limitup'
+                g.limitup_stocks.append(stock)
+
+def check_remain_amount(context):
+    stoploss_list = []
+    uplimit_list = []
+    for key, value in g.reason_to_sell.items():
+        if value == 'stoploss':
+            stoploss_list.append(key)
+        elif value == 'limitup':
+            uplimit_list.append(key)
+    empty_num = len(stoploss_list) + len(uplimit_list)
+    addstock_num = len(uplimit_list)
+    etf_num = len(stoploss_list)
+    g.hold_list = context.portfolio.positions
+    if len(g.hold_list) < g.stock_num:
+        num_stocks_to_buy = min(addstock_num, g.stock_num - len(g.hold_list))
+        target_list = [stock for stock in g.target_list if stock not in g.limitup_stocks][:num_stocks_to_buy]
+        buy_security(context, target_list, len(target_list))
+        if etf_num != 0:
+            buy_security(context, [g.etf], etf_num)
+    g.reason_to_sell = {}
+
+def trade_afternoon(context):
+    if g.trading_signal == True:
+        check_limit_up(context)
+        check_remain_amount(context)
+
+def sell_stocks(context):
+    if g.run_stoploss:
+        current_positions = context.portfolio.positions
+        if g.stoploss_strategy == 1 or g.stoploss_strategy == 3:
+            for stock in current_positions.keys():
+                price = current_positions[stock].price
+                avg_cost = current_positions[stock].avg_cost
+                if price >= avg_cost * 2:
+                    order_target_value(stock, 0)
+                elif price < avg_cost * (1 - g.stoploss_limit):
+                    order_target_value(stock, 0)
+                    g.reason_to_sell[stock] = 'stoploss'
+        if g.stoploss_strategy == 2 or g.stoploss_strategy == 3:
+            stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close', 'open'], count=1, panel=False)
+            down_ratio = (1 - stock_df['close'] / stock_df['open']).mean()
+            if down_ratio >= g.stoploss_market:
+                g.reason_to_sell[stock] = 'stoploss'
+                for stock in current_positions.keys():
+                    order_target_value(stock, 0)
+
+def adjust_stock_num(context):
+    ma_para = 10
+    today = context.previous_date
+    start_date = today - datetime.timedelta(days=ma_para * 2)
+    index_df = get_price('399101.XSHE', start_date=start_date, end_date=today, frequency='daily')
+    index_df['ma'] = index_df['close'].rolling(window=ma_para).mean()
+    last_row = index_df.iloc[-1]
+    diff = last_row['close'] - last_row['ma']
+    result = 3 if diff >= 500 else 3 if 200 <= diff < 500 else 4 if -200 <= diff < 200 else 5 if -500 <= diff < -200 else 6
+    return result
+
+def filter_stocks(context, stock_list):
+    current_data = get_current_data()
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    filtered_stocks = []
+    for stock in stock_list:
+        if current_data[stock].paused:
+            continue
+        if current_data[stock].is_st:
+            continue
+        if '退' in current_data[stock].name:
+            continue
+        if stock.startswith('30') or stock.startswith('68') or stock.startswith('8') or stock.startswith('4'):
+            continue
+        if not (stock in context.portfolio.positions or last_prices[stock][-1] < current_data[stock].high_limit):
+            continue
+        if not (stock in context.portfolio.positions or last_prices[stock][-1] > current_data[stock].low_limit):
+            continue
+        start_date = get_security_info(stock).start_date
+        if context.previous_date - start_date < timedelta(days=375):
+            continue
+        filtered_stocks.append(stock)
+    return filtered_stocks
+
+def filter_audit(context, code):
+    lstd = context.previous_date
+    last_year = lstd.replace(year=lstd.year - 3, month=1, day=1).strftime('%Y-%m-%d')
+    q = query(finance.STK_AUDIT_OPINION).filter(finance.STK_AUDIT_OPINION.code == code, finance.STK_AUDIT_OPINION.pub_date >= last_year)
+    df = finance.run_query(q)
+    df['report_type'] = df['report_type'].astype(str)
+    contains_nums = df['report_type'].str.contains('2|3|4|5')
+    return not contains_nums.any()
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def buy_security(context, target_list, num):
+    position_count = len(context.portfolio.positions)
+    target_num = num
+    if target_num != 0:
+        value = context.portfolio.cash / target_num
+        for stock in target_list:
+            open_position(stock, value)
+            if len(context.portfolio.positions) == g.stock_num:
+                break
+
+def today_is_between(context):
+    month = context.current_dt.month
+    if month in g.pass_months:
+        return False
+    else:
+        return True
+
+def close_account(context):
+    if g.trading_signal == False:
+        if len(g.hold_list) != 0 and g.hold_list != [g.etf]:
+            for stock in g.hold_list:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+
+def print_position_info(context):
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount

@@ -1,0 +1,153 @@
+quant/量化策略/量化策略/首板回调买入策略2026/08上升趋势-回档买入-25年0.78.txt
+from jqdata import *
+import talib
+
+def initialize(context):
+    g.MA_SHORT = 5
+    g.MA_LONG = 20
+    g.ATR_PERIOD = 14
+    g.POSITION_SIZE = 0.1
+    g.STOP_LOSS_RATIO = 0.9
+    g.TRAILING_STOP_RATIO = 0.95
+    g.highest_prices = {}
+    run_daily(before_trading_start, time='09:00')
+    run_daily(trade, time='14:30')
+    run_daily(record_data, time='15:00')
+
+def before_trading_start(context):
+    all_stocks = get_all_securities(types=['stock'], date=context.current_dt.date()).index.tolist()
+    g.stock_pool = filter_stocks(context, all_stocks)
+
+def filter_stocks(context, all_stocks):
+    current_date = context.current_dt.date()
+    filtered_stocks = []
+    for stock in all_stocks:
+        stock_info = get_security_info(stock)
+        if stock_info.end_date < current_date:
+            continue
+        if 'ST' in stock_info.display_name or '*ST' in stock_info.display_name:
+            continue
+        current_data = get_current_data()
+        if stock in current_data and current_data[stock].paused:
+            continue
+        if stock in current_data:
+            if current_data[stock].is_limit_up() or current_data[stock].is_limit_down():
+                continue
+        ipo_date = stock_info.start_date
+        if (current_date - ipo_date).days < 60:
+            continue
+        yesterday = context.current_dt - datetime.timedelta(days=1)
+        try:
+            volume_data = get_price(stock, end_date=yesterday, count=20, fields=['money'], skip_paused=True)
+            if len(volume_data) < 20:
+                continue
+            avg_turnover = volume_data['money'].mean()
+            if avg_turnover < 10000000:
+                continue
+        except:
+            continue
+        filtered_stocks.append(stock)
+    return filtered_stocks
+
+def trade(context):
+    for stock in list(context.portfolio.positions.keys()):
+        sell_logic(context, stock)
+    update_highest_prices(context)
+    buy_logic(context)
+
+def update_highest_prices(context):
+    for stock in context.portfolio.positions:
+        try:
+            current_price = get_bars(stock, count=1, unit='1d', fields=['close'], include_now=True)['close'][-1]
+            if stock not in g.highest_prices:
+                g.highest_prices[stock] = current_price
+            else:
+                g.highest_prices[stock] = max(g.highest_prices[stock], current_price)
+        except:
+            continue
+
+def sell_logic(context, stock):
+    try:
+        prices = get_bars(stock, count=g.MA_LONG + 20, unit='1d', fields=['close', 'high', 'low'], include_now=True)
+        if len(prices['close']) < g.MA_LONG:
+            order_target(stock, 0)
+            if stock in g.highest_prices:
+                del g.highest_prices[stock]
+            return
+        ma_short = talib.MA(prices['close'], timeperiod=g.MA_SHORT)
+        ma_long = talib.MA(prices['close'], timeperiod=g.MA_LONG)
+        position = context.portfolio.positions[stock]
+        cost = position.avg_cost
+        current_price = prices['close'][-1]
+        if len(ma_short) >= 2 and len(ma_long) >= 2:
+            if ma_short[-1] < ma_long[-1] and ma_short[-2] >= ma_long[-2]:
+                order_target(stock, 0)
+                if stock in g.highest_prices:
+                    del g.highest_prices[stock]
+                return
+        if current_price < cost * g.STOP_LOSS_RATIO:
+            order_target(stock, 0)
+            if stock in g.highest_prices:
+                del g.highest_prices[stock]
+            return
+        if stock in g.highest_prices:
+            highest_price = g.highest_prices[stock]
+            if current_price < highest_price * g.TRAILING_STOP_RATIO:
+                order_target(stock, 0)
+                del g.highest_prices[stock]
+    except Exception as e:
+        pass
+
+def buy_logic(context):
+    available_cash = context.portfolio.available_cash
+    if len(context.portfolio.positions) >= 10:
+        return
+    if available_cash < 10000:
+        return
+    import random
+    if len(g.stock_pool) > 0:
+        random_stocks = random.sample(g.stock_pool, min(200, len(g.stock_pool)))
+    else:
+        return
+    for stock in random_stocks:
+        if stock in context.portfolio.positions:
+            continue
+        try:
+            prices = get_bars(stock, count=g.MA_LONG + 20, unit='1d', fields=['close', 'high', 'low'], include_now=True)
+            if len(prices['close']) < g.MA_LONG:
+                continue
+            ma_short = talib.MA(prices['close'], timeperiod=g.MA_SHORT)
+            ma_long = talib.MA(prices['close'], timeperiod=g.MA_LONG)
+            atr = talib.ATR(prices['high'], prices['low'], prices['close'], timeperiod=g.ATR_PERIOD)
+            if ma_short[-1] <= ma_long[-1]:
+                continue
+            recent_high = max(prices['close'][-10:])
+            current_price = prices['close'][-1]
+            drawdown = (recent_high - current_price) / recent_high
+            if not 0.05 <= drawdown <= 0.15:
+                continue
+            if atr[-1] / current_price > 0.05:
+                continue
+            if current_price < ma_short[-1]:
+                continue
+            if current_price < ma_long[-1]:
+                continue
+            amount = int(available_cash * g.POSITION_SIZE / current_price / 100) * 100
+            if amount > 0:
+                order(stock, amount)
+                stock_info = get_security_info(stock)
+                stock_name = stock_info.display_name if stock_info else stock
+                g.highest_prices[stock] = current_price
+                break
+        except Exception as e:
+            continue
+
+def on_strategy_end(context):
+    g.highest_prices.clear()
+
+def record_data(context):
+    try:
+        if context.portfolio.total_value > 0:
+            cash_ratio = context.portfolio.available_cash / context.portfolio.total_value
+    except:
+        pass

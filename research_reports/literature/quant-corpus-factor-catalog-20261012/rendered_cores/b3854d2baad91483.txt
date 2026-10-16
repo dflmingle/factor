@@ -1,0 +1,224 @@
+quant/2021年度精选策略/73.基于期权PCR与标的波动率价差的股指期货套利.txt
+from jqdata import *
+import datetime as dt, numpy as np, pandas as pd
+
+def initialize(context):
+    g.pcr_list = []
+    g.pcr_list_ = []
+    g.multiplier = 300
+    g.margin = 0.15
+    g.pcr_flag = 0
+    g.corr = np.nan
+    g.corr_ = np.nan
+    g.ind = np.nan
+    g.ind_ = np.nan
+    g.count = 0
+    g.hold_ins = ''
+    g.code = '510050.XSHG'
+    g.d = 20
+    g.corr = False
+    g.corr_ = False
+    run_daily(before_market_open, time='09:00', reference_security='IH8888.CCFX')
+    run_daily(market_open, time='every_bar', reference_security='IH8888.CCFX')
+    run_daily(after_market_close, time='15:30', reference_security='IH8888.CCFX')
+
+def before_market_open(context):
+    g.ih = get_future_contracts('IH')[0]
+    g.hands = min(calc_hands(context), 50)
+    g.lc = False
+
+def market_open(context):
+    if str(context.current_dt.time()) == '10:00:00' and g.pcr_flag == 0 and context.portfolio.positions:
+        closePosition(context)
+    if str(context.current_dt.time()) < '14:30:00':
+        return
+    cancelOrder()
+    lostControl(context)
+    if g.lc or g.ind == -1:
+        return
+    if g.hold_ins:
+        end = get_security_info(g.hold_ins).end_date
+        today = context.current_dt.date()
+        if (pd.to_datetime(end) - pd.to_datetime(today)).days < 2:
+            if g.count == 1:
+                g.pcr_flag = 0
+                g.hold_ins = ''
+            g.count -= 1
+            closePosition(context)
+    if g.pcr_flag == 1 and (g.ind < 4 or g.ind_ < 4) and (g.count > 0):
+        if g.count == 1:
+            g.pcr_flag = 0
+        g.count -= 1
+        closePosition(context)
+        g.hold_ins = ''
+    elif g.pcr_flag == -1 and (g.ind > 15 or g.ind_ > 15) and (g.count > 0):
+        if g.count == 1:
+            g.pcr_flag = 0
+        g.count -= 1
+        closePosition(context)
+        g.hold_ins = ''
+    if g.pcr_flag != -1 and (g.ind > 18 or g.ind_ > 18) and (g.corr or g.corr_) and (g.count < g.hands):
+        if g.pcr_flag == 0:
+            g.pcr_flag = 1
+        g.count += 2
+        order(g.ih, 2, None, 'long')
+        g.hold_ins = g.ih
+    elif g.pcr_flag != 1 and (g.ind < 1 or g.ind_ < 1) and (g.corr or g.corr_) and (g.count < g.hands):
+        if g.pcr_flag == 0:
+            g.pcr_flag = -1
+        g.count += 2
+        order(g.ih, 2, None, 'short')
+        g.hold_ins = g.ih
+
+def after_market_close(context):
+    today = context.current_dt.date()
+    df = opt.run_query(query(opt.OPT_CONTRACT_INFO).filter(opt.OPT_CONTRACT_INFO.underlying_symbol == g.code, opt.OPT_CONTRACT_INFO.list_date < today, opt.OPT_CONTRACT_INFO.expire_date > today))
+    call = df[df['contract_type'] == 'CO'].code.tolist()
+    put = df[df['contract_type'] == 'PO'].code.tolist()
+    call_money = get_price(call, end_date=today, fields='money', count=1, panel=False)
+    call_volume = get_price(call, end_date=today, fields='volume', count=1, panel=False)
+    put_money = get_price(put, end_date=today, fields='money', count=1, panel=False)
+    put_volume = get_price(put, end_date=today, fields='volume', count=1, panel=False)
+    pcr = round(put_money.money.sum() / call_money.money.sum(), 4)
+    pcr_ = round(put_volume.volume.sum() / call_volume.volume.sum(), 4)
+    g.pcr_list.append(pcr)
+    g.pcr_list_.append(pcr_)
+    etf_return = get_price(g.code, end_date=today, fields='close', count=21, panel=False).close.pct_change().dropna().tolist()
+    if len(g.pcr_list) > 20:
+        g.pcr_list = g.pcr_list[-20:]
+        g.pcr_list_ = g.pcr_list_[-20:]
+        a = pd.Series(etf_return[-10:])
+        b = pd.Series(g.pcr_list[-10:])
+        b_ = pd.Series(g.pcr_list_[-10:])
+        g.corr = a.corr(b) < -0.75
+        g.corr_ = a.corr(b_) < -0.75
+        g.spread = pd.Series(etf_return) * 100 - pd.Series(g.pcr_list)
+        g.spread_ = pd.Series(etf_return) * 100 - pd.Series(g.pcr_list_)
+        try:
+            g.ind = sorted(g.spread).index(g.spread.values[-1])
+            g.ind_ = sorted(g.spread_).index(g.spread_.values[-1])
+        except:
+            g.ind = np.nan
+            g.ind_ = np.nan
+
+def calc_hands(context):
+    money = context.portfolio.total_value
+    price = attribute_history(g.code, 1, '1d', 'close').close.values[0]
+    hands = int(money / g.margin * 0.8 / price / g.multiplier)
+    return hands
+
+def lostControl(context):
+    profit = np.nan
+    if g.pcr_flag == 1:
+        posi = context.portfolio.long_positions
+        for p in posi.values():
+            cost = p.avg_cost
+            now = p.price
+            profit = (now - cost) * 300
+    elif g.pcr_flag == -1:
+        posi = context.portfolio.short_positions
+        for p in posi.values():
+            cost = p.avg_cost
+            now = p.price
+            profit = (cost - now) * 300
+    if profit < -20000:
+        if g.count == 2:
+            g.pcr_flag = 0
+            g.hold_ins = ''
+        g.count -= 2
+        g.lc = True
+        closePosition(context)
+    elif profit > 100000:
+        if g.count == 2:
+            g.pcr_flag = 0
+            g.hold_ins = ''
+        g.count -= 2
+        g.lc = True
+        closePosition(context)
+
+def closePosition(context):
+    if g.pcr_flag == 1:
+        long_posi = context.portfolio.long_positions
+        for p in long_posi.values():
+            s = p.security
+            v = p.closeable_amount
+            order(s, -2, None, 'long')
+    elif g.pcr_flag == -1:
+        short_posi = context.portfolio.short_positions
+        for p in short_posi.values():
+            s = p.security
+            v = p.closeable_amount
+            order(s, -2, None, 'short')
+    elif g.pcr_flag == 0:
+        long_posi = context.portfolio.long_positions
+        for p in long_posi.values():
+            s = p.security
+            v = p.closeable_amount
+            order(s, -v, None, 'long')
+        short_posi = context.portfolio.short_positions
+        for p in short_posi.values():
+            s = p.security
+            v = p.closeable_amount
+            order(s, -v, None, 'short')
+
+def cancelOrder():
+    orders = get_open_orders()
+    for o in orders:
+        if o.action == 'close':
+            g.count += 1
+        else:
+            g.count -= 1
+        cancel_order(o)
+
+def get_CCFX_end_date(future_code):
+    return get_security_info(future_code).end_date
+
+def position_auto_switch(context, pindex=0, switch_func=None, callback=None):
+    import re
+    subportfolio = context.subportfolios[pindex]
+    symbols = set(subportfolio.long_positions.keys()) | set(subportfolio.short_positions.keys())
+    switch_result = []
+    for symbol in symbols:
+        match = re.match('(?P<underlying_symbol>[A-Z]{1,})', symbol)
+        if not match:
+            raise ValueError('未知期货标的：{}'.format(symbol))
+        else:
+            dominant = get_dominant_future(match.groupdict()['underlying_symbol'])
+            cur = get_current_data()
+            symbol_last_price = cur[symbol].last_price
+            dominant_last_price = cur[dominant].last_price
+            if dominant > symbol:
+                for p in (subportfolio.long_positions.get(symbol, None), subportfolio.short_positions.get(symbol, None)):
+                    if p is None:
+                        continue
+                    if switch_func is not None:
+                        switch_func(context, pindex, p, dominant)
+                    else:
+                        amount = p.total_amount
+                        if p.side == 'long':
+                            symbol_low_limit = cur[symbol].low_limit
+                            dominant_high_limit = cur[dominant].high_limit
+                            if symbol_last_price <= symbol_low_limit:
+                                continue
+                            elif dominant_last_price >= dominant_high_limit:
+                                continue
+                            else:
+                                order_target(symbol, 0, side='long')
+                                order_target(dominant, amount, side='long')
+                                switch_result.append({'before': symbol, 'after': dominant, 'side': 'long'})
+                            if callback:
+                                callback(context, pindex, p, dominant)
+                        if p.side == 'short':
+                            symbol_high_limit = cur[symbol].high_limit
+                            dominant_low_limit = cur[dominant].low_limit
+                            if symbol_last_price >= symbol_high_limit:
+                                continue
+                            elif dominant_last_price <= dominant_low_limit:
+                                continue
+                            else:
+                                order_target(symbol, 0, side='short')
+                                order_target(dominant, amount, side='short')
+                                switch_result.append({'before': symbol, 'after': dominant, 'side': 'short'})
+                                if callback:
+                                    callback(context, pindex, p, dominant)
+    return switch_result

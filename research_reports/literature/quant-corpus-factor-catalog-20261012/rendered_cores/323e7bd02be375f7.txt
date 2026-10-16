@@ -1,0 +1,221 @@
+quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt
+from jqdata import *
+import numpy as np
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.stock_pool = ['510300.XSHG', '510050.XSHG', '159949.XSHE', '159928.XSHE']
+    g.stock_num = 1
+    g.momentum_day = 20
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.K = 8
+    g.biasN = 90
+    g.lossN = 20
+    g.lossFactor = 1.005
+    g.SwitchFactor = 1.04
+    g.Motion_1diff = 19
+    g.raiser_thr = 4.8
+    g.hold_stock = 'null'
+    g.score_thr = -0.68
+    g.score_fall_thr = -0.43
+    g.idex_slope_raise_thr = 12
+    g.slope_series, g.rsrs_score_history = initial_slope_series()
+    g.stock_motion = initial_stock_motion(g.stock_pool)
+    run_daily(my_trade_prepare, time='7:00', reference_security='000300.XSHG')
+    run_daily(my_trade, time='9:30', reference_security='000300.XSHG')
+    run_daily(my_sell2buy, time='9:35', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+    run_daily(pre_hold_check, time='11:25')
+    run_daily(hold_check, time='11:27')
+
+def initial_slope_series():
+    length = g.N + g.M + g.K
+    data = attribute_history(g.ref_stock, length, '1d', ['high', 'low', 'close'])
+    multe_data = [get_ols(data.low[i:i + g.N], data.high[i:i + g.N]) for i in range(length - g.N)]
+    slopes = [i[1] for i in multe_data]
+    r2s = [i[2] for i in multe_data]
+    zscores = [get_zscore(slopes[i + 1:i + 1 + g.M]) * r2s[i + g.M] for i in range(g.K)]
+    return (slopes, zscores)
+
+def initial_stock_motion(stock_pool):
+    stock_motion = {}
+    for stock in stock_pool:
+        motion_que = []
+        data = attribute_history(stock, g.biasN + g.momentum_day + 1, '1d', ['close'])
+        data = data[:-1]
+        bias = (data.close / data.close.rolling(g.biasN).mean())[-g.momentum_day:]
+        score = np.polyfit(np.arange(g.momentum_day), bias / bias[0], 1)[0].real * 10000
+        motion_que.append(score)
+        stock_motion[stock] = motion_que
+    return stock_motion
+
+def pre_hold_check(context):
+    if context.portfolio.positions:
+        for stk in context.portfolio.positions:
+            dt = attribute_history(stk, g.lossN + 2, '60m', ['close'])
+            dt['man'] = dt.close / dt.close.rolling(g.lossN).mean()
+            if dt.man[-1] < 1.0:
+                stk_dict = context.portfolio.positions[stk]
+
+def hold_check(context):
+    current_data = get_current_data()
+    if context.portfolio.positions:
+        for stk in context.portfolio.positions:
+            yesterday_di = attribute_history(stk, 1, '1d', ['close'])
+            dt = attribute_history(stk, g.lossN + 2, '60m', ['close'])
+            dt['man'] = dt.close / dt.close.rolling(g.lossN).mean()
+            if dt.man[-1] < 1.0 and current_data[stk].last_price * g.lossFactor <= yesterday_di['close'][-1]:
+                stk_dict = context.portfolio.positions[stk]
+                if stk_dict.closeable_amount:
+                    order_target_value(stk, 0)
+
+def get_rank(context, stock_pool):
+    rank = []
+    for stock in stock_pool:
+        data = attribute_history(stock, g.biasN + g.momentum_day, '1d', ['close'])
+        bias = (data.close / data.close.rolling(g.biasN).mean())[-g.momentum_day:]
+        score = np.polyfit(np.arange(g.momentum_day), bias / bias[0], 1)[0].real * 10000
+        adr = 100 * (data.close[-1] - data.close[-2]) / data.close[-2]
+        if stock == g.hold_stock:
+            raise_x = g.SwitchFactor
+        else:
+            raise_x = 1
+        rank.append([stock, score * raise_x, adr])
+        g.stock_motion[stock].append(score)
+        if len(g.stock_motion[stock]) > 5:
+            g.stock_motion[stock].pop(0)
+    str = ''
+    for item in rank:
+        str += '%s:%.2f:%.2f; ' % (item[0], item[1], item[2])
+    rank = [i for i in rank if math.isnan(i[1]) == False]
+    rank.sort(key=lambda x: x[1], reverse=True)
+    return rank[0]
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+
+def get_zscore_slope(z_scores):
+    y = z_scores
+    x = np.arange(len(z_scores))
+    slope, intercept = np.polyfit(x, y, 1)
+    return slope
+
+def get_timing_signal(context, stock):
+    data = attribute_history(g.ref_stock, g.N, '1d', ['high', 'low', 'close'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    g.rsrs_score_history.append(rsrs_score)
+    rsrs_slope = get_zscore_slope(g.rsrs_score_history[-g.K:])
+    idex_slope = np.polyfit(np.arange(8), data.close[-8:], 1)[0].real
+    g.slope_series.pop(0)
+    g.rsrs_score_history.pop(0)
+    WR2, WR1 = WR([g.ref_stock], check_date=context.previous_date, N=21, N1=14, unit='1d', include_now=True)
+    if WR1[g.ref_stock] >= 97 and WR2[g.ref_stock] >= 97:
+        return 'BUY'
+    if rsrs_slope < 0 and rsrs_score > 0:
+        return 'SELL'
+    if idex_slope < 0 and rsrs_slope > 0 and (rsrs_score < g.score_fall_thr):
+        return 'SELL'
+    if idex_slope > g.idex_slope_raise_thr and rsrs_slope > 0:
+        return 'BUY'
+    if rsrs_score > g.score_thr:
+        return 'BUY'
+    else:
+        return 'SELL'
+
+def open_position(security, value):
+    order = order_target_value(security, value)
+    if order != None and order.filled > 0:
+        return True
+    return False
+
+def close_position(position):
+    security = position.security
+    order = order_target_value(security, 0)
+    if order != None:
+        if order.status == OrderStatus.held and order.filled == order.amount:
+            return True
+    return False
+
+def adjust_position(context, buy_stocks):
+    for stock in context.portfolio.positions:
+        if stock not in buy_stocks:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+            g.hold_stock = 'null'
+            return
+        else:
+            pass
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        value = context.portfolio.cash / (g.stock_num - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == g.stock_num:
+                        g.hold_stock = stock
+                        break
+
+def buy_stocks(context, buy_stocks):
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        value = context.portfolio.cash / (g.stock_num - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == g.stock_num:
+                        g.hold_stock = stock
+                        break
+
+def my_trade_prepare(context):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    g.check_out_list = get_rank(context, g.stock_pool)
+    g.timing_signal = get_timing_signal(context, g.ref_stock)
+    cur_stock = g.check_out_list[0]
+    cur_adr = g.check_out_list[2]
+    change_rate = g.stock_motion[cur_stock][-1] - g.stock_motion[cur_stock][-2]
+    if change_rate > g.Motion_1diff or cur_adr > g.raiser_thr:
+        g.timing_signal = 'SELL'
+    if g.timing_signal == 'SELL':
+        for stock in context.portfolio.positions:
+            pass
+    elif g.timing_signal == 'BUY' or g.timing_signal == 'KEEP':
+        if g.check_out_list[0] not in context.portfolio.positions:
+            if len(context.portfolio.positions) > 0:
+                stock_tmps = list(context.portfolio.positions.keys())
+    else:
+        pass
+
+def my_trade(context):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if g.timing_signal == 'SELL':
+        for stock in context.portfolio.positions:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    elif g.timing_signal == 'BUY' or g.timing_signal == 'KEEP':
+        adjust_position(context, g.check_out_list)
+    else:
+        pass
+
+def my_sell2buy(context):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == 9:
+        if g.timing_signal == 'BUY' or g.timing_signal == 'KEEP':
+            buy_stocks(context, g.check_out_list)
+        else:
+            pass
+
+def check_lose(context):
+    for position in list(context.portfolio.positions.values()):
+        security = position.security
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        if ret <= -90:
+            order_target_value(position.security, 0)
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=73dd0b225b79125998a6988076a4218a550fa612b090a8db46acb6553a0986bb source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'

@@ -1,0 +1,128 @@
+[
+  {
+    "name": "F-SCH1016-02",
+    "path": "f-sch1016-02.py",
+    "formulas": [
+      "(-(RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM)))",
+      "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),20))",
+      "EMA(ZSCORE((-(RANK((-SMA(VOLUME,1,1)))+RANK((-LOW))))),3)",
+      "TS_MEAN(TURNOVER,20)",
+      "((0.975*ZSCORE(BOOK_TO_MARKET_RATIO_LF))+(0.025*ZSCORE(RANK(BOOK_TO_MARKET_RATIO_LF))))",
+      "MARKET_CAP",
+      "MARKET_CAP",
+      "(CLOSE/TS_MEAN(OPEN,15))",
+      "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),20))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,18)),1),18))))),20)",
+      "RATIO_EP_TTM"
+    ],
+    "weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "directions": [
+      -1,
+      -1,
+      -1,
+      -1,
+      1,
+      -1,
+      -1,
+      -1,
+      -1,
+      1
+    ],
+    "reason": "X01 open mean window 15; local five-snapshot Top20 mean 13.4 vs 13.2 control, latest 10 vs 9.",
+    "sha256": "2a0ee1e12ff17dc62630cbd8f93a799e85872fccdbedda585caa4fdcb992a984"
+  },
+  {
+    "name": "F-SCH1016-03",
+    "path": "f-sch1016-03.py",
+    "formulas": [
+      "(-(RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM)))",
+      "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),20))",
+      "EMA(ZSCORE((-(RANK((-SMA(VOLUME,1,1)))+RANK((-LOW))))),3)",
+      "TS_MEAN(TURNOVER,20)",
+      "((0.975*ZSCORE(BOOK_TO_MARKET_RATIO_LF))+(0.025*ZSCORE(RANK(BOOK_TO_MARKET_RATIO_LF))))",
+      "MARKET_CAP",
+      "MARKET_CAP",
+      "(CLOSE/TS_MEAN(OPEN,10))",
+      "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),20))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,18)),1),18))))),20)",
+      "RATIO_EP_TTM"
+    ],
+    "weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      2.0,
+      1.0,
+      1.0
+    ],
+    "directions": [
+      -1,
+      -1,
+      -1,
+      -1,
+      1,
+      -1,
+      -1,
+      -1,
+      -1,
+      1
+    ],
+    "reason": "Double X01 seat weight; local five-snapshot Top20 mean 13.6, latest 12 vs 9 control.",
+    "sha256": "cadab2f866fb8f6a458fa9b7132e8f1595cb41e4e1031b7137932ae93d89c11d"
+  },
+  {
+    "name": "F-SCH1016-04",
+    "path": "f-sch1016-04.py",
+    "formulas": [
+      "(-(RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM)))",
+      "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),20))",
+      "EMA(ZSCORE((-(RANK((-SMA(VOLUME,1,1)))+RANK((-LOW))))),3)",
+      "TS_MEAN(TURNOVER,20)",
+      "((0.975*ZSCORE(BOOK_TO_MARKET_RATIO_LF))+(0.025*ZSCORE(RANK(BOOK_TO_MARKET_RATIO_LF))))",
+      "MARKET_CAP",
+      "MARKET_CAP",
+      "(CLOSE/TS_MEAN(OPEN,10))",
+      "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),20))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,18)),1),18))))),20)",
+      "RATIO_EP_TTM"
+    ],
+    "weights": [
+      0.5,
+      0.5,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.5,
+      1.0
+    ],
+    "directions": [
+      -1,
+      -1,
+      -1,
+      -1,
+      1,
+      -1,
+      -1,
+      -1,
+      -1,
+      1
+    ],
+    "reason": "Half-weight M03/V01/M02; local full-hold overlap mean 87.95% and latest Top20 10/20.",
+    "sha256": "733472f7e2dc48899ce3d7da851265ae223b0acdda91b9e11ccd22af3ef1acec"
+  }
+]

@@ -1,0 +1,46 @@
+quant/2023年度精选策略/69.选取向上趋势的股票.txt
+import numpy as np
+import pylab as pl
+import matplotlib.pyplot as plt
+import scipy.signal as signal
+from sklearn.linear_model import LinearRegression
+df = get_price('000858.XSHE', start_date='2020-09-09', end_date='2020-12-20', frequency='daily', fields=['close'], skip_paused=False, fq='pre')
+cl = df['close'].tolist()
+x = np.array(df['close'].tolist())
+Y = x[signal.argrelextrema(x, np.greater)]
+X = range(len(Y))
+X_train = np.array(X).reshape((len(X), 1))
+Y_train = np.array(Y).reshape((len(Y), 1))
+lineModel = LinearRegression()
+lineModel.fit(X_train, Y_train)
+Y_predict = lineModel.predict(X_train)
+a = lineModel.coef_[0][0]
+b = lineModel.intercept_[0]
+import numpy as np
+import pylab as pl
+import matplotlib.pyplot as plt
+import scipy.signal as signal
+from sklearn.linear_model import LinearRegression
+sstart_date = '2020-06-21'
+send_date = '2020-12-21'
+i = 0
+dfs = get_all_securities(types=['stock'], date=send_date)
+for s in dfs.index:
+    df = get_price(s, start_date=sstart_date, end_date=send_date, frequency='daily', fields=['close'], skip_paused=False, fq='pre')
+    cl = df['close'].tolist()
+    if len(cl) <= 120:
+        continue
+    x = np.array(df['close'].tolist())
+    Y = x[signal.argrelextrema(x, np.less_equal)]
+    if len(Y) <= 0:
+        continue
+    X = range(len(Y))
+    X_train = np.array(X).reshape((len(X), 1))
+    Y_train = np.array(Y).reshape((len(Y), 1))
+    lineModel = LinearRegression()
+    lineModel.fit(X_train, Y_train)
+    Y_predict = lineModel.predict(X_train)
+    a1 = lineModel.coef_[0][0]
+    b = lineModel.intercept_[0]
+    if a1 > 2:
+        i = i + 1

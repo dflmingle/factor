@@ -1,0 +1,64 @@
+quant/2023年度精选策略/89.2019年到现在90多倍的新策略.txt
+from __future__ import division
+from jqdata import *
+import datetime
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='every_bar', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    g.pool = []
+    g.max_holding = 2
+
+def before_market_open(context):
+    g.pool = select(context)
+
+def market_open(context):
+    pass
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'
+
+def handle_data(context, data):
+    cur_data = get_current_data()
+    if 1031 > int(context.current_dt.strftime('%H%M')) > 930:
+        if cur_data['000300.XSHG'].last_price > cur_data['000300.XSHG'].day_open:
+            toBuy(context)
+    if int(context.current_dt.strftime('%H%M')) == 1450:
+        toSell(context)
+
+def toSell(context):
+    curr_data = get_current_data()
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    for stock in context.portfolio.positions:
+        closeable_amount = context.portfolio.positions[stock].closeable_amount
+        if closeable_amount > 0 and curr_data[stock].last_price < curr_data[stock].high_limit:
+            order_target(stock, 0)
+
+def toBuy(context):
+    if len(g.pool) == 0:
+        return
+    curr_data = get_current_data()
+    if len(context.portfolio.positions) < g.max_holding:
+        per_cash = context.portfolio.available_cash / (g.max_holding - len(context.portfolio.positions))
+        for stock in g.pool:
+            if stock in context.portfolio.positions:
+                continue
+            pre_close = attribute_history(stock, 1, '1d', 'close')['close'][-1]
+            if len(context.portfolio.positions) < g.max_holding:
+                if get_current_data()[stock].last_price > pre_close * 1.09:
+                    order_target_value(stock, per_cash)
+
+def select(context):
+    endDate = context.previous_date
+    trd_days = get_trade_days(end_date=endDate, count=365)
+    security_list = get_all_securities('stock', trd_days[0]).index.tolist()
+    stk_list = [s for s in security_list if not (s[:2] == '30' or s[:2] == '68')]
+    p = get_price(stk_list, count=120, end_date=endDate, frequency='daily', fields=['close', 'pre_close', 'high_limit'])
+    df_ZT = (p['close'].iloc[-1] == p['high_limit'].iloc[-1]) & (p['high_limit'].iloc[-1] / p['pre_close'].iloc[-1] > 1.09)
+    up_limit_list = list(df_ZT[df_ZT == True].index)
+    df_250 = (p['close'].iloc[-1] < p['close'].max()) & (p['close'].iloc[-1] * 1.07 > p['close'].max())
+    up_max250_list = list(df_250[df_250 == True].index)
+    temp_list = []
+    if len(up_limit_list) / len(security_list) > 0.01:
+        temp_list = list(set(up_limit_list).intersection(up_max250_list))
+    return temp_list

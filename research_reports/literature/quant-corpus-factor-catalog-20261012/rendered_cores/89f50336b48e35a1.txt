@@ -1,0 +1,305 @@
+quant/2023年度精选策略/80.趋与势的量化定义.txt
+from typing import Tuple, List, Callable, Union, Dict
+import pandas as pd
+import numpy as np
+import empyrical as ep
+from collections import defaultdict, namedtuple
+from jqdata import *
+import seaborn as sns
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
+
+class Normalize_Trend(object):
+
+    def __init__(self, close_ser: pd.Series) -> None:
+        if not isinstance(close_ser, pd.Series):
+            raise ValueError('输入参数类型必须为pd.Series')
+        self.close_ser = close_ser
+
+    def normalize_monotone(self) -> pd.Series:
+        sign = self.close_ser.pct_change().apply(np.sign)
+        sign = sign.cumsum().fillna(0)
+        return sign
+
+    def normalize_movingaverage(self, window: int=5) -> pd.Series:
+        close_ser = self.close_ser
+        size = len(close_ser)
+        if size < window:
+            raise ValueError('输入数据长度小于窗口期')
+        ma = close_ser.rolling(window).mean()
+        sign = (close_ser - ma).apply(np.sign).iloc[window - 2:]
+        sign = sign.cumsum().fillna(0)
+        return sign
+
+    def normalize_compound(self, window: int=5):
+        close_ser = self.close_ser
+        size = len(close_ser)
+        if size < window:
+            raise ValueError('输入数据长度小于窗口期')
+        sign_monotone = close_ser.pct_change().apply(np.sign)
+        ma = close_ser.rolling(window).mean()
+        sign_ma = (close_ser - ma).apply(np.sign)
+        sign_compound = (sign_monotone + sign_ma) / 2
+        sign_compound = sign_compound.iloc[window - 2:].cumsum().fillna(0)
+        return sign_compound
+
+class Tren_Score(object):
+
+    def __init__(self, normalize_trend_ser: pd.Series) -> None:
+        if not isinstance(normalize_trend_ser, pd.Series):
+            raise ValueError('输入参数类型必须为pd.Series')
+        self.normalize_trend_ser = normalize_trend_ser
+        self.point_frame: Dict[pd.DataFrame] = defaultdict(pd.DataFrame)
+        self.score_record = namedtuple('ScoreRecord', 'trend_score,act_score')
+        self.score: Dict = defaultdict(namedtuple)
+        self.point_mask: Dict[List] = defaultdict(list)
+        self.func_dic: Dict = {'opposite': self._get_opposite_piont, 'absolute': self._get_absolute_point}
+
+    def calc_trend_score(self, method: str) -> float:
+        func: Callable = self.func_dic[method]
+        cond: pd.Series = func()
+        trend_score = np.square(self.normalize_trend_ser[cond].diff()).sum()
+        act_score = self.normalize_trend_ser.diff().sum()
+        self.score[method] = self.score_record(trend_score=trend_score, act_score=act_score)
+        self.point_frame[method] = self.normalize_trend_ser[cond]
+        self.point_mask[method] = cond
+
+    def calc_absolute_score(self) -> float:
+        opposite = self.calc_trend_score('opposite')
+        absolute = self.calc_trend_score('absolute')
+        N = len(self.normalize_trend_ser)
+        return max(opposite, absolute) / N ** (3 / 2)
+
+    def _get_opposite_piont(self) -> List:
+        ser = self.normalize_trend_ser
+        flag_ser = pd.Series(index=ser.index, dtype=ser.index.dtype)
+        dif = ser.diff().fillna(method='bfill')
+        for idx, i in dif.items():
+            try:
+                previous_i
+            except NameError:
+                previous_idx = idx
+                previous_i = i
+                flag_ser[idx] = True
+                continue
+            if i != previous_i:
+                flag_ser[previous_idx] = True
+            else:
+                flag_ser[previous_idx] = False
+            previous_idx = idx
+            previous_i = i
+        flag_ser.iloc[0] = True
+        flag_ser.iloc[-1] = True
+        return flag_ser.values.tolist()
+
+    def _get_absolute_point(self) -> List:
+        arr = self.normalize_trend_ser.values
+        size = len(arr)
+        ind_max = np.max(arr)
+        ind_min = np.min(arr)
+        idx_max = np.argwhere(arr == ind_max).reshape(1, -1)[0]
+        idx_min = np.argwhere(arr == ind_min).reshape(1, -1)[0]
+        point = np.append(idx_min, idx_max)
+        point = np.append(point, [0, size - 1])
+        point = np.unique(point)
+        cond = [True if i in point else False for i in range(size)]
+        return cond
+import sys
+sys.path.append('../..')
+from Hugos_tools.plot_finance import candlestick_ochl
+from matplotlib import ticker
+from matplotlib.pylab import date2num
+
+def plot_ochl(self, title: str=None, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots()
+    data = self._data.copy()
+    date_tickers = pd.to_datetime(data.index)
+    data['dates'] = np.arange(len(data))
+
+    def format_date(x, pos):
+        if x < 0 or x > len(date_tickers) - 1:
+            return ''
+        return date_tickers[int(x)].strftime('%Y-%m-%d')
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
+    candlestick_ochl(ax=ax, quotes=data[['dates', 'open', 'close', 'high', 'low']].values, width=0.7, colorup='r', colordown='g', alpha=0.7)
+    return ax
+pd.DataFrame.plot.ochl = plot_ochl
+price = get_price('601388.XSHG', end_date='2021-09-13', count=12 + 5, fields=['close', 'open', 'high', 'low'], panel=False)
+normalize = Normalize_Trend(price['close'])
+fig, axes = plt.subplots(1, 2, figsize=(18, 5))
+sign1 = normalize.normalize_monotone()
+price.plot.ochl(ax=axes[0])
+sign1.plot(marker='o', ax=axes[1])
+fig, axes = plt.subplots(1, 2, figsize=(18, 5))
+sign2 = normalize.normalize_movingaverage(5)
+price.plot.ochl(ax=axes[0])
+sign2.plot(marker='o', ax=axes[1])
+fig, axes = plt.subplots(1, 2, figsize=(18, 5))
+sign3 = normalize.normalize_compound(5)
+price.plot.ochl(ax=axes[0])
+sign3.plot(marker='o', ax=axes[1])
+test_value = [0, 1, 1, 2, 1, 2, 1, 1, 0, 0, 1, 2]
+test_ser = pd.Series(data=test_value, index=range(len(test_value)))
+test_ser.plot(marker='o')
+test_arr = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4], [5, 5, 5], [6, 6, 4], [7, 7, 5], [8, 6, 6], [9, 7, 7], [8, 8, 8]])
+df1 = pd.DataFrame(test_arr, columns='A,B,C'.split(','))
+
+def get_act_trend_score(ser: pd.Series) -> Tuple:
+    trend_score = Tren_Score(ser)
+    trend_score.calc_trend_score('opposite')
+    return (trend_score.score['opposite'].act_score, trend_score.score['opposite'].trend_score)
+test_arr = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4], [5, 5, 5], [6, 6, 4], [7, 7, 5], [8, 6, 6], [9, 7, 7], [8, 8, 8]])
+df1 = pd.DataFrame(test_arr, columns='A,B,C'.split(','))
+score_df1 = df1.apply(lambda x: get_act_trend_score(x)).T
+fif, axes = plt.subplots(1, 3, figsize=(18, 6))
+for ax, (col_name, score_ser), (_, ser_v) in zip(axes, score_df1.T.items(), df1.items()):
+    a, b = score_ser
+    ser_v.plot(ax=ax, marker='o', title=f'{col_name}:<{a},{b}>')
+test_arr1 = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2], [1, 1, 3], [2, 2, 2], [1, 3, 3], [2, 2, 4], [3, 3, 3], [4, 4, 4], [5, 5, 5], [6, 6, 6]])
+df2 = pd.DataFrame(test_arr1, columns='A,B,C'.split(','))
+score_df2 = df2.apply(lambda x: get_act_trend_score(x)).T
+fif, axes = plt.subplots(1, 3, figsize=(18, 6))
+for ax, (col_name, score_ser), (_, ser_v) in zip(axes, score_df2.T.items(), df2.items()):
+    a, b = score_ser
+    ser_v.plot(ax=ax, marker='o', title=f'{col_name}:<{a},{b}>')
+test_arr2 = np.array([1, 1, 0, 1, -1, 0, -1, 1, 1, -1, 0, 0, 1, 1, 1, 1, -1, -1, -1])
+ser = pd.Series(test_arr2)
+cum_ser = ser.cumsum()
+cum_ser.plot(marker='o')
+test_arr3 = np.array([1, 2, 3, 2, 3, 4, 3, 2, 3, 2, 1, 2, 1, 0, 1, 2, 1, 2, 3])
+ser = pd.Series(test_arr3)
+ser.plot(marker='o')
+
+def compare_score(ser: pd.Series) -> Tuple:
+    trend_score = Tren_Score(ser)
+    trend_score.calc_trend_score('opposite')
+    trend_score.calc_trend_score('absolute')
+    opposit_trend_score = trend_score.score['opposite'].trend_score
+    absolute_trend_score = trend_score.score['absolute'].trend_score
+    return (opposit_trend_score, absolute_trend_score)
+test_arr4 = np.array([[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 0], [3, 3, 3, 3, 1, 1], [4, 4, 4, 2, 0, 0], [5, 5, 5, 3, 1, 1], [6, 4, 6, 4, 2, 0], [7, 5, 5, 3, 1, 1], [8, 6, 4, 4, 0, 0], [9, 7, 3, 5, 1, 1], [10, 8, 2, 6, 2, 0]])
+df4 = pd.DataFrame(test_arr4, columns='A,B,C,D,E,F'.split(','))
+score_df3 = df4.apply(compare_score)
+score_df3 = score_df3.T
+fif, axes = plt.subplots(2, 3, figsize=(18, 10))
+for ax, (col_name, score_ser), (_, ser_v) in zip(np.ravel(axes), score_df3.T.items(), df4.items()):
+    a, b = score_ser
+    ser_v.plot(ax=ax, marker='o', title=f'{col_name}:<{a},{b}>')
+hs300 = get_price('000300.XSHG', start_date='2014-01-01', end_date='2021-10-25', fields=['close', 'open', 'high', 'low'], panel=False)
+slice_price = hs300.loc['2020-01-01':'2021-10-01', 'close']
+weekly_bar = slice_price.resample('W').last()
+normalize = Normalize_Trend(weekly_bar)
+normalize_trend_ser = normalize.normalize_compound(5)
+trend_score = Tren_Score(normalize_trend_ser)
+trend_score.calc_trend_score('absolute')
+fig, axes = plt.subplots(2, figsize=(18, 12))
+hs300.loc['2020-01-01':'2021-10-01'].plot.ochl(ax=axes[0], title='沪深300')
+a = trend_score.score['absolute'].trend_score
+b = trend_score.score['absolute'].act_score
+axes[1].set_title(f'标准化后走势<势={a},趋={b}>')
+normalize_trend_ser.plot(ax=axes[1], marker='o', ms=4)
+trend_score.point_frame['absolute'].plot(ax=axes[1], marker='o', ls='--', color='darkgray')
+point_list = []
+normalize_trend_list = []
+score = []
+for i in range(12, len(weekly_bar), 12):
+    normalize = Normalize_Trend(weekly_bar.iloc[i - 12:i])
+    normalize_trend_ser = normalize.normalize_compound(5)
+    trend_score = Tren_Score(normalize_trend_ser)
+    normalize_trend_list.append(normalize_trend_ser)
+    trend_score.calc_trend_score('absolute')
+    score.append((trend_score.score['absolute'].act_score, trend_score.score['absolute'].trend_score))
+    point_list.append(trend_score.point_frame['absolute'])
+fig, axes = plt.subplots(2, 2, figsize=(18, 4 * 2))
+for ax, ser1, ser2, score in zip(np.ravel(axes), normalize_trend_list, point_list, score):
+    a, b = score
+    ser1.plot(ax=ax, marker='o', title=f'<趋={a},势={b}>')
+    ser2.plot(ax=ax, marker='o', ls='--', color='darkgray')
+slice_price = hs300.loc['2015-10-01':'2016-10-31', 'close']
+weekly_bar = slice_price.resample('W').last()
+normalize = Normalize_Trend(weekly_bar)
+normalize_trend_ser = normalize.normalize_compound(5)
+trend_score = Tren_Score(normalize_trend_ser)
+normalize_trend_list.append(normalize_trend_ser)
+trend_score.calc_trend_score('absolute')
+a = trend_score.score['absolute'].trend_score
+b = trend_score.score['absolute'].act_score
+fig, axes = plt.subplots(2, figsize=(18, 12))
+hs300.loc['2015-10-01':'2016-10-31'].plot.ochl(ax=axes[0], title='沪深300')
+axes[1].set_title(f'标准化后走势<势={a},趋={b}>')
+normalize_trend_ser.plot(ax=axes[1], marker='o', ms=4)
+trend_score.point_frame['absolute'].plot(ax=axes[1], marker='o', ls='--', color='darkgray')
+point_list = []
+normalize_trend_list = []
+score = []
+for i in range(12, len(weekly_bar), 12):
+    normalize = Normalize_Trend(weekly_bar.iloc[i - 12:i])
+    normalize_trend_ser = normalize.normalize_compound(5)
+    trend_score = Tren_Score(normalize_trend_ser)
+    normalize_trend_list.append(normalize_trend_ser)
+    trend_score.calc_trend_score('absolute')
+    score.append((trend_score.score['absolute'].act_score, trend_score.score['absolute'].trend_score))
+    point_list.append(trend_score.point_frame['absolute'])
+fig, axes = plt.subplots(2, 2, figsize=(18, 4 * 2))
+for ax, ser1, ser2, score in zip(np.ravel(axes), normalize_trend_list, point_list, score):
+    a, b = score
+    ser1.plot(ax=ax, marker='o', title=f'<趋={a},势={b}>')
+    ser2.plot(ax=ax, marker='o', ls='--', color='darkgray')
+
+def calc_trend_score(ser: pd.Series) -> float:
+    normalize = Normalize_Trend(ser)
+    normalize_trend_ser = normalize.normalize_compound(5)
+    trend_score = Tren_Score(normalize_trend_ser)
+    trend_score.calc_trend_score('absolute')
+    return trend_score.score['absolute'].trend_score
+score = hs300['close'].rolling(60).apply(calc_trend_score, raw=False)
+lower_bound = score.rolling(20).apply(lambda x: x.quantile(0.05), raw=False)
+upper_bound = score.rolling(20).apply(lambda x: x.quantile(0.85), raw=False)
+fig, axes = plt.subplots(2, 1, figsize=(18, 12))
+hs300.plot.ochl(ax=axes[0], title='走势')
+axes[1].set_title('信号')
+score.plot(ax=axes[1], color='darkgray', label='trend_score')
+upper_bound.plot(ax=axes[1], ls='--', label='upper')
+lower_bound.plot(ax=axes[1], ls='--', label='lower')
+
+def get_hold_flag(df: pd.DataFrame) -> pd.Series:
+    flag = pd.Series(index=df.index, data=np.zeros(len(df)))
+    for trade, row in df.iterrows():
+        sign = row['score']
+        lower = row['lower_bound']
+        upper = row['upper_bound']
+        try:
+            previous_score
+        except NameError:
+            previous_score = sign
+            previous_lower = lower
+            previous_upper = upper
+            order_flag = 0
+            continue
+        if previous_score > previous_lower and sign <= lower:
+            flag[trade] = 0
+            order_flag = 0
+        elif previous_score < previous_upper and sign >= upper:
+            flag[trade] = 1
+            order_flag = 1
+        else:
+            flag[trade] = order_flag
+        previous_score = sign
+        previous_lower = lower
+        previous_upper = upper
+    return flag
+df = pd.concat((score, upper_bound, lower_bound), axis=1)
+df.columns = ['score', 'upper_bound', 'lower_bound']
+flag = get_hold_flag(df)
+next_ret = hs300['close'].pct_change().shift(-1)
+algorithms_ret = flag * next_ret.loc[flag.index]
+algorithms_cum = ep.cum_returns(algorithms_ret)
+fig, axes = plt.subplots(2, figsize=(18, 12))
+axes[0].set_title('指数')
+(hs300['close'] / hs300['close'][0]).plot(ax=axes[0])
+axes[1].set_title('净值')
+flag.plot(ax=axes[0], secondary_y=True, ls='--', color='darkgray')
+algorithms_cum.plot(ax=axes[1])

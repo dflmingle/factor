@@ -1,0 +1,118 @@
+quant/2021年度精选策略/57.股指期货套利，这段时间都没有交易分享给大家.txt
+from jqdata import *
+import datetime as dt
+import numpy as np
+import datetime
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='every_bar')
+
+def before_market_open(context):
+    set_slip_fee(context)
+    date = datetime.date.today()
+    now = datetime.datetime.now()
+    ye = context.current_dt.date().year
+    mo = context.current_dt.date().month
+    da = context.current_dt.date().day
+    if mo == 1:
+        ye1 = ye
+        ye2 = ye
+        mo1 = 3
+        mo2 = 6
+        mon1 = str(mo1)
+        mon2 = str(mo2)
+        yea1 = str(ye1)[2:4]
+        yea2 = str(ye2)[2:4]
+        g.code1 = 'IF' + yea1 + '0' + mon1 + '.CCFX'
+        g.code2 = 'IF' + yea2 + '0' + mon2 + '.CCFX'
+    elif mo <= 4:
+        ye1 = ye
+        ye2 = ye
+        mo1 = 6
+        mo2 = 9
+        mon1 = str(mo1)
+        mon2 = str(mo2)
+        yea1 = str(ye1)[2:4]
+        yea2 = str(ye2)[2:4]
+        g.code1 = 'IF' + yea1 + '0' + mon1 + '.CCFX'
+        g.code2 = 'IF' + yea2 + '0' + mon2 + '.CCFX'
+    elif mo <= 7:
+        ye1 = ye
+        ye2 = ye
+        mo1 = 9
+        mo2 = 12
+        mon1 = str(mo1)
+        mon2 = str(mo2)
+        yea1 = str(ye1)[2:4]
+        yea2 = str(ye2)[2:4]
+        g.code1 = 'IF' + yea1 + '0' + mon1 + '.CCFX'
+        g.code2 = 'IF' + yea2 + mon2 + '.CCFX'
+    elif mo <= 10:
+        ye1 = ye
+        ye2 = ye + 1
+        mo1 = 12
+        mo2 = 3
+        mon1 = str(mo1)
+        mon2 = str(mo2)
+        yea1 = str(ye1)[2:4]
+        yea2 = str(ye2)[2:4]
+        g.code1 = 'IF' + yea1 + mon1 + '.CCFX'
+        g.code2 = 'IF' + yea2 + '0' + mon2 + '.CCFX'
+    elif mo <= 12:
+        ye1 = ye + 1
+        ye2 = ye + 1
+        mo1 = 3
+        mo2 = 6
+        mon1 = str(mo1)
+        mon2 = str(mo2)
+        yea1 = str(ye1)[2:4]
+        yea2 = str(ye2)[2:4]
+        g.code1 = 'IF' + yea1 + '0' + mon1 + '.CCFX'
+        g.code2 = 'IF' + yea2 + '0' + mon2 + '.CCFX'
+
+def set_slip_fee(context):
+    today = context.current_dt
+    if today < dt.datetime(2017, 9, 18):
+        g.futures_margin_rate = 0.2
+    elif today < dt.datetime(2018, 12, 3):
+        g.futures_margin_rate = 0.15
+    elif today < dt.datetime(2019, 4, 22):
+        g.futures_margin_rate = 0.1
+    else:
+        g.futures_margin_rate = 0.1
+
+def market_open(context):
+    mo0 = context.current_dt.date().month
+    da = context.current_dt.date().day
+    ho = context.current_dt.hour
+    mi = context.current_dt.minute
+    IF1 = attribute_history(g.code1, 300, unit='1m', fields=['close'], df=True)['close']
+    IF2 = attribute_history(g.code2, 300, unit='1m', fields=['close'], df=True)['close']
+    gap = IF1 - IF2
+    IF1_now = IF1[-1]
+    IF2_now = IF2[-1]
+    gap_now = IF1_now - IF2_now
+    cash = context.portfolio.available_cash
+    ss = cash / (IF1_now + IF2_now) / 300 / g.futures_margin_rate / 1.2
+    if np.isnan(ss):
+        ss = 0
+    s = int(ss)
+    code3 = ''
+    code4 = ''
+    tt = ho + mi / 60
+    if tt >= 9.55:
+        if context.portfolio.positions_value == 0:
+            if gap.quantile(0.9) >= 0 and gap_now > gap.quantile(0.9) * 1.1:
+                order_target(g.code1, s, side='short', close_today=False)
+                order_target(g.code2, s, side='long', close_today=False)
+            elif gap.quantile(0.9) < 0 and gap_now > gap.quantile(0.9) * 0.9:
+                order_target(g.code1, s, side='short', close_today=False)
+                order_target(g.code2, s, side='long', close_today=False)
+        elif gap_now < gap.quantile(0.3):
+            for LastFuture in context.portfolio.long_positions.keys():
+                code3 = LastFuture
+            order_target(code3, 0, side='long', close_today=False)
+            for LastFuture in context.portfolio.short_positions.keys():
+                code4 = LastFuture
+            order_target(code4, 0, side='short')

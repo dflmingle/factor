@@ -1,0 +1,128 @@
+from jqdata import *
+
+# 初始化全局变量
+def initialize(context):
+    # 设置中小板指数为股票池
+    g.security_universe_index = '399101.XSHE'
+    g.buy_stock_count = 5  # 买入股票数量
+    
+    # 股票类每笔交易时的手续费是：买入时佣金万分之三，卖出时佣金万分之三加千分之一印花税, 每笔交易佣金最低扣5块钱
+    set_order_cost(OrderCost(close_tax=0.001, open_commission=0.0003, close_commission=0.0003, min_commission=5),
+                   type='stock')
+    # 设置交易参数
+    set_option('use_real_price', True)
+    
+    
+    # 每日开盘后运行
+    #run_daily(my_trade, time='open')
+    run_weekly(my_trade, weekday=1, time='open')
+
+def my_trade(context):
+    # 1. 获取中小板成分股
+    check_out_lists = get_index_stocks(g.security_universe_index)
+    
+    # 2. 按流通市值排序，取最小的15只作为初选
+    q = query(
+        valuation.code,
+        valuation.circulating_market_cap
+    ).filter(
+        valuation.code.in_(check_out_lists)
+    ).order_by(
+        valuation.circulating_market_cap.asc()
+    ).limit(
+        g.buy_stock_count * 3  # 初选3倍数量用于过滤
+    )
+    
+    df = get_fundamentals(q)
+    if df is None or len(df) == 0:
+        return
+    
+    log.info('初选股票数量: %d' % len(df))
+    log.info('初选股票详情:')
+    for idx, row in df.iterrows():
+        log.info('  股票: %s, 流通市值: %.2f亿' % (
+            row['code'], row['circulating_market_cap']
+        ))
+    
+    check_out_lists = list(df['code'])
+    
+    # 3. 过滤股票
+    # 过滤ST、*ST股
+    check_out_lists = filter_st_stock(check_out_lists)
+    # 过滤停牌股
+    check_out_lists = filter_paused_stock(check_out_lists)
+    
+
+    # 4. 取前N只
+    check_out_lists = check_out_lists[:g.buy_stock_count]
+    
+    log.info('最终选股(排除ST停牌等)结果(%d只):' % len(check_out_lists))
+    for stock in check_out_lists:
+        current_data = get_current_data()[stock]
+        log.info('  %s - %s' % (stock, current_data.name))
+        
+    # 5. 调仓
+    adjust_position(context, check_out_lists)
+
+# 过滤ST股
+def filter_st_stock(stock_list):
+    if not stock_list:
+        return []
+    
+    current_data = get_current_data()
+    result = []
+    
+    for stock in stock_list:
+        if not current_data[stock].is_st and 'ST' not in current_data[stock].name:
+            result.append(stock)
+    
+    return result
+
+# 过滤停牌股
+def filter_paused_stock(stock_list):
+    if not stock_list:
+        return []
+    
+    current_data = get_current_data()
+    result = []
+    
+    for stock in stock_list:
+        if not current_data[stock].paused:
+            result.append(stock)
+    
+    return result
+
+# 调仓函数
+def adjust_position(context, stock_list):
+    # 卖出不在目标组合中的持仓
+    for stock in context.portfolio.positions:
+        if stock not in stock_list:
+            order_target_value(stock, 0)
+    
+    # 等权重买入目标股票
+    if len(stock_list) > 0:
+        weight = 1.0 / len(stock_list)
+        
+        for stock in stock_list:
+            # 获取当前持仓价值
+            current_position = context.portfolio.positions.get(stock, None)
+            current_value = 0
+            if current_position:
+                current_value = current_position.total_amount * current_position.price  #1.成本价计算目标市值
+            
+            #2.或采用市场价计算目标市值：
+            #current_data = get_current_data()[stock]
+            #current_price = current_data.last_price  # 实时市价
+            #current_value = current_position.total_amount * current_price
+
+            # 计算目标价值
+            total_value = context.portfolio.total_value
+            target_value = total_value * weight
+            
+            # 如果当前持仓与目标差异超过5%，则调仓
+            if abs(current_value - target_value) / target_value > 0.05:
+                order_target_value(stock, target_value)
+
+# 记录持仓
+def log_hold(context):
+    log.info('持仓股票: %s' % list(context.portfolio.positions.keys()))

@@ -1,0 +1,15 @@
+quant/2024年度精选策略1/57.【复现】技术分析算法、框架与实战之二：识别“圆弧底”.txt
+import pandas as pd
+from typing import Dict, List
+from scr.pattern_detect import find_RoundingBottom
+from scr.plotting import view_gride_chart
+data: pd.DataFrame = pd.read_csv('data/data.csv', index_col=[0, 1], parse_dates=[0])
+output: Dict = {code: find_RoundingBottom(slice_df.reset_index(level=1, drop=True), code=code) for code, slice_df in data.groupby(level='code')}
+output_df: pd.DataFrame = pd.DataFrame(output, index=['是否圆弧底', '是否符合买入点']).T
+output_df.head()
+rounding_bottom: pd.DataFrame = output_df.query('是否圆弧底==True')
+codes: List = rounding_bottom.index.tolist()
+cols: int = 2
+size: int = len(codes)
+rows: int = size // 2 + 1 if size % 2 else size / 2
+view_gride_chart(codes, data, rows=rows, cols=cols, figsize=(20, rows * 5 + 5))

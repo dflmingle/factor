@@ -1,0 +1,104 @@
+quant/2023年度精选策略/90.一个月轮动股票换仓，内日做T，相对高频交易.txt
+from typing import List, Tuple, Dict, Callable, Union
+import datetime as dt
+import numpy as np
+import pandas as pd
+from jqdata import *
+from jqfactor import calc_factors, Factor, winsorize_med, neutralize, standardlize
+
+def initialize(context):
+    set_backtest()
+    set_params()
+    set_variables()
+    before_trading_start(context)
+    run_monthly(trade, 1, 'open', reference_security='000300.XSHG')
+    run_daily(get_T, time='every_bar', reference_security='000300.XSHG')
+
+def set_params():
+    g.sel_fields = ['DELTA_ROE', 'ROA2', 'DELTA_MARGIN', 'DELTA_CATURN', 'DELTA_ROA2', 'DLTA_LIQUID']
+    g.orderid = []
+'EXACT_REVIEWED_FUNCTION set_variables sha256=e6562bd1f389a4f439196de428385d85862ee73b282fe8ccdc9b6518d076544f source=quant/2021年度精选策略/5.价值低波（下）--十年十倍（2020拜年）.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=b2647d09183df0425121a2f2f5ab1a204ce4359e1d8071c993b7eb6b021ac9be source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+
+class Filter_Stocks(object):
+    """EXACT_REVIEWED_FUNCTION __init__ sha256=fecd083e84c232f81e0420640c184fc360e16afd70295ec690bd7d1e45562936 source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt"""
+    'EXACT_REVIEWED_FUNCTION get_index_component_stocks sha256=05a7ba403cf00a8799701e052022e0de7344fc7ceb94857eb2546f9b3161475f source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+    'EXACT_REVIEWED_FUNCTION filter_paused sha256=0a3d40e991ff4007afa16452bc010e3589c335b3ed9028906dac343d689a5422 source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+    'EXACT_REVIEWED_FUNCTION filter_st sha256=a59084edb0401c03bbd6ddc5a8fe606b81ca012edea666f4cce842b5e2b13b2a source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+    'EXACT_REVIEWED_FUNCTION filter_ipodate sha256=3cf3ea254501429c57418a6cb127a5d42fb83a9ce7a4487c142d287f2b12431c source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+    'EXACT_REVIEWED_FUNCTION filter_industry sha256=16aa76ad24015a9de01a17dc5c3aada70c1c171d37df2384bda26b3cee3dab2c source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_ind sha256=58828e2ddacbb8e9b45d2ddfacf6ae3924b11347d7b3778ce5c227d8ef20f533 source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+'EXACT_REVIEWED_FUNCTION sign sha256=78fa58462b734edd880b6e100221295f6c3344cb3be3565eb30374820a4e195e source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+
+class F13_Score(Factor):
+    name = 'F13_Score'
+    max_window = 1
+    watch_date = None
+    dependencies = ['roa', 'roa_4', 'net_operate_cash_flow', 'total_assets', 'total_assets_1', 'total_assets_4', 'total_assets_5', 'operating_revenue', 'operating_revenue_4', 'pb_ratio', 'total_current_assets', 'total_current_assets_1', 'total_current_assets_4', 'total_current_assets_5', 'total_non_current_assets', 'total_non_current_liability', 'total_non_current_assets_4', 'total_non_current_liability_4', 'total_current_assets', 'total_current_liability', 'total_current_assets_4', 'total_current_liability_4', 'gross_profit_margin', 'gross_profit_margin_4', 'paidin_capital', 'paidin_capital_4', 'roe', 'roe_4', 'total_profit', 'total_profit_4', 'financial_expense', 'financial_expense_4']
+    'EXACT_REVIEWED_FUNCTION calc sha256=9af7b1da934615859bc34c1ada088573a8ca09e7103302e98646ac1e350057e8 source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+'EXACT_REVIEWED_FUNCTION prepare_pb_ratio sha256=76274ef3c021bc0a3de084f2025ad8d17b9d1a7428d2d0a02373ca8f1b0cf860 source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+'EXACT_REVIEWED_FUNCTION trade sha256=d1d2d204ecbb9c42616ef8e2433a1f21c968864eeba41b7c3cef117f43c4d242 source=quant/2023年度精选策略/18.【复现】FFScore财务模型.txt'
+
+def get_T(context):
+    stocks = context.portfolio.positions
+    now = context.current_dt
+    zeroToday = now - datetime.timedelta(hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+    lastToday = zeroToday + datetime.timedelta(hours=9, minutes=31, seconds=0)
+    for stock in stocks:
+        pre_date = (context.current_dt + timedelta(days=-1)).strftime('%Y-%m-%d')
+        df_panel = get_price(stock, count=1, end_date=pre_date, frequency='daily', fields=['close', 'high', 'low'])
+        low = df_panel['low'].values
+        close = df_panel['close'].values
+        high = df_panel['high'].values
+        pivot = (low + close + high) / 3.0
+        sSetup = pivot + (high - low)
+        sEnter = 2 * pivot - low
+        df_panel_allday = get_price(stock, start_date=lastToday, end_date=context.current_dt, frequency='minute', fields=['high', 'low', 'close', 'high_limit', 'money'])
+        low_allday = df_panel_allday.loc[:, 'low'].min()
+        high_allday = df_panel_allday.loc[:, 'high'].max()
+        current_price = context.portfolio.positions[stock].price
+        cost = context.portfolio.positions[stock].avg_cost
+        if high_allday > sSetup and current_price < sEnter and (context.portfolio.positions[stock].closeable_amount != 0):
+            order1 = order_target(stock, 0)
+            if order1.status == OrderStatus.held and order1.filled == order1.amount:
+                g.orderid.append(order1)
+    if len(g.orderid):
+        for order2 in g.orderid:
+            stock = order2.security
+            pre_date = (context.current_dt + timedelta(days=-1)).strftime('%Y-%m-%d')
+            df_panel = get_price(stock, count=1, end_date=pre_date, frequency='daily', fields=['close', 'high', 'low'])
+            low = df_panel['low'].values
+            close = df_panel['close'].values
+            high = df_panel['high'].values
+            pivot = (low + close + high) / 3.0
+            bSetup = pivot - (high - low)
+            bEnter = 2 * pivot - high
+            df_panel_allday = get_price(stock, start_date=lastToday, end_date=context.current_dt, frequency='minute', fields=['high', 'low', 'close', 'high_limit', 'money'])
+            low_allday = df_panel_allday.loc[:, 'low'].min()
+            current_price = get_current_data()[stock].last_price
+            now = context.current_dt
+            zeroToday = now - datetime.timedelta(hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+            lastToday = zeroToday + datetime.timedelta(hours=14, minutes=50, seconds=0)
+            selltime = order2.add_time
+            trade_days = get_trade_days(selltime, now)
+            if low_allday < bSetup and current_price > bEnter:
+                values = order2.price * order2.filled
+                order1 = order_target_value(stock, values)
+                if order1.status == OrderStatus.held and order1.filled == order1.amount:
+                    g.orderid.remove(order2)
+            elif current_price < order2.price * 0.97:
+                values = order2.price * order2.filled
+                order1 = order_target_value(stock, values)
+                if order1.status == OrderStatus.held and order1.filled == order1.amount:
+                    g.orderid.remove(order2)
+            elif now > lastToday and current_price < order2.price:
+                values = order2.price * order2.filled
+                order1 = order_target_value(stock, values)
+                if order1.status == OrderStatus.held and order1.filled == order1.amount:
+                    g.orderid.remove(order2)
+            elif len(trade_days) > 2:
+                values = order2.price * order2.filled
+                order1 = order_target_value(stock, values)
+                if order1.status == OrderStatus.held and order1.filled == order1.amount:
+                    g.orderid.remove(order2)

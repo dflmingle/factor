@@ -1,0 +1,310 @@
+quant/2021年度精选策略/59.【复现】RSRS择时改进.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+import scipy.stats as st
+import statsmodels.api as sm
+from IPython.core.display import HTML
+import itertools
+from dateutil.parser import parse
+import datetime as dt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdate
+import seaborn as sns
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['axes.unicode_minus'] = False
+plt.style.use('seaborn')
+
+class RSRS(object):
+
+    def __init__(self):
+        self.symbol = ''
+        self.start_date = ''
+        self.end_date = ''
+        self.N = ''
+        self.M = ''
+        self.threshold = {}
+        self.freq = {}
+        self.price_df = pd.DataFrame()
+        self.singal_df = pd.DataFrame()
+        self.position_df = pd.DataFrame()
+        self.hold_mark = {}
+        self.buy_mark = {}
+        self.sell_mark = {}
+        self.strategy_ret = pd.DataFrame()
+        self.strategy_cum = pd.DataFrame()
+
+    def init_from_config(self, symbol, start_date, end_date, freq):
+        self.symbol = symbol
+        self.start_date = start_date
+        self.end_date = end_date
+        self.freq = freq
+        self._get_pretreatment_day()
+        self._check_pretreatment_date()
+        self.query_data
+        self.get_singal_table
+
+    def backtesting(self, threshold_dict: dict):
+        self.threshold = threshold_dict
+        self.position_df, self.hold_mark, self.buy_mark, self.sell_mark = self._get_trade_info(self.threshold)
+        self.get_net_value()
+
+    @property
+    def query_data(self):
+        begin = get_trade_days(end_date=self.start_date, count=self.N + self.M)[0]
+        price_df = get_price(self.symbol, begin, self.end_date, fields=['high', 'low', 'close', 'volume', 'pre_close'], panel=False)
+        price_df['ret'] = price_df['close'] / price_df['pre_close'] - 1
+        self.price_df = price_df
+
+    def _get_pretreatment_day(self):
+        max_day = {}
+        refreq = {}
+        self._check_threshold_key_name(self.freq.keys())
+        for k, v in self.freq.items():
+            max_day[k] = sum(v)
+            if v in refreq:
+                refreq[v] = [refreq[v]] + [k]
+            else:
+                refreq[v] = k
+        max_day_name = max(max_day, key=max_day.get)
+        self.N = self.freq[max_day_name][0]
+        self.M = self.freq[max_day_name][1]
+        self.freq = refreq
+
+    @property
+    def get_singal_table(self):
+        rsrs_singal = pd.concat([self.get_RSRS(RSRS_NAME, NM[0], NM[1]) for NM, RSRS_NAME in self.freq.items()], axis=1)
+        self.singal_df = rsrs_singal
+
+    def get_RSRS(self, rsrs_name, N, M):
+        price_df = self.price_df
+        BETA = [np.nan] * N
+        Rsquared = [np.nan] * N
+        singal_df = pd.DataFrame(index=price_df.index)
+        params = self._regression()
+        ret_quantile = self._cal_ret_quantile()
+        singal_df['RSRS'] = params[0]
+        singal_df['标准分RSRS'] = (singal_df['RSRS'] - singal_df['RSRS'].rolling(M).mean()) / singal_df['RSRS'].rolling(M).std()
+        singal_df['修正标准分RSRS'] = singal_df['标准分RSRS'] * params[1]
+        singal_df['右偏修正标准分RSRS'] = singal_df['修正标准分RSRS'] * singal_df['RSRS']
+        singal_df['钝化RSRS'] = singal_df['标准分RSRS'] * params[1] ** (2 * ret_quantile)
+        passiv_df = pd.DataFrame({'beta': params[2], 'rsquare': params[3]}, index=price_df.index)
+        passiv_z = (passiv_df['beta'] - passiv_df['beta'].rolling(M).mean()) / passiv_df['beta'].rolling(M).std()
+        singal_df['成交额加权钝化RSRS'] = passiv_z * passiv_df['rsquare'] ** (2 * ret_quantile)
+        return singal_df.loc[self.start_date:, rsrs_name]
+
+    def _regression(self) -> tuple:
+        N = self.N
+        price_df = self.price_df
+        BETA_OLS = [np.nan] * (N - 1)
+        Rsquare_OLS = [np.nan] * (N - 1)
+        BETA_WLS = [np.nan] * (N - 1)
+        Rsquare_WLS = [np.nan] * (N - 1)
+        for i in range(N, price_df.shape[0] + 1):
+            vol = price_df['volume'][i - N:i]
+            x = price_df['low'][i - N:i]
+            y = price_df['high'][i - N:i]
+            ols_returns = self._cal_ols(x, y)
+            wls_returns = self._cal_wls(x, y, vol)
+            BETA_OLS.append(ols_returns[0])
+            Rsquare_OLS.append(ols_returns[1])
+            BETA_WLS.append(wls_returns[0])
+            Rsquare_WLS.append(wls_returns[1])
+        return (BETA_OLS, Rsquare_OLS, BETA_WLS, Rsquare_WLS)
+
+    @staticmethod
+    def _cal_ols(x: pd.Series, y: pd.Series) -> tuple:
+        x = np.nan_to_num(x)
+        y = np.nan_to_num(y)
+        X = sm.add_constant(x)
+        BETA = np.linalg.lstsq(X, y, rcond=-1)[0][1]
+        Rsquared = np.corrcoef(x, y)[1, 0] ** 2
+        return (BETA, Rsquared)
+
+    def _cal_wls(self, x: pd.Series, y: pd.Series, vol: pd.Series) -> tuple:
+        x = np.nan_to_num(x)
+        y = np.nan_to_num(y)
+        X = sm.add_constant(x)
+        weights = self._get_vol_weights(vol)
+        results = sm.WLS(y, X, weights=weights).fit()
+        BETA = results.params[1]
+        Rsquared = results.rsquared
+        return (BETA, Rsquared)
+
+    def _cal_ret_quantile(self) -> np.array:
+        ret_std = self.price_df['ret'].rolling(self.N, min_periods=1).apply(np.nanstd, raw=False)
+        ret_quantile = ret_std.rolling(self.M).apply(lambda x: x.rank(pct=True)[-1], raw=False)
+        return ret_quantile.values
+
+    @staticmethod
+    def _get_vol_weights(slice_series: pd.Series) -> list:
+        weights = slice_series / slice_series.sum()
+        return weights.values.tolist()
+
+    def _check_pretreatment_date(self):
+        traget_date = get_trade_days(end_date=parse(self.start_date).date(), count=self.M + self.N)[0]
+        INDEX_START_DATE = get_security_info(self.symbol).start_date
+        all_trade_days = get_all_trade_days()
+        MAX_TRADE_DATE = max(INDEX_START_DATE, all_trade_days[0])
+        limit_date = all_trade_days[np.argwhere(all_trade_days == MAX_TRADE_DATE) + (self.M + self.N)][0][0]
+        if (traget_date - INDEX_START_DATE).days < 0:
+            raise Warning('指数起始日为%s,起始日至少为%s,前序日不足,可能导致比较RSRS信号的回测起止日期不同!' % (INDEX_START_DATE, limit_date))
+
+    def get_net_value(self) -> pd.DataFrame:
+        pct_chg = self.price_df['ret'].shift(-1).loc[self.start_date:]
+        ret = np.broadcast_to(np.expand_dims(pct_chg, axis=1), self.position_df.shape)
+        strategy_ret = ret * self.position_df
+        index_name = get_security_info(self.symbol).name
+        strategy_ret[index_name + '净值'] = self.price_df['ret']
+        strategy_cum = (1 + strategy_ret.fillna(0)).cumprod()
+        self.strategy_ret = strategy_ret
+        self.strategy_cum = strategy_cum
+
+    def _get_trade_info(self, threshold_dict: dict):
+        self._check_threshold_key_name(threshold_dict.keys())
+        for k, v in threshold_dict.items():
+            if isinstance(v, tuple) and len(v) > 1:
+                pass
+            else:
+                threshold_dict[k] = (v, -v)
+        position_df = pd.DataFrame(index=self.singal_df.index)
+        hold_mark = {}
+        buy_mark = {}
+        sell_mark = {}
+        for singal_name, threshold in threshold_dict.items():
+            flag, hold_flag, buy_flag, sell_flag = self._mark_flag(self.singal_df, singal_name, threshold)
+            position_df[singal_name] = flag
+            hold_mark[singal_name] = hold_flag
+            buy_mark[singal_name] = buy_flag
+            sell_mark[singal_name] = sell_flag
+        return (position_df, hold_mark, buy_mark, sell_mark)
+
+    @staticmethod
+    def _mark_flag(singal_df: pd.DataFrame, singal_name: str, threshold: tuple) -> tuple:
+        UP = threshold[0]
+        DN = threshold[1]
+        pre_singal = singal_df[singal_name].shift(1)
+        hold_flag = []
+        buy_flag = []
+        sell_flag = []
+        flag = []
+        for tradeDate, row in singal_df.iterrows():
+            try:
+                if row[singal_name] > UP and flag[-1] == 0:
+                    flag.append(1)
+                    buy_flag.append(tradeDate)
+                    hold_flag.append(tradeDate)
+                elif flag[-1] == 1 and row[singal_name] > DN:
+                    flag.append(1)
+                    hold_flag.append(tradeDate)
+                elif flag[-1] == 1 and row[singal_name] <= DN:
+                    flag.append(0)
+                    sell_flag.append(tradeDate)
+                else:
+                    flag.append(0)
+            except IndexError:
+                if row[singal_name] > 0.7:
+                    flag.append(1)
+                else:
+                    flag.append(0)
+        return (flag, hold_flag, buy_flag, sell_flag)
+
+    @staticmethod
+    def _check_threshold_key_name(threshold_dict_keys: list):
+        singal_name = ['RSRS', '标准分RSRS', '修正标准分RSRS', '右偏修正标准分RSRS', '钝化RSRS', '成交额加权钝化RSRS']
+        for k in threshold_dict_keys:
+            if k not in singal_name:
+                raise Warning('回测用singal_name必须在%s中' % ','.join(singal_name))
+
+    def summary(self):
+        self.plot_net_value()
+
+    def report(self):
+        return pd.concat([self._cal_risk_indicator(col_name) for col_name in self.threshold.keys()], axis=1)
+
+    def _cal_risk_indicator(self, singal_name):
+        strategy_cum = self.strategy_cum[singal_name]
+        strategy_ret = self.strategy_ret[singal_name]
+        position_df = self.position_df[singal_name]
+        hold_mark = self.hold_mark[singal_name]
+        buy_mark = self.buy_mark[singal_name]
+        sell_mark = self.sell_mark[singal_name]
+        'EXACT_REVIEWED_FUNCTION format_x sha256=60c0e4e49dc8146d5b2504fb4af58465b9e94eebc96b3d45923460979e599ca5 source=quant/2021年度精选策略/33.【研报复现】基于风险溢价的沪深300择时-目前依然有效.txt'
+        summary_dic = {}
+        index_name = '年华收益率,累计收益率,夏普比率,最大回撤,持仓总天数,交易次数,平均持仓天数,获利天数,         亏损天数,胜率(按天),平均盈利率(按天),平均亏损率(按天),平均盈亏比(按天),盈利次数,亏损次数,         单次最大盈利,单次最大亏损,胜率(按此),平均盈利率(按次),平均亏损率(按次),平均盈亏比(按次)'.split(',')
+        annual_ret = pow(strategy_cum[-1] / strategy_cum[0], 244 / len(strategy_cum)) - 1
+        cum_ret_rate = strategy_cum[-1] - 1
+        max_nv = np.maximum.accumulate(np.nan_to_num(strategy_cum))
+        mdd = -np.min(strategy_cum / max_nv - 1)
+        sharpe_ratio = (annual_ret - 0.03) / np.nanstd(strategy_cum, ddof=1)
+        trade_count = len(buy_mark)
+        total = len(hold_mark)
+        mean_hold = total / trade_count
+        win = np.sum(np.where(strategy_ret > 0, 1, 0))
+        lose = np.sum(np.where(strategy_ret < 0, 1, 0))
+        win_ratio = win / total
+        mean_win_ratio = np.sum(np.where(strategy_ret > 0, strategy_ret, 0)) / win
+        mean_lose_ratio = np.sum(np.where(strategy_ret < 0, strategy_ret, 0)) / lose
+        win_lose = win / lose
+        temp_df = pd.DataFrame({'RETURNS': strategy_ret, 'singal': position_df})
+        diff = temp_df['singal'] != temp_df['singal'].shift(1)
+        temp_df['singal_MARK'] = diff.cumsum()
+        cond = temp_df['singal'] == 1
+        temp_df = temp_df[cond].groupby('singal_MARK')['RETURNS'].sum()
+        win_count = np.sum(np.where(temp_df > 0, 1, 0))
+        lose_count = np.sum(np.where(temp_df < 0, 1, 0))
+        max_win = np.max(temp_df)
+        max_lose = np.min(temp_df)
+        win_rat = win_count / len(temp_df)
+        mean_win = np.sum(np.where(temp_df > 0, temp_df, 0)) / len(temp_df)
+        mean_lose = np.sum(np.where(temp_df < 0, temp_df, 0)) / len(temp_df)
+        mean_wine_lose = win_count / lose_count
+        summary_dic[singal_name] = [format_x(annual_ret), format_x(cum_ret_rate), sharpe_ratio, format_x(mdd), total, trade_count, mean_hold, win, lose, format_x(win_ratio), format_x(mean_win_ratio), format_x(mean_lose_ratio), win_lose, win_count, lose_count, format_x(max_win), format_x(max_lose), format_x(win_rat), format_x(mean_win), format_x(mean_lose), mean_wine_lose]
+        summary_df = pd.DataFrame(summary_dic, index=index_name)
+        return summary_df
+
+    def plot_net_value(self):
+        mpl.rcParams['font.family'] = 'serif'
+        name = get_security_info(self.symbol).display_name
+        sns.lineplot(data=self.strategy_cum)
+hs300 = RSRS()
+hs300.init_from_config('000300.XSHG', '2008-03-25', '2019-12-31', freq={'钝化RSRS': (18, 700), '右偏修正标准分RSRS': (18, 600)})
+hs300.backtesting({'钝化RSRS': 0.7, '右偏修正标准分RSRS': 0.7})
+hs300.summary()
+S_A = RSRS()
+S_A.init_from_config('000001.XSHG', '2008-03-25', '2019-12-31', freq={'钝化RSRS': (19, 800), '右偏修正标准分RSRS': (19, 800)})
+S_A.backtesting({'钝化RSRS': 0.7, '右偏修正标准分RSRS': 0.8})
+S_A.summary()
+sh50 = RSRS()
+sh50.init_from_config('000016.XSHG', '2008-03-25', '2019-12-31', freq={'钝化RSRS': (16, 700), '右偏修正标准分RSRS': (18, 500)})
+sh50.backtesting({'钝化RSRS': 0.3, '右偏修正标准分RSRS': 0.6})
+sh50.summary()
+zz500 = RSRS()
+zz500.init_from_config('000905.XSHG', '2010-05-24', '2019-12-31', freq={'钝化RSRS': (18, 800), '右偏修正标准分RSRS': (19, 600)})
+zz500.backtesting({'钝化RSRS': 1, '右偏修正标准分RSRS': 0.8})
+zz500.summary()
+cyb = RSRS()
+cyb.init_from_config('399006.XSHE', '2012-12-14', '2019-12-31', freq={'钝化RSRS': (18, 500), '右偏修正标准分RSRS': (18, 600)})
+cyb.backtesting({'钝化RSRS': 0.4, '右偏修正标准分RSRS': 0.5})
+cyb.summary()
+hs300 = RSRS()
+hs300.init_from_config('000300.XSHG', '2008-03-25', '2019-12-31', freq={'钝化RSRS': (18, 700), '成交额加权钝化RSRS': (19, 500), '右偏修正标准分RSRS': (18, 600)})
+hs300.backtesting({'钝化RSRS': 0.7, '成交额加权钝化RSRS': 0.8, '右偏修正标准分RSRS': 0.7})
+hs300.summary()
+S_A = RSRS()
+S_A.init_from_config('000001.XSHG', '2008-03-25', '2019-12-31', freq={'钝化RSRS': (19, 800), '成交额加权钝化RSRS': (15, 800), '右偏修正标准分RSRS': (19, 800)})
+S_A.backtesting({'钝化RSRS': 0.7, '成交额加权钝化RSRS': 0.5, '右偏修正标准分RSRS': 0.8})
+S_A.summary()
+sh50 = RSRS()
+sh50.init_from_config('000016.XSHG', '2008-03-25', '2019-12-31', freq={'钝化RSRS': (16, 700), '成交额加权钝化RSRS': (15, 500), '右偏修正标准分RSRS': (18, 500)})
+sh50.backtesting({'钝化RSRS': 0.3, '成交额加权钝化RSRS': 0.8, '右偏修正标准分RSRS': 0.6})
+sh50.summary()
+zz500 = RSRS()
+zz500.init_from_config('000905.XSHG', '2010-05-24', '2019-12-31', freq={'钝化RSRS': (18, 800), '成交额加权钝化RSRS': (15, 700), '右偏修正标准分RSRS': (19, 600)})
+zz500.backtesting({'钝化RSRS': 1, '成交额加权钝化RSRS': 0.6, '右偏修正标准分RSRS': 0.8})
+zz500.summary()
+cyb = RSRS()
+cyb.init_from_config('000905.XSHG', '2009-07-28', '2019-12-31', freq={'钝化RSRS': (18, 500), '成交额加权钝化RSRS': (20, 400), '右偏修正标准分RSRS': (18, 600)})
+cyb.backtesting({'钝化RSRS': 0.4, '成交额加权钝化RSRS': 0.3, '右偏修正标准分RSRS': 0.5})
+cyb.summary()

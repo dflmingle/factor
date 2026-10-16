@@ -1,0 +1,137 @@
+quant/2024年度精选策略2/84.多大规模的基金收益最好？偏股基金规模研究.txt
+import numpy as np
+import pandas as pd
+import datetime as dt
+from jqdata import *
+
+def initialize(context):
+    g.benchmark = '000300.XSHG'
+    g.funds_num = 10
+    g.min_asset = 150000000
+    g.retry_num = 0
+    g.first_time = True
+    g.finish_trade = False
+    g.last_month = 0
+    set_redeem_latency(day=3, type='open_fund')
+    check_out(context)
+    buy(context, g.fund_targetpositions)
+    run_monthly(check_out, -1, time='open', reference_security=g.benchmark)
+    run_monthly(adding_to_position, -2, time='open', reference_security=g.benchmark)
+    run_monthly(trade, -1, time='open', reference_security=g.benchmark)
+    run_monthly(trade, 4, time='open', reference_security=g.benchmark)
+    run_monthly(trade, 6, time='open', reference_security=g.benchmark)
+    run_monthly(trade, 8, time='open', reference_security=g.benchmark)
+
+def trade(context):
+    if g.retry_num <= 8:
+        if g.finish_trade == False:
+            if sorted(context.portfolio.positions.keys()) != sorted(g.fund_targetpositions.keys()):
+                sell(context, g.fund_targetpositions)
+                buy(context, g.fund_targetpositions)
+            else:
+                g.finish_trade = True
+
+def adding_to_position(context):
+    now_positions_rate = context.portfolio.positions_value / context.portfolio.total_value
+    target_positions_rate = sum(list(g.fund_targetpositions.values()))
+    if target_positions_rate - now_positions_rate > 0.01:
+        buy(context, g.fund_targetpositions)
+
+def check_out(context):
+    if g.last_month != 0:
+        if context.current_dt.strftime('%Y-%m') == g.last_month:
+            return
+        elif context.current_dt.month != 4:
+            return
+    g.finish_trade = False
+    g.retry_num = 0
+    g.last_month = context.current_dt.strftime('%Y-%m')
+    current_date = context.current_dt.date()
+    last_report_date = get_report_date(current_date)
+    fund_codes = get_fund_code(last_report_date, stock_rate_min=70)
+    fund_asset = get_stock_asset(last_report_date, fund_codes, min_asset=g.min_asset)
+    check_out_df = fund_asset.sort_values('stock_value')
+    check_out_lists = [code + '.OF' for code in list(check_out_df.index)]
+    err_lists = []
+    for fund in check_out_lists:
+        try:
+            fund_info = get_fund_info(fund)
+        except:
+            err_lists.append(fund)
+    check_out_lists = [fund for fund in check_out_lists if fund not in err_lists]
+    check_out_lists = check_out_lists[:g.funds_num]
+    g.fund_targetpositions = {fund: 1 / len(check_out_lists) for fund in check_out_lists}
+    trade(context)
+    for fund in g.fund_targetpositions.keys():
+        rate_str = str(round(g.fund_targetpositions[fund] * 100, 1)) + '%'
+        fund_info = get_fund_info(fund)
+
+def sell(context, fund_targetpositions):
+    if len(context.portfolio.positions) == 0:
+        return
+    sell_list = [fund for fund in context.portfolio.positions if fund not in fund_targetpositions.keys()]
+    for fund in sell_list:
+        amount = context.portfolio.positions[fund].closeable_amount
+        redeem(fund, amount)
+    for fund in list(fund_targetpositions.keys()):
+        fund_name = get_fund_info(fund)['fund_name']
+        weight = fund_targetpositions[fund]
+        position = int(weight * context.portfolio.total_value)
+        if fund in context.portfolio.positions:
+            amount = context.portfolio.positions[fund].closeable_amount
+            value = context.portfolio.positions[fund].value
+            rate = value / position
+            if rate >= 1.1:
+                redeem_amount = int((rate - 1) / rate * amount)
+                redeem(fund, redeem_amount)
+
+def buy(context, fund_targetpositions):
+    if context.portfolio.available_cash < 100:
+        return
+    for fund in fund_targetpositions.keys():
+        fund_name = get_fund_info(fund)['fund_name']
+        weight = fund_targetpositions[fund]
+        position = int(weight * context.portfolio.total_value)
+        if fund in context.portfolio.positions:
+            amount = context.portfolio.positions[fund].closeable_amount
+            value = context.portfolio.positions[fund].value
+            rate = value / position
+            if rate <= 0.9:
+                purchase_cash = position - value
+                purchase(fund, purchase_cash)
+        else:
+            purchase(fund, position)
+
+def nyears_ago(end_date, nyears=10.0):
+    d = dt.timedelta(days=-365.242199074 * nyears)
+    return end_date + d
+
+def get_fund_code(tradeDate, stock_rate_min=0, stock_rate_max=100):
+    start_date = datetime.datetime.strptime(tradeDate, '%Y-%m-%d') - timedelta(days=365)
+    start_date = start_date.strftime('%Y-%m-%d')
+    report_date = get_report_date(tradeDate)
+    codes = list(finance.run_query(query(finance.FUND_MAIN_INFO.main_code).filter(finance.FUND_MAIN_INFO.operate_mode_id.in_(['401001', '401006']), finance.FUND_MAIN_INFO.underlying_asset_type_id.in_(['402001', '402004']), finance.FUND_MAIN_INFO.invest_style_id.in_(['005001', '005005']), finance.FUND_MAIN_INFO.start_date < start_date).filter((finance.FUND_MAIN_INFO.end_date > tradeDate) | (finance.FUND_MAIN_INFO.end_date == None)))['main_code'].values)
+    codes = list(finance.run_query(query(finance.FUND_PORTFOLIO.code).filter(finance.FUND_PORTFOLIO.code.in_(codes), finance.FUND_PORTFOLIO.stock_rate >= stock_rate_min, finance.FUND_PORTFOLIO.stock_rate <= stock_rate_max, finance.FUND_PORTFOLIO.period_end == report_date))['code'].values)
+    return codes
+
+def get_stock_asset(reportDate, code, min_asset=0):
+    data = finance.run_query(query(finance.FUND_PORTFOLIO.code, finance.FUND_PORTFOLIO.stock_value).filter(finance.FUND_PORTFOLIO.code.in_(code), finance.FUND_PORTFOLIO.period_end == reportDate, finance.FUND_PORTFOLIO.stock_value > min_asset))
+    data.set_index('code', inplace=True)
+    data = data[~np.isinf(data)]
+    data.dropna(inplace=True)
+    return data
+
+def get_report_date(tradeDate):
+    if isinstance(tradeDate, str):
+        tradeDate = datetime.datetime.strptime(tradeDate, '%Y-%m-%d')
+    year = tradeDate.year
+    month = tradeDate.month
+    report_month = (month - 1) // 3 * 3
+    if report_month == 0:
+        report_month = 12
+        year = year - 1
+    day = 30
+    if report_month in [3, 12]:
+        day = 31
+    report_date = str(year) + '-' + str(report_month).rjust(2, '0') + '-' + str(day)
+    return report_date

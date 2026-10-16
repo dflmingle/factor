@@ -1,0 +1,27 @@
+quant/2021年度精选策略/21.策略coding吐槽帖——以“网红”ETF轮动为例.txt
+from jqdata import *
+import pandas as pd
+import talib
+'EXACT_REVIEWED_FUNCTION initialize sha256=22a39f08ca783669e41300c50acf4a0d917da125470683c7bb168459b7c72973 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def set_params():
+    g.use_dynamic_target_market = True
+    g.target_market = '399001.XSHE'
+    g.empty_keep_stock = '511880.XSHG'
+    g.signal = 'BUY'
+    g.emotion_rate = 0
+    g.lag = 6
+    g.lag0 = 7
+    g.lag1 = 13
+    g.lag2 = 13
+    g.buy = []
+    g.ETF_targets = {'399001.XSHE': '150019.XSHE', '000016.XSHG': '510050.XSHG', '000010.XSHG': '510180.XSHG', '000015.XSHG': '510880.XSHG', '399324.XSHE': '159905.XSHE', '399006.XSHE': '159915.XSHE', '000905.XSHG': '510500.XSHG', '399673.XSHE': '159949.XSHE'}
+    stocks_info = '\n股票池:\n'
+    for security in g.ETF_targets.values():
+        s_info = get_security_info(security)
+        stocks_info += '【%s】%s 上市日期:%s\n' % (s_info.code, s_info.display_name, s_info.start_date)
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=df7898cf1d386cc5ea26f7eee0c5389402d179f145d1c9bd8af7caf30e36d4d5 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION ETFtrade sha256=bd0107ee8961ce034fa5f18dc1d1de2ee50797a43d9fecae726445521cfb4b5b source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION get_signal sha256=9fe7c6b493c815faa5f67e1862ec9b4b89e4549d05414233a09f1c265fffe4c3 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+'EXACT_REVIEWED_FUNCTION EmotionMonitor sha256=1a34895334804fe51b0eae2867c9cab86a0ca09d8a86ca38e5b87fa18380de4e source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'

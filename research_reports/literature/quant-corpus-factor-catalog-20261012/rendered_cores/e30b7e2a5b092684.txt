@@ -1,0 +1,97 @@
+quant/2024年度精选策略1/97.大周期顶底判断：FED指标+格雷厄姆指数一次搞定.txt
+import requests
+from jqdata import *
+import time
+import datetime
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from pylab import mpl
+mpl.rcParams['font.sans-serif'] = ['SimHei']
+mpl.rcParams['axes.unicode_minus'] = False
+my_days = 365 * 10
+my_security = '000300.XSHG'
+my_start_time = (datetime.datetime.now() - datetime.timedelta(days=my_days)).strftime('%Y-%m-%d')
+my_end_time = datetime.datetime.now().strftime('%Y-%m-%d')
+dates = get_trade_days(my_start_time, my_end_time)
+pe_list = []
+pe_date_list = []
+for csrq in dates:
+    security = get_index_stocks(my_security, date=csrq)
+    df = get_valuation(security, start_date=None, end_date=csrq, fields=['pe_ratio'], count=1)
+    if len(df) > 0:
+        bpe = [df['pe_ratio'].median()]
+        pe_list = pe_list + bpe
+        pe_date_list.append(str(csrq))
+
+def bond_china_yield(start_date='2019-02-04', end_date='2020-02-04'):
+    url = 'http://yield.chinabond.com.cn/cbweb-pbc-web/pbc/historyQuery'
+    params = {'startDate': start_date, 'endDate': end_date, 'gjqx': '10', 'qxId': 'hzsylqx', 'locale': 'cn_ZH'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36'}
+    res = requests.get(url, params=params, headers=headers)
+    data_text = res.text.replace('&nbsp', '')
+    data_df = pd.read_html(data_text, header=0)[1]
+    return data_df
+
+def get_bond_yield(start_date: str, end_date: str):
+    dates = get_trade_days(start_date, end_date)
+    n_days = len(dates)
+    limit = 244
+    if n_days > limit:
+        n = n_days // limit
+        df_list = []
+        i = 0
+        pos1, pos2 = (n * i, n * (i + 1) - 1)
+        while pos2 < n_days:
+            df = bond_china_yield(start_date=dates[pos1], end_date=dates[pos2])
+            df_list.append(df)
+            i += 1
+            pos1, pos2 = (n * i, n * (i + 1) - 1)
+        if pos1 < n_days:
+            df = bond_china_yield(start_date=dates[pos1], end_date=dates[-1])
+            df_list.append(df)
+        df = pd.concat(df_list, axis=0)
+    else:
+        df = bond_china_yield(start_date=start_date, end_date=end_date)
+    return df.dropna(axis=1)
+bond_yield = get_bond_yield(my_start_time, my_end_time)
+bond_yield.set_index(['日期'], inplace=True)
+ten_bond = bond_yield['10年']
+dict_ten_bond = {'日期': ten_bond.index, 'ten_bond': ten_bond.values}
+df_ten_bond = pd.DataFrame(dict_ten_bond)
+df_ten_bond = df_ten_bond.sort_values(axis=0, ascending=True, by=['日期'])
+df_ten_bond.set_index(['日期'], inplace=True)
+dict_pe = {'日期': pe_date_list, 'pe': pe_list}
+df_pe = pd.DataFrame(dict_pe)
+df_pe.set_index(['日期'], inplace=True)
+last_dataframe = df_pe.join(df_ten_bond)
+last_dataframe.head()
+re = get_price('510300.XSHG', start_date=my_start_time, end_date=my_end_time, frequency='daily', fields=['close'], fq='pre', panel=False)
+re = list(re['close'])
+x = last_dataframe.index
+y = (100 / last_dataframe['pe'] - last_dataframe['ten_bond']).values
+pe_list1 = np.sort(y)
+fw10 = int(len(y) / 10)
+top10 = pe_list1[fw10 - 1]
+bottom10 = pe_list1[-fw10]
+y_down = [top10] * len(y)
+y_up = [bottom10] * len(y)
+fw20 = int(len(y) / 20)
+top5 = pe_list1[fw20 - 1]
+bottom5 = pe_list1[-fw20]
+y_down2 = [top5] * len(y)
+y_up2 = [bottom5] * len(y)
+fig, ax = plt.subplots(figsize=(10, 4), dpi=200)
+tick_spacing = 100
+ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+fig.autofmt_xdate()
+for label in ax.get_xticklabels() + ax.get_yticklabels():
+    label.set_fontsize(8)
+fig, ax = plt.subplots(figsize=(10, 4), dpi=200)
+pe_ten_bond = 100 / last_dataframe['pe'] / last_dataframe['ten_bond']
+tick_spacing = 100
+ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+fig.autofmt_xdate()
+for label in ax.get_xticklabels() + ax.get_yticklabels():
+    label.set_fontsize(8)

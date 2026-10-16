@@ -1,0 +1,128 @@
+[
+  {
+    "key": "registered_dividend_yield365",
+    "name": "登记日365天现金股息率",
+    "source_paths": [
+      "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt"
+    ],
+    "source_sha256": [
+      "10bc142e232e5b613572d9cb8db6dffd243c5d6d6d511cda03d268b10e222990"
+    ],
+    "formula": "cash registered in past365calendar days / current total_mv",
+    "fidelity": "proxy: new completion of previously omitted dividend field",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "dividend_three_year_floor",
+    "name": "连续三年现金分红底线",
+    "source_paths": [
+      "quant/2022年度精选策略/13.利用股息率长线选股【超稳】.txt"
+    ],
+    "source_sha256": [
+      "f2bb4917cd2efb4194bd7cebf4603dce9f487904e1a081ad678cd9d211914d22"
+    ],
+    "formula": "min(Y1,Y2,Y3)/total_mv; 3 four-quarter blocks anchored to latest announced income report",
+    "fidelity": "proxy: new continuous adaptation, not a source literal ranking",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "dividend13_continuity_priority",
+    "name": "源码三年分红门槛优先",
+    "source_paths": [
+      "quant/2022年度精选策略/13.利用股息率长线选股【超稳】.txt"
+    ],
+    "source_sha256": [
+      "f2bb4917cd2efb4194bd7cebf4603dce9f487904e1a081ad678cd9d211914d22"
+    ],
+    "formula": "2*I(Y1/MV>.02,Y2/MV>.015,Y3/MV>.012,sumY/MV>.1)+rank(Y1/MV)",
+    "fidelity": "proxy: source thresholds retained; full-support priority adaptation, not original CSI300/top3 strategy",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "dividend36_peg_pb_small_priority",
+    "name": "补全高股息负PEG低PB小市值",
+    "source_paths": [
+      "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt"
+    ],
+    "source_sha256": [
+      "10bc142e232e5b613572d9cb8db6dffd243c5d6d6d511cda03d268b10e222990"
+    ],
+    "formula": "2*I(top25percent positive365day dividendyield,PE/NIyoy<0,PB<3)+rank(-totalMV)",
+    "fidelity": "proxy: completion vs previously omitted dividend gate; source full trading path absent",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "dividend26_peg_price_small_priority",
+    "name": "补全高股息双边PEG低价小市值",
+    "source_paths": [
+      "quant/2024年度精选策略1/26.【深度解析 六】高股息率-低PEG-低股价 模型.txt"
+    ],
+    "source_sha256": [
+      "4b6026d94cda1af72dbf51af409214db241c069b7b6d03049ed9c6d17a389687"
+    ],
+    "formula": "2*I(top25percent positive365day dividendyield,-3<PEG<3,price<conditional75percent)+rank(-totalMV)",
+    "fidelity": "proxy: conditional price quantile after dividend and PEG gates; raw close proxy for current quote",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "dividend85_cheap_value_priority",
+    "name": "低PE低PB高股息价值资格",
+    "source_paths": [
+      "quant/2020年度精选策略/85 【第一次玩】我就是要买便宜股系列.txt"
+    ],
+    "source_sha256": [
+      "1235682e2502ecfdf91c50ef7087885d46cd60f3713239f782d053d7536dcb28"
+    ],
+    "formula": "2*I(0<PE<10,0<PB<1.5,DY365>.03)+rank(-PE)",
+    "fidelity": "proxy: dividend365 replaces opaque JYDividendRatio; industry cap and semiannual holding not reproduced",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "control36_without_dividend",
+    "name": "对照36去掉股息条件",
+    "source_paths": [
+      "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt"
+    ],
+    "source_sha256": [
+      "10bc142e232e5b613572d9cb8db6dffd243c5d6d6d511cda03d268b10e222990"
+    ],
+    "formula": "2*I(PEG<0,PB<3)+rank(-totalMV)",
+    "fidelity": "proxy: matched support ablation",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "control26_without_dividend",
+    "name": "对照26去掉股息条件",
+    "source_paths": [
+      "quant/2024年度精选策略1/26.【深度解析 六】高股息率-低PEG-低股价 模型.txt"
+    ],
+    "source_sha256": [
+      "4b6026d94cda1af72dbf51af409214db241c069b7b6d03049ed9c6d17a389687"
+    ],
+    "formula": "2*I(-3<PEG<3,price<conditional75percent)+rank(-totalMV)",
+    "fidelity": "proxy: matched support ablation; price quantile follows partial PEG subset",
+    "direction": 1,
+    "source_execution_reproduced": false
+  },
+  {
+    "key": "control85_without_dividend",
+    "name": "对照85去掉股息条件",
+    "source_paths": [
+      "quant/2020年度精选策略/85 【第一次玩】我就是要买便宜股系列.txt"
+    ],
+    "source_sha256": [
+      "1235682e2502ecfdf91c50ef7087885d46cd60f3713239f782d053d7536dcb28"
+    ],
+    "formula": "2*I(0<PE<10,0<PB<1.5)+rank(-PE)",
+    "fidelity": "proxy: matched support ablation",
+    "direction": 1,
+    "source_execution_reproduced": false
+  }
+]

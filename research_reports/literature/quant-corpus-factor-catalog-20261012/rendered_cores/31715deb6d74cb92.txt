@@ -1,0 +1,166 @@
+quant/2021年度精选策略/93北向Boll带_ETF组合宝付费策略.txt
+from jqdata import *
+import pandas as pd
+import talib
+
+def initialize(context):
+    set_params()
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(get_signal, time='14:10')
+    run_daily(trade, time='11:30')
+    run_daily(ETFtrade, time='14:11')
+
+def set_params():
+    g.use_dynamic_target_market = True
+    g.target_market = '000300.XSHG'
+    g.empty_keep_stock = '511880.XSHG'
+    g.signal = 'BUY'
+    g.emotion_rate = 0
+    g.lag = 6
+    g.lag0 = 7
+    g.lag1 = 15
+    g.lag2 = 15
+    g.north_money = 0
+    g.buy = []
+    g.ETFList = []
+    g.boll252 = []
+    g.boll150 = []
+    g.boll80 = []
+    g.boll20 = []
+'EXACT_REVIEWED_FUNCTION get_before_after_trade_days sha256=bba87308cf156fb7cabc153506a3f5b614c2f113da30949135fee977afd81020 source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'
+
+def before_market_open(context):
+    ETF_targets = ['159901.XSHE', '162605.XSHE', '510050.XSHG', '510880.XSHG', '159905.XSHE', '159915.XSHE', '510300.XSHG', '510500.XSHG', '159949.XSHE', '161903.XSHE', '161005.XSHE']
+    yesterday = context.previous_date
+    list_date = get_before_after_trade_days(yesterday, g.lag1)
+    g.ETFList = []
+    all_funds = get_all_securities(types='fund', date=yesterday)
+    for symbol in ETF_targets:
+        if symbol in all_funds.index:
+            if all_funds.loc[symbol].start_date <= list_date:
+                g.ETFList.append(symbol)
+    df_etf = pd.DataFrame(columns=['基金代码', '对应名称', '周期涨幅', '均线差值'])
+    current_data = get_current_data()
+    for mkt_idx in g.ETFList:
+        security = mkt_idx
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_price = current_data[security].last_price
+        cp_increase = (current_price / close_data['close'][g.lag2 - g.lag1] - 1) * 100
+        ma_n1 = close_data['close'].mean()
+        info = get_security_info(security)
+        pre_price = (current_price / ma_n1 - 1) * 100
+        df_etf = df_etf.append({'基金代码': security, '对应名称': info.display_name, '周期涨幅': cp_increase, '均线差值': pre_price}, ignore_index=True)
+    df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+    return
+
+def ETFtrade(context):
+    if g.signal == 'CLEAR':
+        for stock in context.portfolio.positions:
+            if stock == g.empty_keep_stock:
+                continue
+            order_target(stock, 0)
+    elif g.signal == 'BUY':
+        if g.empty_keep_stock in context.portfolio.positions:
+            order_target(g.empty_keep_stock, 0)
+        holdings = set(context.portfolio.positions.keys())
+        targets = set(g.buy)
+        sells = holdings - targets
+        for code in sells:
+            order_target(code, 0)
+        ratio = len(targets)
+        if ratio > 0:
+            cash = context.portfolio.total_value / ratio
+            adjusts = holdings & targets
+            for code in adjusts:
+                if abs(cash - context.portfolio.positions[code].value) > 5000:
+                    order_target_value(code, cash)
+            purchases = targets - holdings
+            for code in purchases:
+                order_target_value(code, cash)
+        current_returns = 100 * context.portfolio.returns
+    if len(context.portfolio.positions) == 0:
+        order_target_value(g.empty_keep_stock, context.portfolio.available_cash)
+
+def trade(context):
+    today = context.current_dt
+    n_sh = finance.run_query(query(finance.STK_ML_QUOTA).filter(finance.STK_ML_QUOTA.day <= today.date(), finance.STK_ML_QUOTA.link_id == 310001).order_by(finance.STK_ML_QUOTA.day.desc()).limit(252))
+    n_sz = finance.run_query(query(finance.STK_ML_QUOTA).filter(finance.STK_ML_QUOTA.day <= today.date(), finance.STK_ML_QUOTA.link_id == 310002).order_by(finance.STK_ML_QUOTA.day.desc()).limit(252))
+    money_north = []
+    g.boll252 = []
+    g.boll150 = []
+    g.boll80 = []
+    g.boll20 = []
+    for i in range(0, 252):
+        sh_in = n_sh['buy_amount'][i] - n_sh['sell_amount'][i]
+        sz_in = n_sz['buy_amount'][i] - n_sz['sell_amount'][i]
+        amount = sh_in + sz_in
+        money_north.append(amount)
+    g.north_money = money_north[0]
+    mid252 = np.mean(money_north)
+    sted252 = np.std(money_north)
+    up252 = mid252 + 1.5 * sted252
+    low252 = mid252 - 1.5 * sted252
+    g.boll252.append(up252)
+    g.boll252.append(low252)
+    mid150 = np.mean(money_north[0:150])
+    sted150 = np.std(money_north[0:150])
+    up150 = mid150 + 1.5 * sted150
+    low150 = mid150 - 1.5 * sted150
+    g.boll150.append(up150)
+    g.boll150.append(low150)
+    mid80 = np.mean(money_north[0:80])
+    sted80 = np.std(money_north[0:80])
+    up80 = mid80 + 2 * sted80
+    low80 = mid80 - 2 * sted80
+    g.boll80.append(up80)
+    g.boll80.append(low80)
+    mid20 = np.mean(money_north[0:20])
+    sted20 = np.std(money_north[0:20])
+    up20 = mid20 + 2 * sted20
+    low20 = mid20 - 2 * sted20
+    g.boll20.append(up20)
+    g.boll20.append(low20)
+
+def get_signal(context):
+    df_etf = pd.DataFrame(columns=['基金代码', '对应名称', '周期涨幅', '均线差值'])
+    current_data = get_current_data()
+    for mkt_idx in g.ETFList:
+        security = mkt_idx
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_price = current_data[security].last_price
+        cp_increase = (current_price / close_data['close'][g.lag2 - g.lag1] - 1) * 100
+        ma_n1 = close_data['close'].mean()
+        info = get_security_info(security)
+        pre_price = (current_price / ma_n1 - 1) * 100
+        df_etf = df_etf.append({'基金代码': security, '对应名称': info.display_name, '周期涨幅': cp_increase, '均线差值': pre_price}, ignore_index=True)
+    df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+    if len(df_etf) == 0:
+        g.signal = 'CLEAR'
+        return
+    buyNum = 0
+    sellNum = 0
+    if g.north_money - g.boll252[0] > 0:
+        buyNum += 1
+    if g.north_money - g.boll150[0] > 0:
+        buyNum += 1
+    if g.north_money - g.boll80[0] > 0:
+        buyNum += 1
+    if g.north_money - g.boll20[0] > 0:
+        buyNum += 1
+    if g.north_money - g.boll252[1] < 0:
+        sellNum += 1
+    if g.north_money - g.boll150[1] < 0:
+        sellNum += 1
+    if g.north_money - g.boll80[1] < 0:
+        sellNum += 1
+    if g.north_money - g.boll20[1] < 0:
+        sellNum += 1
+    if sellNum >= 2:
+        g.signal = 'CLEAR'
+        return
+    elif buyNum >= 3:
+        index = 2
+        g.buy = df_etf['基金代码'].iloc[0:index]
+        g.signal = 'BUY'
+        return
+'EXACT_REVIEWED_FUNCTION EmotionMonitor sha256=1a34895334804fe51b0eae2867c9cab86a0ca09d8a86ca38e5b87fa18380de4e source=quant/2021年度精选策略/18.6年17倍的etf+分级b的轮动趋势策略跟随感悟.txt'

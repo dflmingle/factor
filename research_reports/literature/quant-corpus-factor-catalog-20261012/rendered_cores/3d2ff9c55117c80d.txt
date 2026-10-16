@@ -1,0 +1,98 @@
+quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    initial_config()
+    run_weekly(trade, weekday=3, reference_security='000300.XSHG')
+
+def initial_config():
+    g.index_pool = [('000016.XSHG', '510050.XSHG'), ('000300.XSHG', '510300.XSHG'), ('399905.XSHE', '510500.XSHG'), ('399006.XSHE', '159915.XSHE'), ('000015.XSHG', '510880.XSHG'), ('399932.XSHE', '159928.XSHE'), ('399913.XSHE', '512010.XSHG')]
+    g.stock_num = 2
+    g.momentum_day = 15
+    g.stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.mean_day = 20
+    g.mean_diff_day = 3
+    g.score_threshold = 0.7
+    g.slope_series = initial_slope_series()[:-1]
+
+def trade(context):
+    stock_hold = set(context.portfolio.positions.keys())
+    stock_pool = get_stock_pool()
+    signal = get_signal()
+    if stock_pool and signal != 'SELL':
+        if stock_hold:
+            change_signal = 0
+            for stock in stock_hold:
+                if stock not in stock_pool or stock_pool.index(stock) > g.stock_num + 1:
+                    change_signal = 1
+            if change_signal:
+                change_position(context, stock_pool)
+            else:
+                pass
+        else:
+            change_position(context, stock_pool)
+    else:
+        if stock_pool and signal == 'SELL':
+            pass
+        for stock in stock_hold:
+            order_target_value(stock, 0)
+
+def get_stock_pool():
+    index_pool = [index for index, stock in g.index_pool]
+    index_rank = []
+    for index in index_pool:
+        score = get_socre(index)
+        if score > 0:
+            index_rank.append((index, score))
+    index_rank = sorted(index_rank, key=lambda x: x[1], reverse=True)
+    index_dict = dict(g.index_pool)
+    return tuple((index_dict[index[0]] for index in index_rank))
+
+def get_socre(stock):
+    data = attribute_history(stock, g.momentum_day, '1d', ['close'])
+    y = data['log'] = np.log(data.close)
+    x = data['num'] = np.arange(data.log.size)
+    slope, intercept = np.polyfit(x, y, 1)
+    annualized_returns = math.pow(math.exp(slope), 250) - 1
+    r_squared = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+    return annualized_returns * r_squared
+
+def change_position(context, stock_pool):
+    for security in set(context.portfolio.positions.keys()):
+        order_target_value(security, 0)
+    stock_num = g.stock_num if len(stock_pool) > g.stock_num else len(stock_pool)
+    cash = context.portfolio.available_cash / stock_num
+    for stock in stock_pool[:stock_num]:
+        order_target_value(stock, cash)
+
+def get_signal():
+    close_data = attribute_history(g.stock, g.mean_day + g.mean_diff_day, '1d', ['close'])
+    today_MA = close_data.close[g.mean_diff_day:].mean()
+    before_MA = close_data.close[:-g.mean_diff_day].mean()
+    data = attribute_history(g.stock, g.N, '1d', ['high', 'low'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * slope * r2
+    if rsrs_score > g.score_threshold and today_MA > before_MA:
+        return 'BUY'
+    elif rsrs_score < -g.score_threshold and today_MA < before_MA:
+        return 'SELL'
+    else:
+        return 'KEEP'
+
+def get_ols(x, y):
+    slope, intercept = np.polyfit(x, y, 1)
+    r2 = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+    return (intercept, slope, r2)
+
+def initial_slope_series():
+    data = attribute_history(g.stock, g.N + g.M, '1d', ['high', 'low'])
+    return [get_ols(data.low[i:i + g.N], data.high[i:i + g.N])[1] for i in range(g.M)]
+
+def get_zscore(slope_series):
+    mean = np.mean(slope_series)
+    std = np.std(slope_series)
+    return (slope_series[-1] - mean) / std

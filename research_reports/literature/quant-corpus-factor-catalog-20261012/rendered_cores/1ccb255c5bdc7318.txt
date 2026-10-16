@@ -1,0 +1,51 @@
+quant/聚宽2025年精选/81搞市场最靓的仔！指数ETF动量轮动策略-2.txt
+from jqdata import *
+import random
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    run_daily(my_trade, time='14:50', reference_security='000300.XSHG')
+    g.stocks = {'510500.XSHG', '510300.XSHG', '510050.XSHG', '159949.XSHE', '513100.XSHG', '513500.XSHG', '159920.XSHE', '513520.XSHG', '513030.XSHG', '162411.XSHE', '159985.XSHE'}
+    g.position = {'ETF_HOLD': '0', 'STATUS': 0, 'HOLD_NUM': 0}
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=c28f361a54ae58fa45086f5fada58af5567aab5a448671ae63b7f557f5cb4d3c source=quant/2020年度精选策略/77 RSRS大盘择时优化.txt'
+
+def after_code_changed(context):
+    pass
+
+def my_trade(context):
+    N = 21
+    SEC_LIST = []
+    SEC_LIST_DETAIL = {}
+    R_LIST = []
+    curr_data = get_current_data()
+    for security in g.stocks:
+        close_data1 = attribute_history(security, 30, unit='1d', fields=['close'])['close']
+        curr_price = curr_data[security].last_price
+        his_n_price = sum(close_data1[-23:-20]) / 3
+        if curr_price != curr_price or his_n_price != his_n_price or curr_price < 0.01 or (his_n_price < 0.01):
+            return
+        R = (close_data1[-2] + close_data1[-1] + curr_price - sum(close_data1[-23:-20])) * 100 / sum(close_data1[-23:-20])
+        base_price = close_data1[-N]
+        if R in R_LIST:
+            R = R + random.random() / 1000
+        R_LIST.append(R)
+        SEC_LIST.append((R, security, curr_price, base_price))
+    SEC_LIST.sort(reverse=True)
+    ETF_No1 = SEC_LIST[0][1]
+    if g.position['STATUS'] == 0:
+        if SEC_LIST[0][2] > SEC_LIST[0][3] * 1.001:
+            order_target_value(ETF_No1, context.portfolio.cash)
+            g.position['STATUS'] = 1
+            g.position['ETF_HOLD'] = ETF_No1
+    elif g.position['STATUS'] == 1:
+        if g.position['ETF_HOLD'] == ETF_No1:
+            if SEC_LIST[0][2] < SEC_LIST[0][3] * 0.999:
+                order_target_value(g.position['ETF_HOLD'], 0)
+                g.position['STATUS'] = 0
+                g.position['ETF_HOLD'] = ' '
+        elif SEC_LIST[0][2] > SEC_LIST[0][3] * 1.001:
+            order_target_value(g.position['ETF_HOLD'], 0)
+            order_target_value(ETF_No1, context.portfolio.cash)
+            g.position['ETF_HOLD'] = ETF_No1
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

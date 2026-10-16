@@ -1,0 +1,48 @@
+quant/2020年度精选策略/93 RSRS——大盘择时.txt
+import jqdata
+from jqdata import *
+import pandas as pd
+from pandas import Series, DataFrame
+import numpy as np
+import matplotlib
+from pandas.stats.api import ols
+import datetime
+import time
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    g.N = 18
+    g.M = 480
+    g.security = '000300.XSHG'
+    g.buy = 0.7
+    g.sell = -0.7
+    g.trade_date_range = len(get_trade_days(start_date=context.run_params.start_date, end_date=context.run_params.end_date)) + 1
+    g.trade_date_series = get_trade_days(end_date=context.run_params.end_date, count=g.trade_date_range)
+    g.date_range = len(get_trade_days(start_date=context.run_params.start_date, end_date=context.run_params.end_date)) + g.M
+    g.date_series = get_trade_days(end_date=context.run_params.end_date, count=g.date_range)
+    g.RSRS_ratio_list = Series(np.zeros(len(g.date_series)), index=g.date_series)
+    for i in g.date_series:
+        g.RSRS_ratio_list[i] = RSRS_ratio(g.N, i)
+    g.trade_mean_series = pd.rolling_mean(g.RSRS_ratio_list, g.M)[-g.trade_date_range:]
+    g.trade_std_series = pd.rolling_std(g.RSRS_ratio_list, g.M)[-g.trade_date_range:]
+    g.RSRS_stdratio_list = Series(np.zeros(len(g.trade_date_series)), index=g.trade_date_series)
+    g.RSRS_stdratio_list = (g.RSRS_ratio_list[-g.trade_date_range:] - g.trade_mean_series) / g.trade_std_series
+
+def RSRS_ratio(N, date):
+    security = g.security
+    stock_price_high = get_price(security, end_date=date, count=N)['high']
+    stock_price_low = get_price(security, end_date=date, count=N)['low']
+    ols_reg = ols(y=stock_price_high, x=stock_price_low)
+    return ols_reg.beta.x
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=c28f361a54ae58fa45086f5fada58af5567aab5a448671ae63b7f557f5cb4d3c source=quant/2020年度精选策略/77 RSRS大盘择时优化.txt'
+
+def market_open(context):
+    security = g.security
+    cash = context.portfolio.available_cash
+    if g.RSRS_stdratio_list[context.previous_date] > g.buy:
+        order_value(security, cash)
+    elif g.RSRS_stdratio_list[context.previous_date] < g.sell and context.portfolio.positions[security].closeable_amount > 0:
+        order_target(security, 0)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

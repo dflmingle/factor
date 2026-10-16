@@ -1,0 +1,86 @@
+quant/2020年度精选策略/82 次新+小市值+KAMA择时 轮动.txt
+import talib as tb
+
+def initialize(context):
+    g.buy_stock_count = 3
+    g.kama_days = 13
+    g.new_public_days = 150
+    g.return_radio = 0.999
+    g.days_counter = 0
+    g.buy_period = 2
+    run_daily(market_end, time='after_close')
+
+def handle_data(context, data):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == 9 and minute == 59:
+        if g.days_counter % g.buy_period == 0:
+            buy_stocks = select_stocks(context, data)
+            adjust_position(context, data, buy_stocks)
+    if minute % 5 == 0:
+        for stock in context.portfolio.positions.keys():
+            if context.portfolio.positions[stock].closeable_amount > 0:
+                single = get_kama_single(context, stock)
+                if single == -1:
+                    order_target_value(stock, 0)
+
+def market_end(context):
+    g.days_counter = g.days_counter + 1
+'EXACT_REVIEWED_FUNCTION filter_paused_and_st_stock sha256=6137617a27a73c8f2a84bb2011210e45eac77405db4216f9e39bd1613e4246fc source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=4816bfed9587e210ded81c6e288a6b9d00544cc261697b889abe16b77ed6ed1b source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def select_stocks(context, data):
+    q = query(valuation.code, valuation.circulating_market_cap).order_by(valuation.circulating_market_cap.asc()).filter(valuation.circulating_market_cap <= 99).limit(100)
+    df = get_fundamentals(q)
+    stock_list = list(df['code'])
+    stock_list = filter_paused_and_st_stock(stock_list)
+    stock_list = filter_gem_stock(context, stock_list)
+    blacklist = []
+    tmpList = []
+    for stock in stock_list:
+        days_public = (context.current_dt.date() - get_security_info(stock).start_date).days
+        if days_public < g.new_public_days and days_public > 50:
+            tmpList.append(stock)
+    stock_list = tmpList
+    tmp_TimeSelect_List = []
+    for stock in stock_list:
+        sigle = get_kama_single(context, stock)
+        if sigle >= 0:
+            tmp_TimeSelect_List.append(stock)
+    stock_list = tmp_TimeSelect_List
+    filter_stocks = []
+    last_prices = history(1, '1m', 'close', security_list=stock_list)
+    curr_data = get_current_data()
+    for stock in stock_list:
+        if last_prices[stock][-1] < curr_data[stock].high_limit:
+            if last_prices[stock][-1] > curr_data[stock].low_limit:
+                if stock not in blacklist:
+                    filter_stocks.append(stock)
+    stock_list = filter_stocks
+    stock_list = stock_list[:g.buy_stock_count]
+    return stock_list
+
+def adjust_position(context, data, buy_stocks):
+    for stock in context.portfolio.positions.keys():
+        last_prices = history(1, '1m', 'close', security_list=context.portfolio.positions.keys())
+        if stock not in buy_stocks:
+            curr_data = get_current_data()
+            if last_prices[stock][-1] < curr_data[stock].high_limit:
+                position = context.portfolio.positions[stock]
+                order_target_value(stock, 0)
+    for stock in buy_stocks:
+        position_count = len(context.portfolio.positions)
+        if g.buy_stock_count > position_count:
+            value = context.portfolio.cash / (g.buy_stock_count - position_count)
+            if context.portfolio.positions[stock].total_amount == 0:
+                order_target_value(stock, value)
+
+def get_kama_single(context, security):
+    period = g.kama_days * 4 * 6
+    close_long = get_price(security, end_date=context.current_dt, frequency='10m', fields=['close'], count=period + 2 * 4 * 6)['close'].values
+    kama_long = tb.KAMA(close_long, timeperiod=period)
+    if kama_long[-1] / kama_long[-2] < g.return_radio:
+        return -1
+    if kama_long[-1] / kama_long[-2] > 1.01:
+        return 1
+    return 0

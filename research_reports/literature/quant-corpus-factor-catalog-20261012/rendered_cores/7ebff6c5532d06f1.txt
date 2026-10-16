@@ -1,0 +1,141 @@
+quant/聚宽2025年精选/37微盘股扩散指数双均线择时.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import talib
+import datetime
+import pickle
+from six import BytesIO
+
+def initialize(context):
+    g.no_trading_today_signal = True
+    g.stock_num = 5
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.watch_day = 20
+    g.base = pd.read_csv(BytesIO(read_file('wp_ks_index.csv')), encoding='utf_8_sig')
+    g.factor_list = [(['Price1Y', 'total_profit_to_cost_ratio', 'VOL120'], [-1.6481969388084845, -0.17062057099935446, -0.061842557079243125])]
+    run_daily(prepare_stock_list, '9:05')
+    run_daily(daily_adjustment, '9:30')
+    run_daily(check_limit_up, '14:00')
+    run_daily(print_position_info, '15:10')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+
+def get_ks_index(context, watch_day):
+    yesterday = context.previous_date
+    ks_index = []
+    dates = get_trade_days(end_date=yesterday, count=30)
+    for date in dates:
+        stocks = get_index_stocks('000852.XSHG', date=date)
+        df0 = get_price(stocks, end_date=date, fields=['close'], count=watch_day, fill_paused=False, skip_paused=False, panel=False).dropna()
+        end_price = df0.groupby('code').apply(lambda df0: df0.iloc[-1, -1])
+        open_price = df0.groupby('code').apply(lambda df0: df0.iloc[0, -1])
+        result = pd.DataFrame()
+        result['ks'] = end_price - open_price
+        ks = len(result[result['ks'] > 0]) / len(result['ks'] > 0)
+        ks_index.append(ks)
+    df = pd.DataFrame()
+    df['date'] = dates
+    df['ks_index'] = ks_index
+    return df
+
+def get_timing_signal(context):
+    yesterday = context.previous_date
+    yesterday = yesterday.strftime('%Y-%m-%d')
+    base = g.base
+    base = base.loc[base['date'] == yesterday]
+    today_sig = base['signal'].tolist()[0]
+    return today_sig
+
+def _get_stocks(date):
+    initial_list = get_all_securities().index.tolist()
+    initial_list = filter_new_stock(context, initial_list)
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_st_stock(initial_list)
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(initial_list)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q, date=date)
+    stock_list = df.code.tolist()[0:1000]
+    return stock_list
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    final_list = []
+    for factor_list, coef_list in g.factor_list:
+        initial_list = get_all_securities().index.tolist()
+        initial_list = filter_new_stock(context, initial_list)
+        initial_list = filter_kcbj_stock(initial_list)
+        initial_list = filter_st_stock(initial_list)
+        factor_values = get_factor_values(initial_list, factor_list, end_date=yesterday, count=1)
+        df = pd.DataFrame(index=initial_list, columns=factor_values.keys())
+        for i in range(len(factor_list)):
+            df[factor_list[i]] = list(factor_values[factor_list[i]].T.iloc[:, 0])
+        df = df.dropna()
+        df['total_score'] = 0
+        for i in range(len(factor_list)):
+            df['total_score'] += coef_list[i] * df[factor_list[i]]
+        df = df.sort_values(by=['total_score'], ascending=False)
+        complex_factor_list = list(df.index)[:int(0.1 * len(list(df.index)))]
+        q = query(valuation.code, valuation.circulating_market_cap, indicator.eps).filter(valuation.code.in_(complex_factor_list)).order_by(valuation.circulating_market_cap.asc())
+        df = get_fundamentals(q)
+        df = df[df['eps'] > 0]
+        lst = list(df.code)
+        lst = filter_paused_stock(lst)
+        lst = filter_limitup_stock(context, lst)
+        lst = filter_limitdown_stock(context, lst)
+        lst = lst[:min(g.stock_num, len(lst))]
+        final_list.extend(lst)
+    final_list = list(set(final_list))
+    return final_list
+
+def daily_adjustment(context):
+    target_stock = get_stock_list(context)
+    target_list = target_stock[:g.stock_num]
+    if g.no_trading_today_signal:
+        today_sig = get_timing_signal(context)
+        try:
+            if today_sig > 0:
+                for stock in g.hold_list:
+                    position = context.portfolio.positions[stock]
+                    close_position(position)
+                return
+        except:
+            pass
+    for stock in g.hold_list:
+        if stock not in target_stock and stock not in g.yesterday_HL_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=e1156ef5376990f768d29303164d87a15e602d5861ac54d0fb47bf5120261b3c source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=9620ae3faed8afa4b71539979a57528fb20f48a987e5fb89d6dd0871ab934580 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=a33a2c2079f46745447693f0d71254e014ee7cb801035eed7930ea353f54bd83 source=quant/2024年度精选策略1/1.差不多得了.txt'
+
+def print_position_info(context):
+    trades = get_trades()
+    for _trade in trades.values():
+        pass
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        name = get_security_info(securities).display_name
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount

@@ -1,0 +1,336 @@
+quant/量化策略/量化策略/龙头追涨策略2026/03-234板介入-优化版v1.0.txt
+from jqlib.technical_analysis import *
+from jqfactor import *
+from jqdata import *
+import datetime as dt
+import pandas as pd
+import numpy as np
+
+def initialize(context):
+    g.max_turnover_ratio = 30
+    g.max_volume_ratio = 1.8
+    g.max_history_high_days = 90
+    g.max_allowed_continue = 4
+    g.hold_num = 5
+    g.max_drop_pct = 0.05
+    g.stop_loss = 0.05
+    g.open_stop_loss = 0.05
+    g.trailing_stop = 0.1
+    g.max_drawdown = 0.3
+    g.index_code = '000300.XSHG'
+    g.ma_short = 20
+    g.volume_limit = 0.15
+    g.target_list = []
+    g.init_cash = context.portfolio.starting_cash
+    g.highest_value = context.portfolio.total_value
+    g.trade_pause = False
+    g.pause_until = None
+    g.buy_signal = False
+    g.market_filter = False
+    run_daily(check_market_environment, '09:20')
+    run_daily(pre_select, '09:25')
+    run_daily(buy_stocks, '09:45')
+    run_daily(check_exit_signals, '10:30')
+    run_daily(check_exit_signals, '14:30')
+    run_daily(record_and_risk, '15:05')
+
+def check_market_environment(context):
+    if not g.market_filter:
+        g.buy_signal = True
+        return
+    date = context.previous_date.strftime('%Y-%m-%d')
+    df_index = attribute_history(g.index_code, count=g.ma_short + 1, unit='1d', fields=['close'], skip_paused=True)
+    if df_index.empty:
+        g.buy_signal = False
+        return
+    ma = df_index['close'].mean()
+    current = df_index['close'].iloc[-1]
+    index_ok = current > ma
+    all_stocks = get_all_securities(['stock'], date).index.tolist()
+    all_stocks = filter_basic(all_stocks, date)
+    hl_stocks = get_hl_stock(all_stocks, date)
+    hl_count = len(hl_stocks)
+    if hl_count > 0:
+        df_today = get_price(hl_stocks, end_date=context.current_dt.strftime('%Y-%m-%d'), fields=['close', 'high_limit'], count=1, panel=False, skip_paused=True)
+        df_today = df_today.dropna()
+        if len(df_today) > 0:
+            continue_count = sum(df_today['close'] >= df_today['high_limit'] * 0.995)
+            advance_rate = continue_count / len(df_today)
+        else:
+            advance_rate = 0
+    else:
+        advance_rate = 0
+    g.buy_signal = index_ok and hl_count >= 20 and (advance_rate >= 0.2)
+    if not g.buy_signal:
+        pass
+
+def pre_select(context):
+    if g.trade_pause or not g.buy_signal:
+        g.target_list = []
+        return
+    date = context.previous_date.strftime('%Y-%m-%d')
+    base_list = prepare_stock_list(date)
+    hl_1d = get_hl_stock(base_list, date)
+    hl_1d = filter_yzb(hl_1d, date)
+    dates = [get_shifted_date(date, -i, 'T') for i in range(1, 6)]
+    hl_lists = [get_hl_stock(base_list, d) for d in dates]
+    two_plus = set(hl_1d).intersection(set(hl_lists[1]))
+    three_plus = set(two_plus).intersection(set(hl_lists[2]))
+    four_plus = set(three_plus).intersection(set(hl_lists[3]))
+    candidates = list(set(two_plus).union(three_plus).union(four_plus))
+    if len(candidates) == 0:
+        g.target_list = []
+        return
+    df_continue = get_max_continue_count(candidates, date, g.max_history_high_days)
+    df_continue = df_continue[df_continue['max_continue'] <= g.max_allowed_continue]
+    candidates = list(df_continue.index)
+    stock_info = []
+    for s in candidates:
+        free_mcap, _ = get_free_market_cap_and_turnover(s, date)
+        stock_info.append((s, free_mcap))
+    if len(stock_info) == 0:
+        g.target_list = []
+        return
+    stock_info.sort(key=lambda x: x[1])
+    g.target_list = [x[0] for x in stock_info[:g.hold_num]]
+
+def buy_stocks(context):
+    if g.trade_pause or not g.buy_signal or len(g.target_list) == 0:
+        return
+    available_cash = context.portfolio.available_cash
+    if available_cash < 10000:
+        return
+    hold_stocks = list(context.portfolio.positions.keys())
+    need_buy = g.hold_num - len(hold_stocks)
+    if need_buy <= 0:
+        return
+    to_buy = [s for s in g.target_list if s not in hold_stocks][:need_buy]
+    if len(to_buy) == 0:
+        return
+    base_value = available_cash / len(to_buy)
+    current_data = get_current_data()
+    date_str = context.previous_date.strftime('%Y-%m-%d')
+    for s in to_buy:
+        df = get_price(s, end_date=context.previous_date, frequency='daily', fields=['close'], count=1)
+        if df is None or df.empty:
+            continue
+        prev_close = df['close'].iloc[-1]
+        current_price = current_data[s].last_price
+        if current_price == 0:
+            continue
+        drop_ratio = (current_price - prev_close) / prev_close
+        if drop_ratio < -g.max_drop_pct:
+            continue
+        volume_yest = get_volume(s, date_str)
+        if volume_yest == 0:
+            continue
+        max_buy_value = volume_yest * current_data[s].day_open * g.volume_limit
+        buy_value = min(base_value, max_buy_value)
+        if buy_value < 10000:
+            continue
+        if current_data[s].day_open >= current_data[s].high_limit * 0.995:
+            order = order_value(s, buy_value, LimitOrderStyle(current_data[s].high_limit))
+            if order:
+                pass
+        else:
+            order = order_value(s, buy_value, MarketOrderStyle())
+            if order:
+                pass
+
+def sell_for_open_stop(context):
+    date = context.previous_date.strftime('%Y-%m-%d')
+    current_data = get_current_data()
+    hold_stocks = list(context.portfolio.positions.keys())
+    if len(hold_stocks) == 0:
+        return
+    df = get_price(hold_stocks, end_date=date, frequency='daily', fields=['close'], count=1, panel=False)
+    df = df.set_index('code')
+    for s in hold_stocks:
+        pos = context.portfolio.positions[s]
+        if pos.closeable_amount == 0:
+            continue
+        if s in df.index:
+            open_price = current_data[s].day_open
+            pre_close = df.loc[s, 'close']
+            if open_price / pre_close < 1 - g.open_stop_loss:
+                order_target_value(s, 0)
+
+def check_exit_signals(context):
+    current_data = get_current_data()
+    for s in list(context.portfolio.positions.keys()):
+        pos = context.portfolio.positions[s]
+        if pos.closeable_amount == 0:
+            continue
+        cost = pos.avg_cost
+        price = current_data[s].last_price
+        loss_pct = price / cost - 1
+        if loss_pct < -g.stop_loss:
+            order_target_value(s, 0)
+            continue
+        if loss_pct > 0:
+            df = attribute_history(s, 5, '1d', ['high'], skip_paused=True)
+            if df is None or df.empty:
+                continue
+            high_since_buy = max(df['high'].max(), price)
+            drawdown = 1 - price / high_since_buy
+            if drawdown >= g.trailing_stop:
+                order_target_value(s, 0)
+
+def force_sell(context):
+    current_data = get_current_data()
+    for s in list(context.portfolio.positions.keys()):
+        pos = context.portfolio.positions[s]
+        if pos.closeable_amount == 0:
+            continue
+        if current_data[s].last_price < current_data[s].high_limit * 0.995:
+            order_target_value(s, 0)
+
+def record_and_risk(context):
+    total = context.portfolio.total_value
+    if total > g.highest_value:
+        g.highest_value = total
+    drawdown = (g.highest_value - total) / g.highest_value
+    if drawdown >= g.max_drawdown and (not g.trade_pause):
+        g.trade_pause = True
+        g.pause_until = context.current_dt + dt.timedelta(days=7)
+        for s in list(context.portfolio.positions.keys()):
+            if context.portfolio.positions[s].closeable_amount > 0:
+                order_target_value(s, 0)
+    if g.trade_pause and context.current_dt >= g.pause_until:
+        g.trade_pause = False
+        g.highest_value = total
+
+def filter_basic(stock_list, date):
+    stock_list = filter_st_stock(stock_list, date)
+    stock_list = filter_paused_stock(stock_list, date)
+    stock_list = filter_new_stock(stock_list, date, days=250)
+    stock_list = filter_cykcbj_stock(stock_list)
+    return stock_list
+
+def prepare_stock_list(date):
+    initial_list = get_all_securities('stock', date).index.tolist()
+    return filter_basic(initial_list, date)
+
+def filter_cykcbj_stock(stock_list):
+    return [s for s in stock_list if s[0] not in ['4', '8']]
+
+def filter_new_stock(stock_list, date, days=250):
+    d_date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+    return [s for s in stock_list if d_date - get_security_info(s).start_date > datetime.timedelta(days=days)]
+
+def filter_st_stock(stock_list, date):
+    df = get_extras('is_st', stock_list, start_date=date, end_date=date, df=True)
+    df = df.T
+    df.columns = ['is_st']
+    df = df[df['is_st'] == False]
+    return list(df.index)
+
+def filter_paused_stock(stock_list, date):
+    df = get_price(stock_list, end_date=date, frequency='daily', fields=['paused'], count=1, panel=False, fill_paused=True)
+    df = df[df['paused'] == 0]
+    return list(df.code)
+
+def get_hl_stock(stock_list, date):
+    if not stock_list:
+        return []
+    df = get_price(stock_list, end_date=date, frequency='daily', fields=['close', 'high_limit'], count=1, panel=False)
+    df = df.dropna()
+    df = df[df['close'] >= df['high_limit'] * 0.995]
+    return list(df.code)
+
+def filter_yzb(stock_list, date):
+    result = []
+    for s in stock_list:
+        df = get_price(s, end_date=date, frequency='1d', fields=['low', 'high', 'high_limit'], count=1, skip_paused=True)
+        if df.empty:
+            continue
+        if df['low'][0] < df['high'][0] or df['high'][0] < df['high_limit'][0]:
+            result.append(s)
+    return result
+
+def get_volume_ratio(stock_code, date):
+    df = attribute_history(stock_code, 2, '1d', ['money'], skip_paused=True)
+    if df is None or len(df) < 2:
+        return 999
+    return df['money'][-1] / df['money'][-2]
+
+def get_volume(stock_code, date):
+    df = get_price(stock_code, end_date=date, frequency='daily', fields=['volume'], count=1)
+    if df.empty:
+        return 0
+    return df['volume'][0]
+
+def get_max_continue_count(stock_list, end_date, days):
+    result = {}
+    for s in stock_list:
+        df = attribute_history(s, days, '1d', ['close', 'high_limit'], skip_paused=True)
+        if df is None or df.empty:
+            result[s] = 0
+            continue
+        limit_up = (df['close'] >= df['high_limit'] * 0.995).astype(int)
+        continue_days = 0
+        max_continue = 0
+        for val in limit_up:
+            if val == 1:
+                continue_days += 1
+                max_continue = max(max_continue, continue_days)
+            else:
+                continue_days = 0
+        result[s] = max_continue
+    df = pd.DataFrame.from_dict(result, orient='index', columns=['max_continue'])
+    return df
+
+def get_free_market_cap_and_turnover(stock_code, date):
+    try:
+        q = query(valuation.code, valuation.market_cap).filter(valuation.code == stock_code)
+        df_mcap = get_fundamentals(q, date=date)
+        if df_mcap.empty:
+            return (100, 100)
+        market_cap = df_mcap['market_cap'][0]
+        price_df = get_price(stock_code, end_date=date, count=1, fields=['close', 'volume'], skip_paused=False)
+        if price_df.empty:
+            return (100, 100)
+        close = price_df['close'][0]
+        volume = price_df['volume'][0]
+        total_shares = market_cap * 100000000.0 / close
+        q = query(finance.STK_SHAREHOLDER_TOP10.pub_date, finance.STK_SHAREHOLDER_TOP10.share_number).filter(finance.STK_SHAREHOLDER_TOP10.code == stock_code, finance.STK_SHAREHOLDER_TOP10.pub_date < date, finance.STK_SHAREHOLDER_TOP10.share_ratio > 5).order_by(finance.STK_SHAREHOLDER_TOP10.pub_date.desc())
+        df_holder = finance.run_query(q)
+        if not df_holder.empty:
+            latest_date = df_holder['pub_date'].max()
+            df_holder = df_holder[df_holder['pub_date'] == latest_date]
+            large_holder_shares = df_holder['share_number'].sum()
+        else:
+            large_holder_shares = 0
+        free_shares = total_shares - large_holder_shares
+        if free_shares <= 0:
+            free_shares = total_shares
+        free_mcap = free_shares * close / 100000000.0
+        actual_turnover = 100 * volume / free_shares if free_shares > 0 else 100
+        return (free_mcap, actual_turnover)
+    except Exception as e:
+        return (100, 100)
+
+def get_shifted_date(date, days, days_type='T'):
+    d = datetime.datetime.strptime(date, '%Y-%m-%d')
+    if days_type == 'N':
+        shifted = d + datetime.timedelta(days=days)
+        return shifted.strftime('%Y-%m-%d')
+    else:
+        all_trade_days = list(get_all_trade_days())
+        all_trade_days_str = [x.strftime('%Y-%m-%d') for x in all_trade_days]
+        if date in all_trade_days_str:
+            idx = all_trade_days_str.index(date)
+            new_idx = idx + days
+            if 0 <= new_idx < len(all_trade_days_str):
+                return all_trade_days_str[new_idx]
+        for i in range(1, 10):
+            test = d - datetime.timedelta(days=i)
+            test_str = test.strftime('%Y-%m-%d')
+            if test_str in all_trade_days_str:
+                idx = all_trade_days_str.index(test_str)
+                new_idx = idx + days
+                if 0 <= new_idx < len(all_trade_days_str):
+                    return all_trade_days_str[new_idx]
+                else:
+                    return test_str
+        return date

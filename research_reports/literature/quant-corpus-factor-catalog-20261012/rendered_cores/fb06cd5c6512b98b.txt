@@ -1,0 +1,50 @@
+quant/2021年度精选策略/0.回测提速十倍,过滤ST,退市,停牌,新股优化方法.txt
+def filter_st_paused_new(stock_list, days, context):
+    df = get_all_securities(types=['stock'], date=context.current_dt)
+    kcb = list(df[df.index.str.startswith('688')].index.unique())
+    start_date = (context.current_dt - timedelta(days=days)).date()
+    df_new_stock = df[df['start_date'] > start_date]
+    stock_list = list(set(stock_list).difference(set(df_new_stock.index)).difference(set(kcb)))
+    curr_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not curr_data[stock].is_st]
+    stock_list = [stock for stock in stock_list if not curr_data[stock].paused]
+    stock_list = [curr_data[stock].code for stock in stock_list if '退' not in curr_data[stock].name]
+    return stock_list
+
+def filter_st_paused_new(days, context):
+    df = get_all_securities(types=['stock'], date=context.current_dt)
+    df = df[~df.index.str.startswith('688')]
+    start_date = (context.current_dt - timedelta(days=days)).date()
+    df_new_stock = df[df['start_date'] > start_date]
+    stock_list = list(set(df.index).difference(set(df_new_stock.index)))
+    curr_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not curr_data[stock].is_st]
+    stock_list = [stock for stock in stock_list if not curr_data[stock].paused]
+    stock_list = [curr_data[stock].code for stock in stock_list if '退' not in curr_data[stock].name]
+    return stock_list
+import jqdata
+from datetime import datetime, date, timedelta
+
+def initialize(context):
+    g.total_time = 0
+    g.total_count = 0
+
+def handle_data(context, data):
+    securities = list(get_all_securities().index)
+    start = datetime.now()
+    stock_list = filter_st_paused_new(securities, 180, context)
+    g.total_time += (datetime.now() - start).microseconds
+    g.total_count += 1
+import pandas as pd
+
+def filter_st_paused_new(stock_list, days, context):
+    df = get_all_securities(types=['stock'], date=context.current_dt)
+    kcb = list(df[df.index.str.startswith('688')].index.unique())
+    start_date = (context.current_dt - timedelta(days=days)).date()
+    df_new_stock = df[df['start_date'] > start_date]
+    stock_list = list(set(stock_list).difference(set(df_new_stock.index)).difference(set(kcb)))
+    curr_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not curr_data[stock].is_st]
+    stock_list = [stock for stock in stock_list if not curr_data[stock].paused]
+    stock_list = [curr_data[stock].code for stock in stock_list if '退' not in curr_data[stock].name]
+    return stock_list

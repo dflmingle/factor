@@ -1,0 +1,108 @@
+quant/2023年度精选策略/92.【超跌反弹v1.0】3年2.3倍的超跌反弹小牛股.txt
+from jqdata import *
+import talib
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open_buy, time='9:30', reference_security='000300.XSHG')
+    run_daily(market_open_sell, time='14:55', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    g.stock_list = []
+    g.buy_stock_num = 5
+
+def before_market_open(context):
+    g.stock_list = get_stocks(context)
+
+def get_stocks(context):
+    stocklist = list(get_all_securities(['stock']).index)
+    stocklist = filter_st_stock(stocklist)
+    stocklist = filter_paused_stock(stocklist)
+    stocklist = filter_kcb_stock(context, stocklist)
+    stocklist = filter_stock_by_days(context, stocklist, 250)
+    stocklist = buy_point_filter(context, stocklist)
+    q = query(valuation.code).filter(valuation.code.in_(stocklist), valuation.circulating_market_cap > 50, indicator.roe > 0).order_by(indicator.roe.desc()).limit(10)
+    stocklist = list(get_fundamentals(q).code)
+    return stocklist
+
+def market_open_buy(context):
+    if len(context.portfolio.positions) < g.buy_stock_num:
+        new_buy_stock_num = g.buy_stock_num - len(context.portfolio.positions)
+        buy_cash = context.portfolio.available_cash / new_buy_stock_num
+        for s in g.stock_list[:new_buy_stock_num]:
+            if s not in context.portfolio.positions and context.portfolio.available_cash >= buy_cash >= 100 * get_current_data()[s].last_price:
+                order_target_value(s, buy_cash)
+
+def market_open_sell(context):
+    sells = list(context.portfolio.positions)
+    for s in sells:
+        loss = context.portfolio.positions[s].price / context.portfolio.positions[s].avg_cost
+        s_sell, sell_msg = check_sell_point(context, s)
+        if s_sell or loss < 0.95:
+            if context.portfolio.positions[s].closeable_amount > 0:
+                order_target_value(s, 0)
+
+def buy_point_filter(context, stocks):
+    final_stocks = []
+    for stock in stocks:
+        s_buy = check_buy_point(context, stock)
+        if s_buy == True:
+            final_stocks.append(stock)
+    return final_stocks
+
+def check_buy_point(context, stock):
+    s_buy = False
+    close_data = attribute_history(stock, 120, '1d', ['close', 'high'])
+    closes = close_data['close'].values
+    ma55_list = list(np.zeros(120))
+    for i in range(54, 120):
+        ma55_list[i] = closes[i - 54:i + 1].mean()
+    over_55_in_40_days = np.array(closes[-40:]) > np.array(ma55_list[-40:])
+    num_over_55_40_days = sum(over_55_in_40_days)
+    ever_upcross_ma55 = sum(over_55_in_40_days[:20])
+    nowadays_upcross_ma55 = sum(over_55_in_40_days[-3:])
+    yesterday_over_ma55 = over_55_in_40_days[-1]
+    current_price = get_current_data()[stock].last_price
+    current_ma55 = (np.sum(closes[-54:]) + current_price) / 55
+    now_over_ma55 = current_price > current_ma55
+    ten_days_lowest = min(closes[-10:]) == min(closes[-60:])
+    if 1 <= ever_upcross_ma55 <= 3 and nowadays_upcross_ma55 >= 1 and now_over_ma55 and ten_days_lowest:
+        s_buy = True
+    return s_buy
+
+def check_sell_point(context, stock):
+    s_sell = False
+    current_price = get_current_data()[stock].last_price
+    bars = get_bars(stock, 60, '1d', ['high', 'close'], include_now=True)
+    closes = bars['close']
+    highs = bars['high']
+    closes[-1] = current_price
+    ma3 = closes[-3:].mean()
+    ma5 = closes[-5:].mean()
+    ma55 = closes[-55:].mean()
+    ma55_ = closes[-56:-1].mean()
+    loss = current_price / context.portfolio.positions[stock].avg_cost
+    high_allday = highs[-1]
+    signal1 = 0
+    signal2 = current_price / closes[-2] < 0.95
+    signal3 = current_price / high_allday < 0.95
+    signal4 = loss < 0.95
+    signal5 = current_price < ma55 * 0.98
+    if signal1 or signal2 or signal3 or signal4 or signal5:
+        s_sell = True
+    msg = []
+    if signal1:
+        msg.append('跌破MA5')
+    if signal2:
+        msg.append('下跌5%')
+    if signal3:
+        msg.append('高点回撤5%')
+    if signal4:
+        msg.append('总亏损5%')
+    if signal5:
+        msg.append('跌破MA55')
+    return (s_sell, msg)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'
+'EXACT_REVIEWED_FUNCTION filter_stock_by_days sha256=964f49f70b0527432e32a21ae322e696343fb0d76b69aa0f216d6bc61b099bd0 source=quant/2023年度精选策略/1.龙头底分型战法-两年23倍.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcb_stock sha256=e61e9dbe99ad6206be66fc22ea053c25bbd931e18b5ec18b4f9675351fe5993d source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'

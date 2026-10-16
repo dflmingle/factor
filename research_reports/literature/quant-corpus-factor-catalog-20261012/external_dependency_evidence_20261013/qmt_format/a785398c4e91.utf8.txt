@@ -1,0 +1,2733 @@
+量化投资平台QMT入门 | Kaka Wan Yifan
+主页
+计算机
+基于Hexo的博客搭建
+经典机器学习及其Python实现
+用Python分析数据的方法和技巧
+深度学习初步及其Python实现
+强化学习浅谈及其Python实现
+算法入门经典(Java与Python描述)
+集成学习概览及其Python实现
+基于Java的后端开发入门
+基于Python的后端开发入门
+Linux操作系统使用入门
+MySQL从入门到实践
+ElasticSearch实战入门(6.X)
+爬虫及其Python实现
+离线异构数据同步工具DataX
+机器学习实战方法(Python)
+C#开发入门经典(现代生态)
+消息队列(Kafka与RabbitMQ)
+基于JavaScript的前端开发入门
+ClickHouse应用实践
+NGINX入门与提高
+Redis应用实践与原理解析
+容器化(Docker与Kubernetes)
+设计模式(Java与Python描述)
+MongoDB实战入门
+数据调度(Airflow与DolphinScheduler)
+未分类【计算机】
+金融
+和金融相关的人工智能比赛
+金融产品与金融市场
+量化回测框架BackTrader
+金融电影解说
+和量化投资相关的一些软件
+未分类【金融】
+数学
+应用统计推断及其Python计算
+生活
+青山邀我共云游
+关于
+本站文章数 :
+190
+本站总字数 :
+1374.2K
+已运行天数 :
+目录
+你已经读了
+0
+%
+简介
+什么是QMT
+不同发行版的区别
+和TqSdk的区别
+建议安装目录
+建议硬件配置
+策略编辑
+新建策略
+导入和导出
+在外部编辑策略
+策略目录
+现象
+国信iQuant编写的策略
+国金QMT编写的策略
+解决方法
+什么是启动本地Python
+现象
+解释
+建议
+使用QMT的Python解释器
+安装第三方包
+策略调试(运行)
+通过运行进行调试
+异常信息
+相关设置
+快速计算
+默认周期、默认品种
+副图，主图叠加，主图
+运行的作用
+回测
+回测参数
+回测结果
+模拟(仿真)
+什么是模拟
+挂载策略
+运行策略
+实盘
+tick和bar
+引例：运行周期
+错误的理解
+现象
+辨析
+下单执行规则
+两种下单规则
+K线走完(Bar结束)下单
+立即下单
+建议将运行周期设置为分笔
+策略结构
+三种策略结构
+ContextInfo
+init
+handlebar
+run_time
+应用场景
+使用方法
+startTime的设置
+例子
+subscribe_quote
+使用方法
+回调函数
+例子
+优点
+交易函数
+QMT中的交易函数
+使用方法
+prType和price
+volume
+strategyName
+quickTrade
+userOrderId
+例子
+注意登录状态
+行情获取
+官网文档
+获取集合竞价阶段的行情
+定时器驱动
+get_full_tick()
+实现
+成交回报实时主推函数
+官网文档
+ContextInfo.set_account
+跨日运行
+不建议关闭重启
+注意策略和自动登录
+建议
+QMT极简版
+什么是QMT极简版
+使用方法
+勾选极简模式
+iQuant的极简模式
+类似的设计
+环境准备
+下载xtquant
+下载方法一
+下载方法二
+导入xtquant
+连接MiniQMT
+回调
+撤单和追单(案例)
+需求
+基于QMT
+设计
+撤单
+追单
+实现
+基于QMT极简版的设计
+Kaka Wan Yifan
+搜索
+主页
+计算机
+基于Hexo的博客搭建
+经典机器学习及其Python实现
+用Python分析数据的方法和技巧
+深度学习初步及其Python实现
+强化学习浅谈及其Python实现
+算法入门经典(Java与Python描述)
+集成学习概览及其Python实现
+基于Java的后端开发入门
+基于Python的后端开发入门
+Linux操作系统使用入门
+MySQL从入门到实践
+ElasticSearch实战入门(6.X)
+爬虫及其Python实现
+离线异构数据同步工具DataX
+机器学习实战方法(Python)
+C#开发入门经典(现代生态)
+消息队列(Kafka与RabbitMQ)
+基于JavaScript的前端开发入门
+ClickHouse应用实践
+NGINX入门与提高
+Redis应用实践与原理解析
+容器化(Docker与Kubernetes)
+设计模式(Java与Python描述)
+MongoDB实战入门
+数据调度(Airflow与DolphinScheduler)
+未分类【计算机】
+金融
+和金融相关的人工智能比赛
+金融产品与金融市场
+量化回测框架BackTrader
+金融电影解说
+和量化投资相关的一些软件
+未分类【金融】
+数学
+应用统计推断及其Python计算
+生活
+青山邀我共云游
+关于
+量化投资平台QMT入门
+金融
+和量化投资相关的一些软件
+发表于 2023-07-07
+|
+更新于 2023-07-07
+字数总计:
+9.3K
+简介
+什么是QMT
+QMT，Quick Model Trade，由迅投开发的量化软件。
+QMT官方文档：
+http://docs.thinktrader.net/vip/QMT/
+QMT极简版官方文档：
+http://docs.thinktrader.net/vip/QMT-Simple/
+但是，我们并不能直接通过讯投获取该软件，需要通过券商获取。
+不同的券商，除了对于QMT的开通要求不同，软件本身也都存在一些差异。
+本文会以国信证券的QMT(iQuant)和国金证券的QMT为例。
+不同发行版的区别
+在其他QMT相关的资料中，没有
+发行版
+这个概念，这个概念是我借鉴的Linux的。
+狭义的Linux特指Linux内核(Linux Kernel)，广义的Linux是指基于Linux内核的各种操作系统，也被称为Linux的发行版。
+狭义的QMT，特指讯投的QMT；而广义的QMT，指的是由各大券商提供的QMT，是QMT的"发行版"。
+一般语境下的QMT，指的都是券商的"发行版"。
+不同QMT发行版的区别有：
+软件的名称不同。
+例如：国信的QMT的名称是iQuant，国金的QMT的名称就是QMT。
+功能菜单的名称不同。
+例如：国信iQuant上的"策略开发"对应国金QMT的"模型研究"，国信iQuant上的"策略交易"对应国金QMT的"模型交易"。
+所支持的编程语言不同。
+例如：国信iQuant只支持用Python语言编写策略，国金QMT支持用Python语言和VBA语言编写策略。
+Python的代码缩进。
+例如：国信iQuant中的Python代码的缩进是4个空格，国金QMT中的Python代码的缩进是一个tab。
+Python编写的策略能否外部直接打开。
+例如，在国信iQuant中编写的策略，可以在外部直接打开；在国金QMT编写的策略，默认无法在外部直接打开。
+QMT软件的使用限制不同，尤其是MiniQMT的使用限制不同。
+部分券商不允许QMT在云服务器上运行，部分券商不允许MiniQMT在云服务器上运行。
+和TqSdk的区别
+天勤量化TqSdk更针对期货量化，但是QMT更针对股票量化。
+建议安装目录
+默认的安装目录有中文，建议不要安装在有中文和特殊符号的目录下。
+建议硬件配置
+建议
+8C
++
+16G
+的配置。
+策略编辑
+新建策略
+点击如图所示之处，新建策略。
+在弹出框，我们会看到有一个预设的策略DEMO，我们可以把该部分的删除。
+点击
+①
+处的名称，可以修改策略的名称。
+点击
+②
+处的编译，实际上的作用是保存。
+注意，
+编译
+的实际作用只是保存，不会检查是否存在语法错误等，只是保存。
+点击
+③
+处，可以设置密码。
+加密公式
+，指的是对策略的具体实现进行加密，不让看源代码。设置加密后，再次进行编辑，需要密码。
+凭密码密码导出公式
+，指的是导出策略，需要密码。
+点击
+④
+处的函数，可以查看一些函数的使用方法。
+如图，我们设置
+加密公式
+后，再次点击编辑，需要输入密码。
+题外话
+QMT中很多功能的名称，取名都很难见名知义。
+比如：
+编译
+的作用其实是保存，
+加密公式
+其实是对策略进行加密。
+导入和导出
+右键选择策略，可以导入和导出。
+策略文件格式为
+.rzrk
+。
+在外部编辑策略
+策略目录
+我们编写的策略，会位于QMT的安装目录的
+python
+目录下。
+现象
+国信iQuant编写的策略
+我们打开通过国信iQuant编写的策略，内容如下：
+我们会看到乱码了，这个我们在
+《基于Java的后端开发入门：5.IO流》
+也遇到过，点击右下角的
+UTF-8
+，在弹出框选择
+Reopen with Encoding
+，再输入
+GBK
+，即可正常打开。
+国金QMT编写的策略
+再打开通过国金QMT编写的策略，内容如下：
+我们看到，是一段被加密的字符串。
+解决方法
+解决方法为勾选，策略编辑的
+启动本地Python
+，然后重新编译(保存)。
+但是，在国信iQuant中，不勾选
+启动本地Python
+，也可以正常打开。
+什么是启动本地Python
+现象
+我们来看一个现象，这个现象在国信iQuant和国金QMT中都存在。
+这段代码会打印所运行的Python环境信息。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+#encoding:gbk
+import
+sys
+def
+init
+(ContextInfo)
+:
+print(sys.version)
+print(sys.executable)
+def
+handlebar
+(ContextInfo)
+:
+print(sys.version)
+print(sys.executable)
+当不勾选
+启动本地Python
+，控制台输出如下：
+1
+2
+3
+4
+5
+6
+7
+8
+[策略测试国信]开始运行
+[策略测试国信]结束运行
+【2023-07-04 12:45:34.320】  start trading mode
+【2023-07-04 12:45:34.320】  3.6.8 (default, Dec 19 2022, 22:05:09) [MSC v.1900 64 bit (AMD64)]
+python
+【2023-07-04 12:45:34.789】  3.6.8 (default, Dec 19 2022, 22:05:09) [MSC v.1900 64 bit (AMD64)]
+python
+但是，当我们勾选
+启动本地Python
+后，控制台没有输出Python的版本信息。
+解释
+勾选
+启动本地Python
+，其含义是，我们在外部运行调试我们的策略，同时策略不能在QMT内部进行运行，所以点击运行会没有反应。
+建议
+不建议长期勾选
+启动本地Python
+，在不需要的时候，及时取消勾选，并重新编译(保存)。
+使用QMT的Python解释器
+如果我们用PyCharm调试我们的策略，但是我们希望PyCharm的Python环境和QMT的Python环境一致，在PyCharm中添加QMT的Python解释器即可。
+QMT的Python解释器位于，QMT安装目录的
+bin.x64
+目录下的
+pythonw.exe
+。
+安装第三方包
+根据QMT官方文档的记录，首先我们需要在本地配置相同版本的Python，然后通过通过类似如下的命令，用
+-t
+参数指定安装到QMT的安装目录的
+bin.x64\Lib\site-packages
+。
+1
+pip install openpyxl -t E:\QMT交易端20962\bin.x64\Lib\site-packages
+官方文档：
+http://docs.thinktrader.net/vip/pages/35edbf/#_3-1-2-第三方库导入指引
+不用这么麻烦。
+即然我们可以在PyCharm中，添加QMT的Python环境，我们就也可以在PyCharm中安装第三方的包。
+注意，需要有QMT目录的权限。
+策略调试(运行)
+通过运行进行调试
+QMT中没有所有的Debug断点功能，我们编写好的策略，想知道能不能正常运行，只能点击运行，借此进行策略的调试。
+(这个和Anaconda有点类似。)
+异常信息
+假设存在一个策略，如下：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+#encoding:gbk
+def
+init
+(ContextInfo)
+:
+pass
+def
+handlebar
+(ContextInfo)
+:
+# 代码
+code = ContextInfo.stockcode +
+'.'
++ ContextInfo.market
+print(code)
+# 周期
+period = ContextInfo.period
+print(period)
+# K线索引
+k_index= ContextInfo.barpos
+print(k_index)
+# K线时间
+k_time = timetag_to_datetime(ContextInfo.get_bar_timetag(k_index),
+'%Y-%m-%d %H:%M:%S'
+)
+print(k_time)
+# K线个数
+k_nums = ContextInfo.time_tick_size
+print(k_nums)
+print(
+1
+/
+0
+)
+在最后一行有一个
+1/0
+，这个将会抛出异常，点击运行之后，会看到异常提示信息。
+相关设置
+在右侧，我们会看到有一些设置，这里解释一下。
+快速计算
+快速计算的含义是，我们需要调用
+handlebar()
+函数多少次。
+0
+表示没有限制，
+1
+表示调用
+1
+1
+1
+次，
+2
+表示调用
+2
+2
+2
+次，以此类推。
+例如，我们设置快速计算的值为
+1
+1
+1
+，通过控制台可以看到，只被调用了一下。
+默认周期、默认品种
+那么，是谁在调用
+handlebar()
+呢？
+我们知道QMT是由行情驱动的。
+由谁的行情驱动？
+由默认品种的行情进行驱动。
+副图，主图叠加，主图
+副图
+、
+主图叠加
+、
+主图
+，这个概念来自通达信。我们不需要太关注这个，一般选择
+副图
+即可。
+运行的作用
+运行的作用，只是在你代码写好后，简单的跑一跑，看看能不能跑通，看看有没有语法错误。
+回测
+回测参数
+左侧，可以输入回测期间的各种参数，然后点击回测，开始回测。
+回测结果
+在左下方可以查看各种统计角度的回测结果，移动右侧，可以查看历史上每一天的结果。
+模拟(仿真)
+什么是模拟
+模拟，也就是所谓的模拟盘，在有些QMT资料会，会成为仿真。
+模拟的步骤有：
+挂载策略
+运行策略
+挂载策略
+点击如图所示之处，挂载策略。
+运行策略
+点击
+操作
+，启动策略。
+在下方，可以看到策略运行期间的各种信息。
+在
+操作
+旁边，有一个
+运行模式
+。
+有些资料说，即使是模拟(仿真)操作，也需要将运行模式切换到实盘，否则会接收不到行情信息。
+我个人对此存疑，或许在某些QMT的发行版中，是这样的。
+我个人建议，如果不必要，不开启。
+实盘
+在登录QMT的时候，选择实盘，之后同样是选择"策略交易"
+tick和bar
+引例：运行周期
+在讨论
+tick
+和
+bar
+之前，我们先讨论上文"模拟(仿真)"中的运行周期
+错误的理解
+一种常见的，错误的，理解是：
+当我们设置运行周期为
+分笔线
+时，handlebar每间隔一个tick会被调用一次；当我们的运行周期设为
+1分钟
+时，handlebar每隔一分钟会被调用一次；以此类推。
+现象
+我们来验证一下，是不是这样。
+假设存在一个策略，如下：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+#encoding:gbk
+def
+init
+(ContextInfo)
+:
+ContextInfo.my_count =
+0
+def
+handlebar
+(ContextInfo)
+:
+k_index= ContextInfo.barpos
+k_time = timetag_to_datetime(ContextInfo.get_bar_timetag(k_index),
+'%Y-%m-%d %H:%M:%S'
+)
+ContextInfo.my_count = ContextInfo.my_count +
+1
+print(k_time,ContextInfo.is_last_bar(),ContextInfo.my_count)
+我们将运行周期设置为一分钟，那么应该一分钟调用一次
+handlebar()
+，实际运行情况：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+[2023-07-05 13:02:39][C_COUNT][SH000300][1分钟] start trading mode
+[2023-07-05 13:02:39][C_COUNT][SH000300][1分钟] 2023-07-05 11:24:00 False 1
+2023-07-05 11:25:00 False 2
+2023-07-05 11:26:00 False 3
+2023-07-05 11:27:00 False 4
+2023-07-05 11:28:00 False 5
+2023-07-05 11:29:00 False 6
+2023-07-05 11:30:00 False 7
+2023-07-05 13:01:00 False 8
+2023-07-05 13:02:00 False 9
+2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:41][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:43][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:46][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:50][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:52][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:55][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:02:59][C_COUNT][SH000300][1分钟] 2023-07-05 13:03:00 True 10
+[2023-07-05 13:03:02][C_COUNT][SH000300][1分钟] 2023-07-05 13:04:00 True 11
+[2023-07-05 13:03:05][C_COUNT][SH000300][1分钟] 2023-07-05 13:04:00 True 11
+[2023-07-05 13:03:07][C_COUNT][SH000300][1分钟] 2023-07-05 13:04:00 True 11
+[2023-07-05 13:03:09][C_COUNT][SH000300][1分钟] 0C:\APP\iQuant\python\C_COUNT.py_00030053: 策略停止
+这个似乎不太对！
+我们看到
+handlebar()
+并不是每分钟被触发一次，而是一个tick时间被触发一下。
+但是，
+ContextInfo.my_count + 1
+，又似乎是每分钟被修改一次。
+辨析
+一个Bar由一个或多个tick组成，具体多少个tick，取决于我们设置的运行周期是多少。
+handlebar函数被调用的频率，取决于我们设置的主图，指数类为5秒一次，股票类为3秒一次。
+handlebar函数handle的是bar，虽然调用频率取决于我们设置的主图，但实际上其对QMT的"修改"，例如修改ContextInfo、调用下单函数(一般设置下)，都需要一个Bar结束后才能生效。
+注意，是在一般设置下，调用下单函数，需要一个Bar结束后才能生效。
+下单执行规则
+两种下单规则
+因为QMT的这种设计，所以在QMT中的下单需要特别注意，有两种下单规则：
+K线走完(Bar结束)下单
+立即下单
+K线走完(Bar结束)下单
+K线走完下单是指当根Bar内调用下单函数，在下一个Bar的第一个分笔到来时再把委托发送出去。
+需要注意的是，如果
+ContextInfo.is_last_bar()
+不等于
+True
+，即使K线走完了，也不会下单。
+QMT官方将
+is_last_bar()
+，解释为最后一个Bar，这个不容易让人看懂，到底是什么情况下的最后一个Bar，是指当天的最后一个Bar吗？
+其是，将
+last
+解释为最近的，
+is_last_bar()
+的含义是最近的一个Bar，这样更容易让人看懂。
+立即下单
+立即下单是指当根Bar内调用下单函数后，Python立即把委托发送出去。
+立即下单又分两种情况：
+当
+passorder()
+的
+quickTrade
+参数传
+1
+时，只有
+ContextInfo.is_last_bar()
+等于
+True
+，下单会生效。
+当
+passorder()
+的
+quickTrade
+参数传
+2
+时，不论
+ContextInfo.is_last_bar()
+等于
+True
+或者
+False
+都会生效。
+特别注意
+passorder()
+的
+quickTrade
+参数传
+2
+正如上文"引例：运行周期"的例子，我们在"2023-07-05 13:02:39"运行策略，但是也读取了之前的Bar。如果我们
+quickTrade
+参数传
+2
+的话，可能会基于之前的Bar的数据，在现在时刻，把单子报出去。
+建议将运行周期设置为分笔
+建议将运行周期设置为分笔。
+策略结构
+三种策略结构
+init
++
+handlebar
+，主图行情tick驱动。
+init
++
+run_time
+，定时器(周期函数)驱动。
+init
++
+subscribe_quote
+，订阅行情驱动。
+ContextInfo
+ContextInfo
+，我们可以将其理解为一个全局容器。更好的理解，我们可以认为其是"QMT中的Spring"。
+因为其除了能帮我们管理全局对象外，还内置了诸多的方法。例如：
+定时器：
+ContextInfo.run_time()
+获取最新分笔数据：
+ContextInfo.get_full_tick()
+获取历史行情数据：
+ContextInfo.get_market_data()
+(关于Spring，可以参考
+《基于Java的后端开发入门》
+的讨论。)。
+init
+init
+，我们可以将其理解构造方法，只是这是一个有参的，参数为ContextInfo的构造方法。
+在这个构造方法中，我们可以做很多事情，例如：
+初始化股票池
+初始化全局变量
+初始化定时器
+handlebar
+策略在被实例化之后，QMT会按照我们定义的规则，每3秒、或者每5秒，调用一次
+handlebar()
+。
+run_time
+应用场景
+正如上文所述，
+handlebar()
+由QMT进行调用，每3秒、或者每5秒，调用一次。
+如果我们想更高频呢，比如500毫秒调用一次，可以利用
+run_time
+定时器。
+需要注意的是，在QMT中没有取消定时器的方法，除非策略结束。
+使用方法
+1
+ContextInfo.run_time(funcName,period,startTime)
+参数：
+funcName
+：回调函数名。
+period
+：重复调用的时间间隔
+'5nSecond'
+表示每5秒运行1次回调函数
+'5nDay'
+表示每5天运行一次回调函数
+'500nMilliSecond'
+表示每500毫秒运行1次回调函数
+startTime
+：表示定时器第一次启动的时间，如果要定时器立刻启动，可以设置历史的时间。
+回调函数参数：
+ContextInfo
+，策略模型全局对象。
+startTime的设置
+有些资料记录，策略实例化之后，立即执行定时器函数，可能会有问题。所以建议
+startTime
+设置为实例化时间(当前时间)之后的一分钟。
+例子
+我们将运行周期设置为一分钟，示例代码：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+#encoding:gbk
+import
+datetime
+def
+init
+(ContextInfo)
+:
+ContextInfo.my_count =
+0
+ContextInfo.run_time(
+"func"
+,
+"5nSecond"
+,
+"2023-01-01 10:00:00"
+)
+def
+handlebar
+(ContextInfo)
+:
+pass
+;
+def
+func
+(ContextInfo)
+:
+ContextInfo.my_count = ContextInfo.my_count +
+1
+print(datetime.datetime.now(),ContextInfo.my_count)
+运行结果：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+[2023-07-05 13:09:46][TIMER][SH000300][1分钟] start trading mode
+[2023-07-05 13:09:46][TIMER][SH000300][1分钟] 2023-07-05 13:09:46.304984 1
+[2023-07-05 13:09:51][TIMER][SH000300][1分钟] 2023-07-05 13:09:51.306087 2
+[2023-07-05 13:09:56][TIMER][SH000300][1分钟] 2023-07-05 13:09:56.305225 2
+[2023-07-05 13:10:01][TIMER][SH000300][1分钟] 2023-07-05 13:10:01.305371 2
+[2023-07-05 13:10:06][TIMER][SH000300][1分钟] 2023-07-05 13:10:06.305678 3
+[2023-07-05 13:10:11][TIMER][SH000300][1分钟] 2023-07-05 13:10:11.306116 3
+[2023-07-05 13:10:16][TIMER][SH000300][1分钟] 2023-07-05 13:10:16.306118 3
+[2023-07-05 13:10:21][TIMER][SH000300][1分钟] 2023-07-05 13:10:21.306073 3
+[2023-07-05 13:10:26][TIMER][SH000300][1分钟] 2023-07-05 13:10:26.321531 3
+[2023-07-05 13:10:31][TIMER][SH000300][1分钟] 2023-07-05 13:10:31.305148 3
+[2023-07-05 13:10:36][TIMER][SH000300][1分钟] 2023-07-05 13:10:36.305775 3
+[2023-07-05 13:10:41][TIMER][SH000300][1分钟] 2023-07-05 13:10:41.305858 3
+[2023-07-05 13:10:46][TIMER][SH000300][1分钟] 2023-07-05 13:10:46.306064 3
+[2023-07-05 13:10:51][TIMER][SH000300][1分钟] 2023-07-05 13:10:51.305019 3
+[2023-07-05 13:10:56][TIMER][SH000300][1分钟] 2023-07-05 13:10:56.305664 3
+[2023-07-05 13:11:01][TIMER][SH000300][1分钟] 2023-07-05 13:11:01.305133 3
+[2023-07-05 13:11:06][TIMER][SH000300][1分钟] 2023-07-05 13:11:06.306074 4
+[2023-07-05 13:11:11][TIMER][SH000300][1分钟] 2023-07-05 13:11:11.305148 4
+运行结果解读
+定时器的方法的调用，确实是由我们定义的定时器决定的。
+但是！在定时器的方法中修改ContextInfo的值，其生效时间依旧是由设置的运行周期决定的。
+(这也是为什么，建议运行周期设置为分笔)
+subscribe_quote
+使用方法
+1
+ContextInfo.subscribe_quote(stock_code,period=
+'follow'
+,dividend_type=
+'follow'
+,result_type=
+''
+,callback=
+None
+)
+参数：
+stock_code
+：str，合约代码
+period
+：str，周期，默认为
+'follow'
+，为当前主图周期。可选范围：
+'tick'
+：分笔数据
+'1m'
+、
+'5m'
+、
+'15m'
+等分钟周期
+'1d'
+：日线数据
+'l2quote'
+：Level2行情快照
+'l2quoteaux'
+：Level2行情快照补充
+'l2order'
+：Level2逐笔委托
+'l2transaction'
+：Level2逐笔成交
+'l2transactioncount'
+：Level2大单统计
+'l2orderqueue'
+：Level2委买委卖队列
+dividend_type
+：复权方式，默认为
+'follow'
+，为当前主图复权方式。可选范围：
+'none'
+：不复权
+'front'
+:前复权
+'back'
+:后复权
+'front_ratio'
+:等比前复权
+'back_ratio'
+:等比后复权
+result_type
+：返回数据格式。可选范围：
+'DataFrame'
+或
+''
+(默认)：返回
+{code:data}
+，
+data
+为
+pd.DataFrame
+类型的数据，
+index
+为字符串格式的时间序列，
+columns
+为数据字段
+'dict'
+：返回
+{code:{k1:v1,k2:v2,...}}
+，
+k
+为数据字段名，
+v
+为字段值。
+'list'
+：返回
+{code:{k1:[v1],k2:[v2],...}}
+，
+k
+为数据字段名，
+v
+为字段值。
+callback
+：数据推送回调
+回调函数
+需要注意的是，回调函数是一种闭包格式的。
+关于闭包，可以参考
+《基于Python的后端开发入门：3.拷贝、类型注解、闭包、装饰器和一些常用的包》
+的"闭包"部分。
+示例代码：
+1
+2
+3
+4
+5
+6
+7
+def
+quote_callback
+(s)
+:
+def
+callback
+(data)
+:
+print(s,data)
+return
+return
+callback
+def
+init
+(ContextInfo)
+:
+ContextInfo.subscribe_quote(
+"600000.SH"
+,
+"tick"
+,
+"none"
+,
+''
+,quote_callback(
+'600000.SH'
+))
+例子
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+#encoding:gbk
+'''
+策略结构:  subscribe订阅模式
+'''
+import
+pandas
+as
+pd
+import
+numpy
+as
+np
+import
+datetime
+as
+dt
+def
+quote_callback_01
+(code, C)
+:
+def
+callback
+(data)
+:
+print(
+'\n 函数1：quote_callback_01  当前代码: {code}'
+)
+now_time = dt.datetime.now().strftime(
+'%Y-%m-%d %H:%M:%S'
+)
+print(
+f'\n now_time:
+{now_time}
+'
+)
+print(data[code])
+# 调用subscribe_func_execute
+subscribe_func_execute_01(code, C, data)
+print(
+"--------------------"
+*
+20
+)
+return
+return
+callback
+def
+quote_callback_02
+(code, C)
+:
+def
+callback
+(data)
+:
+print(
+'\n 函数1：quote_callback_02  当前代码: {code}'
+)
+now_time = dt.datetime.now().strftime(
+'%Y-%m-%d %H:%M:%S'
+)
+print(
+f'\n now_time:
+{now_time}
+'
+)
+print(data[code])
+# 调用subscribe_func_execute
+subscribe_func_execute_02(code, C, data)
+print(
+"--------------------"
+*
+20
+)
+return
+return
+callback
+def
+init
+(C)
+:
+# 订阅股票接口
+C.subscribe_id_01 = C.subscribe_quote(
+'002230.SZ'
+,
+'tick'
+,
+'none'
+,
+'dict'
+, quote_callback_01(
+'002230.SZ'
+, C))
+C.subscribe_id_02 = C.subscribe_quote(
+'601318.SH'
+,
+'tick'
+,
+'none'
+,
+'dict'
+, quote_callback_02(
+'601318.SH'
+, C))
+print(
+f'订阅号01:
+{C.subscribe_id_01}
+'
+)
+print(
+f"订阅号02:
+{C.subscribe_id_02}
+"
+)
+def
+handlebar
+(C)
+:
+pass
+def
+subscribe_func_execute_01
+(code, C, data)
+:
+"""
+订阅函数执行
+"""
+print(
+f"\n subscribe_func_execute_01"
+)
+print(
+f"当前代码:
+{code}
+"
+)
+print(
+f"核心函数:
+{C}
+\n 属性:
+{dir(C)}
+"
+)
+print(
+f'数据:
+{data}
+'
+)
+# 获取当前所有行情订阅信息
+sub_info_res = C.get_all_subscription()
+print(
+f'\n 获取当前所有行情订阅信息: \n
+{sub_info_res}
+'
+)
+def
+subscribe_func_execute_02
+(code, C, data)
+:
+"""
+订阅函数执行
+"""
+pass
+优点
+不论是主图驱动，还是定时器驱动。都存在一个缺点，我们需要手动去拉取我们关注的资产的价格数据。
+用这种方法，我们可以不用再手动去拉取数据。
+交易函数
+QMT中的交易函数
+在QMT中，和交易有关的函数有38个，例如：
+passorder()
+(综合交易下单)、
+smart_algo_passorder()
+(智能算法交易)、
+order_lots()
+(指定手数交易)、
+order_value()
+(指定价格交易)、
+order_percent()
+(指定比例交易)，等等。
+后者其是都是基于
+passorder()
+(综合交易下单)，在
+passorder()
+(综合交易下单)的基础上再包了一层。
+使用方法
+1
+passorder(opType, orderType, accountid, orderCode, prType, price, volume,[strategyName, quickTrade, userOrderId], ContextInfo)
+passorder()
+中的参数非常多，尤其是一些参数的枚举值。这里我们不一一列举，可以参考官方文档：
+http://docs.thinktrader.net/vip/pages/d0dd26/#_1-综合交易下单-passorder
+有几个可以关注一下。
+prType和price
+prType
+，下单选价类型。
+price
+，下单价格。
+其中，
+prType
+，下单选价类型，枚举值很多，可以参考官网的介绍。
+在具体应用方面：
+如果我们报限价单
+prType
+填
+11
+(指定价)，然后在
+price
+中填入价格。
+如果我们报市价单(即不指定价格)的
+prType
+填对应的枚举值，然后在
+price
+中填入任意价格，包括无效的价格(如
+-1
+、
+0
+)。
+volume
+volume
+，下单数量，单位是"股"、“手”、“元"或者”%"。
+具体是哪一个，取决于我们在
+orderType
+(下单方式)中的配置
+1101
+：单股、单账号、普通、股/手方式下单。
+1102
+：单股、单账号、普通、金额(元)方式下单(只支持股票)。
+1113
+：单股、单账号、总资产、比例
+[
+0
+,
+1
+]
+[0,1]
+[
+0
+,
+1
+]
+方式下单。
+1123
+：单股、单账号、可用、比例
+[
+0
+,
+1
+]
+[0,1]
+[
+0
+,
+1
+]
+方式下单。
+更多的枚举值，参考官方文档。
+strategyName
+strategyName
+，策略名，选填，我们可以定义来自某一个策略。
+在
+get_trade_detail_data
+和
+get_last_order_id
+函数中，可以获取相应策略名对应的委托或持仓结果。
+quickTrade
+quickTrade
+设定是否立即触发下单，可选值：
+0
+：否
+1
+：是
+2
+：是(强制)
+0
+：等当前主图的K线完全形成后，下一个Tick数据到来时，才触发下单。
+1
+：非历史Bar上执行时，只要策略模型中调用到就触发下单交易。
+2
+：不判断Bar状态，只要策略模型中调用到就触发下单交易，历史Bar上也能触发下单。
+建议把
+quickTrade
+设置为
+1
+！
+userOrderId
+userOrderId
+，用户自设委托ID，选填。
+如果填了这个，必须也填写前面的
+strategyName
+和
+quickTrade
+参数。
+例子
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+#encoding:gbk
+'''
+passorder常用下单函数总结
+'''
+import
+pandas
+as
+pd
+import
+numpy
+as
+np
+import
+datetime
+as
+dt
+# ======== 全局变量 ==========
+class
+a
+()
+:
+pass
+A = a()
+#初始化
+A.count =
+0
+# 计数器
+def
+init
+(C)
+:
+# === 股票账号 ======
+#C.accID = '410038216508'        # 资金账号
+#C.accountType = "STOCK"         # 账号(股票、可转债)
+# === 期货账号 =======
+#C.accID = "10953"             # 资金账号
+#C.accountType = "FUTURE"      # 账号(期货)
+# ==== 信用账号（两融账号）=====
+C.accID =
+"410009973355"
+C.accountType =
+"CREDIT"
+# 信用账号
+C.stra_name =
+"test"
+# 策略名
+def
+handlebar
+(C)
+:
+# 当前时间
+now_time = dt.datetime.now().strftime(
+'%H:%M:%S'
+)
+# 过滤历史bar
+if
+not
+C.is_last_bar():
+return
+# handlebar
+A.count +=
+1
+print(
+f"\n 当前handlebar执行次数:
+{A.count}
+"
+)
+if
+A.count ==
+10
+:
+# ================= 01 **股票** 的买入和卖出指令 ================
+"""
+code = "688327.SH"   # 下单代码
+nums = 200           # 数量
+msg = str(now_time) + "_" + str(code) + "_" + str(nums)      # 投资备注
+print(f"\n 执行下单: {msg}")
+# 买入
+passorder(23, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+# 卖出
+passorder(24, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+"""
+# ================= 02 **转债** 的买入和卖出的下单代码 ==========
+"""
+code = "123107.SZ"     # 下单代码
+nums = 10           # 数量
+msg = str(now_time) + "_" + str(code) + "_" + str(nums) # 投资备注
+print(f"\n 执行下单: {msg}")
+passorder(23, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+passorder(24, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+"""
+# ================= 03 **期货** ========================
+"""
+# 螺纹钢(rb2205.SF) 市场简称代码  上期所(SF)
+# 开多
+code = "rb2305.SF"
+nums = 1
+msg = str(now_time) + "_" + str(code) + "_" + str(nums)
+# 开多
+passorder(0, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+# 平昨多
+passorder(1, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+# 平今多
+passorder(2, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+# 开空
+passorder(3, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+# 平昨空
+passorder(4, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+# 平今空
+passorder(5, 1101, C.accID, code, 5, -1, nums, C.stra_name, 1, msg, C)
+"""
+# ================ 04 **国债逆回购** ==================
+"""
+code = "131810.SZ"
+amount = 50000
+msg = str(now_time) + "_" + str(code) + "_" + str(amount)
+# 注意: 国债逆回购对应的是： 卖出。
+# 回购卖出R001金额为：5万元
+passorder(24, 1102, C.accID, code, 5, -1, amount, msg, 1 ,msg, C)
+"""
+# ================ 05 **信用账户** ====================
+"""
+# 信用账户下单买入
+code = "601318.SH"
+nums = 200
+msg = str(now_time) + "_" + str(code) + "_" + str(nums)
+# 信用账户-->担保品买入
+passorder(33, 1101, C.accID, code, 5, 0, nums, C.stra_name, 1, msg, C)
+# 信用账户-->担保品卖出
+#passorder(34, 1101, C.accID, code, 5, 0, nums, C.stra_name, 1, msg, C)
+"""
+注意登录状态
+需要注意一下，登录状态，如果登录没有成功，上述的下单会失败。
+鼠标移动到QMT右下角的"行情"，我们可以快速检查一下登录状态。
+行情获取
+官网文档
+官网文档中有关于获取行情的函数的详细介绍
+http://docs.thinktrader.net/vip/pages/fd9cbd/#_3-2-3-获取数据
+这里主要补充一下，如何获取集合竞价阶段的行情。
+获取集合竞价阶段的行情
+定时器驱动
+根据我们之前的讨论，我们知道，在集合竞价阶段，
+tick
+还没来。
+所以，无论是主图驱动，还是订阅驱动，都会存在相关函数无法被调用的情况，只能通过定时器驱动。
+get_full_tick()
+获取行情的方法很多，但是如果想在开盘的集合竞价阶段，获取行情，只能通过
+get_full_tick()
+方法。
+实现
+示例代码：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+# encoding:gbk
+import
+datetime
+as
+dt
+import
+pandas
+as
+pd
+'''
+集合竞价获取实时行情数据。
+01_采用run_time函数与get_full_tick函数，来进行获取实时行情；
+02_早盘集合竞价，观察lastPrice字段具体变化情况。
+'''
+class
+a
+()
+:
+pass
+A = a()
+A.program_start =
+True
+# 程序启动
+def
+init
+(ContextInfo)
+:
+# 资金账号
+try
+:
+ContextInfo.accID = str(account)
+except
+NameError:
+ContextInfo.accID =
+"资金账号"
+ContextInfo.set_account(ContextInfo.accID)
+# 账户类型
+try
+:
+ContextInfo.accountType = str(accountType).upper()
+except
+NameError:
+ContextInfo.accountType =
+"STOCK"
+# 账号类型
+print(
+f"\n 账户号:
+{ContextInfo.accountType}
+账户类型:
+{ContextInfo.accountType}
+"
+)
+# ============ 定时循环 ================
+print(
+f'\n init执行:
+{dt.datetime.now().strftime(
+"%Y-%m-%d %H:%M:%S"
+)}
+'
+)
+current_time = dt.datetime.now().strftime(
+'%Y%m%d%H%M'
+) +
+'00'
+ContextInfo.run_time(
+'Timing_Cycle'
+,
+'1000nMilliSecond'
+, current_time,
+"SH"
+)
+ContextInfo.stock_list = [
+"300740.SZ"
+,
+"601318.SH"
+]
+def
+handlebar
+(ContextInfo)
+:
+pass
+# 定时循环
+def
+Timing_Cycle
+(ContextInfo)
+:
+current_time = dt.datetime.now().strftime(
+'%H:%M:%S'
+)
+print(
+f"\n 当前时间:
+{current_time}
+"
+)
+if
+A.program_start
+is
+not
+True
+:
+print(
+"\n 资金账号暂未登陆成功, 请检查"
+)
+return
+# =================== 策略逻辑 ====================================
+# 行情模块
+res_dict = ContextInfo.get_full_tick(ContextInfo.stock_list)
+data_df = dict_into_dataframe(res_dict)
+print(
+f"tick数据展示: \n
+{data_df}
+"
+)
+print(
+"======="
+*
+20
+)
+def
+account_callback
+(ContextInfo, accountInfo)
+:
+# 等account_callback有主推了,再启动定时周期函数
+A.program_start =
+True
+def
+dict_into_dataframe
+(data_dict)
+:
+"""
+字典转换成Dataframe或Series
+"""
+print(data_dict)
+if
+len(data_dict) ==
+0
+:
+return
+{}
+if
+len(data_dict) >=
+1
+:
+data_df = pd.DataFrame(data_dict)
+data_df = data_df.T[
+[
+'timetag'
+,
+'lastPrice'
+,
+'open'
+,
+'high'
+,
+'low'
+,
+'lastClose'
+,
+'amount'
+,
+'volume'
+,
+'askPrice'
+,
+'askVol'
+,
+'bidPrice'
+,
+'bidVol'
+]]
+data_df.rename(columns={
+'lastPrice'
+:
+'最新价'
+,
+'lastClose'
+:
+'昨收价'
+}, inplace=
+True
+)
+return
+data_df
+成交回报实时主推函数
+官网文档
+官网文档中有关于成交回报实时主推函数的详细介绍
+http://docs.thinktrader.net/vip/pages/84f157/#_3-2-5-实时主推函数
+主推，其是就是回调，我们定义好这个函数，然后由QMT客户端调用这个函数。
+ContextInfo.set_account
+注意！需要先在构造方法
+init
+中，调用
+ContextInfo.set_account()
+，设置对应的资金账号，然后主推函数才会生效。
+跨日运行
+不建议关闭重启
+QMT默认有一个重启机制，虽然我们可以点击删除。但是根据QMT官方技术人员的说法，不建议，因为在有些版本的QMT中，会在程序启动期间，从服务器拉取一些最新的数据。
+注意策略和自动登录
+注意，策略需要勾选
+终端启动后自动执行
+。
+账号管理处理的自动登录，也关注一下。
+建议
+建议！每天巡检！
+QMT极简版
+什么是QMT极简版
+通过上文关于QMT的讨论，我们知道，如果想在QMT中实现策略，就必须遵守QMT的策略结构，QMT中一共有三种策略结构：
+init
++
+handlebar
+init
++
+run_time
+init
++
+subscribe_quote
+此外，还有一个非常关键的上下文变量
+ContextInfo
+。
+如果我们不想这种限制，比如说，我们只需要行情和交易的接口，其他的处理都我们自己来，那么就需要QMT极简版(也被称为Mini-QMT)。
+使用方法
+勾选极简模式
+首选，我们需要有支持极简模式的QMT，并勾选极简模式，启动。
+然后，我们需要一个包
+xtquant
+，之后我们和QMT极简版的所有交互，都需要基于这个包。
+这种结构其实是，我们写的策略，通过
+xtquant
+和QMT极简版进行交互，然后QMT极简版再和券商进行交互。
+xtquant
+的官方文档：
+http://docs.thinktrader.net/vip/QMT-Simple/
+iQuant的极简模式
+我们一般下载的iQuant没有极简模式，需要另外下载支持极简模式的iQuant。
+类似的设计
+本地启动一个服务，然后提供一个包和本地服务进行交互。
+这种设计，不单单QMT极简版是这样的，富图证券的
+FutuOpenD
+也是这样。
+首先，需要在本地启动
+FutuOpenD
+。
+然后通过包
+futu
+和本地启动的
+FutuOpenD
+进行交互。示例代码：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+from
+futu
+import
+*
+# 创建行情对象
+quote_ctx = OpenQuoteContext(host=
+'127.0.0.1'
+, port=
+11111
+)
+# 获取港股 HK.00700 的快照数据
+print(quote_ctx.get_market_snapshot(
+'HK.00700'
+))
+# 关闭对象，防止连接条数用尽
+quote_ctx.close()
+# 创建交易对象
+trd_ctx = OpenSecTradeContext(host=
+'127.0.0.1'
+, port=
+11111
+)
+# 模拟交易，下单（如果是真实环境交易，在此之前需要先解锁交易密码）
+print(trd_ctx.place_order(price=
+500.0
+, qty=
+100
+, code=
+"HK.00700"
+, trd_side=TrdSide.BUY, trd_env=TrdEnv.SIMULATE))
+# 关闭对象，防止连接条数用尽
+trd_ctx.close()
+环境准备
+下载xtquant
+我们通过
+pip
+无法下载包
+xtquant
+，只能通过QMT官方下载这个包。
+下载方法一
+可以直接通过QMT软件下载，下载步骤为：
+不勾选"极简模型"，启动QMT。
+在系统设置，模型设置，点击
+Python库下载
+。
+所下载
+xtquant
+会位于QMT的安装目录的
+bin.x64\Lib\site-packages
+的
+xtquant
+文件夹。
+下载方法二
+可以通过讯投的网页下载：
+http://docs.thinktrader.net/vip/pages/633b48/
+导入xtquant
+有三种方法可以导入xtquant：
+使用QMT自带的解释器。
+可以上文的"策略编辑"的"使用QMT的Python解释器"部分。
+使用外部解释器，复制包。
+我们可以把包复制在项目的目录中，也可以把包复制到外部Python环境的目录中(默认位于Python安装目录的
+Lib\site-packages
+)。
+使用外部解释器，添加包。
+可以参考
+《未分类【计算机】：Kaggle中技术问题的解决方案》
+的"引入外部Py文件"部分。
+需要注意的是，只能添加到
+site-packages
+这一层，无法添加在
+site-packages\xtquant
+这一层级。
+关于第二种和第三种方法的原理，可以参考
+《未分类【计算机】：Kaggle中技术问题的解决方案》
+的"引入外部Py文件"的"原理"部分。
+连接MiniQMT
+前提条件：本机的MiniQMT需要以极简版的方式登录。
+连接步骤：
+本地实例化一个
+XtQuantTrader
+对象。
+启动
+XtQuantTrader
+对象。
+调用
+XtQuantTrader
+的
+connect()
+方法。
+示例代码：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+import
+time
+from
+xtquant
+import
+xtdata
+from
+xtquant.xttrader
+import
+XtQuantTrader
+from
+xtquant.xttype
+import
+StockAccount
+if
+__name__ ==
+'__main__'
+:
+# Mini-QMT的userdata_mini路径
+path =
+r'C:\APP\QMT\userdata_mini'
+# 生成session id 整数类型 同时运行的策略不能重复
+session_id = int(time.time())
+xt_trader = XtQuantTrader(path, session_id)
+# 启动本地客户端
+xt_trader.start()
+# 建立交易连接，返回0表示连接成功
+connect_result = xt_trader.connect()
+print(
+'建立交易连接，返回0表示连接成功：'
+, connect_result)
+sector_list = xtdata.get_sector_list()
+print(sector_list)
+stock_list = xtdata.get_stock_list_in_sector(
+'上证A股'
+)
+print(stock_list)
+stock_account = StockAccount(
+'55002767'
+)
+xt_asset = xt_trader.query_stock_asset(stock_account)
+print(
+'账号类型'
+, xt_asset.account_type)
+print(
+'资金账号'
+, xt_asset.account_id)
+print(
+'可用金额'
+, xt_asset.cash)
+print(
+'冻结金额'
+, xt_asset.frozen_cash)
+print(
+'持仓市值'
+, xt_asset.market_value)
+print(
+'总资产'
+, xt_asset.total_asset)
+# 阻塞主线程退出
+xt_trader.run_forever()
+运行结果：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+建立交易连接，返回0表示连接成功： 0
+['上期所', '上证A股', '上证B股', '上证期权', '上证转债', '中金所', '创业板', '大商所',  【部分运行结果略】
+['601882.SH', '603995.SH', '601128.SH', '600740.SH', '603909.SH', '600734.SH',  【部分运行结果略】
+账号类型 2
+资金账号 55002767
+可用金额 13875505.62
+冻结金额 31733.069999999996
+持仓市值 463547.42000000004
+总资产 14339066.54
+解释说明：
+在连接成功后，即可通过
+xtdata
+获取行情数据，通过实例话之后的
+XtQuantTrader
+获取交易数据。
+xt_trader.run_forever()
+，是用于阻塞主线程退出。
+回调
+步骤：
+继承
+XtQuantTraderCallback
+，定义一个回调类
+MyXtQuantTraderCallback
+。
+XtQuantTrader
+的对象调用
+register_callback(callback)
+，注册回调类。
+其中
+callback
+是回调类
+MyXtQuantTraderCallback
+的对象。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+class
+MyXtQuantTraderCallback
+(XtQuantTraderCallback)
+:
+def
+on_disconnected
+(self)
+:
+"""
+连接状态回调
+:return:
+"""
+print(
+"connection lost"
+)
+def
+on_account_status
+(self, status)
+:
+"""
+账号状态信息推送
+:param response: XtAccountStatus 对象
+:return:
+"""
+print(
+"on_account_status"
+)
+print(status.account_id, status.account_type, status.status)
+def
+on_stock_asset
+(self, asset)
+:
+"""
+资金信息推送  注意，该回调函数目前不生效
+:param asset: XtAsset对象
+:return:
+"""
+print(
+"on asset callback"
+)
+print(asset.account_id, asset.cash, asset.total_asset)
+def
+on_stock_order
+(self, order)
+:
+"""
+委托信息推送
+:param order: XtOrder对象
+:return:
+"""
+print(
+"on order callback:"
+)
+print(order.stock_code, order.order_status, order.order_sysid)
+def
+on_stock_trade
+(self, trade)
+:
+"""
+成交信息推送
+:param trade: XtTrade对象
+:return:
+"""
+print(
+"on trade callback"
+)
+print(trade.account_id, trade.stock_code, trade.order_id)
+def
+on_stock_position
+(self, position)
+:
+"""
+持仓信息推送  注意，该回调函数目前不生效
+:param position: XtPosition对象
+:return:
+"""
+print(
+"on position callback"
+)
+print(position.stock_code, position.volume)
+def
+on_order_error
+(self, order_error)
+:
+"""
+下单失败信息推送
+:param order_error:XtOrderError 对象
+:return:
+"""
+print(
+"on order_error callback"
+)
+print(order_error.order_id, order_error.error_id, order_error.error_msg)
+def
+on_cancel_error
+(self, cancel_error)
+:
+"""
+撤单失败信息推送
+:param cancel_error: XtCancelError 对象
+:return:
+"""
+print(
+"on cancel_error callback"
+)
+print(cancel_error.order_id, cancel_error.error_id, cancel_error.error_msg)
+def
+on_order_stock_async_response
+(self, response)
+:
+"""
+异步下单回报推送
+:param response: XtOrderResponse 对象
+:return:
+"""
+print(
+"on_order_stock_async_response"
+)
+print(response.account_id, response.order_id, response.seq)
+def
+on_smt_appointment_async_response
+(self, response)
+:
+"""
+:param response: XtAppointmentResponse 对象
+:return:
+"""
+print(
+"on_smt_appointment_async_response"
+)
+print(response.account_id, response.order_sysid, response.error_id, response.error_msg, response.seq)
+撤单和追单(案例)
+需求
+在下单2分钟后，如果订单还没成交，进行撤单，并报一笔新的单子。
+基于QMT
+设计
+撤单
+利用
+passorder
+下单。
+利用回调函数
+order_callback
+，监听委托状态。
+利用
+cancel
+撤单
+追单
+定义一个全局变量
+has_order_demo
+，记录委托状态。
+在实盘中，我们可以利用redis或其他的方式记录。
+在
+handlebar
+函数中，轮询
+has_order_demo
+，判断是否需要追单。
+实现
+示例代码：
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+#encoding:gbk
+import
+pandas
+as
+pd
+import
+numpy
+as
+np
+from
+datetime
+import
+datetime,timedelta
+time_formatter =
+'%H%M%S'
+# 交易记录
+# 在实盘中，我们可以记录在某一种数据库中
+fake_trade_record = {}
+# 已经下单的标记位
+# 只要这个值不为真，就下单。
+# 在实际上判断肯定比这个复杂
+has_order_demo =
+False
+def
+init
+(ContextInfo)
+:
+global
+fake_trade_record
+global
+has_order_demo
+# 交易标的
+ContextInfo.stock_code =
+'600000.SH'
+ContextInfo.trade_code_list = [ContextInfo.stock_code]
+ContextInfo.set_universe(ContextInfo.trade_code_list)
+# 资金账号
+ContextInfo.acc_id =
+'620000126311'
+# 账号类型
+ContextInfo.acct_type =
+"STOCK"
+# 策略名
+ContextInfo.stra_name =
+'撤单和追单'
+# 订阅交易回报主推函数
+ContextInfo.set_account(ContextInfo.acc_id)
+def
+handlebar
+(ContextInfo)
+:
+global
+fake_trade_record
+global
+has_order_demo
+# 跳过历史K线
+if
+not
+ContextInfo.is_last_bar():
+return
+# 只要 has_order_demo 不为真，就下单
+if
+not
+has_order_demo:
+has_order_demo =
+True
+user_order_time = datetime.now().strftime(time_formatter)
+user_order_id = user_order_time +
+'_'
++  str(ContextInfo.stra_name) +
+'_'
++ str(ContextInfo.stock_code)
+print(user_order_id)
+# 以实时买5价，买入股票
+passorder(
+23
+,
+1101
+, ContextInfo.acc_id, ContextInfo.stock_code,
+10
+,
+-1
+,
+100
+, ContextInfo.stra_name,
+1
+, user_order_id, ContextInfo)
+# 记录
+# 在实盘中，我们可以记录在数据库中
+# k 是 订单号，元祖的值，分别是 委托状态、委托时间
+fake_trade_record[user_order_id] = (
+48
+,user_order_time,
+'合同编号'
+)
+check_cancel_order()
+def
+check_cancel_order
+()
+:
+global
+fake_trade_record
+global
+has_order_demo
+# 查找 fake_trade_record 中，超过了两分钟，没有被成交的单子
+for
+key, value
+in
+fake_trade_record.items():
+# 委托号
+order_no = key
+# 委托状态
+order_status = value[
+0
+]
+# 委托时间
+order_time = value[
+1
+]
+# 如果已经超过了两分钟值
+# 并且委托状态是 待撤
+if
+((datetime.now() - timedelta(minutes=
+2
+)) >= datetime.strptime(order_time,time_formatter))
+and
+(order_status ==
+51
+or
+order_status ==
+52
+):
+cancel(order_no, ContextInfo.acc_id, ContextInfo.acct_type, ContextInfo)
+def
+order_callback
+(ContextInfo, orderInfo)
+:
+global
+fake_trade_record
+global
+has_order_demo
+# 投资备注
+user_order_id = orderInfo.m_strRemark
+fake_trade_record[user_order_id][
+0
+] = orderInfo.m_nOrderStatus
+fake_trade_record[user_order_id][
+2
+] = orderInfo.m_strOrderSysID
+# 撤单成功，可以重新下单
+if
+orderInfo.m_nOrderStatus
+in
+[
+54
+]:
+has_order_demo =
+False
+print(
+f'投资备注:
+{user_order_id}
+委托状态:
+{orderInfo.m_nOrderStatus}
+'
+)
+基于QMT极简版的设计
+对于撤单：
+利用
+order_stock
+下单。
+利用回调函数
+on_stock_order
+，监听委托状态。
+利用
+cancel_order_stock_sysid
+，撤单。
+对于追单：
+定义一个全局变量
+has_order_demo
+，记录订单状态。
+在实盘中，我们可以利用redis或其他的方式记录。
+在MiniQMT中没有自带的定时器，我们需要自己实现一个，然后在定时任务中轮询
+has_order_demo
+，判断是否需要追单。
+关于Python中自带的定时器，可以参考如下两篇文章：
+《基于Python的后端开发入门：4.多线程、协程、多进程》
+的"多线程"的"Timer(定时器)"部分。
+《基于Java的后端开发入门：19.Quartz和APScheduler》
+的"番外篇：APScheduler"部分。
+参考资料：
+https://space.bilibili.com/702865545
+文章作者:
+Kaka Wan Yifan
+文章链接:
+https://kakawanyifan.com/20501
+版权声明:
+本博客所有文章版权为文章作者所有，未经书面许可，任何机构和个人不得以任何形式转载、摘编或复制。
+上一篇
+天勤量化(TqSdk)入门
+下一篇
+Optiver-1.金融基础与赛题解析
+©2020 - 2026 By Kaka Wan Yifan
+沪ICP备18003997号
+本站搜索
+由
+hexo-generator-search
+提供支持

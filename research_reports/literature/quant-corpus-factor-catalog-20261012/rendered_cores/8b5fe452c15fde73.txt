@@ -1,0 +1,114 @@
+quant/聚宽2025年精选/42国九条：三年分红5千万以下且占净利润30以下将被ST.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import random
+from datetime import time
+
+def initialize(context):
+    g.stock_num = 10
+    g.no_trading_today_signal = False
+    g.pass_april = True
+    g.run_stoploss = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.not_buy_again = []
+    g.m_days = 5
+    g.up_price = 80
+    g.reason_to_sell = ''
+    g.stoploss_strategy = 3
+    g.stoploss_limit = 0.07
+    g.stoploss_market = 0.05
+    g.c = 0
+    run_daily(prepare_stock_list, '8:00')
+    run_weekly(weekly_adjustment, 2, '10:00')
+    run_daily(sell_stocks, time='10:30')
+    run_daily(sell_stocks, time='14:00')
+    run_daily(trade_afternoon, time='14:30')
+    run_daily(close_account, '14:30')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=c2fb1fea05959f01313095f337f7a4bf230c6dea97042f533c77fd983ebeb11c source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+
+def get_stock_list(context):
+    final_list = []
+    initial_list = get_index_stocks('399101.XSHE')
+    initial_list = filter_new_stock(context, initial_list)
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_st_stock(initial_list)
+    initial_list = get_dividend_ratio_filter_list(context, initial_list, False, 0, 0.8)
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(initial_list), valuation.market_cap.between(5, 50)).order_by(valuation.market_cap.asc())
+    df_fun = get_fundamentals(q)[:100]
+    initial_list = list(df_fun.code)
+    initial_list = filter_paused_stock(initial_list)
+    initial_list = filter_limitup_stock(context, initial_list)
+    initial_list = filter_limitdown_stock(context, initial_list)
+    initial_list = filter_highprice_stock(context, initial_list)
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(initial_list)).order_by(valuation.market_cap.asc())
+    df_fun = get_fundamentals(q)[:50]
+    final_list = list(df_fun.code)
+    return final_list
+
+def get_dividend_ratio_filter_list(context, stock_list, is_small_to_big, p1, p2):
+    time1 = context.previous_date
+    time0 = time1 - datetime.timedelta(days=365)
+    interval = 1000
+    list_len = len(stock_list)
+    q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date >= time0, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(stock_list[:min(list_len, interval)]))
+    df = finance.run_query(q)
+    if list_len > interval:
+        df_num = list_len // interval
+        for i in range(df_num):
+            q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date >= time0, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(stock_list[interval * (i + 1):min(list_len, interval * (i + 2))]))
+            temp_df = finance.run_query(q)
+            df = df.append(temp_df)
+    dividend = df.fillna(0)
+    dividend = dividend.set_index('code')
+    dividend = dividend.groupby('code').sum()
+    temp_list = list(dividend.index)
+    if time1.month >= 5:
+        start_year = str(time1.year - 1)
+    else:
+        start_year = str(time1.year - 2)
+    np = get_history_fundamentals(temp_list, fields=[income.net_profit], watch_date=None, stat_by_year=True, stat_date=start_year, interval='1y', count=3)
+    np = np.set_index('code')
+    np = np.groupby('code').mean()
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(temp_list))
+    cap = get_fundamentals(q, date=time1)
+    cap = cap.set_index('code')
+    DR = pd.concat([dividend, np, cap], axis=1)
+    DR = DR[(DR['bonus_amount_rmb'] * 10000 > DR['net_profit'] * 0.3) | (DR['bonus_amount_rmb'] > 5000)]
+    DR['dividend_ratio'] = DR['bonus_amount_rmb'] / 10000 / DR['market_cap']
+    final_list = list(DR.index)
+    return final_list
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=e7d4a0296bf78b1e445e2eb67665bd4d770511b93c546aaca31ae58b33de8122 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION sell_stocks sha256=a1a99fac4eca63cbdd90bc7434f69f3d3e7097837e7df0dd3f7b230221fed217 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=72e88ef464995c9821e682bd5a1539f8dca7b038b95b91ccec5e3b5375822c86 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION check_remain_amount sha256=72137767baae7faa1dd98d3dab68b08d296c86272a042c67cf3297a5ea4cc072 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION trade_afternoon sha256=93d7755d3fb868d58fa1edc86f7c988dbe92baa5917890b97c6199cd326299b9 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=09978c16fb700f1aa8384e0af3f913b9892d43e791345e694f5bb8a88820177c source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=3ebece5727cd54e79d8fce56a2f6424517de218e055d4201ceaa07e8665d6466 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=590265ec52a62a2fb67a20b5e2bc9900854d683ff1c8c8555006836a6a392c7a source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_highprice_stock sha256=bba03a03707a1b9b8221aac2c7d5522390f75a8ebd66796e5aea48dcf97d2801 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION filter_not_buy_again sha256=536cfd215c5a6bea900b65f2ff1a7bcb64a49d55d65069984246d5f7c45d1dec source=quant/2024年度精选策略1/23.wywy1995大神机器学习策略年化提升35pt.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION buy_security sha256=7a398218377b89030306d131dcb6d95ac3eb3bca552bca0ae1f1aadea4bf937a source=quant/聚宽2025年精选/25冷饭热吃之三，14年至今年华99.99.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=469fb5cbfe06ee2e5c9f06f9280876b69a736da3246eb3b67695f6dc4b8c0b92 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=79331e98b472e444a07830206bb935fa0b5c2aa0fb4fc63174fdb53f0d5a2ef7 source=quant/聚宽2025年精选/34十年回测 年化103.32% 最大回撤23.89%.txt'
+
+def log_stocks_bought(context):
+    current_data = get_current_data()
+    hold_stocks = context.portfolio.positions.keys()
+    try:
+        for s in hold_stocks:
+            q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap, valuation.pe_ratio, indicator.inc_total_revenue_year_on_year, indicator.inc_total_revenue_annual, indicator.inc_operation_profit_year_on_year, indicator.inc_operation_profit_annual).filter(valuation.code == s)
+            df = get_fundamentals(q)
+        for s in hold_stocks:
+            pass
+    except:
+        pass

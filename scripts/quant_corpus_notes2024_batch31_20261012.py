@@ -1,0 +1,8 @@
+from quant_corpus_semantic_review_20261012 import add_authored
+E={
+'80.':('MA5下穿MA10但MA20/30仍升、量均线约束、MACD双正且DIF−DEA在0~.1、前两日涨跌异号且次日低开；保留仍入选持仓。','trend pullback event same axes as strategy2/8。','日线OHLCV、开盘、分钟交易。','trend_pullback_execution_variant','相对8改向量化和按交易日两条数据，但保留核心条件；不是新经济因子。stock_filter3在空数据返回None须处理。'),
+'82.':('可转债多因子研究：正股收入意外z、EP+BP、126观测收益，转股价值拟合溢价、14/90自然日量比、90/183日成交金额偏度；另低价低溢价及30日溢价上限退出。','revenue surprise z12, EP+BP, RET125; CB fitted premium=a/conversion_value+b; short/long volume; amount skew。','可转债价格/条款/转股溢价及PIT正股财报。','convertible_multifactor_candidate_inventory','SUE实际营业收入水平z非标准盈余惊喜；points降序使value_rank升序逻辑偏低EP/BP、溢价rank偏低拟合值、收益和量比偏高、偏度偏低，必须保留方向；statDate未锁公告PIT，日期[-2:0]为空有运行错误。缺转债数据不能测全模型；股票原子可单列。'),
+'83.':('开盘沪深300涨幅高于300非银行指数或自身高开则持上证180ETF，反条件清仓。','relative index opening gap market regime。','两个指数当日开盘/昨收和ETF。','etf_open_gap_timing','不是个股横截面；当日开盘信号可因果使用但不能以昨日收盘入场，日频适配要单独标记。'),
+'84.':('股票仓位>=70%、股票资产>1.5亿的偏股开放基金按股票资产最小取10，每年4月更新，10%仓位偏差再平衡。','small stock-invested fund assets within minimum-scale floor。','基金PIT资产配置报告、成立/终止、申赎净值。','fund_size_strategy_blocked','get_report_date映射上季季末但查询未约束报告公告日，存在PIT风险；不是个股size因子也不能直接映射total_mv。'),
+'85.':('RSRS18/800右偏信号选价值质量：净利正、PE<35、负债率<90%、应收周转>6或<=0；扣非PE<20后按低PE、高近半年利润环比同比秩加权1/.5/.4；另估值低位上行时7日动量>20%且龙虎榜不大额流出。','rank(-adjusted_PE)+.5 rank(halfyear_profit_growth)+.4 rank(yoy_halfyear_profit_growth) × receivable turnover; alternate momentum/billboard。','扣非利润/应收/预收PIT季度、历史成分估值、龙虎榜、盘中。','adjusted_profit_growth_value_candidate','statDate需PIT和累计转单季，不能四个累计季直接相加；行业字符串缺逗号产生J67J69；周检查无条件清mode2_flag，模式2实际时段受限。保留财务增长质量线索，整策略有缺数据阻塞。')}
+if __name__=='__main__':add_authored(E,'2024年度精选策略2')

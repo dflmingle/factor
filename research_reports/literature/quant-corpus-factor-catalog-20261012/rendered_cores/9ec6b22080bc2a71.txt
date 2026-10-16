@@ -1,0 +1,106 @@
+quant/2021年度精选策略/9.持续跑赢大盘-真蓝筹v2(资金容量千万以上).txt
+import statsmodels.api as sm
+import pandas as pd
+import numpy as np
+import datetime as dt
+from jqdata import *
+
+def initialize(context):
+    set_parameter_RSRS(context)
+    g.trend = 'None'
+    g.day_count = 0
+    g.period = 22
+    run_daily(before_market_open, time='9:20', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+
+def set_parameter_RSRS(context):
+    g.N = 18
+    g.M = 1100
+    g.init = True
+    g.security = '000300.XSHG'
+    g.buy = 0.7
+    g.sell = -0.7
+    g.ans = []
+    g.ans_rightdev = []
+    previous_date = context.current_dt - datetime.timedelta(days=2)
+    prices = get_price(g.security, '2005-01-05', previous_date, '1d', ['high', 'low'])
+    prices[np.isnan(prices)] = 0
+    prices[np.isinf(prices)] = 0
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+
+def before_market_open(context):
+    beta = 0
+    r2 = 0
+    if g.init:
+        g.init = False
+    else:
+        prices = attribute_history(g.security, g.N, '1d', ['high', 'low'])
+        prices[np.isnan(prices)] = 0
+        prices[np.isinf(prices)] = 0
+        highs = prices.high
+        lows = prices.low
+        X = sm.add_constant(lows)
+        model = sm.OLS(highs, X)
+        beta = model.fit().params[1]
+        g.ans.append(beta)
+        r2 = model.fit().rsquared
+        g.ans_rightdev.append(r2)
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    g.zscore_rightdev = zscore * beta * r2
+    if g.zscore_rightdev > g.buy:
+        g.trend = 'up'
+    if g.zscore_rightdev < g.sell:
+        g.trend = 'down'
+
+def market_open(context):
+    if g.trend == 'up':
+        pass
+    elif g.trend == 'down':
+        sell_all(context)
+        g.day_count = 0
+        return
+    if g.day_count % g.period != 0:
+        g.day_count = g.day_count + 1
+        return
+    pool = get_stock_pool('000300.XSHG', context)
+    positions_list = context.portfolio.positions.keys()
+    sell_list = set(positions_list) - set(pool)
+    buy_list = set(pool) - set(positions_list)
+    for stock in sell_list:
+        order_target_value(stock, 0)
+    for stock in pool:
+        value = context.portfolio.total_value / len(pool)
+        order_target_value(stock, value)
+    g.day_count = g.day_count + 1
+
+def get_stock_pool(index, context):
+    stocks = get_index_stocks(index)
+    dt_now = context.current_dt.date()
+    date_list = [dt_now - datetime.timedelta(days=1), dt_now - datetime.timedelta(days=1 * 365), dt_now - datetime.timedelta(days=2 * 365), dt_now - datetime.timedelta(days=3 * 365), dt_now - datetime.timedelta(days=4 * 365), dt_now - datetime.timedelta(days=5 * 365), dt_now - datetime.timedelta(days=6 * 365), dt_now - datetime.timedelta(days=7 * 365), dt_now - datetime.timedelta(days=8 * 365), dt_now - datetime.timedelta(days=9 * 365)]
+    stocks = [s for s in stocks if get_security_info(s).start_date < date_list[-1]]
+    df = get_fundamentals(query(valuation.code, valuation.pb_ratio, valuation.pe_ratio).filter(valuation.code.in_(stocks), valuation.pb_ratio > 0, valuation.pe_ratio > 0)).dropna().set_index('code')
+    stocks = list(df.index)
+    df_earn = pd.DataFrame(columns=stocks)
+    for idate in date_list:
+        idf = get_fundamentals(query(valuation.code, valuation.market_cap, (valuation.market_cap / valuation.pe_ratio).label('earn')).filter(valuation.code.in_(stocks)), date=idate).set_index('code')
+        df_earn.loc[idate] = idf.earn.T
+    for ix in range(len(date_list) - 1):
+        stocks = [s for s in stocks if df_earn.iloc[ix][s] > df_earn.iloc[ix + 1][s]]
+    return stocks
+
+def sell_all(context):
+    for stock in context.portfolio.positions.keys():
+        order_target(stock, 0)

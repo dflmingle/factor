@@ -1,0 +1,197 @@
+quant/2024年度精选策略1/21.一种宏观数据的中长线策略，年化15%，最大回撤9%.txt
+from jqdata import *
+from jqdata import macro
+from decimal import Decimal
+import numpy as np
+import pandas as pd
+import datetime
+from scipy import optimize as op
+
+def initialize(context):
+    g.mode = 0
+    g.record = 0.0
+    g.times = -1
+    g.order_amount = 0.04
+    g.begin_date = '2013-01'
+    g.stock_security = '510300.XSHG'
+    g.bond_security = '511010.XSHG'
+    g.over_hot = False
+    g.yearMa10 = 0.0
+    run_daily(handle, time='14:55')
+
+def handle(context):
+    pre_date = context.previous_date
+    current_date = context.current_dt.strftime('%Y-%m-%d').split('-')
+    current_date = datetime.date(int(current_date[0]), int(current_date[1]), int(current_date[2]))
+    diff_days = (current_date - pre_date).days
+    if g.mode in [0, 2]:
+        current_date = current_date.strftime('%Y-%m')
+        x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        y = get_PMI(current_date)
+        params = op.curve_fit(func, x, y)
+        k = 2 * params[0][0] * 12 + params[0][1]
+        if k > 0.0 and y[-1] >= 50.0 and (y[0] <= y[-1]):
+            provide_and_need = calc_provide_and_need(g.begin_date, current_date)
+            if provide_and_need[0] < 50.0 and provide_and_need[1] > 50.0:
+                save = calc_save(g.begin_date, current_date)
+                if save[0] < 50.0:
+                    g.mode = 1
+    if g.mode == 1:
+        if g.times == -1:
+            g.record = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+        if g.bond_security in context.portfolio.positions.keys():
+            order_target(g.bond_security, 0)
+        current_price = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+        fund_price = float(np.array(get_bars(g.stock_security, 1, '1d', fields=['close'], include_now=True, df=True))[0])
+        withdraw = Decimal(str(current_price)) / Decimal(str(g.record)) - Decimal('1.0')
+        if withdraw < Decimal('-0.02') or g.times == -1:
+            g.times += 1
+            order_func(context.portfolio.total_value, context.portfolio.available_cash, fund_price)
+            g.record = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+        elif diff_days > 2:
+            order_func(context.portfolio.total_value, context.portfolio.available_cash, fund_price)
+    if g.mode in [0, 2]:
+        if g.mode == 0:
+            year_point = change_to_yeak_k()
+            yearMa10 = year_move_average(year_point)
+            current_price = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+            fund_price = float(np.array(get_bars(g.stock_security, 1, '1d', fields=['close'], include_now=True, df=True))[0])
+            if current_price < yearMa10:
+                g.mode = 2
+                g.record = yearMa10
+                g.times += 1
+                if g.bond_security in context.portfolio.positions.keys():
+                    order_target(g.bond_security, 0)
+                order_func(context.portfolio.total_value, context.portfolio.available_cash, fund_price)
+        if g.mode == 2:
+            current_price = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+            fund_price = float(np.array(get_bars(g.stock_security, 1, '1d', fields=['close'], include_now=True, df=True))[0])
+            withdraw = Decimal(str(current_price)) / Decimal(str(g.record)) - Decimal('1.0')
+            if withdraw < Decimal('-0.05'):
+                g.times += 1
+                order_func(context.portfolio.total_value, context.portfolio.available_cash, fund_price)
+                g.record = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+            elif diff_days > 2:
+                order_func(context.portfolio.total_value, context.portfolio.available_cash, fund_price)
+    if g.mode in [1, 2]:
+        ma5 = day_move_average(5, True)
+        ma10 = day_move_average(10, True)
+        ma20 = day_move_average(20, True)
+        ma30 = day_move_average(30, True)
+        ma30_pre = day_move_average(30, False)
+        if ma5 > ma10 > ma20 > ma30 > ma30_pre:
+            order_value(g.stock_security, context.portfolio.available_cash)
+    if g.stock_security in context.portfolio.positions.keys():
+        sell_stock_security(current_date, context.portfolio.total_value, list(context.portfolio.positions.keys()))
+
+def get_PMI(date: str) -> list:
+    start_date = date
+    for i in range(13):
+        start_date = calc_last_month(start_date)
+    df = macro.run_query(query(macro.MAC_MANUFACTURING_PMI.pmi).filter(macro.MAC_MANUFACTURING_PMI.stat_month >= start_date, macro.MAC_MANUFACTURING_PMI.stat_month < date).order_by(macro.MAC_MANUFACTURING_PMI.stat_month.asc()))
+    return list(np.array(df['pmi']))
+
+def calc_provide_and_need(start_date: str, end_date: str) -> tuple:
+    end_date = calc_last_month(end_date)
+    df = macro.run_query(query(macro.MAC_MANUFACTURING_PMI.stat_month, macro.MAC_MANUFACTURING_PMI.produce_idx, macro.MAC_MANUFACTURING_PMI.new_orders_idx).filter(macro.MAC_MANUFACTURING_PMI.stat_month >= start_date, macro.MAC_MANUFACTURING_PMI.stat_month <= end_date).order_by(macro.MAC_MANUFACTURING_PMI.stat_month.desc()))
+    produce_seq = np.array(df['produce_idx'])
+    new_orders_seq = np.array(df['new_orders_idx'])
+    produce_percent = percentile(produce_seq, df.iloc[0, 1])
+    new_orders_percent = percentile(new_orders_seq, df.iloc[0, 2])
+    return (produce_percent, new_orders_percent)
+
+def calc_save(start_date: str, end_date: str) -> tuple:
+    end_date = calc_last_month(end_date)
+    df = macro.run_query(query(macro.MAC_MANUFACTURING_PMI.stat_month, macro.MAC_MANUFACTURING_PMI.raw_material_idx, macro.MAC_MANUFACTURING_PMI.finished_produce_idx).filter(macro.MAC_MANUFACTURING_PMI.stat_month >= start_date, macro.MAC_MANUFACTURING_PMI.stat_month <= end_date).order_by(macro.MAC_MANUFACTURING_PMI.stat_month.desc()))
+    raw_material_seq = np.array(df['raw_material_idx'])
+    finished_produce_seq = np.array(df['finished_produce_idx'])
+    raw_material_percent = percentile(raw_material_seq, df.iloc[0, 1])
+    finished_produce_percent = percentile(finished_produce_seq, df.iloc[0, 2])
+    return (raw_material_percent, finished_produce_percent)
+
+def order_func(total_cash: float, available_cash: float, fund_price: float):
+    buy_cash = 2 ** g.times * g.order_amount * total_cash
+    if buy_cash <= available_cash:
+        order_value(g.stock_security, buy_cash)
+    elif fund_price * 100 <= available_cash:
+        order_value(g.stock_security, available_cash)
+
+def sell_stock_security(current_date, total_cash: float, stock_in_hand: list):
+    if isinstance(current_date, datetime.date):
+        current_date = current_date.strftime('%Y-%m')
+    if g.mode == 1:
+        provide_and_need = calc_provide_and_need(g.begin_date, current_date)
+        score = 1 / 3 * provide_and_need[0] + 2 / 3 * provide_and_need[1]
+        if score > 97.0 or g.over_hot:
+            g.over_hot = True
+            save = calc_save(g.begin_date, current_date)
+            if save[0] > 50.0 and save[1] < 50.0:
+                g.mode = 2
+    if g.mode == 2:
+        current_price = float(np.array(get_bars('000300.XSHG', 1, '1d', fields=['close'], include_now=True, df=True))[0])
+        ma5 = day_move_average(5, True)
+        ma5_pre = day_move_average(5, False)
+        ma20 = day_move_average(20, True)
+        ma20_pre = day_move_average(20, False)
+        ma120 = day_move_average(120, True)
+        if current_price > ma120 and ma5_pre > ma20_pre and (ma5 < ma20):
+            order_target(g.stock_security, 0)
+            g.times = -1
+            order_value(g.bond_security, total_cash)
+            g.mode = 0
+            g.over_hot = False
+
+def change_to_yeak_k() -> dict:
+    year_point = dict()
+    df = get_bars('000300.XSHG', 109, '1M', fields=['date', 'close'], include_now=True, df=True)
+    df['date'] = df['date'].apply(lambda x: x.strftime('%Y'))
+    last_point = df.iloc[0, 1]
+    last_time = df.iloc[0, 0]
+    current_point = df.iloc[0, 1]
+    current_time = df.iloc[0, 0]
+    for i in range(1, df.shape[0]):
+        last_time = current_time
+        last_point = current_point
+        current_time = df.iloc[i, 0]
+        current_point = df.iloc[i, 1]
+        if not current_time == last_time:
+            year_point[last_time] = last_point
+        if i == df.shape[0] - 1:
+            year_point[current_time] = current_point
+    return year_point
+
+def year_move_average(year_point: dict) -> float:
+    ten_year_total = Decimal('0.0')
+    for point in year_point.values():
+        ten_year_total += Decimal(str(point))
+    yearMa10 = float(ten_year_total / Decimal('10.0'))
+    return yearMa10
+
+def day_move_average(day: int, now: bool) -> float:
+    array = np.array(get_bars('000300.XSHG', day, '1d', fields=['close'], include_now=now, df=True))
+    ma = array.mean()
+    return ma
+
+def percentile(seq, target) -> float:
+    not_less_num = len(np.extract(seq >= target, seq))
+    smaller_num = len(np.extract(seq < target, seq))
+    percent = smaller_num * 100 / (not_less_num + smaller_num - 1)
+    return percent
+
+def calc_last_month(date: str) -> str:
+    result = ''
+    year = int(date.split('-')[0])
+    month = int(date.split('-')[1])
+    if month - 1 < 1:
+        year -= 1
+        month = month + 12 - 1
+    else:
+        month -= 1
+    if month < 10:
+        result = str(year) + '-0' + str(month)
+    else:
+        result = str(year) + '-' + str(month)
+    return result
+
+def func(x, A, B, C):
+    return A * x ** 2 + B * x + C

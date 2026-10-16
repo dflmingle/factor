@@ -1,0 +1,95 @@
+quant/2023年度精选策略/94.可转债回测.txt
+import datetime
+import pandas as pd
+import matplotlib.pyplot as plt
+kzz_num = 10
+days = 0
+first_cash = 100000
+cash = first_cash
+profit = 0
+stock = pd.DataFrame(data=None, index=None, columns=['code', 'qty', 'cost_price', 'amount', 'price'])
+trade_log = pd.DataFrame(data=None, index=None, columns=['date', 'code', 'qty', 'price', 'amount', 'profit', 'cash'])
+stock_log = pd.DataFrame(data=None, index=None, columns=['date', 'stock_amount', 'cash', 'profit'])
+kzz = pd.read_csv('KZZ_20210731.csv')
+kzz['date'] = pd.to_datetime(kzz['date'])
+kzz['double_order'] = kzz['close'] + 100 * kzz['convert_premium_rate']
+kzz_price = pd.read_csv('KZZ_Price20210731.csv')
+kzz_price['date'] = pd.to_datetime(kzz_price['date'])
+begin = pd.to_datetime('20180912')
+end = pd.to_datetime('20210731')
+kzz_low = pd.DataFrame
+is_calc = True
+last_CalcDay = ''
+while begin <= end:
+    days += 1
+    kzz_day = kzz_price[kzz_price['date'] == pd.to_datetime(begin)]
+    if kzz_low.empty:
+        kzz_low = kzz[kzz['date'] == pd.to_datetime(begin)].sort_values(by=['double_order'], ascending=True)[:kzz_num]
+        begin += datetime.timedelta(days=1)
+        continue
+    tmp_str = begin.strftime('%Y%m%d')
+    if last_CalcDay == tmp_str:
+        is_calc = False
+    else:
+        is_calc = True
+        last_CalcDay = tmp_str
+    if is_calc:
+        for row in stock.itertuples():
+            stock_code = str(getattr(row, 'code'))
+            cost_price = getattr(row, 'cost_price')
+            stock_qty = getattr(row, 'qty')
+            sell_price = cost_price
+            if len(kzz_low[kzz_low['code'] == int(stock_code)]) > 0:
+                continue
+            stock.drop(index=stock.loc[stock['code'] == stock_code].index, inplace=True)
+            if not kzz_day[kzz_day['code'] == int(stock_code)].empty:
+                sell_price = float(list(kzz_day[kzz_day['code'] == int(stock_code)]['open'])[0])
+                if sell_price == 0:
+                    sell_price = float(list(kzz_day[kzz_day['code'] == int(stock_code)]['pre_close'])[0])
+            amount = round(sell_price * stock_qty, 2)
+            profit = round((sell_price - cost_price) * stock_qty, 2)
+            cash += amount
+            trade_log.loc[len(trade_log)] = [begin, stock_code, stock_qty * -1, sell_price, amount * -1, profit, cash]
+        stock = stock.reset_index(drop=True)
+        kzz_buy_num = 10 - len(stock)
+        if kzz_buy_num > 0:
+            buy_money = cash / kzz_buy_num
+            for row in kzz_low.itertuples():
+                low_code = str(getattr(row, 'code'))
+                if len(stock[stock['code'] == low_code]) > 0:
+                    continue
+                price = getattr(row, 'close')
+                if not kzz_day[kzz_day['code'] == int(low_code)].empty:
+                    price = float(list(kzz_day[kzz_day['code'] == int(low_code)]['open'])[0])
+                    if price == 0:
+                        price = float(list(kzz_day[kzz_day['code'] == int(low_code)]['pre_close'])[0])
+                buy_qty = int(int(buy_money / price) / 10) * 10
+                if buy_qty == 0:
+                    continue
+                amount = float(round(buy_qty * price, 2))
+                stock.loc[len(stock)] = [low_code, buy_qty, price, amount, price]
+                cash -= amount
+                trade_log.loc[len(trade_log)] = [begin, low_code, buy_qty, price, amount, 0, cash]
+    if not kzz_day.empty:
+        for i in range(0, len(stock)):
+            stock_code = stock.at[i, 'code']
+            qty = stock.at[i, 'qty']
+            sell_price = 0
+            if not kzz_day[kzz_day['code'] == int(stock_code)].empty:
+                sell_price = float(list(kzz_day[kzz_day['code'] == int(stock_code)]['close'])[0])
+            if sell_price == 0:
+                sell_price = stock.at[i, 'price']
+            if sell_price == 0:
+                sell_price = stock.at[i, 'cost_price']
+            stock.loc[i:i, 'price'] = round(sell_price, 3)
+            stock.loc[i:i, 'amount'] = round(sell_price * qty, 2)
+    kzz_low = kzz[kzz['date'] == pd.to_datetime(begin)].sort_values(by=['double_order'], ascending=True)[:kzz_num]
+    sum_amount = round(stock['amount'].sum(), 2)
+    stock_log.loc[len(stock_log)] = [begin, sum_amount, cash, float(sum_amount + cash)]
+    begin += datetime.timedelta(days=1)
+trade_log.to_csv('backtest_trade_log.csv')
+stock_log.to_csv('stock_log.csv')
+last_amount = round(stock['amount'].sum(), 2)
+profit = round(cash + last_amount, 2)
+yy = days / 365
+year_profit = ((profit / first_cash) ** (1 / yy) - 1) * 100

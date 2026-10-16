@@ -1,0 +1,72 @@
+quant/2021年度精选策略/62.【复现】北向资金交易能力一定强吗.txt
+from jqdata import *
+import numpy as np
+import pandas as pd
+enable_profile()
+'EXACT_REVIEWED_FUNCTION initialize sha256=507bbc3c7a2e4f1e57807f9c530a607b5733d4e37a9f594d7ecae19d990d4ec8 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def set_params():
+    g.target_etf = '510300.XSHG'
+    g.params = {'threshold_h': -0.4991838749623957, 'threshold_l': -0.15982912319375642, 'long_period': 71, 'short_period': 6}
+'EXACT_REVIEWED_FUNCTION set_variables sha256=e6562bd1f389a4f439196de428385d85862ee73b282fe8ccdc9b6518d076544f source=quant/2021年度精选策略/5.价值低波（下）--十年十倍（2020拜年）.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=fb674383d7b825a635aaa8059d4d2564e67dec1c38c6c005542d4e5f978bf5e8 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+
+def distributed_query(query_func_name, start: str, end: str, limit=3000, **kwargs) -> pd.DataFrame:
+    days = get_trade_days(start, end)
+    n_days = len(days)
+    if len(days) > limit:
+        n = n_days // limit
+        df_list = []
+        i = 0
+        pos1, pos2 = (n * i, n * (i + 1) - 1)
+        while pos2 < n_days:
+            df = query_func_name(start=days[pos1], end=days[pos2], **kwargs)
+            df_list.append(df)
+            i += 1
+            pos1, pos2 = (n * i, n * (i + 1) - 1)
+            if pos1 < n_days:
+                df = query_func_name(start=days[pos1], end=days[-1], **kwargs)
+                df_list.append(df)
+            df = pd.concat(df_list, axis=0)
+    else:
+        df = query_func_name(start=start, end=end, **kwargs)
+    return df
+
+def query_northmoney(start: str, end: str, fields: list) -> pd.DataFrame:
+    select_type = ['沪股通', '深股通']
+    select_fields = ','.join([f'finance.STK_ML_QUOTA.%s' % i for i in fields])
+    df_list = []
+    for types in select_type:
+        q = query(select_fields).filter(finance.STK_ML_QUOTA.day >= start, finance.STK_ML_QUOTA.day <= end, finance.STK_ML_QUOTA.link_name == types)
+        df_list.append(finance.run_query(q))
+    return pd.concat(df_list)
+
+def get_net_north_flow(watch_date: str, N: int) -> pd.Series:
+    begin = get_trade_days(end_date=watch_date, count=N)[0].strftime('%Y-%m-%d')
+    fields = ['day', 'link_name', 'buy_amount', 'sell_amount', 'sum_amount']
+    north_money = distributed_query(query_northmoney, begin, watch_date, fields=fields)
+    daily_northmoney = north_money.groupby('day').sum()
+    daily_northmoney.index = pd.to_datetime(daily_northmoney.index)
+    return daily_northmoney['buy_amount'] - daily_northmoney['sell_amount']
+
+def get_north_factor(north_flow: pd.Series, params: dict) -> bool:
+    l = north_flow.ewm(span=params['long_period'], adjust=False).mean()
+    s = north_flow.ewm(span=params['short_period'], adjust=False).mean()
+    north_factor = (s - l) / north_flow.rolling(params['long_period']).std()
+    if north_factor.iloc[-1] > params['threshold_h']:
+        return True
+    elif north_factor.iloc[-1] < params['threshold_l']:
+        return False
+    else:
+        return True
+
+def handle_data(context, data):
+    bar_time = context.previous_date.strftime('%Y-%m-%d')
+    north_flow = get_net_north_flow(bar_time, 300)
+    is_trade = get_north_factor(north_flow, g.params)
+    if is_trade and len(context.portfolio.long_positions) == 0:
+        order_target_value(g.target_etf, context.portfolio.total_value)
+    if not is_trade and len(context.portfolio.long_positions) != 0:
+        order_target(g.target_etf, 0)

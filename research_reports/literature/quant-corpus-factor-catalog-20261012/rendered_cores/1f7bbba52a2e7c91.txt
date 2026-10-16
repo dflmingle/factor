@@ -1,0 +1,67 @@
+quant/2022年度精选策略/60.2019年3月以来的前日涨停昨日未涨停今日大涨的追涨策略.txt
+from jqdata import *
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION delisted_filter sha256=20805e736454c014718a41031ebfbcb2259dd26d95a5fcd3021b50c7b352d6fe source=quant/2022年度精选策略/11.林奇PEG选股轮动，十年20倍，有止损模块.txt'
+'EXACT_REVIEWED_FUNCTION st_filter sha256=808736be82acef4a93b42fc35e68d06db1ecb95e6b2bdaa134b8ec05278db95e source=quant/2022年度精选策略/11.林奇PEG选股轮动，十年20倍，有止损模块.txt'
+
+def high_limit_filter(stocks):
+    ret = []
+    cd = get_current_data()
+    for stock in stocks:
+        h = attribute_history(stock, 3, unit='1d', fields=('close', 'high_limit'), skip_paused=True)
+        if (h.close[1] - h.close[0]) / h.close[0] > 0.095 and (not (h.close[2] - h.close[1]) / h.close[1] > 0.095):
+            ret.append(stock)
+    return ret
+
+def get_fullist(context):
+    stocks = get_index_stocks('000002.XSHG') + get_index_stocks('399106.XSHE')
+    stocks = [stock for stock in stocks if not stock.startswith('300')]
+    return list(stocks)
+
+def initialize(context):
+    g.stocks = get_fullist(context)
+    g.stock = None
+    g.last_price = 0.0
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_sell, time='09:34', reference_security='000300.XSHG')
+    run_daily(market_buy, time='09:35', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.stocks = get_fullist(context)
+    g.stocks = filter_paused_stock(g.stocks)
+    g.stocks = delisted_filter(g.stocks)
+    g.stocks = st_filter(g.stocks)
+    g.stocks = high_limit_filter(g.stocks)
+
+def market_sell(context):
+    current_data = get_current_data()
+    for stock in context.portfolio.positions.keys():
+        h = attribute_history(stock, 1, unit='1d', fields='close', skip_paused=True)
+        last_close = h.close[0]
+        current_price = current_data[stock].last_price
+        cost = context.portfolio.positions[stock].avg_cost
+        profit = (current_price - cost) / cost
+        change = (current_price - last_close) / last_close
+        init_time = context.portfolio.positions[stock].init_time
+        if change <= 0.0:
+            order_target(stock, 0)
+
+def market_buy(context):
+    current_data = get_current_data()
+    cash = context.portfolio.total_value
+    temp = {}
+    for stock in g.stocks:
+        h = attribute_history(stock, 1, unit='1d', fields='close', skip_paused=True)
+        last_close = h.close[0]
+        current_price = current_data[stock].last_price
+        change = (current_price - last_close) / last_close
+        if change >= 0.05 and current_price < current_data[stock].high_limit:
+            temp[change] = stock
+    temp = [temp[change] for change in sorted(temp.keys(), reverse=True)]
+    for stock in temp:
+        order_value(stock, cash / 1)
+
+def before_market_close(context):
+    current_data = get_current_data()
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

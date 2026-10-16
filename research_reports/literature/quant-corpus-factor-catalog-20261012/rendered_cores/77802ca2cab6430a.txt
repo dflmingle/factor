@@ -1,0 +1,113 @@
+quant/2023年度精选策略/64.韶华研究之七--不可多得的基本面三角.txt
+from jqdata import *
+from kuanke.wizard import *
+from sklearn.linear_model import LinearRegression
+from jqfactor import get_factor_values
+from jqlib.technical_analysis import *
+from six import BytesIO
+
+def after_code_changed(context):
+    unschedule_all()
+    set_params()
+    set_variables()
+    set_backtest()
+    run_daily(before_market_open, time='7:00')
+    run_daily(market_open, time='9:30')
+
+def set_params():
+    g.index = 'zz'
+    g.strategy = 'D'
+
+def set_variables():
+    g.stocknum = 0
+    g.poolnum = 1 * g.stocknum
+    g.shiftdays = 20
+    g.day_count = 0
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=f5c9cf7d52e3a49e442e31474fc217cc16454e506323f2602e182c2839054da9 source=quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt'
+
+def before_market_open(context):
+    today_date = context.current_dt.date()
+    all_data = get_current_data()
+    g.poollist = []
+    g.buylist = []
+    g.selllist = []
+    if g.day_count % g.shiftdays == 0:
+        g.adjustpositions = True
+        g.day_count += 1
+    else:
+        g.day_count += 1
+        g.adjustpositions = False
+        return
+    if g.index == 'all':
+        stocklist = list(get_all_securities(['stock']).index)
+    elif g.index == 'zz':
+        stocklist = get_index_stocks('000906.XSHG', date=None) + get_index_stocks('000852.XSHG', date=None)
+    else:
+        stocklist = get_index_stocks(g.index, date=None)
+    stocklist = [stockcode for stockcode in stocklist if not all_data[stockcode].paused]
+    stocklist = [stockcode for stockcode in stocklist if not all_data[stockcode].is_st]
+    stocklist = [stockcode for stockcode in stocklist if '退' not in all_data[stockcode].name]
+    stocklist = [stockcode for stockcode in stocklist if (today_date - get_security_info(stockcode).start_date).days > 365]
+    num1, num2, num3 = (0, 0, 0)
+    if g.strategy == 'D':
+        g.poollist = get_delta_stocks(context, stocklist, today_date)
+        num1 = len(g.poollist)
+    else:
+        return
+    for stockcode in g.poollist:
+        stockname = get_security_info(stockcode).display_name
+        write_file('score_log.csv', str('%s,focus,%s,%s\n' % (today_date, stockcode, stockname)), append=True)
+    if g.stocknum == 0 or len(g.poollist) <= g.stocknum:
+        g.buylist = g.poollist
+    else:
+        g.poollist = g.poollist[:g.poolnum]
+        g.buylist = g.poollist[:g.stocknum]
+    return
+
+def market_open(context):
+    today_date = context.current_dt.date()
+    current_data = get_current_data()
+    if g.adjustpositions == False:
+        return
+    for stockcode in context.portfolio.positions:
+        if current_data[stockcode].paused == True:
+            continue
+        if stockcode in g.buylist:
+            continue
+        sell_stock(context, stockcode, 0)
+    if len(context.portfolio.positions) >= len(g.buylist):
+        return
+    else:
+        cash = context.portfolio.total_value / len(g.buylist)
+        for stockcode in g.buylist:
+            if current_data[stockcode].paused == True:
+                continue
+            buy_stock(context, stockcode, cash)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=a740b5151dcf904a0d5898ae738463643456df8dea7eb74f66c01037c2c95334 source=quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt'
+
+def get_delta_stocks(context, stocklist, today_date):
+    lastd_date = context.previous_date
+    current_data = get_current_data()
+    poollist = []
+    df_f_factors = get_history_fundamentals(stocklist, [indicator.roe, indicator.inc_total_revenue_year_on_year, indicator.ocf_to_revenue], watch_date=lastd_date, count=5).dropna()
+    df_value = df_f_factors[(df_f_factors.roe > 0) & (df_f_factors.inc_total_revenue_year_on_year > 0) & (df_f_factors.ocf_to_revenue > 0)]
+    'EXACT_REVIEWED_FUNCTION ttm_sum sha256=6c35cff97870cdae0bda14b518c7006b1951db95a447621cf3ac4474f3db6ef4 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION ttm_avg sha256=ec3e5391d92f12a7a445ee7609b495c60894a8f4212fce9b49201192015df374 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_sum sha256=bd5809e64ab1fedbfab99222734f5a614c26917cab51ea71bf65e2fb872adbc6 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_avg sha256=bbdd442eb5e4a1e727f271c7caa35a073a2bfcc665d2bb741d68794bea2975ae source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_1 sha256=591f9ebae9f25486d27615a14ad8ac0cf38bdf139ad749f1c8c7e21ce72807a0 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_2 sha256=4cb11028a541d023d8f7136ad17916ff1bc05cbc7e7b07e23fac031730404dc3 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    df_delta = pd.DataFrame(columns=['code', 'roe_chg', 'rev_chg', 'ocf_chg'])
+    for stockcode in stocklist:
+        df_temp = df_value[df_value.code == stockcode]
+        if len(df_temp) < 5:
+            continue
+        roe_chg = df_temp.roe.values[-1] / df_temp.roe[:-1].mean()
+        rev_chg = df_temp.inc_total_revenue_year_on_year.values[-1] / df_temp.inc_total_revenue_year_on_year[:-1].mean()
+        ocf_chg = df_temp.ocf_to_revenue.values[-1] / df_temp.ocf_to_revenue[:-1].mean()
+        df_delta = df_delta.append({'code': stockcode, 'roe_chg': roe_chg, 'rev_chg': rev_chg, 'ocf_chg': ocf_chg}, ignore_index=True)
+    df_delta = df_delta[df_delta.roe_chg > 1]
+    poollist = df_delta.sort_values('roe_chg', ascending=False).code.values.tolist()[0:10]
+    return poollist
+'EXACT_REVIEWED_FUNCTION buy_stock sha256=fa6911bf298c68dd8cf880fbfbce3917d28d33f66fd18b1826fa3e1e9e5b4862 source=quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt'
+'EXACT_REVIEWED_FUNCTION sell_stock sha256=87dd7bf87c0e51967fac3963e169339749c54c2719a4c70ecca6182e35a95f52 source=quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt'

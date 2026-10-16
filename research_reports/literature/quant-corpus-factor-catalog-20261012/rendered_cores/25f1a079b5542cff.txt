@@ -1,0 +1,88 @@
+quant/2021年度精选策略/67.RSRS择时改进-【成交量加权-钝化-右偏】.txt
+import statsmodels.api as sm
+import scipy.stats as stats
+
+def initialize(context):
+    g.security = '000300.XSHG'
+    g.N = 18
+    g.M = 200
+    g.buy = 0.85
+    g.sell = -g.buy
+    g.run_time = '14:00'
+    g.beta_weight = []
+    g.r2_weight = []
+    g.volatility = []
+    g.pos = False
+    g.days = 0
+    g.rsrs = 0
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time=g.run_time, reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    prices = get_price(g.security, '2005-05-01', context.previous_date, '1d', ['high', 'low', 'volume'])
+    highs = prices.high
+    lows = prices.low
+    volumes = prices.volume
+    weight_list = []
+    for i in range(0, len(highs) - g.N + 1):
+        data_high = highs.iloc[i:i + g.N]
+        data_low = lows.iloc[i:i + g.N]
+        data_volume = volumes.iloc[i:i + g.N]
+        X = sm.add_constant(data_low)
+        for j in range(0, len(data_volume)):
+            weight = data_volume[j] / data_volume.sum()
+            weight_list.append(weight)
+        model = sm.WLS(data_high, X, weight_list)
+        g.beta_weight.append(model.fit().params.low)
+        g.r2_weight.append(model.fit().rsquared)
+        weight_list = []
+    close = get_price(g.security, '2005-05-01', context.previous_date, '1d', 'close')['close']
+    daily_return = (close - close.shift(1)) / close.shift(1)
+    daily_return = list(daily_return.dropna())
+    for i in range(len(daily_return))[g.N:]:
+        std = np.std(daily_return[i - g.N:i])
+        g.volatility.append(std)
+
+def before_market_open(context):
+    beta = 0
+    r2 = 0
+    weights = []
+    if g.days == 0:
+        g.days = 1
+    elif g.days == 1:
+        prices = attribute_history(g.security, g.N, '1d', ['high', 'low', 'volume'])
+        highs = prices['high']
+        lows = prices['low']
+        volumes = prices['volume']
+        X = sm.add_constant(lows)
+        for i in range(0, len(prices)):
+            weight = volumes[i] / volumes.sum()
+            weights.append(weight)
+        model = sm.WLS(highs, X, weights)
+        beta = model.fit().params.low
+        g.beta_weight.append(beta)
+        r2 = model.fit().rsquared
+        g.r2_weight.append(r2)
+        section = g.beta_weight[-g.M:]
+        mu = np.mean(section)
+        sigma = np.std(section)
+        zscore = (section[-1] - mu) / sigma
+        close = attribute_history(g.security, g.N + 1, '1d', ['close'])['close']
+        daily_return = (close - close.shift(1)) / close.shift(1)
+        daily_return = list(daily_return.dropna())
+        std = np.std(daily_return)
+        g.volatility.append(std)
+        stdpercent = stats.percentileofscore(g.volatility[-g.M:], std) / 100
+        vol_rsrs_right = zscore * beta * r2
+        vol_rsrs = zscore * r2
+        vol_rsrs_right_dun = zscore * beta * r2 ** (2 * stdpercent)
+        vol_rsrs_dun = zscore * r2 ** (2 * stdpercent)
+        g.rsrs = vol_rsrs_right
+
+def market_open(context):
+    if g.rsrs > g.buy and g.pos == False:
+        order_value(g.security, context.portfolio.available_cash)
+        g.pos = True
+    elif g.rsrs < g.sell and g.pos == True:
+        order_target(g.security, 0)
+        g.pos = False
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

@@ -1,0 +1,51 @@
+quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt
+from jqdata import *
+from jqlib.alpha191 import *
+from jqfactor import get_factor_values
+import pandas as pd
+import numpy as np
+from jqfactor import standardlize, winsorize
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000001.XSHG')
+    run_daily(market_open, time='open', reference_security='000001.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000001.XSHG')
+
+def before_market_open(context):
+    stocks = list(get_all_securities(types=['stock'], date=context.current_dt).index)
+    stocks_st = pd.DataFrame()
+    stocks_st['stocks'] = stocks
+    stocks_st['st'] = get_extras('is_st', stocks, end_date=context.previous_date, count=1).iloc[0, :].values
+    stocks_l = list(stocks_st.loc[stocks_st.st == 0, 'stocks'].values)
+    stocks = stocks_l
+    if context.current_dt.month != context.previous_date.month:
+        bp0 = get_factor_values(stocks, ['growth', 'residual_volatility', 'VROC12', 'size', 'momentum'], end_date=context.previous_date, count=1)
+        bp = bp0['growth']
+        size = bp0['size']
+        res = bp0['residual_volatility']
+        vroc = bp0['VROC12']
+        vroc.fillna(0, inplace=True)
+        vroc_001 = vroc.iloc[0, :].values.mean()
+        mom = bp0['momentum']
+        bp2 = pd.DataFrame()
+        bp2['stocks'] = bp.columns
+        bp2['bp'] = winsorize(standardlize(bp.iloc[0, :].values, inf2nan=True, axis=1), qrange=[0.05, 0.93], inclusive=True, inf2nan=True, axis=1)
+        bp2['residual_volatility'] = winsorize(standardlize(res.iloc[0, :].values, inf2nan=True, axis=1), qrange=[0.05, 0.93], inclusive=True, inf2nan=True, axis=1)
+        bp2['VROC12'] = winsorize(standardlize(vroc.iloc[0, :].values, inf2nan=True, axis=1), qrange=[0.05, 0.93], inclusive=True, inf2nan=True, axis=1)
+        bp2['size'] = winsorize(standardlize(size.iloc[0, :].values, inf2nan=True, axis=1), qrange=[0.05, 0.93], inclusive=True, inf2nan=True, axis=1)
+        bp2['zscore'] = bp2['residual_volatility'] + bp2['VROC12'] + bp2['size']
+        bp2.sort_values(by='zscore', ascending=True, inplace=True)
+        bp2 = bp2.iloc[:50, :]
+        g.securities = list(bp2.stocks.values)
+
+def market_open(context):
+    if context.current_dt.month != context.previous_date.month:
+        securities = g.securities
+        for security in context.portfolio.positions:
+            if security not in set(securities):
+                order_target(security, 0)
+        cash = context.portfolio.available_cash
+        for security in securities:
+            if context.portfolio.positions[security].closeable_amount == 0:
+                order_value(security, cash / 50)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'

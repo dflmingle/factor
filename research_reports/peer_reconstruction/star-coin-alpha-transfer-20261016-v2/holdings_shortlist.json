@@ -1,0 +1,242 @@
+[
+  {
+    "seat": 8,
+    "formula": "MARKET_CAP",
+    "reason": "untransformed field hypothesis",
+    "inverse": {
+      "n": 1498,
+      "score": -0.2698699648520511,
+      "rankcorr": 0.10951878798420796,
+      "rmse": 0.9277580389053994,
+      "top20_rmse": 1.0946148480238485
+    }
+  },
+  {
+    "seat": 8,
+    "formula": "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),20))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,20)),1),18))))),16)",
+    "reason": "M02 window neighbourhood",
+    "inverse": {
+      "n": 1497,
+      "score": -0.28060001321065925,
+      "rankcorr": 0.10515368537632007,
+      "rmse": 0.9315658590557202,
+      "top20_rmse": 1.099062221958649
+    }
+  },
+  {
+    "seat": 8,
+    "formula": "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),20))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,20)),1),18))))),18)",
+    "reason": "single trailing-window neighbourhood",
+    "inverse": {
+      "n": 1497,
+      "score": -0.2832285090453993,
+      "rankcorr": 0.10387830537208337,
+      "rmse": 0.9317452089525591,
+      "top20_rmse": 1.0991619777078028
+    }
+  },
+  {
+    "seat": 8,
+    "formula": "TS_MEAN((MARKET_CAP-RANK((RANK((-(-TS_MEAN(TS_MEAN(RATIO_EP_TTM,1),18))))-(-TS_MEAN(TS_MEAN((2/TS_KURT(RATIO_SP_TTM,20)),1),18))))),18)",
+    "reason": "coupled trailing-window neighbourhood",
+    "inverse": {
+      "n": 1497,
+      "score": -0.28322850905535646,
+      "rankcorr": 0.10387830537208337,
+      "rmse": 0.931745208981008,
+      "top20_rmse": 1.0991619777078028
+    }
+  },
+  {
+    "seat": 0,
+    "formula": "(-(ABS((RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM)))**0.5))",
+    "reason": "root distribution hypothesis",
+    "inverse": {
+      "n": 1496,
+      "score": 0.44913996014534285,
+      "rankcorr": 0.46607513521255617,
+      "rmse": 0.9096876818506325,
+      "top20_rmse": 1.0974641442136543
+    }
+  },
+  {
+    "seat": 0,
+    "formula": "ZSCORE((-(RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM))))",
+    "reason": "root distribution hypothesis",
+    "inverse": {
+      "n": 1496,
+      "score": 0.44228706209120494,
+      "rankcorr": 0.46635447355912585,
+      "rmse": 0.9301380302996979,
+      "top20_rmse": 1.0991571628143504
+    }
+  },
+  {
+    "seat": 0,
+    "formula": "RANK((-(RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM))))",
+    "reason": "root distribution hypothesis",
+    "inverse": {
+      "n": 1496,
+      "score": 0.43924366681942695,
+      "rankcorr": 0.46637402512873377,
+      "rmse": 0.9366258850484768,
+      "top20_rmse": 1.1045688244738248
+    }
+  },
+  {
+    "seat": 0,
+    "formula": "(-LOG(MAX(ABS((RANK((-MARKET_CAP))+MEAN(RANK((-CLOSE)),RATIO_CFP_TTM))),1e-12)))",
+    "reason": "root distribution hypothesis",
+    "inverse": {
+      "n": 1496,
+      "score": 0.43518404052857795,
+      "rankcorr": 0.4658762289051383,
+      "rmse": 0.9306546199154165,
+      "top20_rmse": 1.1389286687420193
+    }
+  },
+  {
+    "seat": 1,
+    "formula": "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),18))",
+    "reason": "V01 close-return window",
+    "inverse": {
+      "n": 2489,
+      "score": 0.39840884767271234,
+      "rankcorr": 0.41089573615145336,
+      "rmse": 0.7679998710554147,
+      "top20_rmse": 1.0305511317386618
+    }
+  },
+  {
+    "seat": 1,
+    "formula": "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),19))",
+    "reason": "V01 close-return window",
+    "inverse": {
+      "n": 2489,
+      "score": 0.3973449410950838,
+      "rankcorr": 0.4095101510260868,
+      "rmse": 0.7645904927383735,
+      "top20_rmse": 1.0271245899910604
+    }
+  },
+  {
+    "seat": 1,
+    "formula": "RANK(STDDEV(LOG(MAX(ABS((CLOSE/DELAY(CLOSE,1))),1e-12)),18))",
+    "reason": "V01 log-return window",
+    "inverse": {
+      "n": 2489,
+      "score": 0.39178793941158174,
+      "rankcorr": 0.4081790551622646,
+      "rmse": 0.7697296627745526,
+      "top20_rmse": 1.0344319262790276
+    }
+  },
+  {
+    "seat": 1,
+    "formula": "RANK(STDDEV(((CLOSE/DELAY(CLOSE,1))-1),20))",
+    "reason": "V01 close-return window",
+    "inverse": {
+      "n": 2489,
+      "score": 0.3900721515720325,
+      "rankcorr": 0.4060562542560715,
+      "rmse": 0.7682902892606351,
+      "top20_rmse": 1.0209250379925887
+    }
+  },
+  {
+    "seat": 2,
+    "formula": "EMA(ZSCORE((-(RANK((-SMA(VOLUME,3,1)))+RANK((-LOW))))),3)",
+    "reason": "single trailing-window neighbourhood",
+    "inverse": {
+      "n": 1496,
+      "score": 0.1525365477478914,
+      "rankcorr": 0.31956350859020827,
+      "rmse": 0.9252965523021282,
+      "top20_rmse": 1.0849111741785353
+    }
+  },
+  {
+    "seat": 2,
+    "formula": "EMA(RANK((-(RANK((-SMA(VOLUME,1,1)))+RANK((-LOW))))),3)",
+    "reason": "M04 normalization order",
+    "inverse": {
+      "n": 1496,
+      "score": 0.15209905358800127,
+      "rankcorr": 0.31479278686848755,
+      "rmse": 0.9023814099719223,
+      "top20_rmse": 1.0776868443920071
+    }
+  },
+  {
+    "seat": 2,
+    "formula": "EMA(ZSCORE((-(RANK((-SMA(VOLUME,2,1)))+RANK((-LOW))))),3)",
+    "reason": "single trailing-window neighbourhood",
+    "inverse": {
+      "n": 1496,
+      "score": 0.14695962532028273,
+      "rankcorr": 0.3175312400444873,
+      "rmse": 0.9265801090044523,
+      "top20_rmse": 1.091998777447557
+    }
+  },
+  {
+    "seat": 2,
+    "formula": "RANK(EMA(ZSCORE((-(RANK((-SMA(VOLUME,1,1)))+RANK((-LOW))))),3))",
+    "reason": "root distribution hypothesis",
+    "inverse": {
+      "n": 1496,
+      "score": 0.14558601929050272,
+      "rankcorr": 0.31145970777962767,
+      "rmse": 0.9024350841222457,
+      "top20_rmse": 1.0765407788397776
+    }
+  },
+  {
+    "seat": 7,
+    "formula": "(CLOSE/TS_MEAN(OPEN,20))",
+    "reason": "X01 open mean window",
+    "inverse": {
+      "n": 1496,
+      "score": 0.7743578504765789,
+      "rankcorr": 0.6169429021483875,
+      "rmse": 0.8714374043822016,
+      "top20_rmse": 1.0301657485761717
+    }
+  },
+  {
+    "seat": 7,
+    "formula": "(CLOSE/SMA(OPEN,10,1))",
+    "reason": "recursive versus simple smoothing",
+    "inverse": {
+      "n": 1496,
+      "score": 0.7627399625270042,
+      "rankcorr": 0.6128998044135234,
+      "rmse": 0.8791882927678132,
+      "top20_rmse": 1.0356249588753872
+    }
+  },
+  {
+    "seat": 7,
+    "formula": "(CLOSE/TS_MEAN(OPEN,15))",
+    "reason": "X01 open mean window",
+    "inverse": {
+      "n": 1496,
+      "score": 0.6873232715523268,
+      "rankcorr": 0.5790604940831364,
+      "rmse": 0.8939058669452372,
+      "top20_rmse": 1.0528710878874208
+    }
+  },
+  {
+    "seat": 7,
+    "formula": "(CLOSE/EMA(OPEN,10))",
+    "reason": "recursive versus simple smoothing",
+    "inverse": {
+      "n": 1496,
+      "score": 0.6619161271217586,
+      "rankcorr": 0.5711820046753693,
+      "rmse": 0.9117695893962413,
+      "top20_rmse": 1.0755235062686368
+    }
+  }
+]

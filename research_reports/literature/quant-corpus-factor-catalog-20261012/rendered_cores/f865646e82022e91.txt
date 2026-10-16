@@ -1,0 +1,100 @@
+quant/2021年度精选策略/56.大盘一路向上时，追总龙头2个月3倍.txt
+import csv
+import os
+import xlrd
+import math
+import jqdata
+import numpy as np
+import pandas as pd
+from six import BytesIO
+from jqlib.alpha101 import *
+from pandas import DataFrame, Series
+
+def initialize(context):
+    g.index_security = '000300.XSHG'
+    before_market_open(context)
+    run_monthly(before_market_open, 1, time='before_open', reference_security=g.index_security)
+
+def before_trading_start(context):
+    count = 11
+    g.daily_buy_count = 1
+    g.today_bought_stocks = set()
+    g.high_limit = history(count, '1d', 'high_limit', g.stocks_exsit)
+    g.close = history(count, '1d', 'close', g.stocks_exsit)
+    g.low = history(count, '1d', 'low', g.stocks_exsit)
+    g.x1 = history(1, '1d', 'high_limit', g.stocks_exsit)
+    for security in g.stocks_exsit:
+        stock_data = get_price(security, end_date=context.current_dt.date(), frequency='daily', fields=['high_limit'], skip_paused=False, fq='pre', count=1)
+        g.x1[security][0] = stock_data['high_limit'][0]
+    stocks_zt = {}
+    for security in g.stocks_exsit:
+        if g.close[security][-1] == g.high_limit[security][-1] and g.low[security][-1] < g.high_limit[security][-1]:
+            stocks_zt[security] = 1
+    for security in stocks_zt:
+        for i in range(0, count - 1):
+            if g.close[security][count - 2 - i] == g.high_limit[security][count - 2 - i] and g.low[security][count - 2 - i] < g.high_limit[security][count - 2 - i]:
+                stocks_zt[security] += 1
+            else:
+                break
+    g.max_zt_days = 0
+    for key in stocks_zt:
+        if stocks_zt[key] > g.max_zt_days:
+            g.max_zt_days = stocks_zt[key]
+    g.buy_list = []
+    for key in stocks_zt:
+        if stocks_zt[key] == g.max_zt_days:
+            g.buy_list.append(key)
+    if len(g.buy_list):
+        pass
+
+def handle_data(context, data):
+    current = get_current_data()
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    for security in context.portfolio.positions:
+        closeable_amount = context.portfolio.positions[security].closeable_amount
+        if (minute > 50 and hour == 14 and (data[security].close < current[security].high_limit)) and closeable_amount:
+            order_target(security, 0)
+    if len(g.today_bought_stocks) >= g.daily_buy_count:
+        return
+    if not (fit_linear(context, 3) > 0 and g.max_zt_days > 3):
+        return
+    if hour < 11 and len(g.today_bought_stocks) < g.daily_buy_count:
+        for security in g.buy_list:
+            if (security in context.portfolio.positions) == 0:
+                cash = context.portfolio.available_cash
+                need_count = g.daily_buy_count - len(g.today_bought_stocks)
+                buy_cash = context.portfolio.available_cash
+                if need_count:
+                    buy_cash = context.portfolio.available_cash / need_count
+                if buy_cash > data[security].close * 500:
+                    result = order_value(security, buy_cash)
+                    if not result == None:
+                        g.today_bought_stocks.add(security)
+
+def fit_linear(context, count):
+    from sklearn.linear_model import LinearRegression
+    security = '000001.XSHG'
+    df = history(count=count, unit='1d', field='close', security_list=security, df=True, skip_paused=False, fq='pre')
+    model = LinearRegression()
+    x_train = np.arange(0, len(df[security])).reshape(-1, 1)
+    y_train = df[security].values.reshape(-1, 1)
+    model.fit(x_train, y_train)
+    c = model.intercept_
+    m = model.coef_
+    c1 = round(float(c), 2)
+    m1 = round(float(m), 2)
+    return m1
+
+def before_market_open(context):
+    g.stocks_exsit = get_industry_stocks('HY001') + get_industry_stocks('HY002') + get_industry_stocks('HY003') + get_industry_stocks('HY004') + get_industry_stocks('HY005') + get_industry_stocks('HY006') + get_industry_stocks('HY007') + get_industry_stocks('HY008') + get_industry_stocks('HY009') + get_industry_stocks('HY010') + get_industry_stocks('HY011')
+    g.stocks_exsit = set(filter_special(context, g.stocks_exsit))
+
+def filter_special(context, stock_list):
+    curr_data = get_current_data()
+    stock_list = [stock for stock in stock_list if stock[0:3] != '688']
+    stock_list = [stock for stock in stock_list if not curr_data[stock].is_st]
+    stock_list = [stock for stock in stock_list if not curr_data[stock].paused]
+    stock_list = [stock for stock in stock_list if '退' not in curr_data[stock].name]
+    stock_list = [stock for stock in stock_list if (context.current_dt.date() - get_security_info(stock).start_date).days > 150]
+    return stock_list

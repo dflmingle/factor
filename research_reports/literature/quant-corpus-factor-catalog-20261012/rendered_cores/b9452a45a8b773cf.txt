@@ -1,0 +1,65 @@
+quant/量化策略/量化策略/ETF轮动策略2026/07多品种ETF动量轮动EPO-调优版-25年112.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import talib
+from scipy.optimize import minimize
+import statsmodels.api as sm
+from scipy.linalg import solve
+import math
+
+def initialize(context):
+    g.stock_num = 3
+    g._lambda = 10
+    g.w = 0.2
+    g.etf_pool = ['512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512660.XSHG', '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG']
+    run_monthly(trade, 1, '9:30')
+    g.m_days = 34
+
+def get_rank(etf_pool):
+    score_list = []
+    for etf in etf_pool:
+        df = attribute_history(etf, g.m_days, '1d', ['close'])
+        y = df['log'] = np.log(df.close)
+        x = df['num'] = np.arange(df.log.size)
+        slope, intercept = np.polyfit(x, y, 1)
+        annualized_returns = math.pow(math.exp(slope), 250) - 1
+        r_squared = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+        score = annualized_returns * r_squared
+        score_list.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': score_list})
+    df = df.sort_values(by='score', ascending=False)
+    df = df.dropna()
+    rank_list = list(df.index)
+    filtered_rank_list = [etf for etf in rank_list if df.loc[etf, 'score'] > 0]
+    return (filtered_rank_list, df)
+'EXACT_REVIEWED_FUNCTION epo sha256=11917eb18930335bc9b3301d4d4dc479ce641a4ce920d850389c2f9f926fe526 source=quant/聚宽2025年精选/17多品种ETF动量轮动+EPO优化.txt'
+'EXACT_REVIEWED_FUNCTION run_optimization sha256=54ac6b7ea536b00620b18c2d923b9c1e783a3f8ac4c7db8304141403260baba7 source=quant/聚宽2025年精选/17多品种ETF动量轮动+EPO优化.txt'
+
+def trade(context):
+    end_date = context.previous_date
+    target_list, score_df = get_rank(g.etf_pool)
+    target_list = target_list[:g.stock_num]
+    if len(target_list) > 0:
+        for etf in target_list:
+            pass
+    if len(target_list) == 0:
+        hold_list = list(context.portfolio.positions)
+        for etf in hold_list:
+            order_target_value(etf, 0)
+        return
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+    weights = run_optimization(target_list, end_date)
+    if weights is None:
+        return
+    total_value = context.portfolio.total_value
+    index = 0
+    for w in weights:
+        etf = target_list[index]
+        value = total_value * w
+        order_target_value(etf, value)
+        index += 1

@@ -1,0 +1,838 @@
+quant/2023年度精选策略/0.7年40倍，模拟超过两年，年化高回撤低.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size | pb_ratio -> book_market
+Recipes: 
+112: df = get_fundamentals(query(valuation.code).filter(valuation.pb_ratio.between(g.pbmin, g.pbmax)
+113: ).order_by(valuation.circulating_market_cap.asc()).limit(1000)).dropna()
+128: valuation.code, valuation.market_cap, valuation.circulating_market_cap
+129: ).filter(valuation.code.in_(stock_list)
+130: ).order_by(valuation.circulating_market_cap.asc()).limit(100))
+
+quant/2023年度精选策略/1.龙头底分型战法-两年23倍.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/10.一个简单而持续稳定的懒人超额收益策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+27: weight = weight.sort_values(by='weight', ascending=False).head(10)
+
+quant/2023年度精选策略/11.致敬市场--5 定投ETF之躺平赢.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+37: cm = cov(rs, rx)
+45: capm = capm.sort_values(by='alpha', ascending=False).head(10)
+
+quant/2023年度精选策略/12.【不含未来！】宽基etf轮动8年50倍年化60%.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+105: df_index.sort_values(by='周期动量', ascending=False, inplace=True)
+119: df_incre.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2023年度精选策略/13.胜率65%之缩量分歧反包战法.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+241: #     q = query(valuation.day,valuation.code,valuation.turnover_ratio).filter(valuation.code == stock,valuation.day == end_date).limit(1)
+
+quant/2023年度精选策略/14.2020年 267%年化 13%回撤 上涨趋势策略修改版.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+218: indicator.eps:('desc',1),
+340: #a = query(valuation.code).filter(valuation.market_cap > 1000,valuation.pe_ratio > 15,valuation.pe_ratio < 70)
+413: q = query(valuation.market_cap).filter(
+
+quant/2023年度精选策略/15.动量ETF轮动RSRS择时-升级.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+77: slope, intercept = np.polyfit(x, y, 1)
+96: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/16.8年13倍的ETF动量轮动策略，有滑点，无未来函数，回撤小！.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+77: slope, intercept = np.polyfit(x, y, 1)
+96: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/17.20行代码8年胜率100%躲过了牛年第一场大跌.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/18.【复现】FFScore财务模型.txt
+source sign-score structure; cumulative/single-quarter and share-field proxy; scalar denominator bug preserved | financial components partly covered; original thirteen-component model not claimed exactly replicated
+Related atoms: gross_profit_margin -> gross_margin | net_operate_cash_flow -> cf_yield (TTM adaptation) | pb_ratio -> book_market | roa -> roa | roe -> roe
+Recipes: 
+206: dependencies = ['roa', 'roa_4', 'net_operate_cash_flow', 'total_assets',
+331: f:pd.Series = f['F13_Score'].iloc[-1].sort_values(ascending=False)
+348: low_pb: List = pb[pb <= t].sort_values().index.tolist()[:200]
+
+quant/2023年度精选策略/19.人人可躺平16年3400%.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/2.多策略融合-80倍-无未来函数.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+899: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(query_list))
+914: #     q = query(valuation.day,valuation.code,valuation.turnover_ratio).filter(valuation.code == stock,valuation.day == end_date).limit(1)
+
+quant/2023年度精选策略/20.北向资金股票轮动-优质策略可直接实盘.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+88: finance.STK_ML_QUOTA.link_id == 310001).order_by(
+91: finance.STK_ML_QUOTA.link_id == 310002).order_by(
+134: df = df.sort_values(by='share_ratio',ascending=False)
+
+quant/2023年度精选策略/21.截止到21年12月依然有效的小市值适配因子.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+7: from jqfactor import get_factor_values
+36: score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+41: df.sort_values(by='score', ascending=sort, inplace=True)
+52: q = query(valuation.code,valuation.circulating_market_cap,indicator.eps).filter(valuation.code.in_(x_list)).order_by(valuation.circulating_market_cap.asc())
+
+quant/2023年度精选策略/22.简单到发指的股指策略(2013到现在收益10949%).txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/23.低AH溢价选股.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+28: order_by(finance.STK_AH_PRICE_COMP.h_a_comp))
+
+quant/2023年度精选策略/24.ROE+PB模型的优化.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: pb_ratio -> book_market | roe -> roe
+Recipes: low_leverage;roe_improve_lowpb;roe_weighted_improvement
+7: from jqfactor import get_factor_values
+40: q = query(balance.code, balance.total_liability, balance.total_assets).filter(valuation.code.in_(initial_list))
+44: df = df.sort_values(by='ratio')
+48: q = query(balance.code,
+49: balance.total_assets, #总资产
+50: balance.bill_receivable, #应收票据
+51: balance.account_receivable, #应收账款
+52: balance.other_receivable, #其他应收款
+53: balance.good_will, #商誉
+54: balance.intangible_assets, #无形资产
+55: balance.inventories, #存货
+56: balance.constru_in_process, #在建工程
+57: ).filter(balance.code.in_(low_liability_list))
+62: df = df.sort_values(by='ratio')
+65: df = get_history_fundamentals(proper_receivable_list, fields=[indicator.code, indicator.roe], watch_date=yesterday, count=5, interval='1q')
+71: df.sort_values(by='delta_average',ascending=False, inplace=True)
+74: q = query(valuation.code, valuation.pb_ratio).filter(balance.code.in_(roe_list)).order_by(valuation.pb_ratio.asc())
+
+quant/2023年度精选策略/25.这个可入得了你们法眼.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size
+Recipes: 
+18: valuation.code
+20: valuation.market_cap<500
+
+quant/2023年度精选策略/26.追涨大师（超额142）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/27.从相关系数角度探讨etf轮动的可行性.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+52: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: net_operate_cash_flow -> cf_yield (TTM adaptation) | roa -> roa
+Recipes: 
+77: [indicator.adjusted_profit,
+78: balance.total_current_assets,
+79: balance.total_assets,
+80: balance.total_current_liability,
+81: balance.total_non_current_liability,
+199: res  = df_scores.loc[lambda df_scores: df_scores['total'] > 8].sort_values(by = 'total',ascending=False).index
+
+quant/2023年度精选策略/29.价值成长轮动策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: EBIT -> ebit_ev (EBIT/EV proxy; EBIT standalone differs) | circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+7: from jqfactor import get_factor_values
+51: slope, intercept = np.polyfit(x, y, 1)
+98: slope, intercept = np.polyfit(x, y, 1)
+116: score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+122: df.sort_values(by='score', ascending=sort, inplace=True)
+135: q = query(valuation.code).filter(valuation.code.in_(ms_list)).order_by(valuation.circulating_market_cap.desc())
+148: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(ebit_list)).order_by(valuation.circulating_market_cap.asc())
+
+quant/2023年度精选策略/3.苦咖啡-默默赚钱系列-改.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+72: slope, intercept, r_value, p_value, std_err = linregress(x, y)
+81: ).sort_values(
+
+quant/2023年度精选策略/30.跟着基金报团！！！174% 回撤 7.33%.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/31.北向Boll带_ETF组合宝付费策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+182: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+237: finance.STK_ML_QUOTA.link_id == 310001).order_by(
+240: finance.STK_ML_QUOTA.link_id == 310002).order_by(
+306: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2023年度精选策略/32.最适合上班族的策略-神奇公式策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_net_profit_year_on_year -> growth_profit | pe_ratio -> earnings_yield | roa -> roa
+Recipes: 
+242: #security_list = financial_data_filter_dayu(security_list, indicator.inc_net_profit_year_on_year, 20)
+284: indicator.eps:('desc',1),
+365: a = a.sort_values(['score'],ascending = True)
+370: a = a.sort_values(['score'],ascending = False)
+478: df_pe=get_fundamentals(query(valuation.code,valuation.pe_ratio,indicator.roa).filter(
+479: valuation.code.in_(dfs300),
+480: valuation.pe_ratio>0,
+481: indicator.roa>0
+482: ).order_by(
+484: valuation.pe_ratio.desc()
+494: df_roa=get_fundamentals(query(valuation.code,valuation.pe_ratio,indicator.roa).filter(
+495: valuation.code.in_(dfs300),
+496: valuation.pe_ratio>0,
+497: indicator.roa>0
+498: ).order_by(
+500: indicator.roa.asc()
+512: for s in df.sort_values(by='no',ascending=False).head(30)['code']:
+515: #print(df.sort_values(by='no',ascending=False).head(30)['code'])
+
+quant/2023年度精选策略/33.趋势交易5.0 无择时-2年5倍不是梦.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+115: lis = [linregress(x,df.iloc[ii][:100])[0:3] for ii in range(len(df))]
+121: df.sort_values('k',ascending=False,inplace=True)
+
+quant/2023年度精选策略/34.超稳+翻倍，贝塔值只有0.048的期指策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+191: g.corr = a.corr(b)<-0.65
+192: g.corr_ = a.corr(b_)<-0.65
+
+quant/2023年度精选策略/35.最简强者恒强策略.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | market_cap -> small_size
+Recipes: 
+27: q = query(valuation.code,valuation.market_cap,valuation.circulating_market_cap,valuation.turnover_ratio)
+28: #df = get_fundamentals( q.filter(valuation.code.in_(hys)) )
+29: dfp = get_fundamentals_continuously(q.filter(valuation.code.in_(hys)), end_date=None,count=1, panel=False)
+34: df = df.sort_values(by='market_cap',ascending=False).head(10)
+
+quant/2023年度精选策略/36.PEG+EBIT对小市值因子的优化.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: EBIT -> ebit_ev (EBIT/EV proxy; EBIT standalone differs) | circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+7: from jqfactor import get_factor_values
+35: score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+40: df.sort_values(by='score', ascending=sort, inplace=True)
+52: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(test_list)).order_by(valuation.circulating_market_cap.asc())
+
+quant/2023年度精选策略/37.ETF动量轮动RSRS择时-魔改4-低通滤波.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+59: score = np.polyfit(np.arange(g.momentum_day),newdr[-g.momentum_day:],1)[0].real
+63: # score = np.polyfit(np.arange(g.momentum_day),(data.close/data.close[0])[-g.momentum_day:],1)[0].real
+72: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/38.随机森林策略，低换手率，年化近50%.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+28: g.df_dic[dd.rsplit('-', 1)[0]] = df.sort_values(by='score', ascending=False)
+
+quant/2023年度精选策略/39.低风险高收益的期货策略.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/4.8年10倍，回撤小，有滑点！ETF动量简单轮动策略！.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+77: slope, intercept = np.polyfit(x, y, 1)
+96: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/40.再改进可实盘-默默赚钱系列-风险控制-增强版本-V5.0.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+80: slope, intercept, r_value, p_value, std_err = linregress(x, y)
+89: ).sort_values(
+
+quant/2023年度精选策略/41.大盘拥挤率极速版-180天3秒.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+16: count=1, panel=False).sort_values(by='money', ascending=False)
+39: s2 = h[day].dropna().sort_values(ascending=False)
+
+quant/2023年度精选策略/42.二板排板战法研究.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+340: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(query_list))
+
+quant/2023年度精选策略/43.集合竞价摸奖策略1.0-致敬2022.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | roe -> roe
+Recipes: 
+217: stock_list = list(get_fundamentals(query(valuation.code).filter(valuation.circulating_market_cap<100,valuation.code.in_(stock_list)).order_by(indicator.roe.desc())).code)
+310: m=linregress(x,lis)[0]
+
+quant/2023年度精选策略/44.海龟突破系统，19-21年化150，无未来函数和过拟合.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+91: df_pe.sort_values(by='pe_ratio',ascending=False,inplace=True)
+
+quant/2023年度精选策略/45.敢于直接实盘的—八仙过海V2.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/46.年化46%的北向资金+20日涨幅的创业板策略.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+80: df['252_std'] = df['total_flowin'].rolling(252).std()
+81: df['252_mean'] = df['total_flowin'].rolling(252).mean()
+
+quant/2023年度精选策略/47.动量ETF轮动-RSRS择时-卡尔曼滤波.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+67: score = np.polyfit(np.arange(20),pred_data[-20:],1)[0]
+71: # score = np.polyfit(np.arange(g.momentum_day),(data.close/data.close[0])[-g.momentum_day:],1)[0].real
+80: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/48.【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | net_profit_growth_rate -> growth_profit | roe -> roe
+Recipes: 
+12: from jqfactor import get_factor_values
+141: score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+146: df.sort_values(by='score', ascending=sort, inplace=True)
+159: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(initial_list)).order_by(valuation.circulating_market_cap.asc())
+217: q1 = query( indicator.code, indicator.roe).filter(indicator.code.in_(hypeg_list)).order_by(indicator.roe.desc())  #desc从大到小，asc,从小到大
+229: q3 = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_( roe_all)).order_by(valuation.circulating_market_cap.desc())
+
+quant/2023年度精选策略/49.【7日趋势】交易策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: market_cap -> small_size
+Recipes: 
+178: query(valuation.code).filter(
+179: valuation.turnover_ratio >2,
+180: valuation.turnover_ratio <= 10,
+181: valuation.market_cap > 30,
+182: valuation.market_cap <= 500
+183: ).order_by(
+185: valuation.turnover_ratio.desc()),
+
+quant/2023年度精选策略/5.87.5%胜率之分歧反包二板.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/50.缠论交易策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/51.龙头战法之单阳不破.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+288: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(query_list))
+
+quant/2023年度精选策略/52.筹码选股.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: pe_ratio -> earnings_yield | roa -> roa
+Recipes: 
+73: valuation.code,
+74: indicator.inc_revenue_annual
+76: valuation.code.in_(final_Buylist)
+77: ).order_by(
+78: valuation.pe_ratio < 15,
+79: indicator.roa.desc()
+183: shareholder=shareholder.sort_values('shareholder_ratio',ascending=False)
+258: institutional_holder=institutional_holder_tabler.sort_values('institutional_ratio',ascending=False)
+
+quant/2023年度精选策略/53.利用聚宽的数据库，研究基金.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+102: fdelta = fdelta.sort_values(ascending=False)
+
+quant/2023年度精选策略/54.ETF轮动策略-入门1.0.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+79: slope, intercept = np.polyfit(x, y, 1)
+98: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/55.【分享】券商金股组合增强.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+653: return -np.divide(w.T @ mean_ic, np.sqrt(w @ ic.cov() @ w.T))
+724: cond = close.rank(pct=True) >= self.lamb
+728: return close.rank(pct=True, ascending=False) <= self.lamb
+732: return close.rank(pct=True, ascending=True) <= self.lamb
+824: S_rank = S.rank(ascending=False)
+954: x.rank(method='first'), 10, duplicates='drop', labels=list(range(1, 11))))
+961: return af_df.rank(pct=True) <= lamb
+969: return af_df.rank() > (self.max_window // 2)
+983: dependencies = ['close']
+989: rps = 1 - pct_chg.rank(axis=1).div(pct_chg.count(axis=1),axis=0)
+1030: return pd.concat((factor_df[col].rank(ascending=asc) for col, asc in ind_direction.items()), axis=1, sort=True)
+
+quant/2023年度精选策略/56.韶华研究之五-ETF轮动，躺赚，夏普2.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+263: df_bbi.sort_values(by='bbi', ascending=True, inplace=True)  #升序排列
+273: df_change.sort_values(by='change', ascending=False, inplace=True)  #降序排列
+299: df_increase.sort_values(by='etf_change', ascending=False, inplace=True)  #降序排列
+311: df_change.sort_values(by='change', ascending=False, inplace=True)  #降序排列
+
+quant/2023年度精选策略/57.韶华研究之四-菲阿里四阶在T+1的短线策略应用.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+13: from jqfactor import get_factor_values
+116: stocklist = financial_data_filter_dayu(stocklist, valuation.circulating_market_cap, 50)
+117: stocklist = financial_data_filter_qujian(stocklist, valuation.pe_ratio, (0,100))
+118: stocklist = financial_data_filter_qujian(stocklist, valuation.pb_ratio, (0,10))
+293: df_price.sort_values('coef',ascending=True,inplace=True)
+296: df_price.sort_values('coef',ascending=True,inplace=True)
+299: df_price.sort_values('coef',ascending=True,inplace=True)
+302: df_price.sort_values('coef',ascending=False,inplace=True)
+305: df_price.sort_values('coef',ascending=False,inplace=True)
+308: df_price.sort_values('coef',ascending=False,inplace=True)
+
+quant/2023年度精选策略/58.北向RSRS与布林带择时.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+89: ).order_by(table.day)
+111: return df.sort_values(by='share_ratio',ascending=False)[3:g.max_stock_count]['code'].values
+193: ret_std = np.sqrt(price_df.rolling(g.quantile_N).std())
+194: ret_quantile = ret_std.rolling(g.quantile_M).apply(
+195: lambda x: x.rank(pct=True)[-1], raw=False)
+212: cov = np.cov(np.vstack((X,y)))
+
+quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: inc_total_revenue_year_on_year -> growth_sales | roe -> roe
+Recipes: 
+31: from jqfactor import get_factor_values
+296: df_value = get_fundamentals(query(indicator.code,indicator.roe,indicator.inc_total_revenue_year_on_year,indicator.ocf_to_revenue).filter(indicator.code.in_(stocklist)),lastd_date).dropna()
+297: roe_list = df_value.sort_values(['roe'],ascending = False).code.values.tolist()[:100]
+298: rev_list = df_value.sort_values(['inc_total_revenue_year_on_year'],ascending = False).code.values.tolist()[:100]
+299: ocf_list = df_value.sort_values(['ocf_to_revenue'],ascending = False).code.values.tolist()[:100]
+303: df_f_factors = get_history_fundamentals(stocklist,[indicator.roe,indicator.inc_total_revenue_year_on_year,indicator.ocf_to_revenue]
+347: poollist = df_delta.sort_values('roe_chg', ascending = False).code.values.tolist()#[0:20]
+
+quant/2023年度精选策略/6.21年度6.为了挣点积分自己实盘的策略分享出来.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+185: g.df.sort_values(by='周期涨幅%',ascending=False,inplace=True) # 按照涨幅排序
+
+quant/2023年度精选策略/60.抄底神器2.0，低回撤，高成功率，无未来函数.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+47: q1=query(valuation.code, valuation.market_cap,income.total_operating_revenue,valuation.pe_ratio
+49: valuation.market_cap < 3000,
+50: valuation.market_cap >30,
+51: valuation.pe_ratio>30,
+52: valuation.pe_ratio<100,
+53: ).order_by(
+55: valuation.market_cap.asc()
+
+quant/2023年度精选策略/61.分享一个最近两年非常有效的因子.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/62.3年复合200+%收益+超低回撤11%以内，无惧大跌.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+320: df_etf.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2023年度精选策略/63.A股最强板块动量趋势（最终版）.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+316: result = result.sort_values(by=last_trade_date[5:], ascending=False)[0:6]
+
+quant/2023年度精选策略/64.韶华研究之七--不可多得的基本面三角.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_total_revenue_year_on_year -> growth_sales | roe -> roe
+Recipes: 
+12: from jqfactor import get_factor_values
+208: df_value = get_fundamentals(query(indicator.code,indicator.roe,indicator.inc_total_revenue_year_on_year,indicator.ocf_to_revenue).filter(indicator.code.in_(stocklist)),lastd_date).dropna()
+209: roe_list = df_value.sort_values(['roe'],ascending = False).code.values.tolist()[:100]
+210: rev_list = df_value.sort_values(['inc_total_revenue_year_on_year'],ascending = False).code.values.tolist()[:100]
+211: ocf_list = df_value.sort_values(['ocf_to_revenue'],ascending = False).code.values.tolist()[:100]
+215: df_f_factors = get_history_fundamentals(stocklist,[indicator.roe,indicator.inc_total_revenue_year_on_year,indicator.ocf_to_revenue]
+259: poollist = df_delta.sort_values('roe_chg', ascending = False).code.values.tolist()[0:10]
+265: roe_list = roe_chg.sort_values(ascending = False).index.values.tolist()[:20]
+268: rev_list = rev_chg.sort_values(ascending = False).index.values.tolist()[:20]
+271: ocf_list = ocf_chg.sort_values(ascending = False).index.values.tolist()[:20]
+
+quant/2023年度精选策略/65.PB-POE+双均线--加入jq以来第一个成功的交易策略 一.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: market_cap -> small_size | pb_ratio -> book_market | roe -> roe
+Recipes: 
+37: valuation.code
+39: valuation.market_cap > 800,
+40: valuation.pb_ratio < 20,
+41: indicator.roe > 7,
+42: ).order_by(
+44: (indicator.roe - valuation.pb_ratio).desc()
+
+quant/2023年度精选策略/66.基于动量和反转效应的沪深300成分股策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+67: dl_list = list(stock_data.sort_values('ret')[:25].index)
+93: g.dl_list = list(stock_data.sort_values('ret')[-30:].index)
+
+quant/2023年度精选策略/68.宽基BBI动量追涨，完美避开这波大跌~.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+95: df_index.sort_values(by='周期动量', ascending=False, inplace=True)
+106: df_incre.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2023年度精选策略/69.选取向上趋势的股票.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+47: score = np.polyfit(np.arange(len(data)),data.close/data.close[0],1)[0]
+55: slope, intercept = np.polyfit(x, y, 1)
+
+quant/2023年度精选策略/70.回踩均线搏反弹，21年来70%，无未来（测试第一弹）.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+161: query(valuation.code).filter(
+162: valuation.turnover_ratio > 3,
+163: valuation.turnover_ratio <= 10,
+164: ).order_by(
+166: valuation.turnover_ratio.desc()),
+
+quant/2023年度精选策略/71.lightGBM.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/72.优化了一下宽基etf追涨的策略，值得深入研究.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+105: df_index.sort_values(by='周期动量', ascending=False, inplace=True)
+119: df_incre.sort_values(by='周期涨幅', ascending=False, inplace=True)
+
+quant/2023年度精选策略/73.MACD多周期共振，精准打击！.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+169: df=get_fundamentals(query(valuation.code))
+253: df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by="id",ascending=False)
+294: df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by="id",ascending=False)
+
+quant/2023年度精选策略/74.勾股神器2代码40行，年化一百点.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/75.机器学习策略分享.txt
+trained model and calibration not replicated; only mapped input atoms tested
+Related atoms: cash_to_current_liability -> cash_current_liability (PIT input proxy) | circulating_market_cap -> small_size (total_mv adaptation) | gross_profitability -> profitability_ytd_assets | market_cap -> small_size | pb_ratio -> book_market | pcf_ratio -> cf_yield | ps_ratio -> sales_yield | roa -> roa | roe -> roe
+Recipes: cash_current_liability;profit_growth_stability;roa_growth_stability;sharpe120_atom
+70: stock_to_buy = current_df[current_df.label == 1].sort_values('score').tail(10)
+128: dependencies = ['total_operating_revenue','total_operating_cost','total_assets']
+144: dependencies = ['close']
+156: dependencies = ['close']
+164: dependencies = ['pcf_ratio']
+171: dependencies = ['pb_ratio']
+178: dependencies = ['net_profit_1', 'net_profit_2', 'net_profit_3', 'net_profit_4']
+191: dependencies = ['roa_1', 'roa_2', 'roa_3', 'roa_4']
+204: dependencies = ['circulating_market_cap']
+211: dependencies = ['volume', 'close']
+219: dependencies = ['net_pct_main']
+226: dependencies = ['operating_revenue_1', 'operating_revenue_2', 'operating_revenue_3', 'operating_revenue_4']
+238: dependencies = ['roe']
+245: dependencies = ['roa']
+250: dependencies = ['close']
+259: dependencies = ['a_share_holders']
+266: dependencies = ['cash_to_current_liability']
+273: dependencies = ['ps_ratio']
+
+quant/2023年度精选策略/76.半年6.5倍--次新股排板一式.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/77.【基金增强思考2.0】优秀基金的持续性与周期的关系密不可分.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+115: #     df_fund = df_fund.sort_values(['rate'], ascending=False, inplace=False).head(20)
+117: #      df_fund1 = df_fund.sort_values(['rate'], ascending=False, inplace=False)
+120: df_fund = df_fund.sort_values(['rate'], ascending=False, inplace=False).head(100)
+
+quant/2023年度精选策略/78.EPS+MS因子的大盘蓝筹策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+7: from jqfactor import get_factor_values
+47: slope, intercept = np.polyfit(x, y, 1)
+92: score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].ix[0].tolist()
+97: df.sort_values(by='score', ascending=False, inplace=True)
+106: q = query(valuation.code).filter(valuation.code.in_(ms_list)).order_by(valuation.circulating_market_cap.desc())
+
+quant/2023年度精选策略/79.过滤两个因子，12年15倍的roa选股500指数增强.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_revenue_year_on_year -> growth_sales | pb_ratio -> book_market | pe_ratio -> earnings_yield | roa -> roa | turnover_volatility -> low_turn_std20
+Recipes: 
+11: from jqfactor import get_factor_values
+232: # security_list = financial_data_filter_dayu(security_list, indicator.inc_revenue_year_on_year, 0)
+233: # security_list = financial_data_filter_qujian(security_list, valuation.pe_ratio, (0,120))
+234: # security_list = financial_data_filter_qujian(security_list, valuation.pb_ratio, (0,20))
+275: indicator.roa:('desc',1),
+356: a = a.sort_values(['score'],ascending = True)
+361: a = a.sort_values(['score'],ascending = False)
+475: factor_data = get_factor_values(security_list, factors=[
+493: df = df.sort_values(axis=1,by=pre_date,ascending=True)
+507: factor_data = get_factor_values(security_list, factors=[
+525: df = df.sort_values(axis=1,by=pre_date,ascending=True)
+
+quant/2023年度精选策略/8.iAlpha 基金投资策略.txt
+original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/80.趋与势的量化定义.txt
+normalized path relative to MA; companion source three30-day strength modes tested, index timing not reproduced
+Related atoms: 
+Recipes: 
+62: ma = close_ser.rolling(window).mean()
+80: ma = close_ser.rolling(window).mean()
+717: score = hs300['close'].rolling(60).apply(calc_trend_score,raw=False)
+718: lower_bound = score.rolling(20).apply(lambda x: x.quantile(0.05),raw=False)
+719: upper_bound = score.rolling(20).apply(lambda x: x.quantile(0.85),raw=False)
+
+quant/2023年度精选策略/81.拥挤率指标-择时大盘顶底-Clone1-第二版.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+39: #                   count=1, panel=False).sort_values(by='money', ascending=False)
+167: all_df = all_df.sort_values(['time', 'money'], ascending = [True, False])
+179: df = df.sort_values('money', ascending = False)
+184: df_crowd = df_crowd.sort_values('date')
+
+quant/2023年度精选策略/82.势的度量.txt
+three source ultimate-score modes, example30/MA5, unsigned strength
+Related atoms: 
+Recipes: trend_ultimate30_compound;trend_ultimate30_monotone;trend_ultimate30_moving_average
+37: ma = close_ser.rolling(window).mean()
+52: ma = close_ser.rolling(window).mean()
+304: s_score.sort_values(ascending=False)
+
+quant/2023年度精选策略/83.韶华研究之一，布林突破+均线金叉，四年五倍.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+303: df_waiting = df_waiting.sort_values(['cir_m'], ascending = True) #按市值大小递减排序，以便多个信号时按市值取需
+
+quant/2023年度精选策略/84.对 二板排板战法 的部分优化.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+413: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(query_list))
+
+quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/86.【基本面三角3.0】看过之前策略的就略过吧.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_total_revenue_year_on_year -> growth_sales | roe -> roe
+Recipes: 
+15: from jqfactor import get_factor_values
+281: df_value = get_fundamentals(query(indicator.code,indicator.roe,indicator.inc_total_revenue_year_on_year,indicator.ocf_to_revenue).filter(indicator.code.in_(stocklist)),lastd_date).dropna()
+282: roe_list = df_value.sort_values(['roe'],ascending = False).code.values.tolist()[:100]
+283: rev_list = df_value.sort_values(['inc_total_revenue_year_on_year'],ascending = False).code.values.tolist()[:100]
+284: ocf_list = df_value.sort_values(['ocf_to_revenue'],ascending = False).code.values.tolist()[:100]
+288: df_f_factors = get_history_fundamentals(stocklist,[indicator.roe,indicator.inc_total_revenue_year_on_year,indicator.ocf_to_revenue]
+332: poollist = df_delta.sort_values('roe_chg', ascending = False).code.values.tolist()[0:10]
+
+quant/2023年度精选策略/87.【股指期货】收盘折溢价策略.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy | original non-stock universe/timing strategy; only explicitly labelled stock adaptations eligible
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/88.韶华研究之二，顺势而为，年化140.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | pb_ratio -> book_market | pe_ratio -> earnings_yield
+Recipes: 
+59: df_list= df_list.sort_values(['data'], ascending = False) #按'data'-波动率降序排序
+199: ).filter(finance.SW1_DAILY_PRICE.code==indus_code,finance.SW1_DAILY_PRICE.date <= today_date).order_by(finance.SW1_DAILY_PRICE.date.desc()).limit(100))
+
+quant/2023年度精选策略/89.2019年到现在90多倍的新策略.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/9.10倍-二板排板战法优化-无未来函数.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation)
+Recipes: 
+417: q = query(valuation.code,valuation.circulating_market_cap).filter(valuation.code.in_(query_list))
+
+quant/2023年度精选策略/90.一个月轮动股票换仓，内日做T，相对高频交易.txt
+minute/auction execution or features present; daily atoms do not reproduce this full strategy
+Related atoms: gross_profit_margin -> gross_margin | net_operate_cash_flow -> cf_yield (TTM adaptation) | pb_ratio -> book_market | roa -> roa | roe -> roe
+Recipes: 
+213: dependencies = ['roa', 'roa_4', 'net_operate_cash_flow', 'total_assets',
+338: f:pd.Series = f['F13_Score'].iloc[-1].sort_values(ascending=False)
+355: low_pb: List = pb[pb <= t].sort_values().index.tolist()[:200]
+
+quant/2023年度精选策略/91.致敬市场--4 解析细节.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: inc_total_revenue_year_on_year -> growth_sales
+Recipes: 
+45: indicator.code,
+46: indicator.pubDate,
+47: indicator.inc_return.label('ROE'),
+48: indicator.inc_total_revenue_year_on_year.label('grow'),
+51: indicator.inc_return > 10,
+52: indicator.inc_total_revenue_year_on_year > 0,
+66: cm = cov(r[s], rx)
+68: cvar = cvar.sort_values(ascending=True)
+106: ptable = ptable.sort_values(by='weight', ascending=False)
+
+quant/2023年度精选策略/92.【超跌反弹v1.0】3年2.3倍的超跌反弹小牛股.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | roe -> roe
+Recipes: 
+59: q = query(valuation.code
+60: ).filter(valuation.code.in_(stocklist),
+61: valuation.circulating_market_cap>50, # 流通市值>50
+62: indicator.roe>0
+63: ).order_by(indicator.roe.desc()
+
+quant/2023年度精选策略/93.布林线追龙头战法.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: gross_profit_margin -> gross_margin | market_cap -> small_size | pe_ratio -> earnings_yield
+Recipes: 
+56: q = query(valuation.code).filter(valuation.code.in_(scu),
+57: valuation.pe_ratio  > 15, valuation.pe_ratio < 100 ,
+58: indicator.gross_profit_margin>40,
+59: ).order_by(
+60: valuation.market_cap.desc(),valuation.pe_ratio.asc()
+
+quant/2023年度精选策略/94.可转债回测.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+75: kzz_low = kzz[(kzz['date'] == pd.to_datetime(begin)) ].sort_values(by=['double_order'], ascending=True)[:kzz_num]
+179: kzz_low = kzz[(kzz['date'] == pd.to_datetime(begin)) ].sort_values(by=['double_order'], ascending=True)[:kzz_num]
+
+quant/2023年度精选策略/95.【复现】高频价量相关性，意想不到的选股因子.txt
+external cpv.csv and intraday data missing, no claimed daily replication
+Related atoms: 
+Recipes: 
+
+quant/2023年度精选策略/96.市场宽度20210622.txt
+timing, pattern, execution or helper code; no separately confirmed new cross-sectional recipe
+Related atoms: 
+Recipes: 
+58: df_ma20 = df_close.rolling(window=20, axis=1).mean().iloc[:, -p_count:]
+
+quant/2023年度精选策略/97.韶华研究之六，简单不一样的发现趋势，3年6倍.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: pe_ratio -> earnings_yield
+Recipes: 
+273: df_value = get_fundamentals(query(valuation.code,valuation.pe_ratio).filter(valuation.code.in_(stocklist)),lastd_date).dropna()
+282: df_value = df_value.sort_values(['pe_ratio'],ascending = False)
+284: df_value = df_value.sort_values(['pe_ratio'],ascending = True)
+
+quant/2023年度精选策略/98.欧奈尔CANSLIM策略初探三.txt
+external PIT/event/holdings dataset dependency; not recreated from OHLCV
+Related atoms: 
+Recipes: 
+107: r = f_df.circulating_market_cap.rank()/f_df.shape[0]
+120: r = r.rank(ascending=False)/len(r)
+125: r = r.rank(ascending=False)/len(r)
+130: r = r.rank(ascending=False)/len(r)
+214: indicator.code.in_(stocks),
+223: indicator.code.in_(stocks),
+
+quant/2023年度精选策略/99.全市场选股？7年5倍不择时，回撤30%左右.txt
+mapped stock selection atoms and execution/timing constraints identified; full strategy backtest not reproduced
+Related atoms: circulating_market_cap -> small_size (total_mv adaptation) | pb_ratio -> book_market | ps_ratio -> sales_yield | roa -> roa
+Recipes: 
+91: balance.code, balance.total_liability, balance.total_assets
+92: #balance.code, balance.total_non_current_liability,balance.total_non_current_assets
+94: valuation.code.in_(initial_list)
+101: df = df.sort_values(by = 'ratio',ascending=False)
+109: query(balance.code,
+110: balance.total_assets,  # 总资产
+111: balance.bill_receivable,  # 应收票据
+112: balance.account_receivable,  # 应收账款
+113: balance.other_receivable,  # 其他应收款
+114: balance.good_will,  # 商誉
+115: balance.intangible_assets,  # 无形资产
+116: balance.inventories,  # 存货
+117: balance.constru_in_process,# 在建工程
+119: balance.code.in_(low_liability_list)
+126: df1 = df1.sort_values(by = 'ratio1',ascending=False)
+134: query(balance.code,
+135: balance.total_assets,  # 总资产
+136: balance.bill_receivable,  # 应收票据
+137: balance.account_receivable,  # 应收账款
+138: balance.other_receivable,  # 其他应收款
+139: balance.good_will,  # 商誉
+140: balance.intangible_assets,  # 无形资产
+141: balance.inventories,  # 存货
+142: balance.constru_in_process,# 在建工程
+

@@ -1,0 +1,32 @@
+quant/聚宽2025年精选/90固收+.txt
+from jqdata import *
+import numpy as np
+import pandas as pd
+from scipy.linalg import inv
+import warnings
+warnings.filterwarnings('ignore')
+
+def initialize(context):
+    g.weights = {'510880.XSHG': 0.08, '513100.XSHG': 0.08, '518880.XSHG': 0.14, '511010.XSHG': 0.7}
+    run_daily(trade, '9:35')
+
+def trade(context):
+    total_value = context.portfolio.total_value
+    cdata = get_current_data()
+    weights = g.weights
+    balance = {}
+    for stock in weights.keys():
+        value = total_value * weights[stock]
+        if stock in context.portfolio.positions:
+            diff = value - context.portfolio.positions[stock].value
+        else:
+            diff = value
+        balance[stock] = diff
+    rebalance = dict(sorted(balance.items(), key=lambda x: x[1], reverse=False))
+    for stock in rebalance.keys():
+        value = total_value * weights[stock]
+        if abs(balance[stock]) > 0.15 * value and abs(balance[stock] / cdata[stock].last_price) > 100:
+            if balance[stock] < 0:
+                order_target_value(stock, value)
+            elif context.portfolio.cash / cdata[stock].last_price > 100:
+                order_target_value(stock, value)

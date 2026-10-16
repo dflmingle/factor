@@ -1,0 +1,100 @@
+quant/聚宽2025年精选/52机器学习滚动训练价投策略.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+from xgboost import XGBClassifier, XGBRegressor
+import warnings
+from sklearn.preprocessing import StandardScaler
+warnings.filterwarnings('ignore')
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 20
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.factor_list = ['liquidity', 'VDIFF', 'VEMA26', 'WVAD', 'money_flow_20']
+    run_daily(prepare_stock_list, '9:05')
+    run_monthly(weekly_adjustment, 1, '9:30')
+    run_daily(check_limit_up, '14:00')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+
+def get_factor_data(securities_list, date):
+    factor_data = get_factor_values(securities=securities_list, factors=g.factor_list, count=1, end_date=date)
+    df_jq_factor = pd.DataFrame(index=securities_list)
+    for i in factor_data.keys():
+        df_jq_factor[i] = factor_data[i].iloc[0, :]
+    return df_jq_factor
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    initial_list = get_all_securities('stock', yesterday).index.tolist()
+    initial_list = filter_kcbj_stock(initial_list)
+    N = 30
+    by_date = get_trade_days(end_date=context.previous_date, count=10 * N)
+    by_date = by_date[::-1]
+    dateList = by_date[::N]
+    dateList = dateList[::-1].tolist()
+    train_data = pd.DataFrame()
+    for date in dateList[:-1]:
+        S = get_all_securities('stock', date).index.tolist()
+        S = filter_kcbj_stock(S)
+        factor_origl_data = get_factor_data(S, date)
+        median_values = factor_origl_data.median()
+        factor_origl_data.fillna(median_values, inplace=True)
+        data_close = get_price(S, date, dateList[dateList.index(date) + 1], '1d', 'close')['close']
+        factor_origl_data['pchg'] = data_close.iloc[-1] / data_close.iloc[0] - 1
+        factor_origl_data = factor_origl_data.sort_values(by=['pchg'], ascending=False)
+        factor_origl_data = factor_origl_data.iloc[:int(len(factor_origl_data['pchg']) / 10 * 1), :].append(factor_origl_data.iloc[int(len(factor_origl_data['pchg']) / 10 * 9):, :])
+        factor_origl_data['label'] = list(factor_origl_data['pchg'].apply(lambda x: 1 if x > np.mean(list(factor_origl_data['pchg'])) else 0))
+        train_data = train_data.append(factor_origl_data)
+    X_train = train_data[g.factor_list]
+    y_train = train_data['label']
+    classification_model = XGBClassifier(learning_rate=0.01, max_depth=10, min_child_weight=17, n_estimators=100, nthread=1, subsample=0.2)
+    classification_model.fit(X_train, y_train)
+    df = get_factor_data(initial_list, yesterday)
+    median_values = df.median()
+    df.fillna(median_values, inplace=True)
+    X_test = df[g.factor_list]
+    y_pred_proba = classification_model.predict_proba(X_test)[:, 1]
+    df['total_score'] = list(y_pred_proba)
+    df = df.sort_values(by=['total_score'], ascending=False)
+    lst = df.index.tolist()
+    N = int(len(lst) // 5)
+    lst = lst[:N]
+    lst = get_stock_pool2(lst, context.current_dt)
+    q = query(valuation.code).filter(valuation.code.in_(lst)).order_by(indicator.roa.desc())
+    lst = list(get_fundamentals(q).code)[:g.stock_num]
+    return lst
+
+def weekly_adjustment(context):
+    target_list = get_stock_list(context)
+    for stock in g.hold_list:
+        if stock not in target_list and stock not in g.yesterday_HL_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if stock not in list(context.portfolio.positions.keys()):
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def get_stock_pool2(stock_list, date):
+    by_date = get_trade_days(end_date=date, count=120)[0]
+    all_stocks = get_all_securities(date=by_date).index.tolist()
+    stock_list = list(set(stock_list).intersection(set(all_stocks)))
+    stock_list = get_price(security=stock_list, frequency='1m', end_date=date, count=1, fields=['close', 'high_limit', 'low_limit', 'paused'], panel=False).query('close>low_limit and close< high_limit and paused==0')['code'].tolist()
+    s_extras = get_extras(info='is_st', security_list=stock_list, end_date=date, count=1).iloc[0]
+    stock_list = s_extras[~s_extras].index.tolist()
+    stock_list = [stock for stock in stock_list if not stock.startswith(('3', '68', '4', '8'))]
+    return stock_list
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=5e68dad3789f3dcd9dbc75f23be4ae635975bea8cb208d7f9640cf85a81be542 source=quant/2024年度精选策略1/23.wywy1995大神机器学习策略年化提升35pt.txt'

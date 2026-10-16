@@ -1,0 +1,23 @@
+quant/2020年度精选策略/76 MACD——大盘择时.txt
+import talib
+import pandas as pd
+import numpy as np
+import math
+from sklearn.model_selection import learning_curve
+import talib
+
+def initialize(context):
+    context.stocks = ['399300.XSHE']
+    set_universe(context.stocks)
+
+def handle_data(context, data):
+    cash = context.portfolio.cash
+    for stock in context.stocks:
+        h = attribute_history(stock, 60, '1d', ('high', 'low', 'close'))
+        macd, macdsignal, macdhist = talib.MACD(h['close'].values, fastperiod=9, slowperiod=24, signalperiod=9)
+        current_position = context.portfolio.positions[stock].amount
+        current_price = data[stock].price
+        if macd[-1] < 0 and current_position >= 0:
+            order_target(stock, 0)
+        elif macd[-1] > 0 and current_position <= 0:
+            order_value(stock, cash)

@@ -1,0 +1,32 @@
+quant/2022年度精选策略/66.【配对交易】基于zscore的配对交易策略（胜率88.2%）.txt
+from datetime import datetime
+from jqdata import *
+
+def initialize(context):
+    run_daily(market_open, time='every_bar', reference_security='000300.XSHG')
+    g.code1 = '002415.XSHE'
+    g.code2 = '000651.XSHE'
+    g.window = 60
+    g.high = 2
+    g.low = -2
+    g.hold = 0
+
+def market_open(context):
+    yesterday = (context.current_dt - datetime.timedelta(1)).strftime('%Y-%m-%d')
+    zscore = get_zscore(yesterday)
+    if g.hold != 1 and zscore <= g.low:
+        order_target(g.code2, 0)
+        order_value(g.code1, context.portfolio.available_cash)
+        g.hold = 1
+    elif g.hold != 2 and zscore >= g.high:
+        order_target(g.code1, 0)
+        order_value(g.code2, context.portfolio.available_cash)
+        g.hold = 2
+
+def get_zscore(date):
+    price_df = get_price([g.code1, g.code2], end_date=date, count=g.window, fields='close').close
+    sub = price_df[g.code1] - price_df[g.code2]
+    ma = sub.mean()
+    std = sub.std()
+    zscore = round((sub[-1] - ma) / std, 4)
+    return zscore

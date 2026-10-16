@@ -1,0 +1,414 @@
+quant/2024年度精选策略1/100.全市场归因.txt
+from datetime import datetime, timedelta
+import datetime
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import seaborn as sns
+import math
+import statsmodels.api as sm
+from statsmodels import regression
+from scipy.optimize import minimize
+from scipy import stats
+import scipy.stats as st
+import warnings
+warnings.filterwarnings('ignore')
+mpl.rcParams['font.sans-serif'] = ['SimHei']
+mpl.rcParams['axes.unicode_minus'] = False
+sns.set_style({'font.sans-serif': ['simhei', 'Arial']})
+pd.set_option('display.max_rows', 200)
+pd.set_option('display.max_columns', 200)
+pd.set_option('display.width', 200)
+plt.style.use('ggplot')
+
+def get_tradeday_list(start, end, frequency=None, count=None):
+    if count != None:
+        df = get_price('000001.XSHG', end_date=end, count=count)
+    else:
+        df = get_price('000001.XSHG', start_date=start, end_date=end)
+    if frequency == None or frequency == 'D':
+        return df.index
+    else:
+        df['year-month'] = [str(i)[0:7] for i in df.index]
+        if frequency == 'M':
+            return df.drop_duplicates('year-month').index
+        elif frequency == 'Q':
+            df['month'] = [str(i)[5:7] for i in df.index]
+            df = df[(df['month'] == '01') | (df['month'] == '04') | (df['month'] == '07') | (df['month'] == '10')]
+            return df.drop_duplicates('year-month').index
+        elif frequency == 'H-Y':
+            df['month'] = [str(i)[5:7] for i in df.index]
+            df = df[(df['month'] == '01') | (df['month'] == '06')]
+            return df.drop_duplicates('year-month').index
+'EXACT_REVIEWED_FUNCTION ShiftTradingDay sha256=ce1032b620b38917510b6b88796cd595ce68210d4a70c3224de64bcb2bf67a28 source=quant/2022年度精选策略/37.Barra模型初探，A股市场风格解析.txt'
+
+def filter_stock(stockList, date, days=21 * 3, limit=0):
+    """EXACT_REVIEWED_FUNCTION delect_stop sha256=5da0d1f540f978796b0fa33231dfaae276032028f58eab84c41ff5780917d90e source=quant/2022年度精选策略/37.Barra模型初探，A股市场风格解析.txt"""
+    st_data = get_extras('is_st', stockList, count=1, end_date=date)
+    stockList = [stock for stock in stockList if not st_data[stock][0]]
+    is_susp = get_price(stockList, end_date=date, count=1, fields='paused', panel=False).set_index('code')[['paused']]
+    stockList = is_susp[is_susp == 1].index.tolist()
+    stockList = delect_stop(stockList, date)
+    if limit == 1:
+        df = get_price(stockList, end_date=date, fields=['open', 'high_limit', 'low_limit'], count=1).iloc[:, 0, :]
+        df['h_limit'] = df['open'] == df['high_limit']
+        df['l_limit'] = df['open'] == df['low_limit']
+        stockList = [df.index[i] for i in range(len(df)) if not (df.h_limit[i] or df.l_limit[i])]
+    return stockList
+
+def get_industry_exposure1(stock_list, date):
+    stock_list = list(stock_list)
+    df = pd.DataFrame(index=get_industries(name='sw_l1').index, columns=stock_list)
+    s = get_industry(security=stock_list, date=date)
+    ind_dict = {}
+    for idx, stock in enumerate(stock_list):
+        if 'sw_l1' in s[stock].keys():
+            ind_dict[stock] = s[stock]['sw_l1']['industry_code']
+        else:
+            ind_dict[stock] = ind_dict[stock_list[idx - 1]]
+    for stock in stock_list:
+        df.loc[ind_dict[stock], stock] = 1
+    return df.fillna(0)
+
+def dict_to_df(dct, index, name=None):
+    df = pd.DataFrame(dct, index=index).T
+    df.index = pd.to_datetime(df.index)
+    if name:
+        df.index.name = name
+    return df
+
+def evaluation(ic_df, beta_df, t_df):
+    eval_dict = {}
+    ic_mean = []
+    ic_002 = []
+    ir = []
+    beta_mean = []
+    t_test = []
+    p_value = []
+    t_mean = []
+    t_2 = []
+    for factor in ic_df.columns:
+        mean_temp = np.around(ic_df[factor].mean(), 4)
+        ratio_002 = np.around(np.sum(ic_df[factor].abs() > 0.02) / len(ic_df.index) * 100, 2)
+        IR = np.around(mean_temp / ic_df[factor].std(), 4)
+        ic_mean.append(mean_temp)
+        ic_002.append(str(ratio_002) + '%')
+        ir.append(IR)
+    for factor in beta_df.columns:
+        mean_temp = np.around(beta_df[factor].mean(), 4)
+        t, p = np.around(st.ttest_1samp(beta_df[factor], 0), 4)
+        beta_mean.append(mean_temp)
+        t_test.append(t)
+        p_value.append(p)
+    for factor in t_df.columns:
+        mean_temp = np.around(t_df[factor].abs().mean(), 4)
+        ratio_2 = np.around(np.sum(t_df[factor].abs() > 2) / len(t_df.index) * 100, 2)
+        t_mean.append(mean_temp)
+        t_2.append(str(ratio_2) + '%')
+    eval_dict['IC均值'] = ic_mean
+    eval_dict['|IC|>0.02'] = ic_002
+    eval_dict['IR'] = ir
+    eval_dict['因子收益率均值'] = beta_mean
+    eval_dict['因子收益率t检验'] = t_test
+    eval_dict['p值'] = p_value
+    eval_dict['|t|均值'] = t_mean
+    eval_dict['|t|大于2的占比'] = t_2
+    eval_df = pd.DataFrame(eval_dict, index=t_df.columns)
+    eval_df['score'] = eval_df.apply(score, axis=1)
+    eval_df = eval_df.sort_values('score', ascending=False)
+    return eval_df
+
+def score(series):
+    score = 0
+    if abs(series['IC均值']) > 0.02:
+        score += 1
+    if abs(series['因子收益率t检验']) > 1.8:
+        score += 1
+    if abs(series['IR']) > 0.3:
+        score += 1
+    if series['|t|均值'] > 2:
+        score += 1
+    return score
+
+def plot_heat(ic_df, eval_df):
+    eval_df = eval_df[eval_df['score'] >= 2]
+    ic_df = ic_df.loc[:, eval_df.index]
+    corr = np.around(ic_df.corr('spearman'), 2)
+    fig, ax = plt.subplots(figsize=(20, 10))
+    sns.heatmap(corr.abs(), annot=True, cmap='RdPu', ax=ax)
+    return corr
+index = '000985.XSHG'
+date_start = '2023-07-08'
+date_end = '2023-07-14'
+trade_freq = 'day'
+if trade_freq == 'month':
+    date_list = get_tradeday_list(start=date_start, end=date_end, frequency='M', count=None)
+elif trade_freq == 'day':
+    date_list = get_tradeday_list(start=date_start, end=date_end, count=None)
+else:
+    date_day_list = get_tradeday_list(start=date_start, end=date_end, count=None)
+    date_list = [date_day_list[i] for i in range(len(date_day_list)) if i % int(trade_freq) == 0]
+date_list
+factor_name = ['size', 'beta', 'momentum', 'residual_volatility', 'non_linear_size', 'book_to_price_ratio', 'liquidity', 'earnings_yield', 'growth', 'leverage']
+
+def get_barra_factor(stock_list, date):
+    global factor_name
+    factor_data = get_factor_values(securities=stock_list, factors=factor_name, end_date=end_date, count=1)
+    df = pd.DataFrame()
+    for f in factor_name:
+        temp_df = pd.DataFrame(factor_data[f]).T
+        df = pd.concat([df, temp_df], axis=1)
+    df.columns = factor_name
+    return df
+factor_data_dict = {}
+for end_date in date_list[:]:
+    end_date = str(end_date)[:10]
+    stocks_list = get_index_stocks(index, date=end_date)
+    factor_data_dict[end_date] = get_barra_factor(stocks_list, end_date)
+factor_data_dict[end_date].head(5)
+factor_data_y_dict = {}
+for date_1, date_2 in zip(date_list[:-1], date_list[1:]):
+    d1 = ShiftTradingDay(date_1, 1)
+    d2 = ShiftTradingDay(date_2, 1)
+    d3 = ShiftTradingDay(date_2, 2)
+    factor_df = factor_data_dict[str(date_1)[:10]]
+    pool = list(factor_df.index)
+    pool = filter_stock(pool, str(d1)[:10], days=21 * 3)
+    df_1 = get_price(index, end_date=d1, fields=['open'], count=1)['open']
+    df_2 = get_price(index, end_date=d2, fields=['open'], count=1)['open']
+    index_pct = df_2.values[0] / df_1.values[0] - 1
+    df_1 = get_price(pool, end_date=d1, fields=['open'], count=1)['open']
+    df_2 = get_price(pool, end_date=d2, fields=['open'], count=1)['open']
+    df_3 = pd.concat([df_1, df_2], axis=0).T
+    stock_pct = df_3.iloc[:, 1] / df_3.iloc[:, 0] - 1
+    factor_df = winsorize_med(factor_df, scale=3, inclusive=True, inf2nan=True, axis=0)
+    factor_df = standardlize(factor_df, inf2nan=True, axis=0)
+    factor_df = neutralize(factor_df, how=['sw_l1', 'market_cap'], date=date_1, axis=0, fillna='sw_l1')
+    factor_df['pct_alpha'] = stock_pct - index_pct
+    factor_df['pct_'] = stock_pct
+    factor_data_y_dict[str(date_2)[:10]] = factor_df
+factor_data_y_dict[str(date_2)[:10]].head(500)
+df = factor_data_y_dict['2023-07-14']
+pool = df.index
+get_size = get_fundamentals(query(valuation.code, valuation.market_cap).filter(valuation.code.in_(pool)), date='2023-07-14')
+get_size.index = get_size['code'].values
+get_size['l_size'] = np.sqrt(get_size['market_cap'])
+get_size['w'] = get_size['l_size'] / sum(get_size['l_size'])
+W = get_size['w'].values.reshape(len(get_size), 1)
+hy_df = get_industry_exposure1(pool, date='2023-07-14').T
+hy_df['cons'] = [1] * len(hy_df)
+df_c1 = pd.concat([hy_df, get_size], axis=1)
+ind_name = get_industries(name='sw_l1').index
+all_mkt = sum(df_c1['market_cap'].values)
+ind_w = []
+for ind in list(ind_name):
+    df_temp = df_c1[df_c1[ind] == 1]
+    r_temp = sum(df_temp['market_cap'].values) / all_mkt
+    ind_w.append(r_temp)
+ind_w
+d = date_list[1]
+d = str(d)[:10]
+factor_df = factor_data_y_dict[d]
+x = factor_df.iloc[:, :-2]
+r = factor_df['pct_'].fillna(factor_df['pct_'].mean()).values
+pool = factor_df.index
+get_size = get_fundamentals(query(valuation.code, valuation.market_cap).filter(valuation.code.in_(pool)), date=d)
+get_size.index = get_size['code'].values
+get_size['l_size'] = np.sqrt(get_size['market_cap'])
+get_size['w'] = get_size['l_size'] / sum(get_size['l_size'])
+W = get_size['w'].values.reshape(len(get_size), 1)
+hy_df = get_industry_exposure1(pool, date=d).T
+hy_df['cons'] = [1] * len(hy_df)
+df_c1 = pd.concat([hy_df, get_size], axis=1)
+ind_name = get_industries(name='sw_l1').index
+df_c1['market_cap'].fillna(df_c1['market_cap'].mean())
+all_mkt = df_c1['market_cap'].sum()
+ind_w = []
+for ind in ind_name:
+    df_temp = df_c1[df_c1[ind] == 1]
+    r_temp = sum(df_temp['market_cap'].values) / all_mkt
+    ind_w.append(r_temp)
+X_ = pd.concat([x, hy_df], axis=1)
+X = matrix(X_.values)
+w_m = get_size['market_cap'].values
+w_i = ind_w
+'EXACT_REVIEWED_FUNCTION func sha256=e3f0126bc1cdf0236a150c17f5b55e05539a131189a688e10caae639310a31ff source=quant/2022年度精选策略/37.Barra模型初探，A股市场风格解析.txt'
+
+def func_cons(f):
+    return sum(multiply(f[-1 - len(w_i):-1], w_i))
+f0 = np.ones(X_.shape[1]) / 10 ** 4
+bnds = tuple(((-1, 1) for x in f0))
+cons = {'type': 'eq', 'fun': func_cons}
+options = {'disp': False, 'maxiter': 1000, 'ftol': 0.0001, 'eps': 0.0001}
+res = minimize(func, f0, bounds=bnds, constraints=cons, method='SLSQP', options=options)
+res['x']
+factor_f_df = pd.DataFrame()
+for d in date_list[1:]:
+    d = str(d)[:10]
+    factor_df = factor_data_y_dict[d]
+    x = factor_df.iloc[:, :-2]
+    r = factor_df['pct_'].fillna(factor_df['pct_'].mean()).values
+    pool = factor_df.index
+    get_size = get_fundamentals(query(valuation.code, valuation.market_cap).filter(valuation.code.in_(pool)), date=d)
+    if get_size.shape[0] != x.shape[0]:
+        pass
+    else:
+        get_size.index = get_size['code'].values
+        get_size['l_size'] = np.sqrt(get_size['market_cap'])
+        get_size['w'] = get_size['l_size'] / sum(get_size['l_size'])
+        W = get_size['w'].values.reshape(len(get_size), 1)
+        hy_df = get_industry_exposure1(pool, date=d).T
+        hy_df['cons'] = [1] * len(hy_df)
+        df_c1 = pd.concat([hy_df, get_size], axis=1)
+        ind_name = get_industries(name='sw_l1').index
+        df_c1['market_cap'].fillna(df_c1['market_cap'].mean())
+        all_mkt = df_c1['market_cap'].sum()
+        ind_w = []
+        for ind in ind_name:
+            df_temp = df_c1[df_c1[ind] == 1]
+            r_temp = sum(df_temp['market_cap'].values) / all_mkt
+            ind_w.append(r_temp)
+        X_ = pd.concat([x, hy_df], axis=1)
+        X = matrix(X_.values)
+        w_m = get_size['market_cap'].values
+        w_i = ind_w
+        'EXACT_REVIEWED_FUNCTION func sha256=e3f0126bc1cdf0236a150c17f5b55e05539a131189a688e10caae639310a31ff source=quant/2022年度精选策略/37.Barra模型初探，A股市场风格解析.txt'
+
+        def func_cons(x):
+            return sum(multiply(x[-1 - len(w_i):-1], w_i))
+        f0 = np.ones(X_.shape[1]) / 10 ** 4
+        bnds = tuple(((-1, 1) for x in f0))
+        cons = {'type': 'eq', 'fun': func_cons}
+        options = {'disp': False, 'maxiter': 1000, 'ftol': 0.0001, 'eps': 0.0001}
+        res = minimize(func, f0, bounds=bnds, constraints=cons, method='SLSQP', options=options)
+        factor_f_df[d] = res['x']
+factor_f_df.head()
+factor_f = factor_f_df.T
+factor_f.columns = factor_name + list(get_industries(name='sw_l1').index) + ['cons']
+factor_f.head(15)
+ones_df = pd.DataFrame(np.ones([1, len(factor_name)]), columns=factor_name, index=[date_list[0]])
+temp_df = (factor_f.iloc[:, :10] + 1).cumprod()
+pd.concat([ones_df, temp_df]).plot(figsize=(20, 8))
+((factor_f.iloc[:, :10] + 1).cumprod() - 1).iloc[-1, :].plot(kind='bar', figsize=(20, 8))
+ones_df = pd.DataFrame(np.ones([1, len(get_industries(name='sw_l1').index) + 1]), columns=list(get_industries(name='sw_l1').index) + ['cons'], index=[date_list[0]])
+temp_df = (factor_f.iloc[:, 10:] + 1).cumprod()
+pd.concat([ones_df, temp_df]).plot(figsize=(20, 8))
+(temp_df - 1).iloc[-1, :].plot(kind='bar', figsize=(20, 8))
+factor_data_50_dict = {}
+factor_name = ['size', 'beta', 'momentum', 'residual_volatility', 'non_linear_size', 'book_to_price_ratio', 'liquidity', 'earnings_yield', 'growth', 'leverage']
+for end_date in date_list[1:]:
+    end_date = str(end_date)[:10]
+    stocks_list = get_index_stocks(index, date=end_date)
+    pool_ = [stocks_list[i] for i in range(len(stocks_list)) if i % 10 == 0]
+    stocks_list = pool_
+    hy_df = get_industry_exposure1(pool_, date=end_date).T
+    hy_df['cons'] = [1] * len(hy_df)
+    x = factor_data_y_dict[end_date].loc[pool_, factor_name]
+    df_pct = factor_data_y_dict[end_date].loc[pool_, ['pct_']]
+    X_ = pd.concat([x, hy_df, df_pct], axis=1)
+    factor_data_50_dict[end_date] = X_
+factor_data_50_dict[end_date].head(200)
+df = pd.DataFrame(factor_data_50_dict[end_date])
+write_file('from_backtest.csv', df.to_csv(), append=False)
+factor_fT = factor_f.T
+mark = 1
+for d in date_list[1:]:
+    end_date = str(d)[:10]
+    if end_date not in factor_fT.columns:
+        pass
+    else:
+        d1 = factor_data_50_dict[end_date]
+        d2 = factor_fT.loc[:, end_date]
+        y_df = pd.DataFrame()
+        y_df['pct_'] = d1['pct_']
+        y_df['p_pct_'] = np.dot(d1.iloc[:, :-1], d2)
+        if mark == 1:
+            y_df_ = y_df
+            mark = 0
+        else:
+            y_df_ = pd.concat([y_df_, y_df], axis=0)
+y_df_.head(10)
+y_df_.plot(x='pct_', y='p_pct_', kind='scatter', figsize=(12, 8))
+end_date = '2020-02-03'
+d3 = factor_data_y_dict[end_date]
+d1 = factor_data_50_dict[end_date].dropna(axis=0)
+d_mean = d1.mean(axis=0)[:len(factor_name)]
+d4 = pd.concat([d3.iloc[:, :len(factor_name)].T, d_mean], axis=1)
+d4['mid'] = [0.5] * len(d4)
+(d4.rank(axis=1)[0] / 500).plot(kind='bar', figsize=(12, 6))
+d4['mid'].plot()
+y_df.plot(figsize=(12, 8))
+factor_data_y_dict_new = factor_data_y_dict.copy()
+factor_data_y_dict_new.pop(str(date_list[-1])[:10])
+for idx, timestamp in enumerate(list(date_list[1:-1])):
+    t1 = ShiftTradingDay(timestamp, 1)
+    t2 = ShiftTradingDay(date_list[idx + 1], 1)
+    t3 = ShiftTradingDay(date_list[idx + 2], 1)
+    pool = list(factor_data_y_dict_new[str(timestamp)[:10]].index)
+    pool = filter_stock(pool, str(t3)[:10], days=21 * 3)
+    df1 = get_price(pool, end_date=t2, fields=['open'], count=1)['open']
+    df2 = get_price(pool, end_date=t3, fields=['open'], count=1)['open']
+    df3 = pd.concat([df1, df2], axis=0).T
+    stock_pct_next = df3.iloc[:, 1] / df3.iloc[:, 0] - 1
+    factor_data_y_dict_new[str(timestamp)[:10]]['pct_next'] = stock_pct_next
+factor_data_y_dict_new[str(date_list[-2])[:10]].head()
+factors_ic = {}
+factors_beta = {}
+factors_t = {}
+for date_cur, temp_df in factor_data_y_dict_new.items():
+    factors_ic_period = []
+    factors_beta_period = []
+    factors_t_period = []
+    temp_df = temp_df.fillna(0)
+    for factor in temp_df.columns[:-3]:
+        ic = st.spearmanr(temp_df[factor], temp_df['pct_next'])[0]
+        factors_ic_period.append(ic)
+        x = sm.add_constant(temp_df[factor])
+        model = sm.RLM(temp_df['pct_'], x).fit()
+        factors_beta_period.append(model.params[1])
+        factors_t_period.append(model.tvalues[1])
+    factors_ic[date_cur] = factors_ic_period
+    factors_beta[date_cur] = factors_beta_period
+    factors_t[date_cur] = factors_t_period
+factors_ic
+ic_df = dict_to_df(factors_ic, factor_name, 'IC')
+beta_df = dict_to_df(factors_beta, factor_name, 'beta')
+t_df = dict_to_df(factors_t, factor_name, 't')
+evaluation(ic_df, beta_df, t_df)
+eval_df = evaluation(ic_df, beta_df, t_df)
+
+def color_negative_red(val):
+    color = 'red' if val < 0 else 'black'
+    return 'color: %s' % color
+eval_df.style.applymap(color_negative_red, subset=['IC均值', '因子收益率均值', 'IR'])
+corr = plot_heat(ic_df, eval_df)
+corr
+factor_test = 'momentum'
+pool_dict = {}
+groups = 5
+return_dict = {}
+for date_cur, temp_df in factor_data_y_dict_new.items():
+    group_split = pd.qcut(temp_df[factor_test], 5, labels=['l1', 'l2', 'l3', 'l4', 'l5'])
+    group1 = group_split[group_split == 'l1'].index
+    group2 = group_split[group_split == 'l2'].index
+    group3 = group_split[group_split == 'l3'].index
+    group4 = group_split[group_split == 'l4'].index
+    group5 = group_split[group_split == 'l5'].index
+    pool_dict[date_cur] = [group1, group2, group3, group4, group5]
+return_df = pd.DataFrame()
+for idx, datetimeindex in enumerate(date_list[1:-1]):
+    datetimeindex = str(datetimeindex)[:10]
+    for idx_g, group in enumerate(pool_dict[datetimeindex]):
+        group = list(group)
+        price1 = get_price(group, end_date=datetimeindex, fields=['open'], count=1)['open']
+        price2 = get_price(group, end_date=list(date_list)[idx + 2], fields=['open'], count=1)['open']
+        price3 = pd.concat([price1, price2], axis=0).T
+        ret = (price3.iloc[:, 1] / price3.iloc[:, 0] - 1).mean()
+        return_df.loc[datetimeindex, idx_g] = ret
+return_df.columns = ['group1', 'group2', 'group3', 'group4', 'group5']
+return_df1 = (return_df + 1).cumprod()
+return_df1
+return_df1.plot(figsize=(12, 8))

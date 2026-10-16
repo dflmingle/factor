@@ -1,0 +1,88 @@
+quant/2024年度精选策略2/76.ETF-控制回撤性能拉满（国债ETF增强).txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+import talib
+
+def initialize(context):
+    g.max_net = context.portfolio.total_value
+    g.drawback_status = 0
+    g.bad_sign = 0
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='9:30', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.stock = ['510300.XSHG', '510220.XSHG', '513500.XSHG', '513100.XSHG']
+    g.debt = ['511010.XSHG']
+    cash_management(context)
+
+def cash_management(context):
+    HS300_data = get_bars('000300.XSHG', count=60, unit='1d', fields=['close'])
+    HS300_MA0_20 = HS300_data['close'][-20:-1].mean()
+    HS300_MA20_40 = HS300_data['close'][-40:-21].mean()
+    HS300_MA40_60 = HS300_data['close'][-60:-41].mean()
+    HS300_price = HS300_data['close'][-1]
+    HS300_10_max = HS300_data['close'][-10:-1].max()
+    HS300_20_max = HS300_data['close'][-20:-1].max()
+    if HS300_MA0_20 < HS300_MA20_40 and HS300_MA20_40 < HS300_MA40_60:
+        g.bad_sign = 1
+    elif HS300_price < 0.92 * HS300_10_max:
+        g.bad_sign = 1
+    elif HS300_price < 0.85 * HS300_20_max:
+        g.bad_sign = 1
+    else:
+        g.bad_sign = 0
+    if g.drawback_status == 0:
+        if context.portfolio.total_value < g.max_net * 0.95:
+            g.drawback_status = 2
+        elif context.portfolio.total_value < g.max_net * 0.975:
+            g.drawback_status = 1
+    if g.drawback_status == 1:
+        if context.portfolio.total_value > g.max_net * 0.99:
+            g.drawback_status = 0
+        elif context.portfolio.total_value < g.max_net * 0.95:
+            g.drawback_status = 2
+    if g.drawback_status == 2:
+        if context.portfolio.total_value > g.max_net * 0.99:
+            g.drawback_status = 0
+        elif context.portfolio.total_value > g.max_net * 0.975:
+            g.drawback_status = 1
+    if g.drawback_status == 0:
+        context.stock_cash = 0.3 * context.portfolio.total_value
+        context.debt_cash = 0.7 * context.portfolio.total_value
+    if g.drawback_status == 1:
+        context.stock_cash = 0.4 * context.portfolio.total_value
+        context.debt_cash = 0.6 * context.portfolio.total_value
+    if g.drawback_status == 2:
+        context.stock_cash = 0.5 * context.portfolio.total_value
+        context.debt_cash = 0.5 * context.portfolio.total_value
+    if g.bad_sign == 1:
+        context.stock_cash = 0 * context.portfolio.total_value
+        context.debt_cash = 1 * context.portfolio.total_value
+
+def order_stock(context):
+    pass
+
+def order_debt(context):
+    pass
+
+def mad(factor):
+    me = np.median(factor)
+    mad = np.median(abs(factor - me))
+    mad_e = 1.4826 * mad
+    up = me + 3 * mad_e
+    down = me - 3 * mad_e
+    factor = np.where(factor > up, up, factor)
+    factor = np.where(factor < down, down, factor)
+    return factor
+
+def market_open(context):
+    for stock in g.debt:
+        order_target_value(stock, context.debt_cash / len(g.debt))
+    for stock in g.stock:
+        order_target_value(stock, context.stock_cash / len(g.stock))
+
+def after_market_close(context):
+    if context.portfolio.total_value > g.max_net:
+        g.max_net = context.portfolio.total_value

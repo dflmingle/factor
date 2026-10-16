@@ -1,0 +1,109 @@
+quant/量化策略/量化策略/ETF轮动策略2026/01趋势筛选后相关性最小etf轮动-调优版-25年62.txt
+import numpy as np
+import pandas as pd
+import talib
+
+def initialize(context):
+    g.etf_pool = ['512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512400.XSHG', '516020.XSHG', '512880.XSHG', '512070.XSHG', '510230.XSHG', '512660.XSHG', '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG']
+    g.m_days = 25
+    up_strength(context)
+    run_daily(trade, '10:00')
+    run_monthly(up_strength, 1, '9:00')
+
+def up_strength(context):
+    g.trend_length_ranking = filter_by_trend_strength(g.etf_pool, top_percent=0.4)
+
+def filter_by_trend_strength(etf_pool, top_percent=0.6):
+    scores = {}
+    for etf in etf_pool:
+        raw = trend_strength(etf)
+        if raw:
+            scores[etf] = raw
+    if not scores:
+        return []
+    df = pd.DataFrame(scores).T
+    rank_df = df.rank(pct=True) * 100
+    total = rank_df['mom'] + rank_df['bias']
+    threshold = np.percentile(total, (1 - top_percent) * 100)
+    selected = total[total >= threshold].index.tolist()
+    return selected
+
+def trend_strength(security):
+    df = attribute_history(security, 80, '1d', ['close'], skip_paused=True)
+    if df is None or len(df) < 60:
+        return None
+    close = df['close'].values
+    current = close[-1]
+    mom_20 = current / close[-21] - 1 if len(close) > 20 else 0.0
+    ma60 = np.mean(close[-60:])
+    bias_60 = current / ma60 - 1
+    return {'mom': mom_20, 'bias': bias_60}
+
+def trade(context):
+    target_num = 2
+    etf_pool = min_corr(g.trend_length_ranking)
+    target_list = etf_pool[:target_num]
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            current_price = get_current_data()[etf].last_price
+            position = context.portfolio.positions[etf]
+            amount = position.total_amount
+            avg_cost = position.avg_cost
+            profit = (current_price - avg_cost) * amount if amount > 0 else 0
+            order_target_value(etf, 0)
+    hold_list = list(context.portfolio.positions)
+    if len(hold_list) < target_num:
+        cash_per_target = context.portfolio.available_cash / (target_num - len(hold_list))
+        for etf in target_list:
+            if context.portfolio.positions[etf].total_amount == 0:
+                current_price = get_current_data()[etf].last_price
+                estimated_amount = int(cash_per_target / current_price / 100) * 100
+                estimated_value = estimated_amount * current_price
+                order_target_value(etf, cash_per_target)
+    hold_list = list(context.portfolio.positions)
+    if hold_list:
+        pass
+
+def min_corr(stocks):
+    nday = 245
+    p = history(nday, '1d', 'close', stocks).dropna(axis=1)
+    if len(p.columns) < 2:
+        return list(stocks)[:4]
+    r = np.log(p).diff()[1:]
+    m_corr = r.corr()
+    corr_mean = {}
+    for stock in m_corr.columns:
+        corr_abs = m_corr[stock].drop(stock).abs()
+        if len(corr_abs) > 0:
+            corr_mean[stock] = float(np.nanmean(corr_abs.values))
+        else:
+            corr_mean[stock] = 1.0
+    sorted_stocks = sorted(corr_mean.keys(), key=lambda x: corr_mean[x])
+    return sorted_stocks[:4]
+'EXACT_REVIEWED_FUNCTION mingcheng sha256=a8867aeabfe9e03b1622343a79826ced4da85739cc79a8224f2b7c1494682535 source=quant/聚宽2025年精选/74趋势筛选后相关性最小etf轮动.txt'
+
+def select_etf(context):
+    all_etfs = get_all_securities(['etf'])
+    selected = []
+    min_amount = 0.5 * 100000000.0
+    min_scale = 2 * 100000000.0
+    min_listed_days = 180
+    current_date = context.current_dt.date()
+    for stock in all_etfs.index:
+        info = get_security_info(stock)
+        if (current_date - info.start_date).days < min_listed_days:
+            continue
+        if info.end_date and info.end_date < current_date:
+            continue
+        try:
+            hist = attribute_history(stock, 60, '1d', ['money'], skip_paused=True)
+            if len(hist) < 30:
+                continue
+            avg_money = hist['money'].mean()
+            if avg_money < min_amount:
+                continue
+        except:
+            continue
+        selected.append(stock)
+    return selected

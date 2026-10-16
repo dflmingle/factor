@@ -1,0 +1,63 @@
+quant/量化策略/量化策略/首板回调买入策略2026/实11-红利涨停轮动策略-25年115.txt
+import pandas as pd
+from jqdata import *
+
+def initialize(context):
+    g.stock_num = 10
+    g.choice = []
+    g.just_sold = []
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:00')
+    run_monthly(select_stock, 1, time='9:30')
+    run_monthly(go_Trader, 1, time='14:55')
+
+def select_stock(context):
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    stocks = get_dividend_ratio_filter_list(context, stocks, False, 0, 0.25)
+    stocks = get_peg(context, stocks)
+    choice = filter_st_stock(stocks)
+    choice = filter_paused_stock(choice)
+    choice = filter_limitup_stock(context, choice)
+    choice = filter_limitdown_stock(context, choice)
+    choice = filter_highprice_stock(context, choice)
+    g.choice = choice[:g.stock_num]
+'EXACT_REVIEWED_FUNCTION go_Trader sha256=9ed0a9396caaa54e4de2902f3e39a9e7f452ee1f4670e28302507f1402fb2f1a source=quant/聚宽2025年精选/84正黄旗大妈选股改进-加入涨停卖出后的买入，提高资金利用率.txt'
+
+def get_cap(context):
+    current_data = get_current_data()
+    hold_stocks = context.portfolio.positions.keys()
+    for s in hold_stocks:
+        q = query(valuation).filter(valuation.code == s)
+        df = get_fundamentals(q)
+'EXACT_REVIEWED_FUNCTION get_peg sha256=202db6f4735646d0c9b663116eb233ecc3575fcbc91e6f54e6a1579455e72107 source=quant/聚宽2025年精选/84正黄旗大妈选股改进-加入涨停卖出后的买入，提高资金利用率.txt'
+'EXACT_REVIEWED_FUNCTION get_dividend_ratio_filter_list sha256=38bd0f889a1c3ac16e6d1096b39c06e0aa4623de9d7967b12e2a27f0062063ec source=quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=2697930f141c467accd721565ad85ef5f61cad0d6604e9688b5f455d5556a59e source=quant/2024年度精选策略1/28.正黄旗大妈选股法，修改版，年化92%.txt'
+
+def check_limit_up(context):
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count and position_count != 0:
+        select_stock(context)
+        cdata = get_current_data()
+        psize = context.portfolio.available_cash / (g.stock_num - position_count)
+        for s in g.choice:
+            if s not in context.portfolio.positions and s not in g.just_sold:
+                order_value(s, psize)
+                if len(context.portfolio.positions) == g.stock_num:
+                    break
+    current_data = get_current_data()
+    if g.high_limit_list:
+        for stock in g.high_limit_list:
+            if current_data[stock].last_price < current_data[stock].high_limit:
+                order_target(stock, 0)
+                g.just_sold.append(stock)
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_highprice_stock(context, stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    return [stock for stock in stock_list if stock in context.portfolio.positions.keys() or last_prices[stock][-1] < 20]

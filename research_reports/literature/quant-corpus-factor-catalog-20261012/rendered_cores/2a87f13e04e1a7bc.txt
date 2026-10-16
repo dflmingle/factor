@@ -1,0 +1,132 @@
+quant/2023年度精选策略/70.回踩均线搏反弹，21年来70%，无未来（测试第一弹）.txt
+import jqdata
+import pandas as pd
+import talib
+import numpy as np
+from functools import reduce
+from jqlib.technical_analysis import *
+from jqlib.alpha101 import *
+'EXACT_REVIEWED_FUNCTION get_bigger_than_val_counter sha256=650b523b23d344118e1e6f2caa1e44b647245e840c5d5ae5a54eef5945428bea source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+
+def get_bigger_than_val_counter_noflow(close, n, value_list):
+    np_close = np.array(close[-n:])
+    np_value = np.array(value_list[-n:])
+    diff = np_close - np_value
+    return sum(diff > 0)
+'EXACT_REVIEWED_FUNCTION get_ma sha256=4c9f552b7824ee7e9343e565929557cce5668c7426667bf84f2696ec75d95f64 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION get_avg_price sha256=edbd6e0d6bb17c637ddbeeb41fe8002786c91ee68f6eab4dbb609c0ead6db456 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION get_macd sha256=a5d3b9e9c520dcfea4ddd24580b2052af767c91e5750d65de40b62379b0a0024 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION get_max_price sha256=50aff0e0b60cdcaeb19fd50dcc65e5113ad5932a9f804832177662e2c2dbefd1 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION get_min_price sha256=a6c6489c4bc4e852d0f940685bbd5106d04a00cec427b18a21c4f277cf396299 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION is_multiple_stocks sha256=cd2b5478cda9ba22d2a4e8d8c1e09e6382f907fc33c716473a6f73055b911e40 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION get_std_percentage sha256=f4911d9b02404123b44c4ff66672f282fa4e19239d0245b55f7f41f40e332df3 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+'EXACT_REVIEWED_FUNCTION get_avg_array sha256=18c1c4596932f133ac951f2f8eadc219afcbbe5245a955c4952b65647b534090 source=quant/2021年度精选策略/96.分享一个简单的选股器.txt'
+
+def get_stocks_score(tick_list, data_frame, pass_time):
+    score = {}
+    avg_score = {}
+    for code in tick_list:
+        high = data_frame[data_frame['code'] == code]['high'].values
+        low = data_frame[data_frame['code'] == code]['low'].values
+        close = data_frame[data_frame['code'] == code]['close'].values
+        avg_list = np.array([get_ma(close, 13), get_ma(close, 21), get_ma(close, 55)])
+        box_ratio = 0
+        for i in range(2, 22):
+            box_ratio += get_std_percentage(avg_list.T[-i])
+        array_ratio = 0
+        for i in range(1, 6):
+            array_ratio += get_avg_array(avg_list.T[-i])
+        avg_score[code] = array_ratio
+        score[code] = box_ratio - array_ratio
+    tick_list.clear()
+    score = sorted(score.items(), key=lambda kv: (kv[1], kv[0]), reverse=False)
+    for key in score:
+        sec_info = get_security_info(key[0])
+        if key[1] > 0:
+            tick_list.append(key[0])
+    return tick_list
+
+def select_ticks(check_date):
+    tick_list = get_fundamentals(query(valuation.code).filter(valuation.turnover_ratio > 3, valuation.turnover_ratio <= 10).order_by(valuation.turnover_ratio.desc()), date=check_date)['code'].values
+    tick_list = list(tick_list)
+    stock_base = get_all_securities(['stock'])
+    filter_list = []
+    for code in tick_list:
+        try:
+            if str(code).find('688', 0, 3) != -1 or len(jqdata.get_trade_days(stock_base.loc[code]['start_date'], check_date)) < 365 or stock_base.loc[code]['display_name'].find('ST') != -1 or (stock_base.loc[code]['display_name'].find('退') != -1):
+                filter_list.append(code)
+        except KeyError:
+            filter_list.append(code)
+            continue
+    for code in filter_list:
+        tick_list.remove(code)
+    if len(tick_list) == 0:
+        return tick_list
+    filter_list = []
+    df = get_price(tick_list, count=260, end_date=check_date, panel=False)
+    for code in tick_list:
+        tdf = df[df['code'] == code]
+        low = tdf['low'].values
+        open = tdf['open'].values
+        high = tdf['high'].values
+        close = tdf['close'].values
+        volume = tdf['volume'].values
+        avg21_list = get_ma(close, 21)
+        avg55_list = get_ma(close, 55)
+        avg120_list = get_ma(close, 120)
+        count = get_bigger_than_val_counter(avg21_list, 6, avg55_list)
+        if count < 5:
+            filter_list.append(code)
+            continue
+        count = get_bigger_than_val_counter(avg55_list, 6, avg120_list)
+        if count < 5:
+            filter_list.append(code)
+            continue
+        count = get_bigger_than_val_counter(close, 6, avg55_list)
+        if count < 5:
+            filter_list.append(code)
+            continue
+        if close[-2] > open[-2]:
+            filter_list.append(code)
+            continue
+        if close[-2] > avg55_list[-2]:
+            filter_list.append(code)
+            continue
+        if close[-1] < avg55_list[-1]:
+            filter_list.append(code)
+            continue
+        if avg55_list[-1] < avg55_list[-2]:
+            filter_list.append(code)
+            continue
+    for code in filter_list:
+        tick_list.remove(code)
+    tick_list = get_stocks_score(tick_list, df, check_date)
+    if len(tick_list) > 3:
+        tick_list = tick_list[:3]
+    return tick_list
+'EXACT_REVIEWED_FUNCTION initialize sha256=3dec7f7124a149749c0f0c55f8540e6c95aaa1a4085325700fe9333c35fdef07 source=quant/2021年度精选策略/94.小资金短线策略.txt'
+
+def before_trading_start(context):
+    t_date = context.current_dt.strftime('%Y-%m-%d')
+    p_date = context.previous_date.strftime('%Y-%m-%d')
+    g.security = select_ticks(p_date)
+
+def trade(context):
+    stop_loss(context)
+    if len(g.security) > 0:
+        if len(context.portfolio.positions) == 1:
+            value = context.portfolio.available_cash / 2
+            for security in g.security[:2]:
+                order_value(security, value, side='long')
+        elif len(context.portfolio.positions) == 2:
+            value = context.portfolio.available_cash
+            for security in g.security[:1]:
+                order_value(security, value, side='long')
+        elif len(context.portfolio.positions) > 2:
+            pass
+        else:
+            value = context.portfolio.available_cash / 3
+            for security in g.security:
+                order_value(security, value, side='long')
+'EXACT_REVIEWED_FUNCTION stop_loss sha256=a2bfd23d4f9fdaaf6a83f4ee40de8c6d1c396d27fa58d195a5616e9bf37817c9 source=quant/2023年度精选策略/49.【7日趋势】交易策略.txt'
+'EXACT_REVIEWED_FUNCTION hold_days sha256=89b4029c003c208c6ff5a9ef86cc859412e04fbad567d44ccd474e1c3710cf2b source=quant/2023年度精选策略/49.【7日趋势】交易策略.txt'

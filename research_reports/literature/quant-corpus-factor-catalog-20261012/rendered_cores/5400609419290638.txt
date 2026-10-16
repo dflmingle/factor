@@ -1,0 +1,150 @@
+quant/2024年度精选策略2/75.ETF轮动策略-入门2.0.txt
+from jqdata import *
+import numpy as np
+import numpy
+import datetime
+import statistics
+
+def initialize(context):
+    g.stock_pool = ['159915.XSHE', '510300.XSHG', '510500.XSHG']
+    g.Northbound = []
+    g.Northbound_val = 15
+    g.north_money = 0
+    g.stock_num = 1
+    g.momentum_day = 27
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.score_threshold = 0.7
+    g.mean_day = 20
+    g.mean_diff_day = 5
+    g.slope_series = initial_slope_series()[:-1]
+    run_daily(my_trade, time='8:50', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+    run_daily(print_trade_info, time='15:30', reference_security='000300.XSHG')
+'EXACT_REVIEWED_FUNCTION get_rank sha256=9c81302e41cd9b5d1ea87a381cc3829aa458f2c6a4b48b131ed6838247560d6f source=quant/2023年度精选策略/4.8年10倍，回撤小，有滑点！ETF动量简单轮动策略！.txt'
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION initial_slope_series sha256=805881cbfcf95441e57e788c901e503f8a556b7afe47d9cb65127ce16706c840 source=quant/2023年度精选策略/29.价值成长轮动策略.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_timing_signal sha256=06e5b311db6639c8af0d712aea00ba40fa11a96646b08040b63c3ec6d5296b27 source=quant/2023年度精选策略/78.EPS+MS因子的大盘蓝筹策略.txt'
+
+def get_finance(context):
+    yesterday = context.previous_date
+    n_sh = finance.run_query(query(finance.STK_ML_QUOTA).filter(finance.STK_ML_QUOTA.day <= yesterday, finance.STK_ML_QUOTA.link_id == 310001).order_by(finance.STK_ML_QUOTA.day.desc()).limit(10))
+    if n_sh.empty:
+        return 0
+    n_sz = finance.run_query(query(finance.STK_ML_QUOTA).filter(finance.STK_ML_QUOTA.day <= yesterday, finance.STK_ML_QUOTA.link_id == 310002).order_by(finance.STK_ML_QUOTA.day.desc()).limit(10))
+    total_net_in = 0
+    if n_sz.empty:
+        for i in range(0, 1):
+            sh_in = n_sh['buy_amount'][i] - n_sh['sell_amount'][i]
+            total_net_in += sh_in
+    else:
+        for i in range(0, 1):
+            sh_in = n_sh['buy_amount'][i] - n_sh['sell_amount'][i]
+            sz_in = n_sz['buy_amount'][i] - n_sz['sell_amount'][i]
+            amount = sh_in + sz_in
+            total_net_in += amount
+    g.north_money = total_net_in
+    g.Northbound.append(g.north_money)
+    new = sorted(g.Northbound)
+    if numpy.size(g.Northbound) > 100:
+        g.Northbound_val = new[numpy.size(new) // 2]
+        if g.Northbound_val < 5:
+            g.Northbound_val = 5
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def getPreDayPrice(security):
+    close_data = attribute_history(security, 1, '1d', ['close'])
+    current_price = close_data['close'][-1]
+    return current_price
+
+def print_code_info(context, code, value):
+    huadian = 0.015
+    for position in list(context.portfolio.positions.values()):
+        if str(position.security) == code:
+            if value == 0:
+                account = position.total_amount * -1
+                price = round(position.price * (1 - huadian), 2)
+                return order(code, account, LimitOrderStyle(price))
+            elif value == position.value:
+                pass
+            elif value > position.value:
+                price = round(position.price * (1 + huadian), 2)
+                account = (value - position.total_amount) / price
+                return order(code, account, LimitOrderStyle(price))
+            elif value < position.value:
+                price = round(position.price * (1 - huadian), 2)
+                account = (value - position.total_amount) / price
+                return order(code, account, LimitOrderStyle(price))
+            return
+    price = round(getPreDayPrice(code) * (1 + huadian), 2)
+    account = value / price
+    return order(code, account, LimitOrderStyle(price))
+
+def order_target_value_(security, value, context):
+    if value == 0:
+        pass
+    return print_code_info(context, security, value)
+
+def open_position(security, value, context):
+    order = order_target_value_(security, value, context)
+    if order != None and order.filled > 0:
+        return True
+    return False
+
+def close_position(position, context):
+    security = position.security
+    order = order_target_value_(security, 0, context)
+    if order != None:
+        if order.status == OrderStatus.held and order.filled == order.amount:
+            return True
+    return False
+
+def adjust_position(context, buy_stocks):
+    for stock in context.portfolio.positions:
+        if stock not in buy_stocks:
+            position = context.portfolio.positions[stock]
+            close_position(position, context)
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        value = context.portfolio.cash / (g.stock_num - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value, context):
+                    if len(context.portfolio.positions) == g.stock_num:
+                        break
+
+def my_trade(context):
+    check_out_list = get_rank(g.stock_pool)
+    check_out_list = filter_st_stock(check_out_list)
+    check_out_list = filter_limitup_stock(context, check_out_list)
+    check_out_list = filter_limitdown_stock(context, check_out_list)
+    check_out_list = filter_paused_stock(check_out_list)
+    timing_signal = get_timing_signal(g.ref_stock)
+    get_finance(context)
+    if '510300.XSHG' in check_out_list and g.north_money <= g.Northbound_val:
+        timing_signal = 'SELL'
+    if timing_signal == 'SELL':
+        for stock in context.portfolio.positions:
+            position = context.portfolio.positions[stock]
+            close_position(position, context)
+    elif timing_signal == 'BUY' or timing_signal == 'KEEP':
+        adjust_position(context, check_out_list)
+    else:
+        pass
+
+def check_lose(context):
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount
+        if ret <= -50:
+            order_target_value(position.security, 0)
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=ed72eb656616f2d767f096b61e52ec508ed7cdbf78076ed61809342ad2778339 source=quant/2023年度精选策略/29.价值成长轮动策略.txt'

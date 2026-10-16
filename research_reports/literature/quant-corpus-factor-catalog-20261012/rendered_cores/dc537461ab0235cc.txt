@@ -1,0 +1,56 @@
+quant/2023年度精选策略/77.【基金增强思考2.0】优秀基金的持续性与周期的关系密不可分.txt
+from jqdata import *
+
+def initialize(context):
+    set_redeem_latency(3, 'QDII_fund')
+    run_monthly(market_open_sell, 1, time='open', reference_security='000300.XSHG')
+    run_monthly(market_open_buy, 5, time='open', reference_security='000300.XSHG')
+    g.adjustpositions = False
+    g.days = 180
+    g.num = 30
+    g.monthnum = 0
+
+def market_open_sell(context):
+    if g.monthnum % 6 == 0:
+        g.adjustpositions = True
+        g.monthnum += 1
+    else:
+        g.monthnum += 1
+        g.adjustpositions = False
+        return
+
+def market_open_buy(context):
+    if g.adjustpositions == True:
+        pass
+    else:
+        return
+    g.adjustpositions = False
+    fund_list = get_fund_by_rank(context.current_dt, g.days, g.num)
+    allcash = context.portfolio.available_cash
+    buylist = fund_list - context.portfolio.positions.keys()
+    percash = int(allcash / len(buylist))
+    for s in fund_list:
+        o = purchase(s, percash)
+
+def get_fund_by_rank(current_day, days, x):
+    trade_days = get_trade_days(current_day - datetime.timedelta(days=days), current_day - datetime.timedelta(days=1))
+    day1 = trade_days[0]
+    day2 = trade_days[-1]
+    all_open_fund = get_all_securities(['open_fund'])
+    all_open_fund = all_open_fund[(all_open_fund['type'] == 'stock_fund') & (all_open_fund['start_date'] <= day1)]
+    df1 = get_extras('acc_net_value', all_open_fund.index.tolist(), start_date=day1, end_date=day1)
+    df1 = df1.T
+    df1.columns = ['acc_net_value1']
+    df2 = get_extras('acc_net_value', all_open_fund.index.tolist(), start_date=day2, end_date=day2)
+    df2 = df2.T
+    df2.columns = ['acc_net_value2']
+    df_fund = pd.concat([df1, df2], join='inner', axis=1)
+    df_fund['rate'] = (df_fund['acc_net_value2'] - df_fund['acc_net_value1']) / df_fund['acc_net_value1']
+    d_num = 0
+    for rate in df_fund['rate']:
+        if rate > 0.4:
+            d_num += 1
+        else:
+            pass
+    df_fund = df_fund.sort_values(['rate'], ascending=False, inplace=False).head(100)
+    return df_fund.index.tolist()

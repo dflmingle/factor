@@ -1,0 +1,150 @@
+quant/量化策略/量化策略/实盘2026/Ptrade/pt版05动量最强ETF轮动策略.txt
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    set_limit_mode('UNLIMITED')
+    g.etf_pool = ['512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512400.XSHG', '516020.XSHG', '512880.XSHG', '512070.XSHG', '510230.XSHG', '512660.XSHG', '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG']
+    set_universe(g.etf_pool)
+    g.top_percent = 0.4
+    g.corr_window = 245
+    g.target_num = 2
+    g.corr_select_num = 4
+    g.is_real = is_trade()
+    run_daily(context, up_strength, time='09:00')
+    if g.is_real:
+        run_daily(context, trade, time='10:00')
+
+def handle_data(context, data):
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 10 and current_dt.minute == 0:
+        trade(context, data)
+
+def is_first_trading_day_of_month(date):
+    first_day = date.replace(day=1)
+    first_trading_day_str = get_trading_day_by_date(first_day.strftime('%Y%m%d'), 0)
+    return date.strftime('%Y%m%d') == first_trading_day_str
+
+def trend_strength(security):
+    hist = get_history(80, '1d', ['close', 'volume'], security, fq='pre', is_dict=True)
+    if security not in hist:
+        return None
+    data_arr = hist[security]
+    if len(data_arr) < 60:
+        return None
+    try:
+        close_arr = data_arr['close']
+        volume_arr = data_arr['volume']
+    except (KeyError, ValueError):
+        close_arr = np.array([x[1] for x in data_arr])
+        volume_arr = np.array([x[2] for x in data_arr])
+    valid = (volume_arr > 0) & ~np.isnan(close_arr)
+    if not np.any(valid):
+        return None
+    close_valid = close_arr[valid]
+    if len(close_valid) < 60:
+        return None
+    current = close_valid[-1]
+    if len(close_valid) >= 21:
+        mom_20 = current / close_valid[-21] - 1
+    else:
+        mom_20 = 0.0
+    ma60 = np.mean(close_valid[-60:])
+    bias_60 = current / ma60 - 1
+    return {'mom': mom_20, 'bias': bias_60}
+
+def filter_by_trend_strength(etf_pool, top_percent=0.4):
+    scores = {}
+    for etf in etf_pool:
+        raw = trend_strength(etf)
+        if raw:
+            scores[etf] = raw
+    if not scores:
+        return []
+    df = pd.DataFrame(scores).T
+    rank_df = df.rank(pct=True) * 100
+    total_score = rank_df['mom'] + rank_df['bias']
+    threshold = np.percentile(total_score, (1 - top_percent) * 100)
+    selected = total_score[total_score >= threshold].index.tolist()
+    return selected
+
+def up_strength(context):
+    if not is_first_trading_day_of_month(context.blotter.current_dt):
+        return
+    g.trend_strength_pool = filter_by_trend_strength(g.etf_pool, top_percent=g.top_percent)
+
+def min_corr(stocks, nday=245):
+    if len(stocks) < 2:
+        return stocks[:g.corr_select_num] if len(stocks) >= g.corr_select_num else stocks
+    price_dict = get_history(nday, '1d', 'close', stocks, fq='pre', is_dict=True)
+    df_close = pd.DataFrame()
+    for stock in stocks:
+        if stock not in price_dict:
+            continue
+        data_arr = price_dict[stock]
+        if len(data_arr) < nday:
+            continue
+        try:
+            prices = data_arr['close']
+        except (KeyError, ValueError):
+            prices = np.array([x[1] for x in data_arr])
+        s = pd.Series(prices).replace(0, np.nan).dropna()
+        if len(s) >= nday * 0.8:
+            df_close[stock] = s
+    if df_close.empty or len(df_close.columns) < 2:
+        return stocks[:g.corr_select_num]
+    df_close = df_close.dropna()
+    if df_close.empty or len(df_close.columns) < 2:
+        return stocks[:g.corr_select_num]
+    ret = np.log(df_close).diff().dropna()
+    corr = ret.corr()
+    corr_mean = {}
+    for stock in corr.columns:
+        others = corr[stock].drop(stock)
+        corr_mean[stock] = others.abs().mean() if len(others) > 0 else 1.0
+    sorted_stocks = sorted(corr_mean.keys(), key=lambda x: corr_mean[x])
+    return sorted_stocks[:g.corr_select_num]
+
+def trade(context, data=None):
+    if not hasattr(g, 'trend_strength_pool') or len(g.trend_strength_pool) == 0:
+        g.trend_strength_pool = filter_by_trend_strength(g.etf_pool, top_percent=g.top_percent)
+        if len(g.trend_strength_pool) == 0:
+            return
+    low_corr_list = min_corr(g.trend_strength_pool, nday=g.corr_window)
+    target_list = low_corr_list[:g.target_num]
+    if not target_list:
+        return
+    positions = get_positions()
+    for code, pos in positions.items():
+        if pos.amount != 0 and code not in target_list:
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+            if sellable <= 0:
+                continue
+            order_target_value(code, 0)
+    hold_list = [code for code, pos in get_positions().items() if pos.amount != 0]
+    if len(hold_list) < g.target_num:
+        try:
+            available_cash = get_available_cash()
+        except NameError:
+            available_cash = context.portfolio.cash
+        if available_cash <= 0:
+            return
+        cash_per_target = available_cash / (g.target_num - len(hold_list))
+        for etf in target_list:
+            if context.portfolio.positions[etf].amount == 0:
+                if not g.is_real:
+                    price = data[etf].price if etf in data else None
+                else:
+                    snapshot = get_snapshot(etf)
+                    price = snapshot.get(etf, {}).get('last_px', None) if snapshot else None
+                if price is None or price <= 0:
+                    continue
+                min_amount = price * 100
+                if cash_per_target < min_amount:
+                    continue
+                order_target_value(etf, cash_per_target)

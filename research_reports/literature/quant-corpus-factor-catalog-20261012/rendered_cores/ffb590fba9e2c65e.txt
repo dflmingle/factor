@@ -1,0 +1,66 @@
+quant/2022年度精选策略/61.最简单的动量模型，能否应对A股暴涨？(二).txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from datetime import datetime, timedelta
+
+def initialize(context):
+    set_params(context)
+    set_backtest()
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def set_params(context):
+    g.N = 18
+    g.M = 1200
+    g.init = True
+    g.security1 = '000300.XSHG'
+    g.days = 0
+    g.buy = 0.7
+    g.sell = -0.7
+    g.security = '510300.XSHG'
+    g.ans = []
+    g.ans_rightdev = []
+    prices = get_price(g.security1, '2005-01-05', context.previous_date, '1d', ['high', 'low'])
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=c28f361a54ae58fa45086f5fada58af5567aab5a448671ae63b7f557f5cb4d3c source=quant/2020年度精选策略/77 RSRS大盘择时优化.txt'
+
+def market_open(context):
+    beta = 0
+    r2 = 0
+    if g.init:
+        g.init = False
+    else:
+        prices = attribute_history(g.security1, g.N, '1d', ['high', 'low'])
+        highs = prices.high
+        lows = prices.low
+        X = sm.add_constant(lows)
+        model = sm.OLS(highs, X)
+        beta = model.fit().params[1]
+        g.ans.append(beta)
+        r2 = model.fit().rsquared
+        g.ans_rightdev.append(r2)
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    zscore_rightdev = zscore * beta * r2
+    cash = context.portfolio.available_cash
+    if zscore_rightdev > g.buy:
+        order_value(g.security, cash)
+    elif zscore_rightdev < g.sell and context.portfolio.positions[g.security].closeable_amount > 0:
+        order_target(g.security, 0)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

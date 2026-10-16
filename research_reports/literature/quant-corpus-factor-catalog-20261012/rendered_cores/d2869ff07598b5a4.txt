@@ -1,0 +1,398 @@
+quant/2021年度精选策略/78.机器学习模型大比拼!.txt
+import pandas as pd
+import numpy as np
+from time import time
+import datetime
+pd.set_option('display.max_rows', 200)
+pd.set_option('display.max_columns', 200)
+pd.set_option('display.width', 200)
+from jqdata import *
+from jqfactor import *
+from jqlib.technical_analysis import *
+from scipy import stats
+import statsmodels.api as sm
+from statsmodels import regression
+import pickle
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+mpl.rcParams['font.family'] = 'SimHei'
+mpl.rcParams['axes.unicode_minus'] = False
+plt.style.use('ggplot')
+START_DATE = '2010-01-01'
+END_DATE = '2020-04-30'
+INDEX = '399905.XSHE'
+percent_select = [0.3, 0.3]
+q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap, valuation.pe_ratio, valuation.pb_ratio, valuation.pcf_ratio, valuation.ps_ratio, balance.total_assets, balance.total_liability, balance.fixed_assets, balance.total_non_current_liability, income.operating_profit, income.total_profit, indicator.net_profit_to_total_revenue, indicator.inc_revenue_year_on_year, indicator.inc_net_profit_year_on_year, indicator.roe, indicator.roa, indicator.gross_profit_margin)
+jqfactor_list = ['current_ratio', 'net_profit_to_total_operate_revenue_ttm', 'gross_income_ratio', 'roe_ttm', 'roa_ttm', 'total_asset_turnover_rate', 'net_operating_cash_flow_coverage', 'net_operate_cash_flow_ttm', 'net_profit_ttm', 'cash_to_current_liability', 'operating_revenue_growth_rate', 'non_recurring_gain_loss', 'operating_revenue_ttm', 'net_profit_growth_rate', 'AR', 'ARBR', 'ATR14', 'VOL5', 'VOL60', 'Skewness20', 'Skewness60']
+
+def get_trade_days_monthly(start, end):
+    index = get_trade_days(start_date=start, end_date=end)
+    df = pd.DataFrame(index, index=index)
+    df.index = pd.to_datetime(df.index)
+    return list(df.resample('m', how='last').iloc[:, 0])
+
+def remove_new(stocks, beginDate, n):
+    stocklist = []
+    if isinstance(beginDate, str):
+        beginDate = datetime.datetime.strptime(beginDate, '%Y-%m-%d')
+    for stock in stocks:
+        start_date = get_security_info(stock).start_date
+        if start_date < beginDate - datetime.timedelta(days=n):
+            stocklist.append(stock)
+    return stocklist
+
+def remove_st(stocks, beginDate):
+    is_st = get_extras('is_st', stocks, end_date=beginDate, count=1)
+    return [stock for stock in stocks if not is_st[stock][0]]
+
+def remove_paused(stocks, beginDate):
+    is_paused = get_price(stocks, end_date=beginDate, count=1, fields='paused', panel=False)
+    return list(is_paused[is_paused['paused'] != 1]['code'])
+
+def get_stocks_filtered(beginDate, n, indexID=INDEX):
+    stocklist = get_index_stocks(indexID, date=beginDate)
+    stocklist = remove_new(stocklist, beginDate, n)
+    stocklist = remove_st(stocklist, beginDate)
+    stocklist = remove_paused(stocklist, beginDate)
+    return stocklist
+
+def get_df_jqfactor(stocklist, factor_list, date):
+    factor_data = get_factor_values(securities=stocklist, factors=factor_list, count=1, end_date=date)
+    df_jqfactor = pd.DataFrame(index=stocklist)
+    for factor in factor_data.keys():
+        df_jqfactor[factor] = factor_data[factor].iloc[0, :]
+    return df_jqfactor
+
+def get_newfactors_df(stocklist, df, date):
+    df['net_assets'] = df['total_assets'] - df['total_liability']
+    df_new = pd.DataFrame(index=stocklist)
+    df_new['EP'] = df['pe_ratio'].apply(lambda x: 1 / x)
+    df_new['BP'] = df['pb_ratio'].apply(lambda x: 1 / x)
+    df_new['SP'] = df['ps_ratio'].apply(lambda x: 1 / x)
+    df_new['CFP'] = df['pcf_ratio'].apply(lambda x: 1 / x)
+    df_new['financial_leverage'] = df['total_assets'] / df['net_assets']
+    df_new['debtequityratio'] = df['total_non_current_liability'] / df['net_assets']
+    df_new['cashratio'] = df['cash_to_current_liability']
+    df_new['currentratio'] = df['current_ratio']
+    df_new['NI'] = df['net_profit_to_total_operate_revenue_ttm']
+    df_new['GPM'] = df['gross_income_ratio']
+    df_new['ROE'] = df['roe_ttm']
+    df_new['ROA'] = df['roa_ttm']
+    df_new['asset_turnover'] = df['total_asset_turnover_rate']
+    df_new['net_operating_cash_flow'] = df['net_operating_cash_flow_coverage']
+    df_new['Sales_G_q'] = df['operating_revenue_growth_rate']
+    df_new['Profit_G_q'] = df['net_profit_growth_rate']
+    df_new['RSI'] = pd.Series(RSI(stocklist, date, N1=20))
+    df_new['BIAS'] = pd.Series(BIAS(stocklist, date, N1=20)[0])
+    df_new['PSY'] = pd.Series(PSY(stocklist, date, timeperiod=20))
+    dif, dea, macd = MACD(stocklist, date, SHORT=10, LONG=30, MID=15)
+    df_new['DIF'] = pd.Series(dif)
+    df_new['DEA'] = pd.Series(dea)
+    df_new['MACD'] = pd.Series(macd)
+    df_new['AR'] = df['AR']
+    df_new['ARBR'] = df['ARBR']
+    df_new['ATR14'] = df['ATR14']
+    df_new['ARBR'] = df['ARBR']
+    df_new['VOL5'] = df['VOL5']
+    df_new['VOL60'] = df['VOL60']
+    df_new['Skewness20'] = df['Skewness20']
+    df_new['Skewness60'] = df['Skewness60']
+    return df_new
+
+def get_all_factors_dict(trade_days, q):
+    original_factor_dict = {}
+    for date in trade_days:
+        stocklist = get_stocks_filtered(date, 90, indexID=INDEX)
+        q_new = q.filter(valuation.code.in_(stocklist))
+        q_factor = get_fundamentals(q_new, date=date)
+        q_factor.set_index('code', inplace=True)
+        df_jqfactor = get_df_jqfactor(stocklist, jqfactor_list, date)
+        original_factor_dict[date] = get_newfactors_df(stocklist, pd.concat([q_factor, df_jqfactor], axis=1), date)
+    return original_factor_dict
+trade_days_all = get_trade_days_monthly(START_DATE, END_DATE)
+trade_days_test = trade_days_all[88:]
+
+def fillwith_industry_mean(df, date, industry='sw_l1'):
+    stocklist = df.index.tolist()
+    industry_dict = get_industry(stocklist, date=date)
+    industry_stock = {}
+    for k, v in industry_dict.items():
+        if 'sw_l1' in v.keys():
+            industry_stock[k] = v['sw_l1']['industry_name']
+        else:
+            industry_stock[k] = np.nan
+    df['industry'] = pd.Series(industry_stock)
+    industry_mean_df = df.loc[df['industry'].notnull()].groupby('industry').mean()
+    for factor in df.columns:
+        null_codes = df.loc[df[factor].isnull(), factor].index.tolist()
+        for code in null_codes:
+            if isinstance(df.loc[code, 'industry'], str):
+                df.loc[code, factor] = industry_mean_df.loc[df.loc[code, 'industry'], factor]
+    df.fillna(df.mean(), inplace=True)
+    return df.iloc[:, :-1]
+
+def factor_processing(df, date, industry='sw_l1'):
+    df = winsorize_med(df, scale=5, inf2nan=False, axis=0)
+    df = fillwith_industry_mean(df, date, industry)
+    df = neutralize(df, ['sw_l1', 'market_cap'], date=str(date), axis=0)
+    df = standardlize(df, axis=0)
+    return df
+
+def get_return_monthly(stocklist, start, end):
+    close_start = get_price(stocklist, count=1, end_date=start, fields='close', panel=False).set_index('code')[['close']]
+    close_end = get_price(stocklist, count=1, end_date=end, fields='close', panel=False).set_index('code')[['close']]
+    df = pd.concat([close_start, close_end], axis=1)
+    df['return'] = (df.iloc[:, 1] - df.iloc[:, 0]) / df.iloc[:, 0]
+    return df['return']
+
+def label_data(data, dropna=True):
+    data['return_bin'] = np.nan
+    data = data.sort_values(by='return', ascending=False)
+    n_stock_select = np.multiply(percent_select, data.shape[0])
+    n_stock_select = np.around(n_stock_select).astype(int)
+    data.iloc[:n_stock_select[0], -1] = 1
+    data.iloc[-n_stock_select[1]:, -1] = 0
+    if dropna:
+        data.drop('return', axis=1, inplace=True)
+        data = data.dropna()
+    return data
+with open('train.pkl', 'rb') as pf:
+    train_df_all = pickle.load(pf)
+with open('test.pkl', 'rb') as pf:
+    test_dict = pickle.load(pf)
+X = train_df_all.iloc[:, :-1]
+y = train_df_all['return_bin']
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_classif
+F, p_values = f_classif(X, y)
+k = F.shape[0] - (p_values > 0.01).sum()
+k
+selector = SelectKBest(f_classif, k=k).fit(X, y)
+X_test = selector.transform(X)
+X_ftest.shape
+from sklearn.feature_selection import mutual_info_classif
+result = mutual_info_classif(X, y)
+k = result.shape[0] - sum(result <= 0)
+k
+selector = SelectKBest(mutual_info_classif, k=k).fit(X, y)
+X_mic = selector.transform(X)
+X_mic.shape
+from sklearn.feature_selection import SelectFromModel
+from sklearn.ensemble import RandomForestClassifier as RFC
+RFC_ = RFC(n_estimators=100, max_depth=3, random_state=0)
+result = RFC_.fit(X, y).feature_importances_
+result
+selector = SelectFromModel(RFC_, threshold=0.005).fit(X, y)
+X_embedded = selector.transform(X)
+X_embedded.shape
+from sklearn.feature_selection import RFE
+selector = RFE(RFC_, n_features_to_select=20, step=1).fit(X, y)
+selector.support_.sum()
+selector.ranking_
+X_wrapper = selector.transform(X)
+X_wrapper.shape
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import roc_auc_score, roc_curve
+
+def group_return(df):
+    length = df.shape[0] // 5
+    df = df.sort_values('predict', ascending=False)
+    g1 = df.iloc[:length, :]['return'].mean()
+    g2 = df.iloc[length:2 * length, :]['return'].mean()
+    g3 = df.iloc[2 * length:-2 * length, :]['return'].mean()
+    g4 = df.iloc[-2 * length:-length, :]['return'].mean()
+    g5 = df.iloc[-length:, :]['return'].mean()
+    return [g1, g2, g3, g4, g5]
+
+def visualization(result_df):
+    try:
+        Result_cum_return = (result_df + 1).cumprod()
+        Result_cum_return.index = [str(i) for i in Result_cum_return.index]
+        plt.style.use('ggplot')
+    except Exception as e:
+        pass
+
+def evaluation(group_df):
+    index = ['累计收益率', '年化收益率', '最大回撤', '夏普比率', '年化超额收益率', '月最大超额收益', '跑赢基准月份占比', '正收益月份占比', '信息比率']
+    eval_df = pd.DataFrame(np.zeros((9, 6)), index=index, columns=['第一组', '第二组', '第三组', '第四组', '第五组', '比较基准'])
+    ret_bc = group_df.iloc[:, -1]
+    for i in range(len(group_df.columns)):
+        ret = group_df.iloc[:, i]
+        n = len(group_df.index)
+        return_cump = np.around((ret + 1).cumprod()[-1] * 100, 1)
+        eval_df.iloc[0, i] = str(np.around(return_cump - 100, 1)) + '%'
+        annul = (return_cump / 100) ** (12 / n) - 1
+        eval_df.iloc[1, i] = str(np.round(annul * 100, 2)) + '%'
+        cummax = (group_df + 1).cumprod().iloc[:, i].cummax()
+        maxback = ((cummax - (group_df + 1).cumprod().iloc[:, i]) / cummax).max()
+        eval_df.iloc[2, i] = str(np.around(maxback * 100, 2)) + '%'
+        eval_df.iloc[3, i] = np.around((annul - 0.04) / ret.std(), 2)
+        alpha = (ret - ret_bc + 1).cumprod()[-1]
+        alpha_ann = alpha ** (12 / n) - 1
+        eval_df.iloc[4, i] = str(np.round(alpha_ann * 100, 2)) + '%'
+        eval_df.iloc[5, i] = str(np.round((ret - ret_bc).max() * 100, 2)) + '%'
+        eval_df.iloc[6, i] = str(np.round((ret > ret_bc).sum() / n * 100, 2)) + '%'
+        eval_df.iloc[7, i] = str(np.round((ret > 0).sum() / n * 100, 2)) + '%'
+        ann_bc = (ret_bc + 1).cumprod()[-1] ** (12 / n) - 1
+        std = (ret - ret_bc).std()
+        eval_df.iloc[8, i] = np.around((annul - ann_bc) / std, 2) if i != len(group_df.columns) - 1 else np.NAN
+    return eval_df
+
+def model_evaluation(model, test_dict, trade_days_test, selector):
+    accuracy_monthly = []
+    auc_monthly = []
+    group_return_dict = {}
+    for idx, date in enumerate(trade_days_test[:-1]):
+        df = test_dict[date].copy()
+        if hasattr(model, 'decision_function'):
+            y_predict = model.decision_function(selector.transform(df.iloc[:, :-2]))
+        else:
+            y_predict = model.predict_proba(selector.transform(df.iloc[:, :-2]))[:, 1]
+        x_test = selector.transform(df[df['return_bin'].notnull()].iloc[:, :-2])
+        y_test = df[df['return_bin'].notnull()].iloc[:, -1]
+        accuracy_monthly.append(model.score(x_test, y_test))
+        auc_monthly.append(roc_auc_score(y_test, y_predict[df['return_bin'].notnull()]))
+        df['predict'] = y_predict
+        grouplist = group_return(df)
+        bench = get_price(INDEX, date, trade_days_test[idx + 1], fields=['close'], panel=False)['close']
+        bench = (bench[-1] - bench[0]) / bench[0]
+        grouplist.append(bench)
+        group_return_dict[date] = grouplist
+    group_df = pd.DataFrame(group_return_dict, index=['group1', 'group2', 'group3', 'group4', 'group5', 'benchmark']).T
+    return (accuracy_monthly, auc_monthly, group_df)
+
+def plot_accuracy_auc(accu_list, auc_list):
+    plt.style.use('ggplot')
+    xticks = [str(i) for i in trade_days_test[:-1]]
+from sklearn.neighbors import KNeighborsClassifier as KNN
+knn = KNN(n_neighbors=10)
+accuracy_train = cross_val_score(knn, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(knn, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+knn.fit(X_wrapper, y)
+with open('knn.pkl', 'wb') as pf:
+    pickle.dump(knn, pf)
+accu_1, auc_1, group_df1 = model_evaluation(knn, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_1, auc_1)
+visualization(group_df1)
+eval1 = evaluation(group_df1)
+eval1
+from sklearn.linear_model import LogisticRegression
+lg = LogisticRegression()
+params = {'C': [0.001, 0.01, 0.1, 1, 10, 100, 1000], 'max_iter': [100, 200, 300], 'penalty': ['l1', 'l2']}
+lg_GS = GridSearchCV(estimator=lg, param_grid=params, cv=5)
+lg_GS.fit(X_wrapper, y)
+lg = LogisticRegression(C=1000, max_iter=300, penalty='l1')
+accuracy_train = cross_val_score(lg, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(lg, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+lg.fit(X_wrapper, y)
+with open('lg.pkl', 'wb') as pf:
+    pickle.dump(lg, pf)
+accu_2, auc_2, group_df2 = model_evaluation(lg, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_2, auc_2)
+visualization(group_df2)
+eval2 = evaluation(group_df2)
+eval2
+from sklearn.tree import DecisionTreeClassifier
+tree = DecisionTreeClassifier()
+params = {'criterion': ['gini', 'entropy'], 'max_depth': [*range(3, 8)], 'min_samples_split': [2, 10, 20, 30, 60], 'min_samples_leaf': [1, 5, 10, 20, 30]}
+tree_GS = GridSearchCV(estimator=tree, param_grid=params, cv=5)
+tree_GS.fit(X_wrapper, y)
+tree = DecisionTreeClassifier(criterion='entropy', max_depth=5, min_samples_leaf=30, min_samples_split=2)
+accuracy_train = cross_val_score(tree, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(tree, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+tree.fit(X_wrapper, y)
+with open('tree.pkl', 'wb') as pf:
+    pickle.dump(tree, pf)
+accu_3, auc_3, group_df3 = model_evaluation(tree, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_3, auc_3)
+visualization(group_df3)
+eval3 = evaluation(group_df3)
+eval3
+from sklearn.naive_bayes import GaussianNB
+bys = GaussianNB()
+accuracy_train = cross_val_score(bys, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(bys, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+bys.fit(X_wrapper, y)
+with open('bys.pkl', 'wb') as pf:
+    pickle.dump(bys, pf)
+accu_4, auc_4, group_df4 = model_evaluation(bys, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_4, auc_4)
+visualization(group_df4)
+eval4 = evaluation(group_df4)
+eval4
+from sklearn.ensemble import RandomForestClassifier
+rfc = RandomForestClassifier()
+params = {'n_estimators': [50, 100, 200, 300], 'max_depth': [*range(3, 6)], 'min_samples_split': [2, 10, 20, 30], 'min_samples_leaf': [1, 5, 10, 20]}
+rfc_GS = GridSearchCV(estimator=rfc, param_grid=params, cv=5)
+rfc_GS.fit(X_wrapper, y)
+rfc = RandomForestClassifier(n_estimators=200, max_depth=5, min_samples_leaf=20, min_samples_split=20)
+accuracy_train = cross_val_score(rfc, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(rfc, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+rfc.fit(X_wrapper, y)
+with open('rfc.pkl', 'wb') as fp:
+    pickle.dump(rfc, fp)
+accu_5, auc_5, group_df5 = model_evaluation(rfc, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_5, auc_5)
+visualization(group_df5)
+eval5 = evaluation(group_df5)
+eval5
+from sklearn.ensemble import AdaBoostClassifier
+adb = AdaBoostClassifier()
+params = {'base_estimator': [DecisionTreeClassifier(max_depth=5)], 'n_estimators': [50, 100, 200, 300], 'learning_rate': [0.01, 0.1, 1, 10, 100]}
+adb_GS = GridSearchCV(estimator=adb, param_grid=params, cv=5)
+adb_GS.fit(X_wrapper, y)
+adb = AdaBoostClassifier(DecisionTreeClassifier(max_depth=5), learning_rate=0.01, n_estimators=200)
+accuracy_train = cross_val_score(adb, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(adb, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+adb.fit(X_wrapper, y)
+with open('adb.pkl', 'wb') as fp:
+    pickle.dump(adb, fp)
+accu_6, auc_6, group_df6 = model_evaluation(adb, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_6, auc_6)
+visualization(group_df6)
+eval6 = evaluation(group_df6)
+eval6
+from sklearn.svm import SVC
+svm = SVC(C=0.003, kernel='rbf', gamma=0.01)
+accuracy_train = cross_val_score(svm, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(svm, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+svm.fit(X_wrapper, y)
+with open('svm.pkl', 'wb') as fp:
+    pickle.dump(svm, fp)
+accu_7, auc_7, group_df7 = model_evaluation(svm, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_7, auc_7)
+visualization(group_df7)
+eval7 = evaluation(group_df7)
+eval7
+from xgboost import XGBClassifier
+xgb = XGBClassifier(n_estimators=200, max_depth=5)
+accuracy_train = cross_val_score(xgb, X_wrapper, y, scoring='accuracy', cv=5).mean()
+auc_train = cross_val_score(xgb, X_wrapper, y, scoring='roc_auc', cv=5).mean()
+xgb.fit(X_wrapper, y)
+with open('xgb.pkl', 'wb') as fp:
+    pickle.dump(xgb, fp)
+accu_8, auc_8, group_df8 = model_evaluation(xgb, test_dict, trade_days_test, selector)
+plot_accuracy_auc(accu_8, auc_8)
+visualization(group_df8)
+eval8 = evaluation(group_df8)
+eval8
+models = ['KNN', 'Logistic', 'DecisionTree', 'Bayes', 'RF', 'AdaBoost', 'SVM', 'XGBoost']
+df = pd.DataFrame([[mean(accu_1), mean(accu_2), mean(accu_3), mean(accu_4), mean(accu_5), mean(accu_6), mean(accu_7), mean(accu_8)], [mean(auc_1), mean(auc_2), mean(auc_3), mean(auc_4), mean(auc_5), mean(auc_6), mean(auc_7), mean(auc_8)]], index=['accuracy', 'auc']).T
+df.index = models
+df.plot(kind='bar', figsize=(10, 6), ylim=[0.3, 0.6], title='Accuracy and AUC of models', fontsize=12)
+group1_all = pd.DataFrame(index=group_df1.index, columns=models + ['benchmark'])
+for i, df in enumerate([group_df1, group_df2, group_df3, group_df4, group_df5, group_df6, group_df7, group_df8]):
+    if i == 7:
+        group1_all.iloc[:, i + 1] = df['benchmark']
+    group1_all.iloc[:, i] = df['group1']
+(group1_all + 1).cumprod().iloc[-1, :].sort_values()
+group1_all.index = [str(i) for i in group1_all.index]
+eval_df = pd.DataFrame(index=eval1.index, columns=models)
+for i, df in enumerate([eval1, eval2, eval3, eval4, eval5, eval6, eval7, eval8]):
+    if i == 7:
+        eval_df['benchmark'] = df['比较基准']
+    eval_df.iloc[:, i] = df['第一组']
+eval_df

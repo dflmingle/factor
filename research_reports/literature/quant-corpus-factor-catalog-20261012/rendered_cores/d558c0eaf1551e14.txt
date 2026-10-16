@@ -1,0 +1,56 @@
+quant/2021年度精选策略/76.日内交易策略R-breaker - 300346.XSHE.txt
+from jqdata import *
+import numpy as np
+import pandas as pd
+from pandas import DataFrame as df
+import datetime
+import time
+
+def initialize(context):
+    run_daily(before_market_open, time='09:30', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='15:30', reference_security='000300.XSHG')
+
+def judge(tick_data, context, limit):
+    break_price = g.break_price
+    security = g.security
+    if tick_data.current > break_price['R3'].values and context.portfolio.available_cash > limit:
+        order_value(security, limit, style=None, side='long', pindex=0, close_today=False)
+    if tick_data.high > break_price['R2'].values and tick_data.current < break_price['R1'].values and (context.portfolio.total_value > 0):
+        position = context.portfolio.long_positions[security]
+        if position.closeable_amount > 100 * np.floor(limit / (tick_data.current * 100)):
+            order_value(security, -1 * limit, style=None, side='long', pindex=0, close_today=False)
+    if tick_data.low < break_price['S2'].values and tick_data.current > break_price['S1'].values and (context.portfolio.available_cash > limit):
+        order_value(security, limit, style=None, side='long', pindex=0, close_today=False)
+    if tick_data.current < break_price['S3'].values and context.portfolio.total_value > 0:
+        position = context.portfolio.long_positions[security]
+        if position.closeable_amount > 100 * np.floor(limit / (tick_data.current * 100)):
+            order_value(security, -1 * limit, style=None, side='long', pindex=0, close_today=False)
+
+def before_market_open(context):
+    g.security = '300346.XSHE'
+    security = g.security
+    g.limits = context.portfolio.starting_cash / 10
+    subscribe(security, 'tick')
+    daily_ND = get_price(security, start_date=None, end_date=context.previous_date, frequency='daily', fields=['open', 'close', 'high', 'low'], skip_paused=False, fq='pre', count=1, panel=True)
+    break_price = df(columns=['R3', 'R2', 'R1', 'S1', 'S2', 'S3'])
+    break_price['R2'] = daily_ND['high'] + 0.35 * (daily_ND['close'] - daily_ND['low'])
+    break_price['S2'] = daily_ND['low'] - 0.35 * (daily_ND['high'] - daily_ND['close'])
+    break_price['R1'] = 1.07 / 2 * (daily_ND['high'] + daily_ND['low']) - 0.07 * daily_ND['low']
+    break_price['S1'] = 1.07 / 2 * (daily_ND['high'] + daily_ND['low']) - 0.07 * daily_ND['high']
+    break_price['R3'] = break_price['R2'] + 0.25 * (break_price['R2'] - break_price['S2'])
+    break_price['S3'] = break_price['S2'] - 0.25 * (break_price['R2'] - break_price['S2'])
+    break_price.index = [context.current_dt]
+    g.break_price = break_price
+
+def handle_tick(context, tick):
+    break_price = g.break_price
+    security = g.security
+    limits = g.limits
+    tick_data = get_current_tick(security, dt=None, df=False)
+    judge(tick_data, context, limits)
+
+def after_market_close(context):
+    trades = get_trades()
+    for _trade in trades.values():
+        pass
+    unsubscribe_all()

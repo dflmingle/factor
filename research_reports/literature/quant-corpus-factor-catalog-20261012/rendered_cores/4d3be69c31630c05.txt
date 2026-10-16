@@ -1,0 +1,133 @@
+quant/量化策略/量化策略/龙头追涨策略2026/02涨停板多头策略-25年负-47.txt
+from jqdata import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+from jqfactor import *
+
+def initialize(context):
+    g.count = 30
+    g.buy_stock_list = []
+    g.max_number_stock = 5
+    g.stop_loss_per = 0.9
+    g.stop_win = 0.1
+    run_daily(before_open, time='09:20', reference_security='000300.XSHG')
+    run_daily(market_open, time='09:33', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    run_daily(stop_win, time='14:50', reference_security='000300.XSHG')
+    run_daily(stop_down_loss, time='9:40', reference_security='000300.XSHG')
+    run_daily(close_summary, time='15:05', reference_security='000300.XSHG')
+
+def before_open(context):
+    g.buy_stock_list = search_can_buy_stock(context)
+    if g.buy_stock_list and len(g.buy_stock_list) > 0:
+        for i, stock in enumerate(g.buy_stock_list, 1):
+            stock_name = get_security_info(stock).display_name
+            df_limit = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['high_limit'], skip_paused=True, fq='pre', count=1)
+            if not df_limit.empty:
+                limit_price = df_limit['high_limit'][0]
+
+def search_can_buy_stock(context):
+    stock_list = Get_all_security_list(context)
+    up_limted_stock_list = find_up_limted_sort(context, stock_list)
+    if up_limted_stock_list is None:
+        return None
+    stock_list = []
+    for stock in up_limted_stock_list:
+        ma_5 = MA(stock, context.previous_date, 5, '1d')
+        ma_10 = MA(stock, context.previous_date, 10, '1d')
+        ma_20 = MA(stock, context.previous_date, 20, '1d')
+        ma_60 = MA(stock, context.previous_date, 60, '1d')
+        df = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['close'], skip_paused=True, fq='pre', count=1)
+        if df.empty:
+            continue
+        pre_close_price = df['close'][0]
+        if pre_close_price > ma_5[stock] and ma_5[stock] > ma_10[stock] and (ma_10[stock] > ma_20[stock]) and (ma_20[stock] > ma_60[stock]):
+            stock_list.append(stock)
+    return stock_list
+
+def Get_all_security_list(context):
+    security_list = []
+    stocks = list(get_all_securities(['stock']).index)
+    for stock in stocks:
+        security_obj = get_security_info(stock)
+        if str(security_obj.type) == 'stock':
+            if context.current_dt.date() < security_obj.end_date and security_obj.start_date < context.current_dt.date():
+                security_list.append(stock)
+            else:
+                pass
+    security_list = filter_st_and_paused(security_list)
+    security_list = filter_kc_ban(security_list)
+    security_list = filter_new(context, security_list, g.count)
+    return security_list
+'EXACT_REVIEWED_FUNCTION filter_new sha256=3be01c9fafb09bfefbcb46244876182a4d755f7c002b69c5889d1d8f95697f85 source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_and_paused sha256=fa99309af245548a69a7b878e5e8f1f6a5249171c613b827938aa5c69ab58bd5 source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION filter_kc_ban sha256=e775546ca062bacd0ccca0b5ad7ee0f698e13e85629e1585fc13bdb0a7d9f796 source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=fd83aa11188267ff88f7a655dd76be12c22d0b08ad7d19000f22ef3259f248cb source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+
+def find_up_limted_sort(context, stock_list):
+    if len(stock_list) < 0:
+        return None
+    df_data = get_price(stock_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'low_limit'], skip_paused=True, fq='pre', count=1, panel=False)
+    df = df_data[df_data['high_limit'] == df_data['close']]
+    up_limit_list = df.code.values.tolist()
+    if up_limit_list:
+        import pandas as pd
+        yesterday = context.previous_date
+        score_list = get_factor_values(up_limit_list, 'market_cap', end_date=yesterday, count=1)['market_cap'].iloc[0].tolist()
+        df = pd.DataFrame(index=up_limit_list, data={'score': score_list}).dropna()
+        df = df.sort_values(by='score', ascending=True)
+        up_limit_list = df.index.tolist()
+    return up_limit_list
+
+def find_up_limted(context, stock_list):
+    if len(stock_list) < 0:
+        return None
+    df_data = get_price(stock_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'low_limit'], skip_paused=True, fq='pre', count=1, panel=False)
+    df = df_data[df_data['high_limit'] == df_data['close']]
+    up_limit_list = df.code.values.tolist()
+    return up_limit_list
+'EXACT_REVIEWED_FUNCTION market_open sha256=03654c974326e1dfd89afffa8d631fa8369a2bd799b5935eb3d0d8e51722ec1f source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION stop_loss sha256=dc8d8d191978e8afc983f0ef9380c1b8683b7a34f28cc1129a48a9a5f5c7d5da source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+
+def buy_stock(context, stock):
+    if stock in context.portfolio.positions.keys():
+        pass
+    else:
+        buy_value = context.subportfolios[0].total_value / g.max_number_stock
+        if context.subportfolios[0].available_cash >= buy_value:
+            df_limit = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['high_limit'], skip_paused=True, fq='pre', count=1)
+            limit_price = df_limit['high_limit'][0] if not df_limit.empty else None
+            current_data = get_current_data()
+            current_price = current_data[stock].last_price
+            Order_object = order_value(stock, buy_value)
+            if Order_object is not None and Order_object.filled > 0:
+                if limit_price and limit_price > 0:
+                    price_ratio = (Order_object.price - limit_price) / limit_price * 100
+            elif Order_object is None:
+                pass
+
+def sell_stock(stock, stock_number):
+    order_result = order_target(stock, stock_number)
+    if order_result is not None and order_result.filled > 0:
+        pass
+    elif order_result is None:
+        pass
+'EXACT_REVIEWED_FUNCTION stop_win sha256=627ac485fbbb1d2dda451bc07defc823db89fa7b20ee3b7ba576f51d0ba7b72f source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION check_position_number sha256=d6cd10f4ed6b461fb24b83739dd5b7c4aeb5ecacf91e8a292c90df275157439d source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'
+
+def close_summary(context):
+    positions = context.portfolio.positions
+    if len(positions) > 0:
+        total_value = 0
+        for stock in positions:
+            stock_name = get_security_info(stock).display_name
+            position = positions[stock]
+            current_data = get_current_data()
+            current_price = current_data[stock].last_price
+            position_value = position.total_amount * current_price
+            total_value += position_value
+            profit_pct = (current_price - position.avg_cost) / position.avg_cost * 100 if position.avg_cost > 0 else 0
+'EXACT_REVIEWED_FUNCTION stop_down_loss sha256=68affb174ef9e5ba2ec15c3e0c12f66c2bed5f5e86b7cc4695d31b4c8333be7d source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'
+'EXACT_REVIEWED_FUNCTION print_stock_info sha256=331a401a9f84d0fbc61acd03dc673590fd68add57e663c91fefcdc964ee66924 source=quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt'

@@ -1,0 +1,440 @@
+quant/2021年度精选策略/14.FOF养老成长基金-v2.0.txt
+import numpy as np
+import talib
+import pandas
+import scipy as sp
+import scipy.optimize
+import datetime as dt
+from scipy import linalg as sla
+from scipy import spatial
+
+def initialize(context):
+    context.tradeRatio = {}
+    context.positionDict = {}
+    context.position = {}
+    context.initPriceDict = {}
+    context.transactionRecord = {}
+
+def handle_data(context, data):
+    initializeStockDict(context)
+    rebalance(context)
+    message = ''
+    for stock in context.pool:
+        if context.tradeRatio[stock] > 0:
+            message += buyOrSellCheck(context, stock, 3, 1.4)
+    if message != '':
+        pass
+    if getLastestTransactTime(context):
+        tradeStockDict(context, context.tradeRatio)
+        if context.doneTrade:
+            pass
+
+def initializeStockDict(context):
+    inout_cash(400, pindex=0)
+    context.doneTrade = False
+    context.Transitional = True
+    context.weekDay = {4}
+    context.confidenceLevel = 0.02
+    context.referenceCycle = 250
+    context.maxRange = 30
+    context.consolidation = 5
+    context.stockCount = 5
+    context.referStock = '000002.XSHG'
+    context.minPosition = 0
+    context.Multiple = 1
+    context.minRatio = 0.1 * context.Multiple
+    context.maxRatio = 0.3 * context.Multiple
+    context.minAmount = 2000
+    context.netRate = 3
+    context.stockDict = {}
+    context.trackStock = ''
+    context.bondStock = '163210.XSHE'
+    context.stockDict['515520.XSHG'] = 10
+    context.stockDict['161907.XSHE'] = 10
+    context.stockDict['512890.XSHG'] = 10
+    context.stockDict['515300.XSHG'] = 10
+    context.stockDict['510050.XSHG'] = 10
+    context.stockDict['159916.XSHE'] = 10
+    context.stockDict['512910.XSHG'] = 10
+    context.stockDict['510310.XSHG'] = 10
+    context.stockDict['512260.XSHG'] = 10
+    context.stockDict['512090.XSHG'] = 10
+    context.stockDict['515000.XSHG'] = 10
+    context.stockDict['512040.XSHG'] = 10
+    context.stockDict['510900.XSHG'] = 10
+    context.stockDict['501021.XSHG'] = 10
+    context.stockDict['513050.XSHG'] = 10
+    context.stockDict['518880.XSHG'] = 4
+    context.stockDict = delNewStock(context, context.stockDict)
+    context.pool = list(context.stockDict.keys())
+    if len(context.pool) < context.stockCount:
+        context.stockCount = len(context.pool)
+    for stock in context.pool:
+        if stock not in context.initPriceDict:
+            context.initPriceDict[stock] = 0
+        if stock not in context.positionDict:
+            context.positionDict[stock] = 0
+        if stock not in context.transactionRecord:
+            context.transactionRecord[stock] = 0
+    context.tradeRecord = ''
+    context.ratioMessage = ''
+
+def getStockRSIRatio(stock):
+    try:
+        if ratio > 0:
+            nRSI = 60
+            nRSIAvg = 5
+            his = attribute_history(stock, 300, '1d', 'close', skip_paused=True, df=False, fq='pre')
+            closeArray = his['close']
+            rsiArray = talib.RSI(closeArray, nRSI)
+            rsiAvgArrayS = talib.MA(rsiArray, nRSIAvg)
+            rsiAvgArrayL = talib.MA(rsiArray, nRSI)
+            rsiRatio = 100 - np.round(math.tan(math.radians(rsiAvgArrayS[-1] - (50.0 if math.isnan(rsiAvgArrayL[-1]) else rsiAvgArrayL[-1]))) * 50, 0)
+            if rsiRatio < 0:
+                rsiRatio = 0
+            return rsiRatio
+        else:
+            return 0
+    except:
+        return 50
+
+def getStockRSI(stock):
+    try:
+        nRSI = 7
+        his = attribute_history(stock, 30, '1d', ('close', 'high', 'low'), skip_paused=True, df=False, fq='pre')
+        closeArray = his['close']
+        rsiArray = talib.RSI(closeArray, nRSI)
+        return np.round(rsiArray[-1], 2)
+    except Exception as err:
+        return 100
+
+def getLastestTransactTime(context):
+    lastestDate = datetime.datetime(2000, 1, 1)
+    for stock in list(context.portfolio.positions.keys()):
+        if context.portfolio.positions[stock].transact_time > lastestDate:
+            lastestDate = context.portfolio.positions[stock].transact_time
+    if (context.current_dt - lastestDate).days >= 30 and context.current_dt.isoweekday() in context.weekDay:
+        return True
+    return False
+
+def getStockName(stock):
+    return get_security_info(stock).display_name
+
+def drawCloseValue(stock):
+    his = attribute_history(stock, 1, '1d', 'close', df=False, skip_paused=False)
+
+def variance(stock):
+    his = attribute_history(stock, 120, '1d', 'close', df=False, skip_paused=False)
+    trList = []
+    for i in range(len(his['close'])):
+        if i > 0:
+            trList.append(abs(his['close'][i - 1] - his['close'][i]) / his['close'][i - 1] * 100)
+    trArray = np.array(trList)
+    trMean = trArray.mean()
+    return np.round(trMean, 1) if not isnan(trMean) else 0
+
+def getAvgMoney(stock):
+    his = attribute_history(stock, 120, '1d', 'money', df=False, skip_paused=False)
+    trMean = his['money'].mean()
+    return np.round(trMean, 1) if not isnan(trMean) else 0
+
+def delNewStock(context, stockDict):
+    deltaDate = context.current_dt.date() - dt.timedelta(300)
+    tmpDict = {}
+    for stock in list(stockDict.keys()):
+        if get_security_info(stock).start_date < deltaDate:
+            avgMoney = getAvgMoney(stock)
+            if avgMoney >= 2000000:
+                tmpDict[stock] = stockDict[stock]
+    return tmpDict
+
+def buyOrSellCheck(context, stock, nATRValue, nstdValue):
+    message = ''
+    try:
+        nRSI = 7
+        nRSIAvg = 14
+        nATR = 21
+        deltaDate = context.current_dt.date() - datetime.timedelta(90)
+        if get_security_info(stock).start_date > deltaDate:
+            return message
+        his = attribute_history(stock, 120, '1d', ('close', 'high', 'low'), skip_paused=True, df=False, fq='pre')
+        closeArray = his['close']
+        emaArray = talib.MA(closeArray, 60)
+        rsiArray = talib.RSI(closeArray, nRSI)
+        rsiAvgArray = talib.MA(rsiArray, nRSIAvg)
+        rsiStdArray = talib.STDDEV(rsiArray, nRSIAvg)
+        trList = []
+        for i in range(len(closeArray)):
+            if i > 0:
+                trList.append(max([his['high'][i] - his['low'][i], abs(his['close'][i - 1] - his['high'][i]), abs(his['close'][i - 1] - his['low'][i])]))
+        trArray = np.array(trList)
+        atrAvgArray = talib.MA(trArray, nATR)
+        ATR = nATRValue * atrAvgArray[-1]
+        buyThreshold = rsiAvgArray[-1] - nstdValue * rsiStdArray[-1]
+        if buyThreshold > 30:
+            buyThreshold = 30
+        sellThreshold = rsiAvgArray[-1] + nstdValue * rsiStdArray[-1]
+        if sellThreshold < 70:
+            sellThreshold = 70
+        premiumRate = getPremiumRate(context, stock)
+        if stopLoss(stock):
+            message = getStockName(stock) + ' : ' + '禁止操作！\n'
+        elif premiumRate >= 0.5:
+            message = getStockName(stock) + ' : ' + '溢价[' + str(premiumRate) + ']！\n'
+        elif premiumRate <= -1.0:
+            message = getStockName(stock) + ' : ' + '折价[' + str(premiumRate) + ']！\n'
+        elif rsiArray[-1] > sellThreshold:
+            message = getStockName(stock) + ' : ' + 'RSI[' + str(np.round(rsiArray[-1], 2)) + '>' + str(np.round(sellThreshold, 2)) + ']卖出！\n'
+        elif rsiArray[-1] < buyThreshold:
+            message = getStockName(stock) + ' : ' + 'RSI[' + str(np.round(rsiArray[-1], 2)) + '<' + str(np.round(buyThreshold, 2)) + ']买入！\n'
+        elif closeArray[-1] > closeArray[-2] + ATR:
+            message = getStockName(stock) + ' : ' + 'ATR[' + str(np.round(closeArray[-1], 2)) + '>' + str(np.round(emaArray[-1], 2)) + ']卖出！\n'
+        elif closeArray[-1] < closeArray[-2] - ATR:
+            message = getStockName(stock) + ' : ' + 'ATR[' + str(np.round(closeArray[-1], 2)) + '<' + str(np.round(emaArray[-1], 2)) + ']买入！\n'
+    except:
+        message = ''
+    return message
+
+def stopLoss(stock, lag=2, loss=2, more=4):
+    hisArray = attribute_history(stock, lag, '1d', ('open', 'close', 'high', 'low', 'volume'), skip_paused=True)
+    closeArray = hisArray['close'].values
+    rate = abs((closeArray[-1] - closeArray[-2]) / closeArray[-2] * 100)
+    if rate > loss and rate < more:
+        return True
+    else:
+        return False
+
+def getPremiumRate(context, stock):
+    try:
+        now = context.current_dt
+        start_date = now + datetime.timedelta(days=-10)
+        end_date = now + datetime.timedelta(days=-1)
+        unitPriceArray = get_extras('unit_net_value', stock, start_date=start_date, end_date=end_date, df=False)
+        unitPrice = unitPriceArray[stock][-1]
+        his = attribute_history(stock, 5, '1d', 'close', skip_paused=True, df=False, fq='pre')
+        closePrice = his['close'][-1]
+        return np.round((closePrice - unitPrice) / unitPrice * 100, 2)
+    except:
+        return 0
+
+def rebalance(context):
+    tradeRatio = caltradeStockRatio(context)
+    context.tradeRatio = tradeRatio
+
+def caltradeStockRatio(context):
+
+    def getGrowthRate(stock, n=21):
+        lc = attribute_history(stock, n, '1d', 'close', True)['close'][0]
+        c = attribute_history(stock, 1, '1d', 'close', True)['close'][0]
+        if not isnan(lc) and (not isnan(c)) and (lc != 0):
+            return (c - lc) / lc * 100
+        else:
+            return 0
+
+    def calstockRiskVaR(stock):
+        portfolio_VaR = 1e-07
+        dailyReturns = fun_getdailyreturn(stock, '1d', context.referenceCycle)
+        portfolio_VaR = 1 * context.confidenceLevel * np.std(dailyReturns) * 100
+        if isnan(portfolio_VaR):
+            portfolio_VaR = 1e-07
+        return 1
+
+    def calstockRiskES(stock):
+        portfolio_ES = 0
+        dailyReturns = fun_getdailyreturn(stock, '1d', context.referenceCycle)
+        dailyReturns_sort = sorted(dailyReturns)
+        count = 0
+        sum_value = 0
+        for i in range(len(dailyReturns_sort)):
+            if i < context.referenceCycle * context.confidenceLevel:
+                sum_value += dailyReturns_sort[i]
+                count += 1
+        if count == 0:
+            portfolio_ES = 0
+        else:
+            portfolio_ES = -(sum_value / (context.referenceCycle * context.confidenceLevel))
+        if isnan(portfolio_ES):
+            portfolio_ES = 0
+        return portfolio_ES
+
+    def fun_getdailyreturn(stock, freq, lag):
+        stockHis = history(lag, freq, 'close', stock, df=True)
+        dailyReturns = stockHis.resample('D').last().pct_change().fillna(value=0, method=None, axis=0).values
+        return dailyReturns
+
+    def fun_caltraderatio(tradeRatio, stock, position, total_position):
+        if stock in tradeRatio:
+            tradeRatio[stock] += np.round(position / total_position, 3)
+        else:
+            tradeRatio[stock] = np.round(position / total_position, 3)
+        tradeRatio[stock] = tradeRatio[stock] * 100 // context.Multiple * context.Multiple / 100
+        return tradeRatio
+    max_ES = -1
+    max_VaR = -1
+    ESDict = {}
+    VaRDict = {}
+    grDict = {}
+    for stock in context.pool:
+        ES = calstockRiskES(stock)
+        if ES > max_ES:
+            max_ES = ES
+        ESDict[stock] = ES
+        VaR = calstockRiskVaR(stock)
+        if VaR > max_VaR:
+            max_VaR = VaR
+        VaRDict[stock] = VaR
+        grDict[stock] = getGrowthRate(stock)
+    referES = calstockRiskES(context.referStock)
+    referVar = calstockRiskVaR(context.referStock)
+    referGR = getGrowthRate(context.referStock)
+    referPosition = np.round(max_ES / referES * (max_VaR / referVar) * power(1.02, referGR) * 100, 3)
+    if context.minPosition == 0:
+        context.minPosition = referPosition
+    else:
+        context.minPosition = (referPosition + context.minPosition) / 2
+    positionDict = {}
+    for stock in context.pool:
+        if ESDict[stock] == 0:
+            positionDict[stock] = 0
+        else:
+            stockRatio = context.stockDict[stock]
+            positionDict[stock] = np.round(max_ES / ESDict[stock] * (max_VaR / VaRDict[stock]) * power(1.02, grDict[stock]) * stockRatio * 10, 3)
+        if context.transactionRecord[stock] == 0:
+            context.transactionRecord[stock] = positionDict[stock]
+        else:
+            positionDict[stock] = positionDict[stock] * 0.8 + context.transactionRecord[stock] * 0.2
+            context.transactionRecord[stock] = positionDict[stock]
+    positionDictSorted = sorted(list(positionDict.items()), key=lambda d: d[1], reverse=True)
+    stockIn = ''
+    stockOut = ''
+    doChange = False
+    if len(positionDictSorted) > context.stockCount and context.Transitional:
+        stockIn = positionDictSorted[context.stockCount - 1][0]
+        stockOut = positionDictSorted[context.stockCount][0]
+        doChange = stockIn not in context.portfolio.positions and stockOut in context.portfolio.positions
+        if doChange:
+            if np.round(positionDict[stockIn] - context.minPosition, 2) < 0 or np.round(positionDict[stockOut] - context.minPosition, 2) < 0:
+                doChange = False
+    positionDict.clear()
+    index = 1
+    for key, value in positionDictSorted:
+        if context.initPriceDict[key] == 0 and abs(grDict[key]) >= context.maxRange:
+            context.initPriceDict[key] = 1
+        elif context.initPriceDict[key] == 1 and abs(grDict[key]) < context.consolidation:
+            context.initPriceDict[key] = 0
+        if context.initPriceDict[key] == 1:
+            positionDict[key] = 0
+        elif doChange and (key == stockIn or key == stockOut):
+            if key == stockIn:
+                positionDict[key] = 0
+            elif key == stockOut:
+                positionDict[key] = value
+        elif index <= context.stockCount:
+            positionDict[key] = value
+        else:
+            positionDict[key] = 0
+        index += 1
+    total_position = 0
+    for stock in context.pool:
+        total_position += positionDict[stock]
+    if total_position == 0:
+        total_position = 1
+    ratio = {}
+    profitDict = {}
+    for stock in context.pool:
+        stockPosition = positionDict[stock]
+        RSI = getStockRSI(stock)
+        if RSI > 30 and np.round(stockPosition - context.minPosition, 2) < 0:
+            stockPosition = 0
+        ratio = fun_caltraderatio(ratio, stock, stockPosition, total_position)
+        if stock in context.portfolio.positions:
+            profitDict[stock] = (context.portfolio.positions[stock].price - context.portfolio.positions[stock].avg_cost) / context.portfolio.positions[stock].avg_cost * 100
+        else:
+            profitDict[stock] = 0
+    if context.trackStock != '':
+        drawCloseValue(context.trackStock)
+    for stock in context.pool:
+        if ratio[stock] < context.minRatio and ratio[stock] > 0:
+            ratio[stock] = 0
+        elif ratio[stock] > context.maxRatio:
+            ratio[stock] = context.maxRatio
+        if context.trackStock == stock:
+            if ratio[stock] > 0:
+                pass
+    sumRatio = 0
+    index = 1
+    adjustment = np.round(context.stockCount * 1.0 / 2 / 100, 2)
+    for key, value in positionDictSorted:
+        if ratio[key] > 0:
+            ratio[key] = adjustment + ratio[key]
+        adjustment -= 0.01
+        try:
+            context.ratioMessage += '%2d.%s:%3d/%3d(%2d%%/%1.1f%%/%1.1f%%/%1.1f%%/%1.2f%%) %s\n' % (index, key, positionDict[key], value, ratio[key] * 100, variance(key), grDict[key], context.positionDict[key] + profitDict[key], getPremiumRate(context, key), getStockName(key))
+        except:
+            context.ratioMessage += '%2d.%s' % (index, key)
+        sumRatio += ratio[key]
+        index += 1
+        if index > context.stockCount + 2:
+            break
+    ratio[context.bondStock] = 0
+    context.positionDict[context.bondStock] = 1
+    try:
+        context.ratioMessage += '合计：%3d%%，%3d，' % (sumRatio * 100, context.minPosition)
+        if 1 - sumRatio > 0.2:
+            ratio[context.bondStock] = 1 - sumRatio
+    except:
+        context.ratioMessage += '合计：%3d%%，%3d，' % (0, context.minPosition)
+    context.ratioMessage += '累计金额：%d，可用资金：%d，总资产：%d\n' % (context.portfolio.inout_cash, context.portfolio.available_cash, context.portfolio.total_value)
+    if context.trackStock == '':
+        pass
+    return ratio
+
+def tradeStockDict(context, buyDict):
+
+    def tradeStock(context, stock, ratio):
+        total_value = context.portfolio.total_value
+        curPrice = history(1, '1d', 'close', stock, df=False)[stock][-1]
+        curValue = 0
+        if stock in context.portfolio.positions:
+            curValue = context.portfolio.positions[stock].total_amount * curPrice
+        quota = total_value * ratio
+        if quota == 0 and curValue > 0:
+            if stock in context.portfolio.positions:
+                context.positionDict[stock] += np.round((curPrice - context.portfolio.positions[stock].avg_cost) / context.portfolio.positions[stock].avg_cost * 100, 2)
+            else:
+                context.positionDict[stock] = curPrice
+        deltaValue = np.round(abs(quota - curValue) / 1000, 0) * 1000
+        if deltaValue >= context.minAmount or (quota == 0 and curValue > 0):
+            order_target_value(stock, quota)
+            context.doneTrade = True
+    buylist = list(buyDict.keys())
+    hStocks = history(1, '1d', 'close', buylist, df=False)
+    myholdstock = list(context.portfolio.positions.keys())
+    portfolioValue = context.portfolio.portfolio_value
+    holdDict = {}
+    hholdstocks = history(1, '1d', 'close', myholdstock, df=False)
+    for stock in myholdstock:
+        tmpW = np.round(context.portfolio.positions[stock].total_amount * hholdstocks[stock] / portfolioValue, 2)
+        holdDict[stock] = float(tmpW)
+    tmpDict = {}
+    for stock in holdDict:
+        if stock in buyDict:
+            tmpDict[stock] = np.round(buyDict[stock] - holdDict[stock], 2)
+        else:
+            tmpDict[stock] = -999999
+    tradeOrder = sorted(list(tmpDict.items()), key=lambda d: d[1], reverse=False)
+    tmpList = []
+    for idx in tradeOrder:
+        stock = idx[0]
+        if stock in buyDict:
+            tradeStock(context, stock, buyDict[stock])
+        else:
+            tradeStock(context, stock, 0)
+        tmpList.append(stock)
+    for i in range(len(buylist)):
+        stock = buylist[i]
+        if len(tmpList) != 0:
+            if stock not in tmpList:
+                tradeStock(context, stock, buyDict[stock])
+        else:
+            tradeStock(context, stock, buyDict[stock])

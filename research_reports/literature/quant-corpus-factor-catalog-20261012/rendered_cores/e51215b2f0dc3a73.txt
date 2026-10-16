@@ -1,0 +1,470 @@
+quant/2022年度精选策略/8.多因子策略研究代码框架.txt
+import pandas as pd
+import numpy as np
+import time
+import datetime
+import statsmodels.api as sm
+import pickle
+import warnings
+from jqdata import *
+warnings.filterwarnings('ignore')
+start_date = '2013-01-01'
+end_date = '2014-01-01'
+all_trade_days = get_trade_days(start_date=start_date, end_date=end_date).tolist()
+trade_days = all_trade_days[::20]
+securities = get_all_securities()
+start_data_dt = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+securities_after_start_date = securities[securities['start_date'] < start_data_dt]
+all_stocks = list(securities_after_start_date.index)
+INDUSTRY_NAME = 'sw_l1'
+ttm_factors = []
+fac_dict = {'MC': valuation.market_cap, 'GP': indicator.gross_profit_margin * income.operating_revenue, 'OP': income.operating_profit, 'OR': income.operating_revenue, 'NP': income.net_profit, 'EV': valuation.market_cap + balance.shortterm_loan + balance.non_current_liability_in_one_year + balance.longterm_loan + balance.bonds_payable + balance.longterm_account_payable - cash_flow.cash_and_equivalents_at_end, 'TOE': balance.total_owner_equities, 'TOR': income.total_operating_revenue, 'EBIT': income.net_profit + income.financial_expense + income.income_tax_expense, 'TOC': income.total_operating_cost, 'NOCF/MC': cash_flow.net_operate_cash_flow / valuation.market_cap, 'OTR': indicator.ocf_to_revenue, 'GPOA': indicator.gross_profit_margin * income.operating_revenue / balance.total_assets, 'GPM': indicator.gross_profit_margin, 'OPM': income.operating_profit / income.operating_revenue, 'NPM': indicator.net_profit_margin, 'ROA': indicator.roa, 'ROE': indicator.roe, 'INC': indicator.inc_return, 'EPS': indicator.eps, 'AP': indicator.adjusted_profit, 'OP': indicator.operating_profit, 'VCP': indicator.value_change_profit, 'ETTR': indicator.expense_to_total_revenue, 'OPTTR': indicator.operation_profit_to_total_revenue, 'NPTTR': indicator.net_profit_to_total_revenue, 'OETTR': indicator.operating_expense_to_total_revenue, 'GETTR': indicator.ga_expense_to_total_revenue, 'FETTR': indicator.financing_expense_to_total_revenue, 'OPTP': indicator.operating_profit_to_profit, 'IPTP': indicator.invesment_profit_to_profit, 'GSASTR': indicator.goods_sale_and_service_to_revenue, 'OTR': indicator.ocf_to_revenue, 'OTOP': indicator.ocf_to_operating_profit, 'ITRYOY': indicator.inc_total_revenue_year_on_year, 'ITRA': indicator.inc_total_revenue_annual, 'IRYOY': indicator.inc_revenue_year_on_year, 'IRA': indicator.inc_revenue_annual, 'IOPYOY': indicator.inc_operation_profit_year_on_year, 'IOPA': indicator.inc_operation_profit_annual, 'INPYOY': indicator.inc_net_profit_year_on_year, 'INPA': indicator.inc_net_profit_annual, 'INPTSYOY': indicator.inc_net_profit_to_shareholders_year_on_year, 'INPTSA': indicator.inc_net_profit_to_shareholders_annual, 'INPTSA': indicator.inc_net_profit_to_shareholders_annual, 'ROIC': (income.net_profit + income.financial_expense + income.income_tax_expense) / (balance.total_owner_equities + balance.shortterm_loan + balance.non_current_liability_in_one_year + balance.longterm_loan + balance.bonds_payable + balance.longterm_account_payable), 'OPTT': income.operating_profit / income.total_profit, 'TP/TOR': income.total_profit / income.total_operating_revenue, 'OP/TOR': income.operating_profit / income.total_operating_revenue, 'NP/TOR': income.net_profit / income.total_operating_revenue, 'NP': income.net_profit, 'TA': balance.total_assets, 'DER': balance.total_liability / balance.equities_parent_company_owners, 'FCFF/TNCL': (cash_flow.net_operate_cash_flow - cash_flow.net_invest_cash_flow) / balance.total_non_current_liability, 'NOCF/TL': cash_flow.net_operate_cash_flow / balance.total_liability, 'TCA/TCL': balance.total_current_assets / balance.total_current_liability, 'PE': valuation.pe_ratio, 'PB': valuation.pb_ratio, 'PR': valuation.pcf_ratio, 'PS': valuation.ps_ratio, 'TOR/TA': income.total_operating_revenue / balance.total_assets, 'TOR/FA': income.total_operating_revenue / balance.fixed_assets, 'TOR/TCA': income.total_operating_revenue / balance.total_current_assets, 'LTL/OC': balance.longterm_loan / income.operating_cost, 'TL/TA': balance.total_liability / balance.total_assets, 'TL/TOE': balance.total_liability / balance.total_owner_equities}
+adjust_factors = {'TOR/TA': income.total_operating_revenue / balance.total_assets, 'TOR/FA': income.total_operating_revenue / balance.fixed_assets, 'TOR/TCA': income.total_operating_revenue / balance.total_current_assets, 'LTL/OC': balance.longterm_loan / income.operating_cost, 'TL/TA': balance.total_liability / balance.total_assets, 'TL/TOE': balance.total_liability / balance.total_owner_equities, 'DER': balance.total_liability / balance.equities_parent_company_owners, 'FCFF/TNCL': (cash_flow.net_operate_cash_flow - cash_flow.net_invest_cash_flow) / balance.total_non_current_liability, 'NOCF/TL': cash_flow.net_operate_cash_flow / balance.total_liability, 'TCA/TCL': balance.total_current_assets / balance.total_current_liability, 'ROIC': (income.net_profit + income.financial_expense + income.income_tax_expense) / (balance.total_owner_equities + balance.shortterm_loan + balance.non_current_liability_in_one_year + balance.longterm_loan + balance.bonds_payable + balance.longterm_account_payable), 'OPTT': income.operating_profit / income.total_profit, 'TP/TOR': income.total_profit / income.total_operating_revenue, 'OP/TOR': income.operating_profit / income.total_operating_revenue, 'NP/TOR': income.net_profit / income.total_operating_revenue, 'NOCF/MC': cash_flow.net_operate_cash_flow / valuation.market_cap, 'GPOA': indicator.gross_profit_margin * income.operating_revenue / balance.total_assets, 'OPM': income.operating_profit / income.operating_revenue, 'EBIT': income.net_profit + income.financial_expense + income.income_tax_expense}
+factor_list = list(fac_dict.keys())
+
+def get_fundamental_data(securities, factor_list, ttm_factors, date):
+    if len(factor_list) == 0:
+        return 'factors list is empty, please input data'
+    q = query(valuation.code)
+    for fac in factor_list:
+        q = q.add_column(fac_dict[fac])
+    q = q.filter(valuation.code.in_(securities))
+    fundamental_df = get_fundamentals(q, date)
+    fundamental_df.index = fundamental_df['code']
+    fundamental_df.columns = ['code'] + factor_list
+    if type(date) == str:
+        year = int(date[:4])
+        month_day = date[5:]
+    elif type(date) == datetime.date:
+        date = date.strftime('%Y-%m-%d')
+        year = int(date[:4])
+        month_day = date[5:]
+    else:
+        return 'input date error'
+    if month_day < '05-01':
+        statdate_list = [str(year - 2) + 'q4', str(year - 1) + 'q1', str(year - 1) + 'q2', str(year - 1) + 'q3']
+    elif month_day >= '05-01' and month_day < '09-01':
+        statdate_list = [str(year - 1) + 'q1', str(year - 1) + 'q2', str(year - 1) + 'q3', str(year) + 'q1']
+    elif month_day >= '09-01' and month_day < '11-01':
+        statdate_list = [str(year - 1) + 'q2', str(year - 1) + 'q3', str(year) + 'q1', str(year) + 'q2']
+    elif month_day >= '11-01':
+        statdate_list = [str(year - 1) + 'q4', str(year) + 'q1', str(year) + 'q2', str(year) + 'q3']
+    ttm_fundamental_data = ''
+    ttm_q = query(valuation.code)
+    for fac in ttm_factors:
+        ttm_q = ttm_q.add_column(fac_dict[fac])
+    ttm_q = ttm_q.filter(valuation.code.in_(securities))
+    for statdate in statdate_list:
+        if type(ttm_fundamental_data) == str:
+            fundamental_data = get_fundamentals(ttm_q, statDate=statdate)
+            fundamental_data.index = fundamental_data['code']
+            ttm_fundamental_data = fundamental_data
+        else:
+            fundamental_data = get_fundamentals(ttm_q, statDate=statdate)
+            fundamental_data.index = fundamental_data['code']
+            ttm_fundamental_data.iloc[:, 1:] += fundamental_data.iloc[:, 1:]
+    ttm_fundamental_data.columns = ['code'] + ttm_factors
+    results = pd.merge(fundamental_df, ttm_fundamental_data, on=['code'], how='inner')
+    results = results.sort_values(by='code')
+    results.index = results['code']
+    results = results.drop(['code'], axis=1)
+    columns = list(results.columns)
+    for column in columns:
+        if not (isinstance(results[column][0], int) or isinstance(results[column][0], float)):
+            results = results.drop([column], axis=1)
+    return results
+
+def get_all_fundamentals(securities, date):
+    q = query(valuation, balance, cash_flow, income, indicator).filter(valuation.code.in_(securities))
+    fundamentals = get_fundamentals(q, date)
+    fundamentals.index = fundamentals['code']
+    columns = list(fundamentals.columns)
+    for column in columns:
+        if not (isinstance(fundamentals[column][0], int) or isinstance(fundamentals[column][0], float)):
+            fundamentals = fundamentals.drop([column], axis=1)
+    fundamentals = fundamentals.sort_index()
+    return fundamentals
+all_fundamentals = get_all_fundamentals(all_stocks, start_date)
+'EXACT_REVIEWED_FUNCTION get_stock_industry sha256=e93b2044dfe7ad8478bbc9bd7202ac92129b899cc983ad0b5eb588801a3744bd source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+'EXACT_REVIEWED_FUNCTION fillna_with_industry sha256=372a92cdc694ebcbad7bdb200d8bd94dd2e35e8d5a4b3f54518b4be391c13e79 source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+'EXACT_REVIEWED_FUNCTION get_tradeday_list sha256=09738207b2ec48d3d4d607ead6a64175c6be52463d0c9e49df360d3296201550 source=quant/2021年度精选策略/10.多因子选股.txt'
+tl = get_tradeday_list(start_date, end_date, frequency='month')
+
+def get_date_list(begin_date, end_date):
+    dates = []
+    dt = datetime.datetime.strptime(begin_date, '%Y-%m-%d')
+    date = begin_date[:]
+    while date <= end_date:
+        dates.append(date)
+        dt += datetime.timedelta(days=1)
+        date = dt.strftime('%Y-%m-%d')
+    return dates
+
+def filter_extreme_MAD(series, n):
+    median = series.quantile(0.5)
+    new_median = (series - median).abs().quantile(0.5)
+    max_range = median + n * new_median
+    min_range = median - n * new_median
+    return np.clip(series, min_range, max_range)
+
+def winsorize(factor, std=3, have_negative=True):
+    r = factor.dropna().copy()
+    if have_negative == False:
+        r = r[r >= 0]
+    else:
+        pass
+    edge_up = r.mean() + std * r.std()
+    edge_low = r.mean() - std * r.std()
+    r[r > edge_up] = edge_up
+    r[r < edge_low] = edge_low
+    return r
+
+def standardize(s, ty=2):
+    data = s.dropna().copy()
+    if int(ty) == 1:
+        re = (data - data.min()) / (data.max() - data.min())
+    elif ty == 2:
+        re = (data - data.mean()) / data.std()
+    elif ty == 3:
+        re = data / 10 ** np.ceil(np.log10(data.abs().max()))
+    return re
+
+def winsorize_and_standarlize(data, qrange=[0.05, 0.95], axis=0):
+    if isinstance(data, pd.DataFrame):
+        if axis == 0:
+            q_down = data.quantile(qrange[0])
+            q_up = data.quantile(qrange[1])
+            index = data.index
+            col = data.columns
+            for n in col:
+                data[n][data[n] > q_up[n]] = q_up[n]
+                data[n][data[n] < q_down[n]] = q_down[n]
+            data = (data - data.mean()) / data.std()
+            data = data.fillna(0)
+        else:
+            data = data.stack()
+            data = data.unstack(0)
+            q = data.quantile(qrange)
+            index = data.index
+            col = data.columns
+            for n in col:
+                data[n][data[n] > q[n]] = q[n]
+            data = (data - data.mean()) / data.std()
+            data = data.stack().unstack(0)
+            data = data.fillna(0)
+    elif isinstance(data, pd.Series):
+        name = data.name
+        q = data.quantile(qrange)
+        data = np.clip(data, q.values[0], q.values[1])
+        data = (data - data.mean()) / data.std()
+    return data
+
+def neutralize(data, date, market_cap, industry_name='sw_l1'):
+    industry_se = get_stock_industry(industry_name, date)
+    columns = list(data.columns)
+    if isinstance(industry_se, pd.Series):
+        industry_se = industry_se.to_frame()
+    if isinstance(market_cap, pd.Series):
+        market_cap = market_cap.to_frame()
+    index = list(data.index)
+    industry_se = np.array(industry_se.ix[index, 0].tolist())
+    industry_dummy = sm.categorical(industry_se, drop=True)
+    industry_dummy = pd.DataFrame(industry_dummy, index=index)
+    market_cap = np.log(market_cap.loc[index])
+    x = pd.concat([industry_dummy, market_cap], axis=1)
+    model = sm.OLS(data, x)
+    result = model.fit()
+    y_fitted = result.fittedvalues
+    neu_result = data - y_fitted
+    return neu_result
+
+def get_month_profit(stocks, start_date, end_date, month_num=1, cal_num=3):
+    start_year = int(start_date[:4])
+    end_year = int(end_date[:4])
+    start_month = int(start_date[5:7])
+    end_month = int(end_date[5:7])
+    len_month = (end_year - start_year) * 12 + (end_month - start_month)
+    price_list = []
+    if start_month == 1:
+        last_date = str(start_year - 1) + '-' + '12' + '-' + '01'
+    else:
+        last_date = str(start_year - 1) + '-' + str(start_month - 1) + '-' + '01'
+    last_price = get_price(stocks, fields=['close'], count=cal_num, end_date=last_date)['close']
+    last_price = last_price.mean().to_frame()
+    last_price.columns = [last_date]
+    price_list.append(last_price)
+    for i in range(len_month):
+        date = str(start_year + i // 12) + '-' + str(start_month + i % 12) + '-' + '01'
+        price = get_price(stocks, fields=['close'], count=cal_num, end_date=date)['close']
+        price_mean = price.mean().to_frame()
+        price_mean.columns = [date]
+        price_list.append(price_mean)
+    month_profit = pd.concat(price_list, axis=1)
+    month_profit_pct = month_profit.pct_change(month_num, axis=1).dropna(axis=1, how='all')
+    return month_profit_pct
+
+def get_profit_depend_timelist(stocks, timelist, month_num=1, cal_num=3):
+    price_list = []
+    for date in timelist:
+        price = get_price(stocks, fields=['close'], count=cal_num, end_date=date)['close']
+        price_mean = price.mean().to_frame()
+        price_mean.columns = [date]
+        price_list.append(price_mean)
+    profit = pd.concat(price_list, axis=1)
+    profit_pct = profit.pct_change(month_num, axis=1).dropna(axis=1, how='all')
+    return profit_pct
+
+def get_day_profit_forward(stocks, end_date, start_date=None, count=-1, pre_num=20):
+    if count == -1:
+        price = get_price(stocks, start_date, end_date, fields=['close'])['close']
+        date_list = get_trade_days(start_date=start_date, end_date=end_date)
+        price.index = date_list
+    else:
+        price = get_price(stocks, end_date=end_date, count=count, fields=['close'])['close']
+        date_list = get_trade_days(end_date=end_date, count=count)
+        price.index = date_list
+    profit = price.pct_change(periods=pre_num).shift(-pre_num).dropna()
+    return profit
+
+def get_one_day_data(stocks, factor_list, ttm_factors, date, neu=False):
+    fund_data = get_fundamental_data(stocks, factor_list, ttm_factors, date)
+    fillna_data = fillna_with_industry(fund_data, date)
+    if neu == False:
+        results = winsorize_and_standarlize(fillna_data)
+    elif 'MC' in fillna_data.columns:
+        neu_data = neutralize(fillna_data, date, fillna_data['MC'])
+        results = winsorize_and_standarlize(neu_data)
+    elif 'market_cap' in fillna_data.columns:
+        neu_data = neutralize(fillna_data, date, fillna_data['market_cap'])
+        results = winsorize_and_standarlize(neu_data)
+    else:
+        return None
+    return results
+
+def get_timelist_data(stocks, factor_list, ttm_factors, timelist, neu=False):
+    dic = {}
+    for date in timelist:
+        fund_date = get_one_day_data(stocks, factor_list, ttm_factors, date, neu=neu)
+        dic[date] = fund_date
+    return dic
+fund_data = get_timelist_data(all_stocks, factor_list, ttm_factors, tl)
+fund_data_neu = get_timelist_data(all_stocks, factor_list, ttm_factors, tl, neu=True)
+profit = get_profit_depend_timelist(all_stocks, tl, month_num=2, cal_num=3)
+res = []
+res.append(fund_data)
+res.append(fund_data_neu)
+res.append(profit)
+with open('fundamental_data.pkl', 'wb') as pk_file:
+    pickle.dump(res, pk_file)
+import numpy as np
+import pandas as pd
+import pickle
+import datetime
+import statsmodels.api as sm
+import warnings
+from sklearn.feature_selection import RFE, SelectKBest, SelectPercentile, SelectFromModel, f_classif
+import lightgbm as lgb
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC, LinearSVC
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV
+import gc
+from sklearn.metrics import accuracy_score, recall_score
+warnings.filterwarnings('ignore')
+with open('fundamental_data.pkl', 'rb') as pk_file:
+    data_pk = pickle.load(pk_file)
+fund_data = data_pk[0]
+fund_data_neu = data_pk[1]
+profit = data_pk[2]
+keys = list(fund_data.keys())
+
+def get_fund_profit_data(fund_data, profit):
+    keys = list(fund_data.keys())
+    columns = profit.columns.tolist()
+    l = min(len(keys), len(columns))
+    fund_profit = {}
+    for i in range(l):
+        fd = fund_data[keys[i]].copy()
+        p = profit[columns[i]].to_frame()
+        p.columns = ['profit']
+        fd_merge = pd.merge(fd, p, left_index=True, right_index=True, how='inner')
+        fund_profit[keys[i]] = fd_merge
+    return fund_profit
+
+def get_fund_profit_class_data(fund_data, profit):
+    pf = profit.copy(deep=True)
+    pf[pf > 0] = 1
+    pf[pf < 0] = 0
+    keys = list(fund_data.keys())
+    columns = pf.columns.tolist()
+    l = min(len(keys), len(columns))
+    fund_profit = {}
+    for i in range(l):
+        fd = fund_data[keys[i]].copy()
+        p = pf[columns[i]].to_frame()
+        p.columns = ['profit']
+        fd_merge = pd.merge(fd, p, left_index=True, right_index=True, how='inner')
+        fund_profit[keys[i]] = fd_merge
+    return fund_profit
+fund_profit_data = get_fund_profit_data(fund_data, profit)
+fund_profit_data_neu = get_fund_profit_data(fund_data_neu, profit)
+fund_profit_class_data = get_fund_profit_class_data(fund_data, profit)
+fund_profit_class_data_neu = get_fund_profit_class_data(fund_data_neu, profit)
+
+def get_RLM_res(fund_profit_data):
+    keys = fund_profit_data.keys()
+    f_dic = {}
+    t_dic = {}
+    f = []
+    t = []
+    for k in keys:
+        col = fund_profit_data[k].columns
+        f_list = []
+        t_list = []
+        for c in col[:-1]:
+            df = fund_profit_data[k]
+            rlm_model = sm.RLM(df[col[-1]], df[c], M=sm.robust.norms.HuberT()).fit()
+            f_list.append(rlm_model.params)
+            t_list.append(rlm_model.tvalues)
+        f_list = [f_list[i].values[0] for i in range(len(f_list))]
+        t_list = [t_list[i].values[0] for i in range(len(t_list))]
+        f_df_k = pd.DataFrame(f_list, index=list(col[:-1]), columns=[k])
+        t_df_k = pd.DataFrame(t_list, index=col[:-1], columns=[k])
+        f.append(f_df_k)
+        t.append(t_df_k)
+    f = pd.concat(f, axis=1)
+    t = pd.concat(t, axis=1)
+    return (f, t)
+rlm_res = get_RLM_res(fund_profit_data)
+rlm_neu_res = get_RLM_res(fund_profit_data_neu)
+
+def get_IC(fund_profit_data):
+    keys = fund_profit_data.keys()
+    p_dic = {}
+    s_dic = {}
+    p = []
+    s = []
+    for k in keys:
+        columns = fund_profit_data[k].columns
+        p_list = []
+        s_list = []
+        for c in columns[:-1]:
+            df = fund_profit_data[k]
+            p_value = df[c].corr(df[columns[-1]], method='pearson')
+            s_value = df[c].corr(df[columns[-1]], method='spearman')
+            p_list.append(p_value)
+            s_list.append(s_value)
+        p_df_k = pd.DataFrame(p_list, index=list(columns[:-1]), columns=[k])
+        s_df_k = pd.DataFrame(s_list, index=columns[:-1], columns=[k])
+        p.append(p_df_k)
+        s.append(s_df_k)
+    p = pd.concat(p, axis=1)
+    s = pd.concat(s, axis=1)
+    return (p, s)
+ic_res = get_IC(fund_profit_data)
+ic_res_neu = get_IC(fund_profit_data_neu)
+res = []
+res.append(rlm_res)
+res.append(rlm_neu_res)
+res.append(ic_res)
+res.append(ic_res_neu)
+with open('judge_data.pkl', 'wb') as pf:
+    pickle.dump(res, pf)
+
+def cal_IC_indicator(data):
+    data = data.stack().unstack(0)
+    data_mean = data.mean()
+    data_std = data.std()
+    data_ir = data_mean / data_std
+    data_mean_df = data_mean.to_frame()
+    data_mean_df.columns = ['mean']
+    data_std_df = data_std.to_frame()
+    data_std_df.columns = ['std']
+    data_ir_df = data_ir.to_frame()
+    data_ir_df.columns = ['IR']
+    data_nagative = data[data > 0].count() / len(data)
+    data_nagative_df = data_nagative.to_frame()
+    data_nagative_df.columns = ['IC正值比例']
+    data_abs_dayu = data[data.abs() > 0.02].count() / len(data)
+    data_abs_dayu_df = data_abs_dayu.to_frame()
+    data_abs_dayu_df.columns = ['IC绝对值>0.02']
+    res = pd.concat([data_mean_df, data_std_df, data_nagative_df, data_abs_dayu_df, data_ir_df], axis=1)
+    return res
+ic_indicator_pearson = cal_IC_indicator(ic_res[0])
+
+class FeatureSelection:
+
+    def __init__(self):
+        self.supports = None
+        self.columns = None
+        self.record_collinear = None
+        self.feature_importances = None
+    'EXACT_REVIEWED_FUNCTION identify_collinear sha256=036854defd29fa59d7c1cdfde350a35210567e89b2e6f34216fac5dab2fc3bd3 source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+
+    def identify_importance_lgbm(self, features, labels, p_importance=0.8, eval_metric='auc', task='classification', n_iterations=10, early_stopping=True):
+        data = features
+        features = pd.get_dummies(features)
+        feature_names = list(features.columns)
+        features = np.array(features)
+        labels = np.array(labels).reshape((-1,))
+        feature_importance_values = np.zeros(len(feature_names))
+        for _ in range(n_iterations):
+            if task == 'classification':
+                model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.05, verbose=-1)
+            elif task == 'regression':
+                model = lgb.LGBMRegressor(n_estimators=100, learning_rate=0.05, verbose=-1)
+            else:
+                raise ValueError('Task must be either "classification" or "regression"')
+            if early_stopping:
+                train_features, valid_features, train_labels, valid_labels = train_test_split(features, labels, test_size=0.15)
+                model.fit(train_features, train_labels, eval_metric=eval_metric, eval_set=[(valid_features, valid_labels)], verbose=-1)
+                gc.enable()
+                del train_features, train_labels, valid_features, valid_labels
+                gc.collect()
+            else:
+                model.fit(features, labels)
+            feature_importance_values += model.feature_importances_ / n_iterations
+        feature_importances = pd.DataFrame({'feature': feature_names, 'importance': feature_importance_values})
+        feature_importances = feature_importances.sort_values('importance', ascending=False).reset_index(drop=True)
+        feature_importances['normalized_importance'] = feature_importances['importance'] / feature_importances['importance'].sum()
+        feature_importances['cumulative_importance'] = np.cumsum(feature_importances['normalized_importance'])
+        self.feature_importances = feature_importances
+        select_df = feature_importances[feature_importances['cumulative_importance'] <= p_importance]
+        select_columns = select_df['feature']
+        self.columns = list(select_columns.values)
+        res = data[self.columns]
+        return res
+    'EXACT_REVIEWED_FUNCTION filter_select sha256=783253141645b34c5ad6d45887ddb9fe8d4f26e394648335001388fe17fe6982 source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+    'EXACT_REVIEWED_FUNCTION wrapper_select sha256=362954c4fb23a163f1d303f7374566f9eee7db76dce53d27a5d525ef463c897c source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+    'EXACT_REVIEWED_FUNCTION embedded_select sha256=359edaee7ee4a09d381a3edb6436894500671eddf5a827eaa3e84cbd4cdeb849 source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+test_fund = fund_profit_class_data_neu[keys[0]]
+test_fund1 = fund_profit_class_data_neu[keys[1]]
+columns = test_fund.columns
+fs = FeatureSelection()
+x = test_fund[columns[:-1]]
+y = test_fund[columns[-1]]
+lgbm = fs.identify_importance_lgbm(x, y)
+fs.feature_importances
+fund_data_train = fund_profit_class_data_neu[keys[1]]
+columns_s = lgbm.columns
+col_s = columns_s[:-1]
+fund_data_train_y = fund_data_train[fund_data_train.columns[-1]]
+lgbm_x_train, lgbm_x_test, lgbm_y_train, lgbm_y_test = train_test_split(fund_data_train[col_s], fund_data_train_y, test_size=0.3)
+lgbm_svm = SVC(max_iter=1000)
+param_grid = {'C': [0.1, 1, 3], 'kernel': ['rbf', 'sigmoid', 'linear', 'poly'], 'gamma': np.arange(0.3, 0.8, 0.1)}
+lgbm_model = GridSearchCV(estimator=lgbm_svm, param_grid=param_grid, scoring='accuracy')
+lgbm_model.fit(lgbm_x_train, lgbm_y_train)
+lgbm_test_res = lgbm_model.predict(lgbm_x_test)
+accuracy = accuracy_score(lgbm_y_test, lgbm_test_res)
+gbdt = GradientBoostingClassifier()
+gbdt_params_grid = {'max_depth': [4, 6, 8], 'min_samples_split': [10, 20, 30]}
+gbdt_model = GridSearchCV(estimator=gbdt, param_grid=gbdt_params_grid)
+gbdt_model.fit(lgbm_x_train, lgbm_y_train)
+gbdt_test_res = gbdt_model.predict(lgbm_x_test)
+gbdt_accuracy = accuracy_score(lgbm_y_test, gbdt_test_res)
+fund_for_pre = fund_profit_class_data_neu[keys[3]]
+columns_for_pre = fund_for_pre.columns
+x_for_pre = fund_for_pre[col_s]
+y_for_pre = fund_for_pre[columns_for_pre[-1]]
+prediction = lgbm_model.predict(x_for_pre)
+accuracy_for_pre = accuracy_score(y_for_pre, prediction)

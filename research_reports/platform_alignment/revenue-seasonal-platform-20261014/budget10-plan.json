@@ -1,0 +1,156 @@
+{
+  "authorization": "用户：划给你10点算力试错",
+  "additional_credit_cap": 10,
+  "starting_balance": 1392.120152,
+  "window": [
+    "20210907",
+    "20260907"
+  ],
+  "cycle": 10,
+  "groups": 10,
+  "direction": 1,
+  "one_way_cost": 0.003,
+  "purpose": "repair seasonal revenue candidate, then isolate field errors only if needed",
+  "formula_candidates": [
+    {
+      "step": 1,
+      "formula": "(is_revenue-(is_revenue_mrq_4+is_revenue_mrq_8+is_revenue_mrq_12)/3)/POWER((POWER(is_revenue_mrq_4-is_revenue_mrq_8,2)+POWER(is_revenue_mrq_4-is_revenue_mrq_12,2)+POWER(is_revenue_mrq_8-is_revenue_mrq_12,2))/6,0.5)",
+      "estimated_credits": [
+        2,
+        4
+      ],
+      "purpose": "remove trailing newline causing empty formula 2"
+    },
+    {
+      "step": 2,
+      "formula": "is_revenue",
+      "estimated_credits": [
+        2,
+        4
+      ],
+      "purpose": "if step1 fails, verify native current revenue field independently"
+    },
+    {
+      "step": 3,
+      "formula": "is_revenue_mrq_12",
+      "estimated_credits": [
+        2,
+        4
+      ],
+      "purpose": "if needed, verify oldest seasonal lag independently"
+    },
+    {
+      "step": 4,
+      "formula": "(operating_revenue-(operating_revenue_mrq_4+operating_revenue_mrq_8+operating_revenue_mrq_12)/3)/POWER((POWER(operating_revenue_mrq_4-operating_revenue_mrq_8,2)+POWER(operating_revenue_mrq_4-operating_revenue_mrq_12,2)+POWER(operating_revenue_mrq_8-operating_revenue_mrq_12,2))/6,0.5)",
+      "estimated_credits": [
+        2,
+        4
+      ],
+      "purpose": "native mrq12 is missing; test full exact formula using documented formula-mode operating_revenue alias",
+      "conditional": true
+    },
+    {
+      "step": 5,
+      "formula": "operating_revenue",
+      "estimated_credits": 2,
+      "purpose": "last remaining budget: distinguish whether alternate base alias itself loads, after full alias expression failed",
+      "diagnostic_only": true
+    }
+  ],
+  "max_credit_per_next_run_reserved": 4,
+  "stop_on_success": "stop on successful seasonal candidate; successful single-field diagnostics do not satisfy objective",
+  "no_formal_pool_changes": true,
+  "runs": [
+    {
+      "step": "full_no_newline",
+      "factor_id": "6acf40b42d2f6998fc1c331f",
+      "run_id": "6acf45f8cd820fa2a40aa909",
+      "status": 3,
+      "error_details": [
+        "错误代码：10000 \n错误消息：执行失败 \n详细错误信息：Missing required base factors \n解决方案：请检查指定位置的代码或者提示位置的错误节点"
+      ],
+      "balance_after": 1390.120152,
+      "deducted": 2.0
+    },
+    {
+      "step": "current",
+      "name": "F-Q141014-04",
+      "factor_id": "6acf4623812a2a13b9646fdc",
+      "run_id": "6acf4623cd820fa2a40aa90b",
+      "status": 2,
+      "error_details": [],
+      "balance_after": 1388.120152,
+      "deducted": 2.0,
+      "metrics": {
+        "ic_mean": "-0.0037",
+        "rank_ic": "-0.0036",
+        "ic_ir": "-0.0397",
+        "ic_p_value": "0.6635",
+        "monotonicity": "0.94",
+        "long_excess": -6.92,
+        "short_excess": 3.67,
+        "turnover": 3.14,
+        "long_sharpe": 0.1004,
+        "long_max_drawdown": 22.01,
+        "long_monthly_win_rate": 55.0
+      }
+    },
+    {
+      "step": "lag12",
+      "name": "F-Q141014-05",
+      "factor_id": "6acf46989e9d797cfb2d3ea2",
+      "run_id": "6acf4698cd820fa2a40aa90d",
+      "status": 3,
+      "error_details": [
+        "错误代码：10000 \n错误消息：执行失败 \n详细错误信息：Missing required base factors \n解决方案：请检查指定位置的代码或者提示位置的错误节点"
+      ],
+      "balance_after": 1386.120152,
+      "deducted": 2.0
+    },
+    {
+      "step": "alias",
+      "name": "F-Q141014-03",
+      "factor_id": "6acf40b42d2f6998fc1c331f",
+      "run_id": "6acf46e7b8f0d75493c873ad",
+      "status": 3,
+      "error_details": [
+        "错误代码：10000 \n错误消息：执行失败 \n详细错误信息：Missing required base factors \n解决方案：请检查指定位置的代码或者提示位置的错误节点"
+      ],
+      "balance_after": 1384.120152,
+      "deducted": 2.0
+    },
+    {
+      "step": "aliascurrent",
+      "name": "F-Q141014-04",
+      "factor_id": "6acf4623812a2a13b9646fdc",
+      "run_id": "6acf47362d2f6998fc1c332b",
+      "status": 2,
+      "error_details": [],
+      "balance_after": 1382.120152,
+      "deducted": 2.0,
+      "metrics": {
+        "ic_mean": "-0.0037",
+        "rank_ic": "-0.0036",
+        "ic_ir": "-0.0397",
+        "ic_p_value": "0.6635",
+        "monotonicity": "0.94",
+        "long_excess": -6.92,
+        "short_excess": 3.67,
+        "turnover": 3.14,
+        "long_sharpe": 0.1004,
+        "long_max_drawdown": 22.01,
+        "long_monthly_win_rate": 55.0
+      }
+    }
+  ],
+  "spent": 10.0,
+  "remaining": 0.0,
+  "alias_precheck_note": "No unknown operators or syntax issue. Expanded operating_revenue_mrq_n names are absent from literal catalog; treat as explicit field-availability diagnostic, not verified fields.",
+  "final_single_field_budget_basis": "precheck single bare field estimate2; current-revenue full5year single-field test actual2; all 4 previous runs actual2. No compound expression at remaining2.",
+  "status": "budget_exhausted_seasonal_candidate_blocked",
+  "seasonal_successful_runs": 0,
+  "diagnostic_successful_runs": 2,
+  "new_alpha_confirmed": false,
+  "final_balance": 1382.120152,
+  "conclusion": "Current revenue loads using both aliases; exact seasonal formula fails with both historical alias sets; standalone is_revenue_mrq_12 fails missing required base factors. Lag4/8 not independently verified. No more runs permitted in this budget."
+}

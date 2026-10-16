@@ -1,0 +1,36 @@
+quant/2022年度精选策略/80.小盘价值股策略2.01，年化131%，回撤8.8%.txt
+"""EXACT_REVIEWED_FUNCTION initialize sha256=bcb33653d84f8fa0ee0ff1ddb986bfd00c521f5168e854dbb64fc40c3199a066 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt"""
+
+def after_code_changed(context):
+    g.last_update_month = 0
+    g.choicenum = 100
+    g.weight = {}
+    g.treasury = '000013.XSHG'
+    g.stock_weight = 0.2
+
+def before_trading_start(context):
+    """EXACT_REVIEWED_FUNCTION sum_func sha256=07f87e5d54201e8b41b29ce4501898cb22caac95239cec08d70fc7ed2a62fe6d source=quant/2022年度精选策略/100.实战型小盘价值策略--14年30倍.txt"""
+    if g.last_update_month == context.current_dt.month:
+        return
+    g.last_update_month = context.current_dt.month
+    stk_sh = get_index_stocks('000001.XSHG')
+    stk_sz = get_index_stocks('399106.XSHE')
+    allstocks = stk_sh + stk_sz
+    df = get_fundamentals(query(valuation.code, valuation.market_cap, valuation.pb_ratio, valuation.pe_ratio, valuation.pcf_ratio).filter(valuation.code.in_(allstocks), valuation.pb_ratio > 0, valuation.pe_ratio > 0, valuation.pcf_ratio > 0)).dropna()
+    df['point'] = df[['market_cap', 'pb_ratio', 'pe_ratio', 'pcf_ratio']].rank().T.apply(sum_func)
+    df = df.sort_values(by='point').head(g.choicenum)
+    stocks = list(df['code'])
+    g.weight = dict(zip(stocks, g.stock_weight * ones(g.choicenum) / g.choicenum))
+    g.weight[g.treasury] = 0.99 - g.stock_weight
+
+def handle_data(context, data):
+    for stock in context.portfolio.positions.keys():
+        if stock not in g.weight:
+            order_target(stock, 0)
+    for stock in g.weight.keys():
+        position = g.weight[stock] * context.portfolio.total_value
+        if stock not in context.portfolio.positions:
+            order_value(stock, position)
+    delta = g.weight[g.treasury] * context.portfolio.total_value - context.portfolio.positions[g.treasury].value
+    if abs(delta) > 110 * data[g.treasury].close and context.portfolio.available_cash > delta:
+        order_value(g.treasury, delta)

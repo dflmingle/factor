@@ -1,0 +1,80 @@
+{
+  "experiment_version": "shu-mulvey-local-sjm-bl-v1",
+  "alignment_rule": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+  "paper": "https://arxiv.org/abs/2410.14841",
+  "journal_doi": "10.3905/jpm.2024.1.649",
+  "paper_sha256": "321c2a75e2707d477b333a0098fcb6a0535395a07e28887b39d312e1f882d9d0",
+  "author_library_wheel_sha256": "89132e1308801ffac5a9d88ba000a842be61eb80c6746d683cbb0216db327047",
+  "candidate_configs": {
+    "SJM_BL_TE2": [
+      0.02,
+      0.0
+    ],
+    "SJM_BL_TE4": [
+      0.04,
+      0.0
+    ],
+    "SJM_BL_TE2_TURN": [
+      0.02,
+      0.003
+    ]
+  },
+  "model_hyperparameters": [
+    [
+      10.0,
+      9.5
+    ],
+    [
+      50.0,
+      9.5
+    ],
+    [
+      100.0,
+      9.5
+    ]
+  ],
+  "feature_names": [
+    "active_ew8",
+    "active_ew21",
+    "active_ew63",
+    "rsi8",
+    "rsi21",
+    "rsi63",
+    "stoch8",
+    "stoch21",
+    "stoch63",
+    "macd8_21",
+    "macd21_63",
+    "log_downside21",
+    "active_beta21",
+    "market_ew21",
+    "market_logvol_diff_ew21",
+    "market_breadth_ew21"
+  ],
+  "paper_deviations": [
+    "A-share local proxies instead of six US factor indices",
+    "saved five-year signal histories; min252 daily training, max756, not paper8-12years",
+    "prequential last50 completed periods for validation, at least12; not paper6years",
+    "monthly refits at available signal dates",
+    "US VIX/2Y/10Y2Y unavailable; omit, substitute separately labelled local vol and breadth",
+    "24-sleeve historical-correlation pruning and covariance diagonal shrink25%",
+    "allocation is factor-only; market used for relative views but not invested",
+    "main results are bottom-up stock ranking; paper is top-down ETF allocation",
+    "weight cap20%, predicted TE2/4%, adjustment penalty added locally",
+    "original daily ledgers have factor_valid benchmarks, possible tie/field proxies",
+    "entire factor library was discovered on this historical window; replay is exploratory, not untouched OOS"
+  ],
+  "platform_compute": 0,
+  "formal_window": [
+    "20210907",
+    "20260907"
+  ],
+  "recent_window": [
+    "20260101",
+    "2026-09-07"
+  ],
+  "actual_last_signal": "2026-08-10",
+  "actual_last_exit": "2026-08-25",
+  "weight_sum": 1.0,
+  "future_return_training": "strictly before signal close; completed exits before validation selection"
+}

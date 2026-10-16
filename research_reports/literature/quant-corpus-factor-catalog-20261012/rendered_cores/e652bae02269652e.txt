@@ -1,0 +1,89 @@
+quant/2021年度精选策略/70.超稳的股息率+均线选股策略.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+'EXACT_REVIEWED_FUNCTION initialize sha256=fe407274d3aee43998c806388a7e6ccaf61f4596fbf1c0e543cb70b7e98ead37 source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'
+
+def main(context):
+    df = getBigStocks()
+    df = controlReport(df)
+    setSmallStocks(df)
+    orderStock(context)
+
+def getBigStocks():
+    stocks = get_index_stocks('000300.XSHG')
+    q = query(income.statDate, income.code).filter(valuation.pe_ratio > 0, income.code.in_(stocks))
+    rets = get_fundamentals(q)
+    return rets
+
+def controlReport(df):
+    df_qc = pd.DataFrame()
+    for i in range(0, len(df)):
+        statDate = df.loc[i].statDate
+        q = int(int(statDate[5:7]) / 3)
+        year = int(statDate[:4])
+        statqs = []
+        for kk in range(0, 12):
+            statq = str(year) + 'q' + str(q)
+            statqs.append(statq)
+            q = q - 1
+            if q == 0:
+                q = 4
+                year = year - 1
+        code = df.loc[i].code
+        gx = finance.run_query(query(finance.STK_XR_XD.bonus_amount_rmb, finance.STK_XR_XD.report_date).filter(finance.STK_XR_XD.code == code, finance.STK_XR_XD.report_date <= statDate).order_by(finance.STK_XR_XD.report_date.desc()).limit(12))
+        gx = gx.fillna(0)
+        one_year = 0.0
+        two_year = 0.0
+        three_year = 0.0
+        for j in range(0, len(gx)):
+            report_date = gx.loc[j].report_date
+            q = report_date.month // 3
+            year = report_date.year
+            statq = str(year) + 'q' + str(q)
+            if statq in (statqs[0], statqs[1], statqs[2], statqs[3]):
+                one_year = one_year + gx.loc[j].bonus_amount_rmb
+            if statq in (statqs[4], statqs[5], statqs[6], statqs[7]):
+                two_year = two_year + gx.loc[j].bonus_amount_rmb
+            if statq in (statqs[8], statqs[9], statqs[10], statqs[11]):
+                three_year = three_year + gx.loc[j].bonus_amount_rmb
+        qcap = query(valuation.market_cap).filter(valuation.code == code)
+        market_cap = get_fundamentals(qcap).loc[0, 'market_cap'] * 10000
+        comp_value = market_cap * 0.02
+        if one_year > comp_value and two_year > comp_value * 0.8 and (three_year > comp_value * 0.64) and (one_year + two_year + three_year > market_cap * 0.1):
+            cc = pd.DataFrame([[code, one_year / market_cap, two_year / market_cap, three_year / market_cap]], columns=['code', 'gxl', 'gxl2', 'gxl3'])
+            df_qc = df_qc.append(cc, ignore_index=True)
+    return df_qc.reset_index(drop=True)
+
+def setSmallStocks(df):
+    if df.shape[0] <= g.stock_num * 2:
+        g.bten = []
+        g.bfive = []
+        return
+    df = df.sort_values(by='gxl', ascending=False).head(g.stock_num * 16)
+    if len(df) < g.stock_num * 4:
+        df = df.head(len(df) - g.stock_num * 2)
+    df = df.sort_values(by='gxl2', ascending=False).head(g.stock_num * 8)
+    df = df.sort_values(by='gxl3', ascending=False).head(g.stock_num * 4)
+    df = df.sort_values(by='gxl', ascending=False).head(g.stock_num * 2)
+    g.bten = list(df.head(g.stock_num * 2)['code'])
+    g.bfive = list(df.head(g.stock_num)['code'])
+
+def orderStock(context):
+    bfive = g.bfive
+    bten = g.bten
+    all_value = context.portfolio.total_value
+    for sell_code in context.portfolio.long_positions.keys():
+        if sell_code not in bfive:
+            order_target_value(sell_code, 0)
+    for buy_code in bten:
+        stock_hitory = attribute_history(buy_code, 35, '1d', ['close'])
+        thirty_mean = stock_hitory['close'][-30:].mean()
+        current_data = get_current_data()
+        if buy_code not in context.portfolio.long_positions.keys():
+            if current_data[buy_code].last_price >= thirty_mean:
+                cash_value = context.portfolio.available_cash
+                buy_value = all_value / g.stock_num
+                if cash_value > buy_value / 2:
+                    order_target_value(buy_code, buy_value)
+'EXACT_REVIEWED_FUNCTION set_param sha256=610591fb4072bfcf235e86291f5e61e6c5afcc3f9a448461d76ac259c14ee962 source=quant/2021年度精选策略/26.稳定高回报周期股策略2.txt'

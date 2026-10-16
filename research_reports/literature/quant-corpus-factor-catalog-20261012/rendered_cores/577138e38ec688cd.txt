@@ -1,0 +1,72 @@
+quant/2024年度精选策略2/60.ETF动量轮动RSRS择时-v2.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    g.stock_pool = ['510050.XSHG', '510300.XSHG', '159949.XSHE', '159928.XSHE']
+    g.stock_num = 1
+    g.momentum_day = 20
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.score_threshold = 0.7
+    g.slope_series = initial_slope_series()
+    g.checktime = '13:00'
+    g.checktime2 = '13:50'
+    g.hold = ''
+    g.rsrs_score_hisitory = []
+    run_daily(my_trade, time='9:30', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+    run_daily(hold_check, time=g.checktime)
+
+def hold_check(context):
+    N = 20
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if context.portfolio.positions:
+        if hour == int(g.checktime.split(':')[0]) and minute == int(g.checktime.split(':')[-1]):
+            for stk in context.portfolio.positions:
+                dt = attribute_history(stk, N + 2, '60m', ['close'])
+                dt['man'] = dt.close / dt.close.rolling(N).mean()
+                if dt.man[-1] < 1.0:
+                    stk_dict = context.portfolio.positions[stk]
+                    order_target_value(stk, 0)
+                    g.hold = stk
+    else:
+        return
+'EXACT_REVIEWED_FUNCTION get_rank sha256=e247c5544f757ed17115a8f169922da011be9276c26b0e058d91dde069180aee source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+
+def initial_slope_series():
+    data = attribute_history(g.ref_stock, g.N + g.M, '1d', ['high', 'low'])
+    multe_data = [get_ols(data.low[i:i + g.N], data.high[i:i + g.N]) for i in range(g.M)]
+    slopes = [i[1] for i in multe_data]
+    return slopes
+
+def get_rsrs_score_mean(rsrs_score):
+    N = 12
+    g.rsrs_score_hisitory.append(rsrs_score)
+    if len(g.rsrs_score_hisitory) < N:
+        return 0
+    return mean(g.rsrs_score_hisitory[-N:])
+
+def get_timing_signal(context, stock):
+    data = attribute_history(g.ref_stock, g.N, '1d', ['high', 'low', 'volume'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    rsrs_mean = get_rsrs_score_mean(rsrs_score)
+    if rsrs_score > 0 and rsrs_score < rsrs_mean:
+        return 'SELL'
+    if rsrs_score > -g.score_threshold:
+        return 'BUY'
+    else:
+        return 'SELL'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=ff389f7c66135b57bd0e3985861e520815f16bd818f86c6f3076a0e92260b0d2 source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=17eb752a92056238278b3c87d4d4d78d9c255bd6d25884013035c3867f3ad21a source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION my_trade sha256=6836e4126a8529db6d7779cf147453cb92b27e400278e5380175015d4b074870 source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'
+'EXACT_REVIEWED_FUNCTION check_lose sha256=0d7346eccaca9f820602108d5c5696978c4b85e4f24e7c8acce21bc4ac2ac806 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=73dd0b225b79125998a6988076a4218a550fa612b090a8db46acb6553a0986bb source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'

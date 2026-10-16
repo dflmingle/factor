@@ -1,0 +1,93 @@
+quant/2022年度精选策略/10.期货macd简单择时，atp止损.txt
+from jqdata import *
+import numpy as np
+import talib
+import time
+
+def initialize(context):
+    g.sign = 0
+    run_daily(before_market_open, time='09:00', reference_security='AG9999.XSGE')
+    run_daily(after_market_close, time='15:30', reference_security='AG9999.XSGE')
+    g.stockkind = 'AG'
+    g.stockcode = str(g.stockkind + '9999.XSGE')
+
+def before_market_open(context):
+    g.IF_current_month = get_future_contracts(g.stockkind)[0]
+    g.IF_next_quarter = get_future_contracts(g.stockkind)[2]
+    IF_current_month = g.IF_current_month
+    IF_next_quarter = g.IF_next_quarter
+    IF_current_month_close = get_bars(IF_current_month, count=1, unit='1d', fields=['close'])['close']
+    IF_next_quarter_close = get_bars(IF_next_quarter, count=1, unit='1d', fields=['close'])['close']
+    g.sign = 0
+    g.clear = 0
+
+def handle_data(context, data):
+    timeArray = context.current_dt.time().strftime('%H:%M:%S')
+    clocktime = int(str(timeArray)[-5:-3])
+    if clocktime % 5 == 0:
+        deal(context)
+    else:
+        pass
+
+def deal(context):
+    IF_current_month = g.IF_current_month
+    IF_next_quarter = g.IF_next_quarter
+    end_data = get_CCFX_end_date(IF_current_month)
+    df = get_price('AG9999.XSGE', count=40, end_date=context.current_dt, frequency='15m', fields='close')
+    df2 = get_price('AG9999.XSGE', count=40, end_date=context.current_dt, frequency='60m', fields='close')
+    macd_15min = macd(df['close'])
+    macd_60min = macd(df2['close'])
+    if tralling_stop(context, g.stockcode) == 1:
+        order_target(IF_current_month, 0, side='long')
+        g.sign = 0
+        g.clear = 1
+    elif tralling_stop(context, g.stockcode) == -1:
+        order_target(IF_current_month, 0, side='short')
+        g.sign = 0
+        g.clear = -1
+    if macd_15min[-1] > 0 and macd_15min[-2] <= 0 and (macd_60min[-1] > 0) and (g.clear < 1):
+        g.sign = 1
+    elif macd_15min[-1] < 0 and macd_15min[-2] >= 0 and (macd_60min[-1] < 0) and (g.clear > -1):
+        g.sign = -1
+    if g.sign == 1:
+        if context.current_dt.date() == end_data:
+            pass
+        elif len(context.portfolio.short_positions) >= 0 and len(context.portfolio.long_positions) == 0:
+            if len(context.portfolio.short_positions) > 0:
+                order_target(IF_current_month, 0, side='short')
+            order_value(IF_current_month, context.portfolio.available_cash, side='long')
+            g.sign = 1
+    if g.sign == -1:
+        if context.current_dt.date() == end_data:
+            pass
+        elif len(context.portfolio.short_positions) >= 0 and len(context.portfolio.long_positions) == 0:
+            if len(context.portfolio.long_positions) > 0:
+                order_target(IF_current_month, 0, side='long')
+            order_value(IF_current_month, context.portfolio.available_cash, side='short')
+            g.sign = -1
+    else:
+        pass
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+'EXACT_REVIEWED_FUNCTION get_CCFX_end_date sha256=68d1d2166c7739a5ca3c5864963df9cb1f5edf8d1c2a50befec1cd4ecc85544e source=quant/2021年度精选策略/71.【股指策略】【研报复现】周内与日内结合CTA.txt'
+'EXACT_REVIEWED_FUNCTION position_auto_switch sha256=06d6c5818b529b5424930bf0ca28dac0c4d81c14a600e4213714892d4bb9a17b source=quant/2021年度精选策略/72.【股指期货】收盘折溢价策略.txt'
+
+def macd(close):
+    macdDIFF, macdDEA, macd = talib.MACDEXT(close, fastperiod=12, fastmatype=1, slowperiod=26, slowmatype=1, signalperiod=9, signalmatype=1)
+    macd = macd * 2
+    return macd
+
+def tralling_stop(context, stock_code):
+    ATR_timeperiod = 14
+    Data_ATR = get_price('AG9999.XSGE', count=ATR_timeperiod + 10, end_date=context.current_dt, frequency='15m', fields=['close', 'high', 'low'])
+    close_ATR = Data_ATR['close']
+    high_ATR = Data_ATR['high']
+    low_ATR = Data_ATR['low']
+    atr = talib.ATR(high_ATR, low_ATR, close_ATR)
+    highest20 = max(close_ATR[-20:])
+    lowest20 = min(close_ATR[-20:])
+    if highest20 - close_ATR[-1] > 2 * atr[-1] and len(context.portfolio.long_positions) > 0:
+        return 1
+    elif close_ATR[-1] - lowest20 > 2 * atr[-1] and len(context.portfolio.short_positions) > 0:
+        return -1
+    else:
+        return 0

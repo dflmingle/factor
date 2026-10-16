@@ -262,9 +262,17 @@ def python_candidate_check(py_path: Path) -> dict:
             defined.add(node.arg)
         elif isinstance(node, ast.ExceptHandler) and node.name:
             defined.add(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                defined.add(alias.asname or alias.name.split('.')[0])
     loads = {n.id for n in ast.walk(tree)
              if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
-    unknown = sorted(n for n in loads if n not in defined and n not in PY_OP_ALLOW)
+    # Documented FileUploadControl APIs: available only when the upload node
+    # is connected to this candidate's CodeControl. Runtime access is audited
+    # separately; this check only recognizes the supported function names.
+    upload_apis = {"upload_path", "read_upload"}
+    unknown = sorted(n for n in loads if n not in defined and n not in PY_OP_ALLOW
+                     and n not in upload_apis)
     notes = []
     if unknown:
         notes.append("未定义名（平台会 NameError）: " + "|".join(unknown))

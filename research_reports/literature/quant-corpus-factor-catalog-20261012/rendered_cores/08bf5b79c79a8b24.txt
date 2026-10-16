@@ -1,0 +1,80 @@
+quant/2020年度精选策略/47 次新小盘策略.txt
+from kuanke.wizard import *
+from jqdata import *
+import numpy as np
+import pandas as pd
+import talib
+import datetime
+
+def initialize(context):
+    g.security_max_proportion = 1
+    g.check_stocks_refresh_rate = 10
+    g.buy_refresh_rate = 1
+    g.sell_refresh_rate = 1
+    g.max_hold_stocknum = 1
+    g.check_stocks_days = 0
+    g.buy_trade_days = 0
+    g.sell_trade_days = 0
+    g.open_sell_securities = []
+    g.selled_security_list = {}
+    check_stocks_initialize()
+    check_stocks_sort_initialize()
+    sell_initialize()
+    buy_initialize()
+    risk_management_initialize()
+    run_daily(sell_every_day, 'open')
+    run_daily(risk_management, 'every_bar')
+    run_daily(check_stocks, 'open')
+    run_daily(trade, 'open')
+    run_daily(selled_security_list_count, 'after_close')
+
+def check_stocks_initialize():
+    g.filter_paused = True
+    g.filter_delisted = True
+    g.only_st = False
+    g.filter_st = True
+    g.security_universe_index = ['399101.XSHE', '399102.XSHE']
+    g.security_universe_user_securities = []
+    g.industry_list = []
+    g.concept_list = []
+'EXACT_REVIEWED_FUNCTION check_stocks_sort_initialize sha256=336b0ee5390fa8e294649e6405e1e6cf85b68ae29767931d34ec6ec0ca23faf2 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION sell_initialize sha256=30ecaa2841ebba3a8e29705bad815d35b82afeee51d804a6796818c868ccb24e source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION buy_initialize sha256=074e59bed4ba94a5befe53c6aed1df335ba2ba84dd9a1bd7c20924bee3ba49c0 source=quant/2020年度精选策略/24 自选策略1.txt'
+'EXACT_REVIEWED_FUNCTION risk_management_initialize sha256=8159931819895e4f3c7f626fc09f13d3634d41df74c7169432871000656e5026 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION sell_every_day sha256=bff74874fa080901b99d6ce50bfe8e49ecf1b71b491e61bfffb5bba3ef6bb141 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+
+def risk_management(context):
+    index_stoploss_diefu(context, 2, 1, g.open_sell_securities, '000300.XSHG')
+    return
+'EXACT_REVIEWED_FUNCTION check_stocks sha256=b65b95548b2a666989ae2207ca1340e9f87b58dfc8d76f93955c004af70dd5a8 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION trade sha256=0adf2c0f6a7269679de436a5eb92395cb84bc30802e343a5419902d3ee9b9c8d source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION selled_security_list_count sha256=9d12231e3b609d0e8a48f27bc08090cff9ebb804508d3e1073a08d921dc96d0b source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+
+def financial_statements_filter(context, security_list):
+    security_list = financial_data_filter_xiaoyu(security_list, valuation.circulating_market_cap, 100)
+    security_list = financial_data_filter_dayu(security_list, indicator.operation_profit_to_total_revenue, 20)
+    return security_list
+
+def situation_filter(context, security_list):
+    security_list = [security for security in security_list if ipo_days_qujian(context, security, (20, 300))]
+    return security_list
+'EXACT_REVIEWED_FUNCTION technical_indicators_filter sha256=780d64830d7ff5e9fde74e30da41c9dc6842c1c9611055cd6635f96f3e180d08 source=quant/2020年度精选策略/16 投资学作业.txt'
+'EXACT_REVIEWED_FUNCTION pattern_recognition_filter sha256=97166f9b1ff04e17b7298d38150ecaa5cdec2bee6e0cc57bf1f9325436de9818 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION other_func_filter sha256=23519e4de7a5749b04185093aef5425f86f97be853ad6482f4fbb6ac5ee96cc6 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+
+def get_check_stocks_sort_input_dict():
+    input_dict = {indicator.inc_net_profit_year_on_year: ('desc', 50), indicator.roe: ('desc', 50)}
+    return input_dict
+'EXACT_REVIEWED_FUNCTION sell sha256=7be7287aa4723d9275953916d23ad92ca1b7e456e2f0e9d2a595ba61a15a3294 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION buy sha256=5a6245acc66aa362c342529a79c0377af243b0d1611a9af4df03c9ddc202debe source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION check_stocks_sort sha256=92764bce25a60f01ffb08c74b1316ef2ed88bce49e94cf6f9c16398f7d534705 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_n_tradeday_not_buy sha256=583e69018b60dea4979deca2fa6b76a50ac22408de7f42f3ea44f931b5a51a6d source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION holded_filter sha256=0e796ce111e852f32f1064932390855e666cddd28e1e5128d10780c5bc426cfc source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION selled_security_list_dict sha256=485b05ced98da4db16ba51f60d52ae043be29dea23f063ba3195245ea73fd47c source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION paused_filter sha256=e50e1ef763510638194ab8c43207ea269858ac10fe1e720971d875f9812854f6 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION delisted_filter sha256=88047cb06fae70634db21a4ebcfd9fcb3aefc92195ae516c675dc29878de15f3 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION st_filter sha256=3c49a1ae89ad85688fbf97ebde88a432f69c09a08fa115a40bf848aa23de51f3 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION high_limit_filter sha256=c69a2d42ed9c3a45e1bb70c9081749f8db378fda5a23f815c2bcec98f89ce3aa source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_security_universe sha256=5ac9f63b0cae6931ac7fe3118b32518d45cb11da34a0a50cd6da4c4235ffbc0b source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION industry_filter sha256=08b12d32e16c78780edd7c76314d8560159ed1759171c2021f5b937f6e3dee7f source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+'EXACT_REVIEWED_FUNCTION concept_filter sha256=ac958d64a0f4b45884f6b0cd56cdf3951a32746d0138778ee9d4cfc6325e3294 source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'

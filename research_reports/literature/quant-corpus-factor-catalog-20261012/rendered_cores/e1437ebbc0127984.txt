@@ -1,0 +1,121 @@
+quant/2024年度精选策略1/29.高增股池小市值轮动.txt
+from jqdata import *
+import datetime
+import pandas as pd
+
+def initialize(context):
+    g.total_stock_num = 10
+    g.hold_list = []
+    g.buy_list = []
+    g.high_limit_list = []
+    g.limit_up_list = []
+    g.history_hold_list = []
+    g.not_buy_again_list = []
+    g.limit_days = 20
+    g.is_empty_position = False
+    run_daily(before_market_open, time='09:25', reference_security='000300.XSHG')
+    run_weekly(market_opened, weekday=1, time='09:30', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:40', reference_security='000300.XSHG')
+    run_daily(clear_account, '14:50')
+
+def before_market_open(context):
+    g.is_empty_position = today_is_between(context, '04-01', '04-30')
+    get_history_hold_list(context)
+    get_yesterday_limit_up_stocks(context)
+
+def market_opened(context):
+    yesterday = context.previous_date
+    if g.is_empty_position == False:
+        adjustment(context, yesterday)
+
+def adjustment(context, yesterday):
+    all_stocks = list(get_all_securities(types=['stock'], date=yesterday).index)
+    g.buy_list = basic_filters(context, all_stocks)
+    g.buy_list = get_high_growth_stocks(context, g.buy_list)[:g.total_stock_num * 2]
+    recent_limit_up_list = get_recent_limit_up_stock(context, g.buy_list, g.limit_days)
+    black_list = list(set(g.not_buy_again_list).intersection(set(recent_limit_up_list)))
+    g.buy_list = [stock for stock in g.buy_list if stock not in black_list]
+    g.buy_list = filter_limitup_stock(context, g.buy_list)[:min(g.total_stock_num, len(g.buy_list))]
+    all_positions = context.portfolio.positions
+    for stock in all_positions:
+        if stock not in g.buy_list and stock not in g.high_limit_list:
+            current_data = get_current_data()
+            limit_price = current_data[stock].last_price * 0.9
+            order_target(stock, 0, MarketOrderStyle(limit_price))
+    no_hold_target_num = g.total_stock_num - len(context.portfolio.positions)
+    if no_hold_target_num > 0:
+        cash_per_stock = context.portfolio.available_cash / no_hold_target_num
+        for stock in g.buy_list:
+            if stock not in g.hold_list:
+                current_data = get_current_data()
+                limit_price = current_data[stock].last_price * 1.1
+                order_target_value(stock, cash_per_stock, MarketOrderStyle(limit_price))
+
+def get_high_growth_stocks(context, stock_codes):
+    yesterday = context.previous_date
+    q = query(income.code, income.operating_revenue, indicator.adjusted_profit, valuation.pe_ratio, valuation.market_cap, valuation.circulating_market_cap).filter(income.code.in_(stock_codes), valuation.pe_ratio <= 30, valuation.pe_ratio > 0, indicator.adjusted_profit > 0)
+    now_df = get_fundamentals(q, date=yesterday)
+    filtered_codes = now_df['code'].values.tolist()
+    day = yesterday.day
+    if yesterday.month == 2 and yesterday.day == 29:
+        day = 28
+    lastyear_same_day = datetime.date(yesterday.year - 1, yesterday.month, day)
+    lastyear_q = query(income.code, income.operating_revenue, indicator.adjusted_profit, valuation.pe_ratio).filter(income.code.in_(filtered_codes))
+    lastyear_df = get_fundamentals(lastyear_q, date=lastyear_same_day)
+    merged_df = pd.merge(now_df, lastyear_df, on=['code'], suffixes=['', '_lastyear'])
+    merged_df['growth_operating_revenue'] = (merged_df['operating_revenue'] - merged_df['operating_revenue_lastyear']) / abs(merged_df['operating_revenue_lastyear'])
+    merged_df['growth_adjusted_profit'] = (merged_df['adjusted_profit'] - merged_df['adjusted_profit_lastyear']) / abs(merged_df['adjusted_profit_lastyear'])
+    merged_df['peg'] = merged_df['pe_ratio'] / (merged_df['growth_adjusted_profit'] * 100)
+    df = merged_df.loc[(merged_df['peg'] <= 1) & (merged_df['growth_adjusted_profit'] > 0) & (merged_df['growth_operating_revenue'] >= 0.15), :]
+    df = df.sort_values(by='market_cap')
+    buy_list = list(df['code'])
+    return buy_list
+'EXACT_REVIEWED_FUNCTION get_recent_limit_up_stock sha256=6f96d6fbb6791ab81d101d45811a024a55f8d46cbafc2e879a01c1e7ebc93174 source=quant/2024年度精选策略1/2.“7年40倍”策略扩容到50只.txt'
+
+def get_history_hold_list(context):
+    g.hold_list = []
+    for position in list(context.portfolio.positions.values()):
+        stock = position.security
+        g.hold_list.append(stock)
+    g.history_hold_list.append(g.hold_list)
+    if len(g.history_hold_list) >= g.limit_days:
+        g.history_hold_list = g.history_hold_list[-g.limit_days:]
+    temp_set = set()
+    for hold_list in g.history_hold_list:
+        for stock in hold_list:
+            temp_set.add(stock)
+    g.not_buy_again_list = list(temp_set)
+
+def get_yesterday_limit_up_stocks(context):
+    if g.hold_list != []:
+        df = get_price(g.hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit'], count=1, panel=False, fill_paused=False)
+        df = df[df['close'] == df['high_limit']]
+        g.high_limit_list = list(df.code)
+    else:
+        g.high_limit_list = []
+
+def check_limit_up(context):
+    now_time = context.current_dt
+    if g.high_limit_list != []:
+        for stock in g.high_limit_list:
+            current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close', 'high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            if current_data.iloc[0, 0] < current_data.iloc[0, 1] / 1.1 * 1.1:
+                limit_price = current_data.iloc[0, 0] * 0.8
+                order_target(stock, 0, MarketOrderStyle(limit_price))
+
+def basic_filters(context, stock_list):
+    yesterday = context.previous_date
+    current_data = get_current_data()
+    return [stock for stock in stock_list if not current_data[stock].is_st and 'ST' not in current_data[stock].name and ('*' not in current_data[stock].name) and ('退' not in current_data[stock].name) and (yesterday - get_security_info(stock).start_date > datetime.timedelta(days=375)) and (not current_data[stock].paused)]
+
+def filter_limitup_stock(context, stock_list):
+    current_data = get_current_data()
+    return [stock for stock in stock_list if current_data[stock].last_price < current_data[stock].high_limit]
+
+def clear_account(context):
+    current_data = get_current_data()
+    if g.is_empty_position == True:
+        for stock in context.portfolio.positions:
+            limit_price = current_data[stock].last_price * 0.9
+            order_target(stock, 0, MarketOrderStyle(limit_price))
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=9620ae3faed8afa4b71539979a57528fb20f48a987e5fb89d6dd0871ab934580 source=quant/2024年度精选策略1/1.差不多得了.txt'

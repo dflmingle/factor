@@ -1,0 +1,97 @@
+quant/2024年度精选策略1/28.正黄旗大妈选股法，修改版，年化92%.txt
+import pandas as pd
+from jqdata import *
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.stock_num = 10
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_monthly(my_Trader, 1, time='9:30')
+    run_daily(check_limit_up, time='14:00')
+    run_daily(check_at_dayend, time='14:30')
+    g.buylist = []
+'EXACT_REVIEWED_FUNCTION get_dividend_ratio_filter_list sha256=38bd0f889a1c3ac16e6d1096b39c06e0aa4623de9d7967b12e2a27f0062063ec source=quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt'
+
+def my_Trader(context):
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    stocks = get_dividend_ratio_filter_list(context, stocks, False, 0, 0.25)
+    q = query(valuation.code, valuation.pe_ratio / indicator.inc_net_profit_year_on_year, indicator.roe / valuation.pb_ratio, indicator.roe).filter(valuation.pe_ratio / indicator.inc_net_profit_year_on_year > -1, valuation.pe_ratio / indicator.inc_net_profit_year_on_year < 3, valuation.code.in_(stocks))
+    df_fundamentals = get_fundamentals(q, date=None)
+    stocks = list(df_fundamentals.code)
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(stocks), valuation.market_cap <= 100).order_by(valuation.market_cap.asc())
+    df = get_fundamentals(q, date=None)
+    choice = list(df.code)
+    choice = filter_st_stock(choice)
+    choice = filter_paused_stock(choice)
+    choice = filter_limitup_stock(context, choice)
+    choice = filter_limitdown_stock(context, choice)
+    choice = filter_highprice_stock(context, choice)
+    g.buylist = choice
+    buystock(context, g.buylist)
+
+def buystock(context, choice):
+    position_count = len(context.portfolio.positions)
+    if g.stock_num <= position_count:
+        return
+    buylist = choice
+    cdata = get_current_data()
+    psize = context.portfolio.available_cash / (g.stock_num - position_count)
+    for s in buylist:
+        if s not in context.portfolio.positions:
+            order_value(s, psize)
+            if len(context.portfolio.positions) == g.stock_num:
+                break
+
+def sellstock(context, sell_list):
+    current_data = get_current_data()
+    if len(sell_list) > 0:
+        for security in sell_list:
+            cprice = current_data[security].last_price
+            boughtcost = context.portfolio.positions[security].acc_avg_cost
+            profit = (cprice - boughtcost) / boughtcost * 100
+            limit_price = max(cprice * 0.95, current_data[security].low_limit)
+            ordert = order_target_value(security, 0, LimitOrderStyle(limit_price))
+            if None == ordert:
+                pass
+    return
+
+def prepare_stock_list(context):
+    g.high_limit_list = []
+    hold_list = list(context.portfolio.positions)
+    if hold_list:
+        df = get_price(hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit'], count=1, panel=False)
+        g.high_limit_list = df[df['close'] == df['high_limit']]['code'].tolist()
+
+def check_limit_up(context):
+    cdata = get_current_data()
+    sell_list = []
+    if g.high_limit_list:
+        for stock in g.high_limit_list:
+            if cdata[stock].last_price < cdata[stock].high_limit:
+                sell_list.append(stock)
+    if len(sell_list) > 0:
+        sellstock(context, sell_list)
+
+def check_at_dayend(context):
+    btlist = context.portfolio.positions
+    cdata = get_current_data()
+    VOLT, MAVOL5, MAVOL10 = VOL(btlist, check_date=context.current_dt, M1=5, M2=10, include_now=True)
+    sell_list = []
+    for stock in btlist:
+        if cdata[stock].last_price == cdata[stock].high_limit:
+            continue
+        if VOLT[stock] > MAVOL10[stock] * 3:
+            sell_list.append(stock)
+    sellstock(context, sell_list)
+    buystock(context, g.buylist)
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_highprice_stock(context, stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    return [stock for stock in stock_list if stock in context.portfolio.positions.keys() or last_prices[stock][-1] < 9]

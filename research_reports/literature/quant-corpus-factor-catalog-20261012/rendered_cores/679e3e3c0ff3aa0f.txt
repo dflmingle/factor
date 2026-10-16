@@ -1,0 +1,153 @@
+quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import pandas as pd
+import torch
+import torch.nn as nn
+from tqdm import tqdm
+industry_code = ['HY001', 'HY002', 'HY003', 'HY004', 'HY005', 'HY006', 'HY007', 'HY008', 'HY009', 'HY010', 'HY011']
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 20
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.model = pickle.loads(read_file('model/xgboost_technical.pkl'))
+    g.factor_list = ['boll_down', 'boll_up', 'EMA5', 'EMAC10', 'EMAC12', 'EMAC120', 'EMAC20', 'EMAC26', 'MAC10', 'MAC120', 'MAC20', 'MAC5', 'MAC60', 'MACDC', 'MFI14', 'price_no_fq']
+    run_daily(prepare_stock_list, '9:05')
+    run_weekly(weekly_adjustment, 1, '9:30')
+    run_daily(check_limit_up, '14:00')
+    run_daily(close_account, '14:50')
+
+def min_max_scaling(lst):
+    min_val = min(lst)
+    max_val = max(lst)
+    scaled_lst = [(x - min_val) / (max_val - min_val) for x in lst]
+    return scaled_lst
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+model_path1 = 'ZCSZX_0.pt'
+model_path2 = 'ZCSZX_1.pt'
+model_path3 = 'ZCSZX_2.pt'
+
+class model(nn.Module):
+
+    def __init__(self, fc1_size=2000, fc2_size=1000, fc3_size=100, fc1_dropout=0.2, fc2_dropout=0.2, fc3_dropout=0.2, num_of_classes=50):
+        super(model, self).__init__()
+        self.f_model = nn.Sequential(nn.Linear(2816, fc1_size), nn.BatchNorm1d(fc1_size), nn.ReLU(), nn.Dropout(fc1_dropout), nn.Linear(fc1_size, fc2_size), nn.BatchNorm1d(fc2_size), nn.ReLU(), nn.Dropout(fc2_dropout), nn.Linear(fc2_size, fc3_size), nn.BatchNorm1d(fc3_size), nn.ReLU(), nn.Dropout(fc3_dropout), nn.Linear(fc3_size, 2))
+        self.conv_layers1 = nn.Sequential(nn.Conv1d(6, 16, kernel_size=1), nn.BatchNorm1d(16), nn.Dropout(fc3_dropout), nn.ReLU(), nn.MaxPool1d(kernel_size=2), nn.Conv1d(16, 32, kernel_size=1), nn.BatchNorm1d(32), nn.Dropout(fc3_dropout), nn.ReLU())
+        self.conv_2D = nn.Sequential(nn.Conv2d(1, 16, kernel_size=2), nn.BatchNorm2d(16), nn.Dropout(fc3_dropout), nn.ReLU(), nn.MaxPool2d(kernel_size=2), nn.Conv2d(16, 32, kernel_size=2), nn.BatchNorm2d(32), nn.Dropout(fc3_dropout), nn.ReLU())
+        hidden_dim = 32
+        self.lstm = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=4, batch_first=True, bidirectional=True)
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+            if isinstance(module, nn.Conv1d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+
+    def forward(self, x):
+        min_vals, _ = torch.min(x, dim=1, keepdim=True)
+        max_vals, _ = torch.max(x, dim=1, keepdim=True)
+        x = (x - min_vals) / (max_vals - min_vals + 1e-05)
+        xx = x.unsqueeze(1)
+        xx = self.conv_2D(xx)
+        xx = torch.reshape(xx, (xx.shape[0], xx.shape[1] * xx.shape[2] * xx.shape[3]))
+        x = x.transpose(1, 2)
+        x = self.conv_layers1(x)
+        out = x.transpose(1, 2)
+        out2, _ = self.lstm(out)
+        out2 = torch.reshape(out2, (out2.shape[0], out2.shape[1] * out2.shape[2]))
+        IN = torch.cat((xx, out2), dim=1)
+        out = self.f_model(IN)
+        return out
+import io
+buffer = io.BytesIO(read_file(model_path1))
+model_t1 = model()
+model_t1.load_state_dict(torch.load(buffer))
+model_t1.eval()
+buffer = io.BytesIO(read_file(model_path2))
+model_t2 = model()
+model_t2.load_state_dict(torch.load(buffer))
+model_t2.eval()
+buffer = io.BytesIO(read_file(model_path3))
+model_t3 = model()
+model_t3.load_state_dict(torch.load(buffer))
+model_t3.eval()
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    final_list = []
+    today = context.current_dt
+    initial_list = get_all_securities('stock', today).index.tolist()
+    initial_list = filter_all_stock2(context, initial_list)
+    factor_data = get_factor_values(initial_list, g.factor_list, end_date=yesterday, count=1)
+    df_jq_factor_value = pd.DataFrame(index=initial_list, columns=g.factor_list)
+    for factor in g.factor_list:
+        df_jq_factor_value[factor] = list(factor_data[factor].T.iloc[:, 0])
+    df_jq_factor_value = data_preprocessing(df_jq_factor_value, initial_list, industry_code, yesterday)
+    tar = g.model.predict_proba(df_jq_factor_value)
+    df = df_jq_factor_value
+    df = df.dropna()
+    df['total_score'] = list(tar[:, 1])
+    df = df[df['total_score'] > 0.5]
+    df = df.sort_values(by=['total_score'], ascending=False)
+    postive_list = list(df.index)[:int(0.1 * len(list(df.index)))]
+    q = query(valuation.code, valuation.circulating_market_cap, indicator.eps).filter(valuation.code.in_(postive_list)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q)
+    df = df[df['eps'] > 0]
+    lst = list(df.code)
+    lst = filter_paused_stock(lst)
+    lst = filter_limitup_stock(context, lst)
+    lst = filter_limitdown_stock(context, lst)
+    tensor_list = []
+    for i in lst:
+        df = attribute_history(i, 60, '1d')
+        df = np.array(df)
+        df_tensor = torch.Tensor(df)
+        tensor_list.append(df_tensor)
+    stacked_tensor = torch.stack(tensor_list)
+    tensor_list = []
+    with torch.no_grad():
+        output1 = model_t1(stacked_tensor)
+        output2 = model_t2(stacked_tensor)
+        output3 = model_t3(stacked_tensor)
+        output = output1 + output2 + output3
+        output = output[:, 1]
+    data = {'ID': lst, 'score': output.squeeze().tolist()}
+    df = pd.DataFrame(data)
+    N = 3
+    top_N_rows = df.nlargest(N, 'score')
+    top_N_IDs = top_N_rows['ID'].tolist()
+    return top_N_IDs
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=a1df4d22629f85082f6938646725ae0af4cf6af55d2ed3c1cfcb9fc9e3e100b7 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION zheshi_trade sha256=2e4cca891b05190492865df80b269a595f0ee2cc28fb8b43e0376655b9fa6422 source=quant/2023年度精选策略/48.【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块.txt'
+
+def filter_all_stock2(context, stock_list):
+    by_date = get_trade_days(end_date=context.previous_date, count=180)[0]
+    all_stocks = get_all_securities(date=by_date).index.tolist()
+    stock_list = list(set(stock_list).intersection(set(all_stocks)))
+    curr_data = get_current_data()
+    return [stock for stock in stock_list if not (stock.startswith(('3', '68', '4', '8')) or curr_data[stock].paused or curr_data[stock].is_st or ('ST' in curr_data[stock].name) or ('*' in curr_data[stock].name) or ('退' in curr_data[stock].name) or (curr_data[stock].day_open == curr_data[stock].high_limit) or (curr_data[stock].day_open == curr_data[stock].low_limit))]
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=a33a2c2079f46745447693f0d71254e014ee7cb801035eed7930ea353f54bd83 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION get_industry_name sha256=c9726e05239a37f562934b17b1b5733160a88375853703dfe7c3a8d57e84b413 source=quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt'
+'EXACT_REVIEWED_FUNCTION replace_nan_indu sha256=04f064c8d8a29623f632738b915e8d07e2ef10a77e6ba512b87d92fd170bda26 source=quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def data_preprocessing(factor_data, stockList, industry_code, date):
+    factor_data = winsorize_med(factor_data, scale=5, inf2nan=False, axis=0)
+    factor_data = replace_nan_indu(factor_data, stockList, industry_code, date)
+    factor_data = standardlize(factor_data, axis=0)
+    return factor_data

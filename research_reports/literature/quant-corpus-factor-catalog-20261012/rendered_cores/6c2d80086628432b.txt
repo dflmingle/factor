@@ -1,0 +1,464 @@
+quant/2021年度精选策略/12.机器学习用于量化分析.txt
+import pandas as pd
+import numpy as np
+import math
+import jqdata
+from jqdata import *
+import time
+import datetime
+from jqfactor import *
+import pickle
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.feature_selection import SelectPercentile, f_classif
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
+from jqlib.technical_analysis import *
+from xgboost.sklearn import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import seaborn as sns
+import lightgbm as lgb
+from sklearn.model_selection import train_test_split
+import gc
+from sklearn.model_selection import GridSearchCV
+import tensorflow as tf
+import warnings
+warnings.filterwarnings('ignore')
+peroid = 'M'
+start_date = '2010-01-01'
+end_date = '2020-02-28'
+train_length = 48
+industry_name = 'sw_l1'
+industry_code = ['HY001', 'HY002', 'HY003', 'HY004', 'HY005', 'HY006', 'HY007', 'HY008', 'HY009', 'HY010', 'HY011']
+DELETE_STOP_NDAYS = 90
+SELECT_STOCK_INDEX = '000985.XSHG'
+TRAIN_PERCENT = 0.7
+POSITIVE_PERCENT = 0.3
+NAGATIVE_PERCENT = 0.3
+jqfactors_list = ['current_ratio', 'net_profit_to_total_operate_revenue_ttm', 'gross_income_ratio', 'roe_ttm', 'roa_ttm', 'total_asset_turnover_rate', 'net_operating_cash_flow_coverage', 'net_operate_cash_flow_ttm', 'net_profit_ttm', 'cash_to_current_liability', 'operating_revenue_growth_rate', 'non_recurring_gain_loss', 'operating_revenue_ttm', 'net_profit_growth_rate']
+basis_factors = ['net_working_capital', 'total_operating_revenue_ttm', 'operating_profit_ttm', 'net_operate_cash_flow_ttm', 'operating_revenue_ttm', 'interest_carry_current_liability', 'sale_expense_ttm', 'retained_earnings', 'total_operating_cost_ttm', 'non_operating_net_profit_ttm', 'net_invest_cash_flow_ttm', 'financial_expense_ttm', 'administration_expense_ttm', 'net_interest_expense', 'value_change_profit_ttm', 'total_profit_ttm', 'net_finance_cash_flow_ttm', 'interest_free_current_liability', 'EBIT', 'net_profit_ttm', 'OperateNetIncome', 'EBITDA', 'asset_impairment_loss_ttm', 'np_parent_company_owners_ttm', 'operating_cost_ttm', 'net_debt', 'non_recurring_gain_loss', 'goods_sale_and_service_render_cash_ttm', 'market_cap', 'cash_flow_to_price_ratio', 'sales_to_price_ratio', 'circulating_market_cap', 'operating_assets', 'financial_assets', 'operating_liability', 'financial_liability']
+q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap, valuation.pe_ratio, valuation.pb_ratio, valuation.pcf_ratio, valuation.ps_ratio, balance.total_assets, balance.total_liability, balance.development_expenditure, balance.dividend_payable, balance.fixed_assets, balance.total_non_current_liability, income.operating_profit, income.total_profit, indicator.net_profit_to_total_revenue, indicator.inc_revenue_year_on_year, indicator.inc_net_profit_year_on_year, indicator.roe, indicator.roa, indicator.gross_profit_margin)
+all_jqfactors = list(get_all_factors()['factor'].values)
+len(all_jqfactors)
+
+def delete_stop(stocks, beginDate, n):
+    stockList = []
+    beginDate = datetime.datetime.strptime(beginDate, '%Y-%m-%d')
+    for stock in stocks:
+        start_date = get_security_info(stock).start_date
+        if start_date < (beginDate - datetime.timedelta(days=n)).date():
+            stockList.append(stock)
+    return stockList
+
+def delete_st(stocks, begin_date):
+    st_data = get_extras('is_st', stocks, count=1, end_date=begin_date)
+    stockList = [stock for stock in stocks if not st_data[stock][0]]
+    return stockList
+securities_list = delete_stop(get_index_stocks(SELECT_STOCK_INDEX), start_date, DELETE_STOP_NDAYS)
+securities_list = delete_st(securities_list, start_date)
+
+def get_jq_factor(securities, factor_list, date):
+    factor_data = get_factor_values(securities=securities, factors=factor_list, count=1, end_date=date)
+    df_jq_factor = pd.DataFrame(index=securities)
+    for i in factor_data.keys():
+        df_jq_factor[i] = factor_data[i].iloc[0, :]
+    return df_jq_factor
+
+def initialize_df(securities, df, date):
+    df['net_assets'] = df['total_assets'] - df['total_liability']
+    df_new = pd.DataFrame(index=securities)
+    df_new['EP'] = df['pe_ratio'].apply(lambda x: 1 / x)
+    df_new['BP'] = df['pb_ratio'].apply(lambda x: 1 / x)
+    df_new['SP'] = df['ps_ratio'].apply(lambda x: 1 / x)
+    df_new['RD'] = df['development_expenditure'] / (df['market_cap'] * 100000000)
+    df_new['CFP'] = df['pcf_ratio'].apply(lambda x: 1 / x)
+    df_new['CMV'] = np.log(df['circulating_market_cap'])
+    df_new['financial_leverage'] = df['total_assets'] / df['net_assets']
+    df_new['debtequityratio'] = df['total_non_current_liability'] / df['net_assets']
+    df_new['cashratio'] = df['cash_to_current_liability']
+    df_new['currentratio'] = df['current_ratio']
+    df_new['NI'] = df['net_profit_to_total_operate_revenue_ttm']
+    df_new['GPM'] = df['gross_income_ratio']
+    df_new['ROE'] = df['roe_ttm']
+    df_new['ROA'] = df['roa_ttm']
+    df_new['asset_turnover'] = df['total_asset_turnover_rate']
+    df_new['net_operating_cash_flow'] = df['net_operating_cash_flow_coverage']
+    df_new['Sales_G_q'] = df['operating_revenue_growth_rate']
+    df_new['Profit_G_q'] = df['net_profit_growth_rate']
+    df_new['RSI'] = pd.Series(RSI(securities, date, N1=20))
+    dif, dea, macd = MACD(securities, date, SHORT=10, LONG=30, MID=15)
+    df_new['DIF'] = pd.Series(dif)
+    df_new['DEA'] = pd.Series(dea)
+    df_new['MACD'] = pd.Series(macd)
+    return df_new
+
+def get_period_date(peroid, start_date, end_date):
+    stock_data = get_price('000001.XSHE', start_date, end_date, 'daily', fields=['close'])
+    stock_data['date'] = stock_data.index
+    period_stock_data = stock_data.resample(peroid).last()
+    date = period_stock_data.index
+    pydate_array = date.to_pydatetime()
+    date_only_array = np.vectorize(lambda s: s.strftime('%Y-%m-%d'))(pydate_array)
+    date_only_series = pd.Series(date_only_array)
+    start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+    start_date = start_date - datetime.timedelta(days=1)
+    start_date = start_date.strftime('%Y-%m-%d')
+    date_list = date_only_series.values.tolist()
+    date_list.insert(0, start_date)
+    return date_list
+dateList = get_period_date(peroid, start_date, end_date)
+
+def get_datelist_stocks_factors(securities, jqfactot_list, date_list):
+    df_jq_factor = {}
+    df_q_factor = {}
+    df_factor_pre_train = {}
+    for date in dateList:
+        df_jq_factor = get_jq_factor(securities, jqfactot_list, date)
+        df_q_factor = get_fundamentals(q.filter(valuation.code.in_(securities)), date=date)
+        df_q_factor.index = df_q_factor['code']
+        df_factor_pre_train[date] = pd.concat([df_q_factor, df_jq_factor], axis=1)
+        df_factor_pre_train[date] = initialize_df(securities, df_factor_pre_train[date], date)
+    return df_factor_pre_train
+
+def get_datelist_stocks_factors_jqfactors(securities, jqfactot_list, date_list):
+    df_jq_factor = {}
+    df_q_factor = {}
+    df_factor_pre_train = {}
+    for date in date_list:
+        length_factors = len(jqfactot_list)
+        if length_factors > 50:
+            df_factor_pre_train_l = []
+            r = int(length_factors / 30)
+            for i in range(r + 1):
+                if 30 * (i + 1) < length_factors:
+                    df = get_jq_factor(securities, jqfactot_list[30 * i:30 * (i + 1)], date)
+                else:
+                    df = get_jq_factor(securities, jqfactot_list[30 * i:], date)
+                df_factor_pre_train_l.append(df)
+            df_jq_factor = pd.concat(df_factor_pre_train_l, axis=1)
+        else:
+            df_jq_factor = get_jq_factor(securities, jqfactot_list, date)
+        df_factor_pre_train[date] = df_jq_factor
+    return df_factor_pre_train
+with open('all_jqfactors.pkl', 'rb') as pf:
+    all_data = pickle.load(pf)
+keys = list(all_data.keys())
+basic_dic = {}
+for key in keys[:2]:
+    data = all_data[key]
+    basic_data = data[basis_factors]
+    basic_dic[key] = basic_data
+len(basic_dic)
+
+def get_stock_industry(industry_name, date, output_csv=False):
+    industries = list(get_industries(industry_name).index)
+    all_securities = get_all_securities(date=date)
+    all_securities['industry_code'] = 1
+    for ind in industries:
+        industry_stocks = get_industry_stocks(ind, date)
+        industry_stocks = set(all_securities) & set(industry_stocks)
+        all_securities['industry_code'][industry_stocks] = ind
+    stock_industry = all_securities['industry_code'].to_frame()
+    if output_csv == True:
+        stock_industry.to_csv('stock_industry.csv')
+    return stock_industry
+
+def fillna_with_industry(data, date, industry_name='sw_l1'):
+    stocks = list(data.index)
+    stocks_industry = get_stock_industry(industry_name, date)
+    stocks_industry_merge = data.merge(stocks_industry, left_index=True, right_index=True, how='left')
+    stocks_dropna = stocks_industry_merge.dropna()
+    columns = list(data.columns)
+    select_data = []
+    group_data = stocks_industry_merge.groupby('industry_code')
+    group_data_mean = group_data.mean()
+    group_data = stocks_industry_merge.merge(group_data_mean, left_on='industry_code', right_index=True, how='left')
+    for column in columns:
+        if type(data[column][0]) != str:
+            group_data[column + '_x'][pd.isnull(group_data[column + '_x'])] = group_data[column + '_y'][pd.isnull(group_data[column + '_x'])]
+            group_data[column] = group_data[column + '_x']
+            select_data.append(group_data[column])
+    result = pd.concat(select_data, axis=1)
+    mean = result.mean()
+    for i in result.columns:
+        result[i].fillna(mean[i], inplace=True)
+    return result
+
+def data_preprocessing(factor_data, date, industry_name='sw_l1'):
+    try:
+        factor_data = winsorize(factor_data, inf2nan=False, scale=1, axis=0)
+        factor_data = fillna_with_industry(factor_data, date, industry_name=industry_name)
+        factor_data = neutralize(factor_data, how=['sw_l1', 'ln_market_cap'], date=date, axis=0)
+        factor_data = standardlize(factor_data, axis=0)
+    except:
+    return factor_data
+with open('combine_neu_ln_market_cap_swl1.pkl', 'rb') as pf:
+    df_factor_train = pickle.load(pf)
+
+def get_train_data(dic_data, date_list):
+    length = len(dic_data)
+    train_length = int(length * TRAIN_PERCENT)
+    train_data = pd.DataFrame()
+    for date in dateList[:train_length]:
+        traindf = df_factor_train[date]
+        stockList = list(traindf.index)
+        data_close = get_price(stockList, date, dateList[dateList.index(date) + 1], '1d', 'close')['close']
+        traindf['pchg'] = data_close.iloc[-1] / data_close.iloc[0] - 1
+        traindf = traindf.dropna()
+        traindf = traindf.sort_values(by=['pchg'], ascending=False)
+        traindf = traindf.iloc[:int(len(traindf['pchg']) * POSITIVE_PERCENT), :].append(traindf.iloc[int(len(traindf['pchg']) * (1 - NAGATIVE_PERCENT)):, :])
+        traindf['label'] = list(traindf['pchg'].apply(lambda x: 1 if x > np.mean(list(traindf['pchg'])) else -1))
+        if train_data.empty:
+            train_data = traindf
+        else:
+            train_data = train_data.append(traindf)
+    return train_data
+train_data = get_train_data(df_factor_train, dateList)
+len(train_data)
+
+def get_test_data(dic_data, date_list):
+    length = len(dic_data)
+    train_length = int(length * TRAIN_PERCENT)
+    test_data = {}
+    for date in dateList[train_length:-1]:
+        testdf = df_factor_train[date]
+        stockList = list(testdf.index)
+        data_close = get_price(stockList, date, dateList[dateList.index(date) + 1], '1d', 'close')['close']
+        testdf['pchg'] = data_close.iloc[-1] / data_close.iloc[0] - 1
+        testdf = testdf.dropna()
+        testdf = testdf.sort_values(by=['pchg'], ascending=False)
+        testdf['label'] = list(testdf['pchg'].apply(lambda x: 1 if x > 0 else -1))
+        test_data[date] = testdf
+    return test_data
+test_data = get_test_data(df_factor_train, dateList)
+y_train = train_data['label']
+X_train = train_data.copy()
+del X_train['pchg']
+del X_train['label']
+test_l = []
+for key in test_data.keys():
+    td = test_data[key]
+    test_l.append(td)
+test_df = pd.concat(test_l)
+y_test = test_df['label']
+x_test = test_df.copy()
+del x_test['pchg']
+del x_test['label']
+
+class FeatureSelection:
+
+    def __init__(self):
+        self.supports = None
+        self.columns = None
+        self.record_collinear = None
+
+    def identify_collinear(self, data, correlation_threshold):
+        columns = data.columns
+        self.correlation_threshold = correlation_threshold
+        corr_matrix = data.corr()
+        self.corr_matrix = corr_matrix
+        upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+        to_drop = [column for column in upper.columns if any(upper[column].abs() > correlation_threshold)]
+        obtain_columns = [column for column in columns if column not in to_drop]
+        self.columns = obtain_columns
+        record_collinear = pd.DataFrame(columns=['drop_feature', 'corr_feature', 'corr_value'])
+        for column in to_drop:
+            corr_features = list(upper.index[upper[column].abs() > correlation_threshold])
+            corr_values = list(upper[column][upper[column].abs() > correlation_threshold])
+            drop_features = [column for _ in range(len(corr_features))]
+            temp_df = pd.DataFrame.from_dict({'drop_feature': drop_features, 'corr_feature': corr_features, 'corr_value': corr_values})
+            record_collinear = record_collinear.append(temp_df, ignore_index=True)
+        self.record_collinear = record_collinear
+        return data[obtain_columns]
+
+    def identify_importance_lgbm(self, features, labels, p_importance=0.8, eval_metric='auc', task='classification', n_iterations=10, early_stopping=True):
+        data = features
+        features = pd.get_dummies(features)
+        feature_names = list(features.columns)
+        features = np.array(features)
+        labels = np.array(labels).reshape((-1,))
+        feature_importance_values = np.zeros(len(feature_names))
+        for _ in range(n_iterations):
+            if task == 'classification':
+                model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.05, verbose=-1)
+            elif task == 'regression':
+                model = lgb.LGBMRegressor(n_estimators=100, learning_rate=0.05, verbose=-1)
+            else:
+                raise ValueError('Task must be either "classification" or "regression"')
+            if early_stopping:
+                train_features, valid_features, train_labels, valid_labels = train_test_split(features, labels, test_size=0.15)
+                model.fit(train_features, train_labels, eval_metric=eval_metric, eval_set=[(valid_features, valid_labels)], verbose=-1)
+                gc.enable()
+                del train_features, train_labels, valid_features, valid_labels
+                gc.collect()
+            else:
+                model.fit(features, labels)
+            feature_importance_values += model.feature_importances_ / n_iterations
+        feature_importances = pd.DataFrame({'feature': feature_names, 'importance': feature_importance_values})
+        feature_importances = feature_importances.sort_values('importance', ascending=False).reset_index(drop=True)
+        feature_importances['normalized_importance'] = feature_importances['importance'] / feature_importances['importance'].sum()
+        feature_importances['cumulative_importance'] = np.cumsum(feature_importances['normalized_importance'])
+        select_df = feature_importances[feature_importances['cumulative_importance'] <= p_importance]
+        select_columns = select_df['feature']
+        self.columns = list(select_columns.values)
+        res = data[self.columns]
+        return res
+
+    def filter_select(self, data_x, data_y, k=None, p=50, method=f_classif):
+        columns = data_x.columns
+        if k != None:
+            model = SelectKBest(method, k)
+            res = model.fit_transform(data_x, data_y)
+            supports = model.get_support()
+        else:
+            model = SelectPercentile(method, p)
+            res = model.fit_transform(data_x, data_y)
+            supports = model.get_support()
+        self.support_ = supports
+        self.columns = columns[supports]
+        return res
+
+    def wrapper_select(self, data_x, data_y, n, estimator):
+        columns = data_x.columns
+        model = RFE(estimator=estimator, n_features_to_select=n)
+        res = model.fit_transform(data_x, data_y)
+        supports = model.get_support()
+        self.supports = supports
+        self.columns = columns[supports]
+        return res
+
+    def embedded_select(self, data_x, data_y, estimator, threshold=None):
+        columns = data_x.columns
+        model = SelectFromModel(estimator=estimator, prefit=False, threshold=threshold)
+        res = model.fit_transform(data_x, data_y)
+        supports = model.get_support()
+        self.supports = supports
+        self.columns = columns[supports]
+        return res
+
+def feature_selection_params_xgboost():
+    score_means = list()
+    score_stds = list()
+    importance_list = [0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    model = XGBClassifier()
+    featureSelect = FeatureSelection()
+    for importance in importance_list:
+        lgbm_res = featureSelect.identify_importance_lgbm(X_train, y_train, p_importance=importance)
+        this_scores = cross_val_score(model, lgbm_res, y_train, cv=5, n_jobs=-1)
+        score_means.append(this_scores.mean())
+        score_stds.append(this_scores.std())
+
+def feature_selection_params_randomforest():
+    score_means = list()
+    score_stds = list()
+    importance_list = [0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    model = RandomForestClassifier()
+    featureSelect = FeatureSelection()
+    for importance in importance_list:
+        lgbm_res = featureSelect.identify_importance_lgbm(X_train, y_train, p_importance=importance)
+        this_scores = cross_val_score(model, lgbm_res, y_train, cv=5, n_jobs=-1)
+        score_means.append(this_scores.mean())
+        score_stds.append(this_scores.std())
+featureSelect = FeatureSelection()
+lgbm_feature_select = featureSelect.identify_importance_lgbm(X_train, y_train, p_importance=0.9)
+len(X_train.columns)
+rf_model = RandomForestClassifier()
+model_params = {'n_estimators': range(4, 12, 3), 'max_depth': range(3, 8, 2), 'min_samples_split': range(20, 300, 50)}
+rf_grid_serach_model = GridSearchCV(estimator=rf_model, param_grid=model_params)
+rf_grid_serach_model.fit(lgbm_feature_select, y_train)
+rf_model = RandomForestClassifier()
+model_params = {'n_estimators': range(3, 6), 'max_depth': range(2, 5), 'min_samples_split': range(230, 300, 20)}
+rf_grid_serach_model = GridSearchCV(estimator=rf_model, param_grid=model_params)
+rf_grid_serach_model.fit(lgbm_feature_select, y_train)
+
+def test_prediction_score(test_data, select_factors, model):
+    test_data_keys = list(test_data.keys())
+    accuracy_score_list = []
+    roc_auc_score_list = []
+    date_list = []
+    for date in test_data_keys:
+        test_d = test_data[date]
+        if len(test_d) == 0:
+            break
+        y_test = test_d['label']
+        x_test = test_d.copy()
+        del x_test['pchg']
+        del x_test['label']
+        x_test_featurn_select = x_test[select_factors]
+        prediction = model.predict(x_test_featurn_select)
+        accuracy_score_res = accuracy_score(y_test, prediction)
+        roc_auc_score_res = roc_auc_score(y_test, prediction)
+        accuracy_score_list.append(accuracy_score_res)
+        roc_auc_score_list.append(roc_auc_score_res)
+        date_list.append(date)
+    score_df = pd.DataFrame(accuracy_score_list, index=date_list, columns=['accuracy'])
+    score_df['roc_auc'] = roc_auc_score_list
+    return score_df
+select_factors = featureSelect.columns
+test_model = rf_grid_serach_model
+score_df = test_prediction_score(test_data, select_factors, test_model)
+
+def xgboost_model(x_train, y_train):
+    st = time.time()
+    xgboost_model = XGBClassifier()
+    model_params = {'n_estimators': range(6, 14, 2), 'max_depth': range(3, 8, 2)}
+    model = GridSearchCV(estimator=xgboost_model, param_grid=model_params, cv=5)
+    model.fit(x_train, y_train)
+    et = time.time()
+    delta = (et - st) / 60
+    return model
+xgboost_model = xgboost_model(lgbm_feature_select, y_train)
+xgboost_score_df = test_prediction_score(test_data, select_factors, xgboost_model)
+y_test.shape
+
+def nn_model(x_train, y_train, x_test, y_test):
+    keep_prob = 0.5
+    LR = 0.1
+    l1_num = 6
+    l2_num = 5
+    batch_size = 10
+    times = 1000
+    v1 = np.array(y_train.values)
+    train_y_a = v1.reshape((-1, 1))
+    v2 = np.array(y_test.values)
+    test_y_a = v2.reshape((-1, 1))
+    n_features = len(x_train.columns)
+    x = tf.placeholder(tf.float32, [None, n_features])
+    y = tf.placeholder(tf.float32, [None, 1])
+
+    def weights(shape):
+        weights = tf.Variable(tf.truncated_normal(shape, stddev=0.1))
+        return weights
+
+    def biases(shape):
+        biases = tf.zeros(shape) + 0.1
+        return tf.Variable(biases)
+    weights1 = weights([n_features, l1_num])
+    biases1 = biases([1, l1_num])
+    w_plus_b1 = tf.matmul(x, weights1) + biases1
+    l1 = tf.nn.relu(w_plus_b1)
+    l1_dropout = tf.nn.dropout(l1, keep_prob=keep_prob)
+    weight2 = weights([l1_num, l2_num])
+    biases2 = biases([l2_num])
+    w_plus_b2 = tf.matmul(l1_dropout, weight2) + biases2
+    l2 = tf.nn.relu(w_plus_b2)
+    l2_dropout = tf.nn.dropout(l2, keep_prob=keep_prob)
+    weight3 = weights([l2_num, 1])
+    biases3 = biases([1])
+    w_plus_b3 = tf.matmul(l2_dropout, weight3) + biases3
+    l3 = tf.nn.relu(w_plus_b3)
+    res = tf.nn.sigmoid(l3)
+    loss = tf.reduce_mean(tf.square(y - res))
+    train_steps = tf.train.AdadeltaOptimizer(LR).minimize(loss)
+    initialize = tf.global_variables_initializer()
+    with tf.Session() as sess:
+        sess.run(initialize)
+        for batch in range(batch_size):
+            for time in range(times):
+                sess.run(train_steps, feed_dict={x: x_train, y: train_y_a})
+            accuracy = sess.run(loss, feed_dict={x: x_train, y: train_y_a})
+            accuracy_test = sess.run(loss, feed_dict={x: x_test, y: test_y_a})
+x_test_feature_select = x_test[featureSelect.columns]
+nn_model(lgbm_feature_select, y_train, x_test_feature_select, y_test)

@@ -1,0 +1,74 @@
+quant/2024年度精选策略2/87.北上净买入策略.txt
+from jqdata import *
+
+def initialize(context):
+    g.N = 2
+    run_daily(period2, time='every_bar')
+    run_monthly(period, 7)
+
+def period2(context):
+    if len(context.portfolio.positions) > 0:
+        for stock in context.portfolio.positions:
+            cost = context.portfolio.positions[stock].avg_cost
+            price = context.portfolio.positions[stock].price
+            if cost > 0:
+                ret = price / cost - 1
+                if ret < -0.16:
+                    order_target(stock, 0)
+                    period(context)
+
+def period(context):
+    toBuy = selectStock(context, -1)
+    adjustPostion(context, toBuy)
+
+def adjustPostion(context, toBuy):
+    if len(context.portfolio.positions) > 0:
+        lastPrice = history(1, '1m', 'close', context.portfolio.positions.keys())
+        for stock in context.portfolio.positions:
+            if not stock in toBuy:
+                if lastPrice[stock][-1] < get_current_data()[stock].high_limit:
+                    order_target(stock, 0)
+    for stock in toBuy:
+        positionsCount = len(context.portfolio.positions)
+        if g.N > positionsCount:
+            div = g.N - positionsCount
+            cash = context.portfolio.available_cash
+            if div > 0:
+                cash = context.portfolio.available_cash / div
+            if stock not in context.portfolio.positions:
+                order_value(stock, cash)
+
+def selectStock(context, mix):
+    today = context.current_dt.date()
+    yesterday = shiftTradingDay(today, mix)
+    q = query(finance.STK_EL_TOP_ACTIVATE).filter(finance.STK_EL_TOP_ACTIVATE.day == yesterday, finance.STK_EL_TOP_ACTIVATE.link_id.in_([310001]))
+    df = finance.run_query(q)
+    df['net'] = df['buy'] - df['sell']
+    df.sort_values(by=['net'], ascending=False, inplace=True)
+    stockList = df['code'].tolist()
+    stockList = filterStock(context, stockList)
+    q2 = query(finance.STK_EL_TOP_ACTIVATE).filter(finance.STK_EL_TOP_ACTIVATE.day == yesterday, finance.STK_EL_TOP_ACTIVATE.link_id.in_([310002]))
+    df2 = finance.run_query(q2)
+    df2['net'] = df2['buy'] - df2['sell']
+    df2.sort_values(by=['net'], ascending=False, inplace=True)
+    stockList2 = df2['code'].tolist()
+    stockList2 = filterStock(context, stockList2)
+    allList = []
+    if len(stockList) > 0:
+        hStock = stockList[0]
+        allList.append(hStock)
+    if len(stockList2) > 0:
+        sStock = stockList2[0]
+        allList.append(sStock)
+    if len(allList) <= 0:
+        nexta = mix - 1
+        allList = selectStock(context, nexta)
+    return allList
+
+def shiftTradingDay(date, shift):
+    tradingDays = get_all_trade_days()
+    return tradingDays[list(tradingDays).index(date) + shift]
+
+def filterStock(context, stockList):
+    currData = get_current_data()
+    return [stock for stock in stockList if not (currData[stock].paused or currData[stock].is_st or 'ST' in currData[stock].name or ('*' in currData[stock].name) or ('退' in currData[stock].name))]

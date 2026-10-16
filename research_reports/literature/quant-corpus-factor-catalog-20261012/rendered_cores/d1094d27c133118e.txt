@@ -1,0 +1,99 @@
+quant/2021年度精选策略/95.冲天炮最高板策略迭代.txt
+from jqdata import *
+import datetime as dt
+from sklearn.linear_model import LinearRegression
+
+def initialize(context):
+    g.max_hold_nums = 1
+    g.recent_bought_stocks = {}
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='every_bar', reference_security='000300.XSHG')
+
+def market_open(context):
+    curr_data = get_current_data()
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    for security in context.portfolio.positions:
+        closeable_amount = context.portfolio.positions[security].closeable_amount
+        if closeable_amount > 0:
+            if minute > 55 and hour == 14:
+                if curr_data[security].last_price < curr_data[security].high_limit:
+                    order_target(security, 0)
+            elif curr_data[security].last_price < context.portfolio.positions[security].avg_cost * 0.95:
+                order_target(security, 0)
+    if g.buy_list is None:
+        return
+    if len(context.portfolio.positions) >= g.max_hold_nums:
+        return
+    if not (fit_linear(3) > 0 and g.max_zt_days > 2):
+        return
+    if hour < 11 and len(context.portfolio.positions) < g.max_hold_nums:
+        for security in g.buy_list:
+            if security not in context.portfolio.positions:
+                if curr_data[security].last_price >= curr_data[security].high_limit:
+                    continue
+                need_count = g.max_hold_nums - len(context.portfolio.positions)
+                if need_count > 0:
+                    buy_cash = context.portfolio.available_cash / need_count
+                    if buy_cash > curr_data[security].last_price * 500:
+                        result = order_value(security, buy_cash)
+                        if result is not None:
+                            g.recent_bought_stocks[security] = 1
+'EXACT_REVIEWED_FUNCTION fit_linear sha256=3d9cfc1674320978f90bd0d3dc7f7e54a80c5cefa8c3dbc70654f1ec9d9cfd71 source=quant/2021年度精选策略/20.冲天炮最高板策略，收益惊呆了我.txt'
+
+def before_market_open(context):
+    if risk_management(context):
+        g.buy_list = None
+        return
+    end_dt = context.previous_date
+    review_days = 10
+    trd_days = get_trade_days(end_date=end_dt, count=1 + 60)
+    stock_list = get_all_securities('stock', trd_days[0]).index.tolist()
+    curr_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not (curr_data[stock].paused or curr_data[stock].is_st or 'ST' in curr_data[stock].name or ('*' in curr_data[stock].name) or ('退' in curr_data[stock].name) or stock.startswith('688'))]
+    df = get_price(stock_list, end_date=end_dt, count=1 + review_days, fields=['close', 'low', 'high_limit', 'paused'], panel=False)
+    cond = df.close == df.high_limit
+    df = df[cond].set_index('time')
+    trd_days = trd_days[-review_days - 1:]
+    day_count = pd.Series(range(len(trd_days)), index=trd_days)
+    df['day_count'] = day_count
+    df = df.reset_index()
+    ups = []
+    stock, preday_count = ('', 0)
+    for index, row in df.iterrows():
+        if row.code != stock or row.day_count - preday_count != 1:
+            ups += [1 - row.paused]
+            stock = row.code
+        else:
+            ups += [ups[-1] + 1 - row.paused]
+        preday_count = row.day_count
+    df['ups'] = pd.Series(ups, dtype=np.uint8)
+    df = df[df.paused == 0]
+    g.max_zt_days = df[df.day_count == review_days].ups.max()
+    stock_list = df[(df.day_count == review_days) & (df.ups == g.max_zt_days)]['code'].tolist()
+    temp_dict = {}
+    for key in g.recent_bought_stocks:
+        if g.recent_bought_stocks[key] < 7:
+            temp_dict[key] = g.recent_bought_stocks[key] + 1
+    g.recent_bought_stocks = temp_dict
+    stock_list = [stock for stock in stock_list if stock not in g.recent_bought_stocks]
+    h1 = history(61, '1d', 'close', stock_list)
+    s = h1[-60:].mean() > h1[-61:-1].mean()
+    g.buy_list = s[s].index.tolist()
+    if len(g.buy_list):
+        pass
+
+def risk_management(context):
+    current_data = get_current_data()
+    security_list = list(get_all_securities(['stock']).index)
+    security_list = [stock for stock in security_list if not current_data[stock].is_st and (not current_data[stock].paused) and ('ST' not in current_data[stock].name) and ('*' not in current_data[stock].name) and ('退' not in current_data[stock].name)]
+    pre_data = get_price(security_list, end_date=context.previous_date, frequency='daily', fields=['close', 'low_limit'], skip_paused=True, fq='pre', count=1, panel=False)
+    pre_pre_data = get_price(security_list, end_date=context.previous_date - dt.timedelta(1), frequency='daily', fields=['close', 'low_limit'], skip_paused=True, fq='pre', count=1, panel=False)
+    pre_limit_down = pre_data[pre_data.close == pre_data.low_limit]
+    pre_pre_limit_down = pre_pre_data[pre_pre_data.close == pre_pre_data.low_limit]
+    pre_limit_down_num = len(pre_limit_down)
+    pre_pre_limit_down_num = len(pre_pre_limit_down)
+    if pre_limit_down_num > pre_pre_limit_down_num and pre_limit_down_num > 15:
+        return True
+    else:
+        return False

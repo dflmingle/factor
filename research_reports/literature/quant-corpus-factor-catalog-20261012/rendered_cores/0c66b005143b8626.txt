@@ -1,0 +1,19 @@
+quant/2020年度精选策略/83 沪深300ETF-1060双均线.txt
+from jqdata import *
+
+def initialize(context):
+    g.security = '510310.XSHG'
+    run_daily(trade, 'every_bar')
+
+def trade(context):
+    security = g.security
+    close_data = attribute_history(security, 10, '1d', ['close'], df=False)
+    ma1 = close_data['close'].mean()
+    close_data = attribute_history(security, 60, '1d', ['close'], df=False)
+    ma2 = close_data['close'].mean()
+    close_price = close_data['close'][-1]
+    cash = context.portfolio.cash
+    if ma1 > ma2:
+        order_value(security, cash)
+    elif ma1 < ma2 and context.portfolio.positions[security].closeable_amount > 0:
+        order_target(security, 0)

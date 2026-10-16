@@ -1,0 +1,822 @@
+[
+  {
+    "key": "qroe_accel",
+    "name": "单季ROE改善",
+    "source_paths": [
+      "quant/2024年度精选策略2/28.【回顾2】小市值成长股策略更新FROEC-PB-CAP-HL.txt"
+    ],
+    "source_sha256": [
+      "8883a4f8fdca8f9da3f973f3d7ef20b1b49e96f5b1f532fdcc20037c1f884dea"
+    ],
+    "formula": "4*qROE0-sum(qROE1..4)",
+    "direction": 1,
+    "fidelity": "PIT_quarterly_accounting_proxy_atom_or_rank_adaptation",
+    "gated": false,
+    "batch": 6,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source6-20261012"
+  },
+  {
+    "key": "qroe_accel_bm",
+    "name": "ROE改善×低PB",
+    "source_paths": [
+      "quant/2024年度精选策略2/28.【回顾2】小市值成长股策略更新FROEC-PB-CAP-HL.txt"
+    ],
+    "source_sha256": [
+      "8883a4f8fdca8f9da3f973f3d7ef20b1b49e96f5b1f532fdcc20037c1f884dea"
+    ],
+    "formula": "rank(4*qROE0-sum(qROE1..4))+rank(BM), BM>0",
+    "direction": 1,
+    "fidelity": "PIT_quarterly_accounting_proxy_atom_or_rank_adaptation",
+    "gated": false,
+    "batch": 6,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source6-20261012"
+  },
+  {
+    "key": "qroe_lowpb_gate",
+    "name": "低PB半池内ROE改善",
+    "source_paths": [
+      "quant/2024年度精选策略2/28.【回顾2】小市值成长股策略更新FROEC-PB-CAP-HL.txt"
+    ],
+    "source_sha256": [
+      "8883a4f8fdca8f9da3f973f3d7ef20b1b49e96f5b1f532fdcc20037c1f884dea"
+    ],
+    "formula": "4*qROE0-sum(qROE1..4); positive income and PB, bottom50% PB",
+    "direction": 1,
+    "fidelity": "PIT_quarterly_accounting_proxy_atom_or_rank_adaptation",
+    "gated": true,
+    "batch": 6,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source6-20261012"
+  },
+  {
+    "key": "triangle_roe_gate",
+    "name": "基本面三角ROE改善",
+    "source_paths": [
+      "quant/2023年度精选策略/59.可能是最接近实盘的“基本面三角.txt"
+    ],
+    "source_sha256": [
+      "445da08fc6da7790c2d8d861d70277e0212c9f2283d7c7ac0cdfa2cc8dd3992d"
+    ],
+    "formula": "qROE0/mean(qROE1..4)>1, five quarters qROE/growth/CFO-revenue>0",
+    "direction": 1,
+    "fidelity": "PIT_quarterly_accounting_proxy_atom_or_rank_adaptation",
+    "gated": true,
+    "batch": 6,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source6-20261012"
+  },
+  {
+    "key": "supplier_credit_roic_gate",
+    "name": "高ROIC供应商信用",
+    "source_paths": [
+      "quant/聚宽2025年精选/60高股息V1.0（小程序公开股池）.txt"
+    ],
+    "source_sha256": [
+      "daaf73f27eee2cc499094abee38296091374fae34839ffd035bcdab8bf4b11d9"
+    ],
+    "formula": "365*mean(AP0,AP4)/TTM operating_cost; ROIC>8%",
+    "direction": 1,
+    "fidelity": "PIT_quarterly_accounting_proxy_atom_or_rank_adaptation",
+    "gated": true,
+    "batch": 6,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source6-20261012"
+  },
+  {
+    "key": "supplier_credit_quality",
+    "name": "供应商信用×投资回报质量",
+    "source_paths": [
+      "quant/聚宽2025年精选/60高股息V1.0（小程序公开股池）.txt"
+    ],
+    "source_sha256": [
+      "daaf73f27eee2cc499094abee38296091374fae34839ffd035bcdab8bf4b11d9"
+    ],
+    "formula": "rank(365*mean(AP0,AP4)/TTM operating_cost)+rank(ROIC)",
+    "direction": 1,
+    "fidelity": "PIT_quarterly_accounting_proxy_atom_or_rank_adaptation",
+    "gated": false,
+    "batch": 6,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source6-20261012"
+  },
+  {
+    "key": "credit_aparp",
+    "name": "供应链议价能力APARP",
+    "source_paths": [
+      "quant/2021年度精选策略/10.多因子选股.txt"
+    ],
+    "formula": "(acct_payable+adv_receipts)/(accounts_receiv+prepayment), denominator>0",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "48ae1e45825a57fc52ba1b184201b065ad66940b2cdaaa8668cfa0bc7f583393"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "credit_margin_rank",
+    "name": "供应链议价×毛利质量",
+    "source_paths": [
+      "quant/2021年度精选策略/10.多因子选股.txt"
+    ],
+    "formula": "rank(APARP)+rank(grossprofit_margin)",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "48ae1e45825a57fc52ba1b184201b065ad66940b2cdaaa8668cfa0bc7f583393"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "fcf_capex_roe_rank",
+    "name": "自由现金流×ROE",
+    "source_paths": [
+      "quant/2024年度精选策略1/39.大资金优质股策略，总收益1217%！无小市值因子！.txt",
+      "quant/2024年度精选策略2/90.大师策略——柯林·麦克连成长价值优势投资法.txt"
+    ],
+    "formula": "rank((TTM_CFO-TTM_capex)/total_mv)+rank(qROE)",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "f8b6b5b809cf610092c7925771624340bc9e3484f2417928d219cd23d01e18c6",
+      "ac69d107b4d9d97cb381fa853cd9ecddf7a6e5201da8e24fad82199409c69311"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "fcf_invest_roe_size_neutral",
+    "name": "投资现金流口径×ROE中性化",
+    "source_paths": [
+      "quant/2024年度精选策略1/39.大资金优质股策略，总收益1217%！无小市值因子！.txt"
+    ],
+    "formula": "sum(zscore(logcap residual of winsor5_93(FCF_invest_yield,qROE))); industry neutralization omitted",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "f8b6b5b809cf610092c7925771624340bc9e3484f2417928d219cd23d01e18c6"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "roa_turncv_bias_rank",
+    "name": "盈利×换手稳定×短期乖离",
+    "source_paths": [
+      "quant/2023年度精选策略/79.过滤两个因子，12年15倍的roa选股500指数增强.txt"
+    ],
+    "formula": "rank(ROA)+rank(-STD20(turn)/MEAN20(turn))+rank(1-C/MA10)",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "2bfa6a28c1bf84502f2bd057c47db286e4ea49c9eaec3e46e5bcbf2ae8d2fc4d"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "roa_turncv_bias_gate",
+    "name": "低换手波动低乖离池内ROA",
+    "source_paths": [
+      "quant/2023年度精选策略/79.过滤两个因子，12年15倍的roa选股500指数增强.txt"
+    ],
+    "formula": "ROA in lower50% turn_CV then lower50% BIAS10",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": true,
+    "direction": 1,
+    "source_sha256": [
+      "2bfa6a28c1bf84502f2bd057c47db286e4ea49c9eaec3e46e5bcbf2ae8d2fc4d"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "bm_roa_lowbeta_rank",
+    "name": "低估值×盈利×低市场风险",
+    "source_paths": [
+      "quant/聚宽2025年精选/23大盘择时，逻辑简单.txt"
+    ],
+    "formula": "rank(BM)+rank(ROA)+rank(-CAPM_beta252_equalweight_fullA)",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "af9587ef944b9d964e62145a02333c2cda5bb4812b042f79be42b59e6ee5dcd5"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "roe_minus_pb",
+    "name": "ROE减PB",
+    "source_paths": [
+      "quant/2023年度精选策略/65.PB-POE+双均线--加入jq以来第一个成功的交易策略 一.txt"
+    ],
+    "formula": "qROE-PB; positive book equity",
+    "fidelity": "fullA_atom_or_equalrank_adaptation_PIT_proxy; original execution/universe omitted",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "a0962a9e76dfe804436e657dc6dd39c27c75bdbc774cda19f55370434c415f95"
+    ],
+    "batch": 7,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source7-20261012"
+  },
+  {
+    "key": "chip60_arc_low",
+    "name": "筹码60日平均盈亏低",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "-1*arc(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_arc_high",
+    "name": "筹码60日平均盈亏高",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "1*arc(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_vrc_low",
+    "name": "筹码60日分散度低",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "-1*vrc(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_vrc_high",
+    "name": "筹码60日分散度高",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "1*vrc(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_src_low",
+    "name": "筹码60日偏度低",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "-1*src(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_src_high",
+    "name": "筹码60日偏度高",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "1*src(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_krc_low",
+    "name": "筹码60日峰度低",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "-1*krc(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "chip60_krc_high",
+    "name": "筹码60日峰度高",
+    "source_paths": [
+      "quant/2024年度精选策略1/77.【复现】筹码分布因子.txt"
+    ],
+    "formula": "1*krc(60 prior-day VWAPs, turnover survival weights)",
+    "fidelity": "source moment definition, missing imported custom ops proxied; direction not specified, both signs frozen",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "46bd5b33db08d587a0887ea9af57c944677a65ebba14ac824ae3902d6307b427"
+    ],
+    "batch": 8,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source8-20261012"
+  },
+  {
+    "key": "idio_bm_rank",
+    "name": "低特质波动×账面价值",
+    "formula": "rank(-IVOL120)+rank(BM)",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/2023年度精选策略/24.ROE+PB模型的优化.txt"
+    ],
+    "fidelity": "research adaptation from source legs; equal ranks frozen, not original strategy",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "bf241cf9d0f96a1ff2fa764f17cdf5c93b1ab2a58f8dc4ec3438f2232e856b53"
+    ],
+    "batch": 9,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source9-20261012"
+  },
+  {
+    "key": "idio_ep_rank",
+    "name": "低特质波动×盈利估值",
+    "formula": "rank(-IVOL120)+rank(EP_TTM)",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/聚宽2025年精选/24大容量低回撤价值投资-排除小市值因子.txt"
+    ],
+    "fidelity": "research adaptation from source legs; equal ranks frozen, not original strategy",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "ce1d09234a556cf2f65e7a734f23068c069c4fca0299b43ca99368f177000ef9"
+    ],
+    "batch": 9,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source9-20261012"
+  },
+  {
+    "key": "idio_roe_rank",
+    "name": "低特质波动×季度盈利质量",
+    "formula": "rank(-IVOL120)+rank(qROE)",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/2023年度精选策略/24.ROE+PB模型的优化.txt"
+    ],
+    "fidelity": "research adaptation from source legs; equal ranks frozen, not original strategy",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "bf241cf9d0f96a1ff2fa764f17cdf5c93b1ab2a58f8dc4ec3438f2232e856b53"
+    ],
+    "batch": 9,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source9-20261012"
+  },
+  {
+    "key": "idio_quality_value_rank",
+    "name": "低特质波动×质量价值",
+    "formula": "rank(-IVOL120)+rank(ROIC)+rank(grossmargin)+rank(-PS_TTM)",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/聚宽2025年精选/24大容量低回撤价值投资-排除小市值因子.txt"
+    ],
+    "fidelity": "research adaptation from source legs; equal ranks frozen, not original strategy",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "ce1d09234a556cf2f65e7a734f23068c069c4fca0299b43ca99368f177000ef9"
+    ],
+    "batch": 9,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source9-20261012"
+  },
+  {
+    "key": "idio_reversal_product",
+    "name": "低特质波动×20日反转",
+    "formula": "rank(-IVOL120)*rank(-return20)",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/2023年度精选策略/79.过滤两个因子，12年15倍的roa选股500指数增强.txt"
+    ],
+    "fidelity": "research adaptation from source legs; equal ranks frozen, not original strategy",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "2bfa6a28c1bf84502f2bd057c47db286e4ea49c9eaec3e46e5bcbf2ae8d2fc4d"
+    ],
+    "batch": 9,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source9-20261012"
+  },
+  {
+    "key": "idio_roa_turn_bias_rank",
+    "name": "盈利×低风险×换手×乖离",
+    "formula": "rank(-IVOL120)+rank(ROA)+rank(-turnCV20)+rank(-BIAS10)",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/2023年度精选策略/79.过滤两个因子，12年15倍的roa选股500指数增强.txt"
+    ],
+    "fidelity": "research adaptation from source legs; equal ranks frozen, not original strategy",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "2bfa6a28c1bf84502f2bd057c47db286e4ea49c9eaec3e46e5bcbf2ae8d2fc4d"
+    ],
+    "batch": 9,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source9-20261012"
+  },
+  {
+    "key": "fixed_capm_ivol504",
+    "name": "固定期初组合CAPM低特质波动504",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "-STD(OLS residuals(return ~ CAPM,504),ddof=0)*sqrt252; start-date total_mv factor portfolios",
+    "fidelity": "source economic mechanism adaptation; intended24months mapped to504daily observations; source count24/month bug not copied",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 10,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source10-20261012"
+  },
+  {
+    "key": "fixed_ff3_ivol504",
+    "name": "固定期初组合FF3低特质波动504",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "-STD(OLS residuals(return ~ FF3,504),ddof=0)*sqrt252; start-date total_mv factor portfolios",
+    "fidelity": "source economic mechanism adaptation; intended24months mapped to504daily observations; source count24/month bug not copied",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 10,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source10-20261012"
+  },
+  {
+    "key": "fixed_ff5_ivol504",
+    "name": "固定期初组合FF5低特质波动504",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "-STD(OLS residuals(return ~ FF5,504),ddof=0)*sqrt252; start-date total_mv factor portfolios",
+    "fidelity": "source economic mechanism adaptation; intended24months mapped to504daily observations; source count24/month bug not copied",
+    "gated": false,
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 10,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source10-20261012"
+  },
+  {
+    "key": "idio_rd_assets_rank",
+    "name": "低特质波动×研发强度",
+    "source_paths": [
+      "quant/2020年度精选策略/03 机器学习多因子策略.txt",
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt"
+    ],
+    "formula": "rank(-IVOL120)+rank(PIT_rd_exp/assets)",
+    "gated": false,
+    "fidelity": "fixed equal-rank source-mechanism adaptation; margin stability six-reported-quarter proxy, not exact vendor field",
+    "direction": 1,
+    "source_sha256": [
+      "77f0c7ff116e2e83699e092f7fd776667d922ad1aa98b65f92df5f7ee20a9906",
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f"
+    ],
+    "batch": 11,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source11-20261012"
+  },
+  {
+    "key": "idio_rd_market_rank",
+    "name": "低特质波动×研发估值",
+    "source_paths": [
+      "quant/2020年度精选策略/03 机器学习多因子策略.txt",
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt"
+    ],
+    "formula": "rank(-IVOL120)+rank(PIT_rd_exp/total_mv)",
+    "gated": false,
+    "fidelity": "fixed equal-rank source-mechanism adaptation; margin stability six-reported-quarter proxy, not exact vendor field",
+    "direction": 1,
+    "source_sha256": [
+      "77f0c7ff116e2e83699e092f7fd776667d922ad1aa98b65f92df5f7ee20a9906",
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f"
+    ],
+    "batch": 11,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source11-20261012"
+  },
+  {
+    "key": "margin_stable_eps_rank",
+    "name": "毛利稳定×每股盈利",
+    "source_paths": [
+      "quant/2023年度精选策略/78.EPS+MS因子的大盘蓝筹策略.txt"
+    ],
+    "formula": "rank(-std(GPM_q0..5)/mean(GPM_q0..5))+rank(EPS_TTM)",
+    "gated": false,
+    "fidelity": "fixed equal-rank source-mechanism adaptation; margin stability six-reported-quarter proxy, not exact vendor field",
+    "direction": 1,
+    "source_sha256": [
+      "a1a72e6dd4e40013c1cf8e81d21f61142110427b6215e01ee8c3c3cf367acbf6"
+    ],
+    "batch": 11,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source11-20261012"
+  },
+  {
+    "key": "idio_margin_stable_rank",
+    "name": "低特质波动×毛利稳定",
+    "source_paths": [
+      "quant/2024年度精选策略2/67.三因子策略年化21%简单多因子策略框架.txt",
+      "quant/2023年度精选策略/78.EPS+MS因子的大盘蓝筹策略.txt"
+    ],
+    "formula": "rank(-IVOL120)+rank(-std(GPM_q0..5)/mean(GPM_q0..5))",
+    "gated": false,
+    "fidelity": "fixed equal-rank source-mechanism adaptation; margin stability six-reported-quarter proxy, not exact vendor field",
+    "direction": 1,
+    "source_sha256": [
+      "53a46f09a3a8a57415a507665e49b7a5c2fbf626489cabd38e8c4fb50939860f",
+      "a1a72e6dd4e40013c1cf8e81d21f61142110427b6215e01ee8c3c3cf367acbf6"
+    ],
+    "batch": 11,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source11-20261012"
+  },
+  {
+    "key": "fixed_ff3_ivol120",
+    "name": "三因子低特质波动120",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "-STD(OLS residual(RM,SMB,HML),120)",
+    "gated": false,
+    "fidelity": "fixed fullA risk model/value adaptation; source runtime, original pools and neutralization not reproduced",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 12,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source12-20261012"
+  },
+  {
+    "key": "fixed_ff5_ivol120",
+    "name": "五因子低特质波动120",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "-STD(OLS residual(RM,SMB,HML,RMW,CMA),120)",
+    "gated": false,
+    "fidelity": "fixed fullA risk model/value adaptation; source runtime, original pools and neutralization not reproduced",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 12,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source12-20261012"
+  },
+  {
+    "key": "market_cov240_low",
+    "name": "低市场收益协方差240",
+    "source_paths": [
+      "quant/2023年度精选策略/91.致敬市场--4 解析细节.txt"
+    ],
+    "formula": "-COV(return_stock,return_fullA,240)",
+    "gated": false,
+    "fidelity": "fixed fullA risk model/value adaptation; source runtime, original pools and neutralization not reproduced",
+    "direction": 1,
+    "source_sha256": [
+      "b3f42fac13f97877c8e71db640e73e50e70c9097b75cc89f64496a671ca31c84"
+    ],
+    "batch": 12,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source12-20261012"
+  },
+  {
+    "key": "cov240_bm_rank",
+    "name": "低系统风险×账面价值",
+    "source_paths": [
+      "quant/2023年度精选策略/91.致敬市场--4 解析细节.txt"
+    ],
+    "formula": "rank(-COV240)+rank(BM)",
+    "gated": false,
+    "fidelity": "fixed fullA risk model/value adaptation; source runtime, original pools and neutralization not reproduced",
+    "direction": 1,
+    "source_sha256": [
+      "b3f42fac13f97877c8e71db640e73e50e70c9097b75cc89f64496a671ca31c84"
+    ],
+    "batch": 12,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source12-20261012"
+  },
+  {
+    "key": "turncv_bm_rank",
+    "name": "换手相对波动×账面价值",
+    "source_paths": [
+      "quant/2024年度精选策略2/49.修改成一创版本.txt"
+    ],
+    "formula": "rank(-STD20(turn)/MEAN20(turn))+rank(BM); value leg replaces PEG explicitly",
+    "gated": false,
+    "fidelity": "fixed fullA risk model/value adaptation; source runtime, original pools and neutralization not reproduced",
+    "direction": 1,
+    "source_sha256": [
+      "d47c5c14be0b34bf899e844a2e9439c674f269328c654d7704c3a6d16e39ab69"
+    ],
+    "batch": 12,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source12-20261012"
+  },
+  {
+    "key": "revenue_sue12",
+    "name": "12季度收入惊喜",
+    "source_paths": [
+      "quant/2024年度精选策略2/82.可转债知识总结.txt"
+    ],
+    "formula": "(single_quarter_revenue0-mean(prior12))/std(prior12)",
+    "gated": false,
+    "fidelity": "PIT source accounting atom adaptation, quarterly value ordering causal; source execution/universe removed",
+    "direction": 1,
+    "source_sha256": [
+      "d5b780dc601a73ef85d230087d661a32b6c4adc3030a7ba147cebdc0719b3e20"
+    ],
+    "batch": 13,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source13-20261012"
+  },
+  {
+    "key": "revenue_seasonal_sue12",
+    "name": "季节调整收入惊喜",
+    "source_paths": [
+      "quant/2024年度精选策略2/82.可转债知识总结.txt"
+    ],
+    "formula": "(revenue0-mean(revenue4,8,12))/std(revenue4,8,12); seasonality adaptation",
+    "gated": false,
+    "fidelity": "PIT source accounting atom adaptation, quarterly value ordering causal; source execution/universe removed",
+    "direction": 1,
+    "source_sha256": [
+      "d5b780dc601a73ef85d230087d661a32b6c4adc3030a7ba147cebdc0719b3e20"
+    ],
+    "batch": 13,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source13-20261012"
+  },
+  {
+    "key": "adjusted_profit_value_rank",
+    "name": "扣非盈利成长×估值",
+    "source_paths": [
+      "quant/2021年度精选策略/26.稳定高回报周期股策略2.txt"
+    ],
+    "formula": "rank(sum(q_dtprofit0..3)/mv)+.5rank(sum0..1/sum2..3)+.3rank(sum0..1/sum4..5)",
+    "gated": false,
+    "fidelity": "PIT source accounting atom adaptation, quarterly value ordering causal; source execution/universe removed",
+    "direction": 1,
+    "source_sha256": [
+      "6f46c3e6ed3c37a962170fc4b5a13dc05054ad863d2202e5069b6e3aee2843df"
+    ],
+    "batch": 13,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source13-20261012"
+  },
+  {
+    "key": "adjusted_profit_value_gate",
+    "name": "低PE应收效率内盈利成长",
+    "source_paths": [
+      "quant/2021年度精选策略/26.稳定高回报周期股策略2.txt"
+    ],
+    "formula": "same score; PE0..20, debt/assets<.9, receivable turnover>6 or<=0",
+    "gated": true,
+    "fidelity": "PIT source accounting atom adaptation, quarterly value ordering causal; source execution/universe removed",
+    "direction": 1,
+    "source_sha256": [
+      "6f46c3e6ed3c37a962170fc4b5a13dc05054ad863d2202e5069b6e3aee2843df"
+    ],
+    "batch": 13,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source13-20261012"
+  },
+  {
+    "key": "ff3_explained_high",
+    "name": "FF3风格解释比例high",
+    "formula": "1*(1-(IVOL_ff3/IVOL_CAPM)^2), fixed120",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "gated": false,
+    "fidelity": "variance decomposition research adaptation of source CAPM/FF3/FF5; both directions fixed",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 14,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source14-20261012"
+  },
+  {
+    "key": "ff3_explained_low",
+    "name": "FF3风格解释比例low",
+    "formula": "-1*(1-(IVOL_ff3/IVOL_CAPM)^2), fixed120",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "gated": false,
+    "fidelity": "variance decomposition research adaptation of source CAPM/FF3/FF5; both directions fixed",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 14,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source14-20261012"
+  },
+  {
+    "key": "ff5_explained_high",
+    "name": "FF5风格解释比例high",
+    "formula": "1*(1-(IVOL_ff5/IVOL_CAPM)^2), fixed120",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "gated": false,
+    "fidelity": "variance decomposition research adaptation of source CAPM/FF3/FF5; both directions fixed",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 14,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source14-20261012"
+  },
+  {
+    "key": "ff5_explained_low",
+    "name": "FF5风格解释比例low",
+    "formula": "-1*(1-(IVOL_ff5/IVOL_CAPM)^2), fixed120",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "gated": false,
+    "fidelity": "variance decomposition research adaptation of source CAPM/FF3/FF5; both directions fixed",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 14,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source14-20261012"
+  },
+  {
+    "key": "style_stable_equalrank",
+    "name": "风格解释力×低特质风险等权",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "rank(1-IVOL_FF3^2/IVOL_CAPM^2)+rank(-IVOL_FF3)",
+    "gated": false,
+    "fidelity": "causal refinement of source model residual risk and source-derived partial explained variance; fixed equal ranks",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 15,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source15-20261012"
+  },
+  {
+    "key": "style_stable_rankproduct",
+    "name": "风格解释力×低特质风险乘积",
+    "source_paths": [
+      "quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt"
+    ],
+    "formula": "rank(1-IVOL_FF3^2/IVOL_CAPM^2)*rank(-IVOL_FF3)",
+    "gated": false,
+    "fidelity": "causal refinement of source model residual risk and source-derived partial explained variance; fixed equal ranks",
+    "direction": 1,
+    "source_sha256": [
+      "99e8198ab2b752214a6fd0442b0a719bfb2f51c23cc5e1dd117b0f484d880d48"
+    ],
+    "batch": 15,
+    "result_directory": "research_reports/platform_alignment/quant-corpus-semantic-source15-20261012"
+  }
+]

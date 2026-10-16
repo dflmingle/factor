@@ -1,0 +1,27 @@
+quant/2022年度精选策略/49.LLT低延迟趋势线择时交易初探.txt
+import pandas as pd
+import numpy as np
+import math
+
+def initialize(context):
+    g.stocks = ['510300.XSHG']
+    g.alpha = 0.05
+    g.LLT = []
+    h = attribute_history('510300.XSHG', 10, '1d', 'close')
+    g.LLT.append(h['close'].values[-2])
+    g.LLT.append(h['close'].values[-1])
+
+def handle_data(context, data):
+    cash = context.portfolio.available_cash
+    a = g.alpha
+    for stock in g.stocks:
+        h = attribute_history(stock, 10, '1d', 'close')
+        LLT1 = g.LLT[-1]
+        LLT2 = g.LLT[-2]
+        LLT = (a - a ** 2 / 4) * h['close'].values[-1] + a ** 2 / 2 * h['close'].values[-2] - (a - 3 / 4 * a ** 2) * h['close'].values[-3] + 2 * (1 - a) * LLT1 - (1 - a) ** 2 * LLT2
+        g.LLT.append(LLT)
+        current_position = context.portfolio.positions[stock].total_amount
+        if g.LLT[-1] < g.LLT[-2] * 0.995 and current_position > 0:
+            order_target_value(stock, 0)
+        elif g.LLT[-1] > g.LLT[-2] * 1.005 and current_position <= 0:
+            order_target_value(stock, cash)

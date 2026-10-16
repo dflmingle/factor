@@ -1,0 +1,29 @@
+quant/2024年度精选策略1/70.致敬市场(12)——赚钱的策略.txt
+def initialize(context):
+    run_daily(iUpdate, time='10:00')
+
+def iUpdate(context):
+    index = '399310.XSHE'
+    n = 50
+    rente_ratio = 0.05
+    cash_ratio = 2 * rente_ratio
+    treasury_ratio = 0.4
+    treasury_fund = '000012.XSHG'
+    cur_data = get_current_data()
+    if context.current_dt.year > context.previous_date.year:
+        rente = int(rente_ratio * context.portfolio.total_value)
+        inout_cash(-rente)
+        if not cur_data[treasury_fund].paused:
+            treasury_size = treasury_ratio * context.portfolio.total_value
+            order_target_value(treasury_fund, treasury_size)
+    stocks = get_index_stocks(index)
+    for s in context.portfolio.positions:
+        if s not in stocks and (not cur_data[s].paused):
+            order_target(s, 0)
+    cash_size = cash_ratio * context.portfolio.total_value
+    position_size = (1.0 - cash_ratio - treasury_ratio) / n * context.portfolio.total_value
+    for s in stocks:
+        if context.portfolio.available_cash < cash_size:
+            break
+        if s not in context.portfolio.positions and (not cur_data[s].paused):
+            order_value(s, position_size)

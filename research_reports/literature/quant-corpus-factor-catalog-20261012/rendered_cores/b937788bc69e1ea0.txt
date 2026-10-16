@@ -1,0 +1,179 @@
+quant/2023年度精选策略/85.最新解密--追涨龙头打板策略-适合近期实盘行情.txt
+from jqdata import *
+from jqlib.technical_analysis import *
+import datetime as dt
+
+def initialize(context):
+    g.count = 30
+    g.buy_stock_list = []
+    g.max_number_stock = 3
+    g.stop_loss_per = 0.96
+    g.stop_win = 0.6
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='09:33', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    run_daily(stop_win, time='14:50', reference_security='000300.XSHG')
+    run_daily(stop_down_loss, time='9:40', reference_security='000300.XSHG')
+
+def stop_down_loss(context):
+    if len(context.portfolio.positions.keys()) > 0:
+        for stock in context.portfolio.positions.keys():
+            last_price_dict = get_current_data()
+            current_price = last_price_dict[stock].last_price
+            closeable_amount = context.portfolio.positions[stock].closeable_amount
+            if closeable_amount > 0:
+                df = get_price(stock, end_date=context.current_dt, frequency='daily', fields=['open'], skip_paused=True, fq='pre', count=1)
+                if df.empty:
+                    continue
+                today_open_price = df['open'][0]
+                if current_price < 0.97 * today_open_price:
+                    sell_stock(stock, 0)
+
+def print_stock_info(stock_list):
+    if stock_list is None:
+        return
+    if len(stock_list) < 0:
+        return
+    for stock in stock_list:
+        stock_name = get_security_info(stock).display_name
+
+def search_can_buy_stock(context):
+    stock_list = Get_all_security_list(context)
+    up_limted_stock_list = find_predata_up_limted(context, stock_list)
+    if up_limted_stock_list is None:
+        return None
+    stock_list = []
+    for stock in up_limted_stock_list:
+        ma_5 = MA(stock, context.previous_date, 5, '1d')
+        ma_10 = MA(stock, context.previous_date, 10, '1d')
+        ma_20 = MA(stock, context.previous_date, 20, '1d')
+        ma_60 = MA(stock, context.previous_date, 60, '1d')
+        df = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['close'], skip_paused=True, fq='pre', count=1)
+        if df.empty:
+            continue
+        pre_close_price = df['close'][0]
+        if pre_close_price > ma_5[stock] and ma_5[stock] > ma_10[stock] and (ma_10[stock] > ma_20[stock]) and (ma_20[stock] > ma_60[stock]):
+            stock_list.append(stock)
+    return stock_list
+
+def before_market_open(context):
+    g.buy_stock_list = search_can_buy_stock(context)
+
+def stop_loss(context):
+    if len(context.portfolio.positions.keys()) > 0:
+        for stock in context.portfolio.positions.keys():
+            last_price_dict = get_current_data()
+            current_price = last_price_dict[stock].last_price
+            closeable_amount = context.portfolio.positions[stock].closeable_amount
+            cost_price = context.portfolio.positions[stock].avg_cost
+            df = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['close'], skip_paused=True, fq='pre', count=1)
+            if df.empty:
+                continue
+            pre_close_price = df['close'][0]
+            if closeable_amount > 0 and current_price < g.stop_loss_per * pre_close_price or (closeable_amount > 0 and current_price < g.stop_loss_per * cost_price):
+                sell_stock(stock, 0)
+
+def buy_stock(context, stock):
+    if stock in context.portfolio.positions.keys():
+        pass
+    else:
+        buy_value = context.subportfolios[0].total_value / g.max_number_stock
+        if context.subportfolios[0].available_cash >= buy_value:
+            Order_object = order_value(stock, buy_value)
+            if Order_object is not None:
+                pass
+
+def sell_stock(stock, stock_number):
+    order_result = order_target(stock, stock_number)
+    if order_result is not None:
+        pass
+
+def market_open(context):
+    stop_loss(context)
+    if g.buy_stock_list is None:
+        return
+    if len(g.buy_stock_list) > 0:
+        code_len = len(g.buy_stock_list)
+        if code_len > g.max_number_stock:
+            g.buy_stock_list = g.buy_stock_list[0:g.max_number_stock]
+        if check_position_number(context) == False:
+            return
+        for stock in g.buy_stock_list:
+            if check_position_number(context) == False:
+                return
+            buy_stock(context, stock)
+
+def stop_win(context):
+    if len(context.portfolio.positions.keys()) > 0:
+        for stock in context.portfolio.positions.keys():
+            last_price_dict = get_current_data()
+            current_price = last_price_dict[stock].last_price
+            closeable_amount = context.portfolio.positions[stock].closeable_amount
+            cost_price = context.portfolio.positions[stock].avg_cost
+            price_change = (current_price - cost_price) / cost_price
+            df = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['close'], skip_paused=True, fq='pre', count=1)
+            if df.empty:
+                continue
+            pre_close_price = df['close'][0]
+            if closeable_amount > 0 and price_change > g.stop_win:
+                sell_stock(stock, 0)
+            elif closeable_amount > 0 and current_price < g.stop_loss_per * pre_close_price:
+                sell_stock(stock, 0)
+
+def check_position_number(context):
+    stock_number = len(context.portfolio.positions.keys())
+    if stock_number == g.max_number_stock:
+        return False
+    else:
+        return True
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'
+
+def Get_all_security_list(context):
+    security_list = []
+    stocks = list(get_all_securities(['stock']).index)
+    for stock in stocks:
+        security_obj = get_security_info(stock)
+        if str(security_obj.type) == 'stock':
+            if context.current_dt.date() < security_obj.end_date and security_obj.start_date < context.current_dt.date():
+                security_list.append(stock)
+            else:
+                pass
+    security_list = filter_st_and_paused(security_list)
+    security_list = filter_kc_ban(security_list)
+    security_list = filter_new(context, security_list, g.count)
+    security_list = industry_filter(context, security_list, g.industry_list)
+    return security_list
+
+def filter_new(context, equity, deltaday):
+    deltaDate = context.current_dt.date() - dt.timedelta(deltaday)
+    tmpList = []
+    for stock in equity:
+        if get_security_info(stock).start_date < deltaDate:
+            tmpList.append(stock)
+    return tmpList
+
+def filter_st_and_paused(stock_list):
+    current_data = get_current_data()
+    retult_list = []
+    for stock in stock_list:
+        if not current_data[stock].is_st and (not current_data[stock].paused):
+            retult_list.append(stock)
+    return retult_list
+
+def filter_kc_ban(stock_list):
+    return [stock for stock in stock_list if stock[0:3] != '688']
+
+def filter_gem_stock(stock_list):
+    return [stock for stock in stock_list if stock[0:3] != '300']
+
+def find_predata_up_limted(context, stock_list):
+    if len(stock_list) < 0:
+        return None
+    df_data = get_price(stock_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'low_limit'], skip_paused=True, fq='pre', count=1, panel=False)
+    df = df_data[df_data['high_limit'] == df_data['close']]
+    up_limit_list = df.code.values.tolist()
+    return up_limit_list
+industry_list1 = ['801010', '801020', '801030', '801040', '801050', '801080', '801110', '801130', '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', '801790', '801880', '801890']
+industry_list2 = ['801080', '801110', '801130', '801140', '801150', '801200', '801210', '801230', '801730', '801740', '801750', '801760', '801770', '801880', '801890']
+g.industry_list = list(set(industry_list1).union(set(industry_list2)))
+'EXACT_REVIEWED_FUNCTION industry_filter sha256=08b12d32e16c78780edd7c76314d8560159ed1759171c2021f5b937f6e3dee7f source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'

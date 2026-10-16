@@ -1,0 +1,200 @@
+quant/2023年度精选策略/73.MACD多周期共振，精准打击！.txt
+from jqlib.technical_analysis import *
+from jqdata import *
+import talib as tl
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import datetime
+import heapq
+
+def initialize(context):
+    set_backtest()
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(every_bar, time='every_bar', reference_security='000300.XSHG')
+    run_daily(buy_every30m, time='14:00', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def set_backtest():
+    g.t = 0
+    g.s = []
+
+def before_market_open(context):
+    g.Now_date = context.current_dt.strftime('%Y-%m-%d')
+    filterlist(context)
+    g.stocks = g.all_stocks_list
+    get_D()
+
+def get_D():
+    if len(g.stocks) != 0:
+        for i in g.stocks:
+            macd_day = get_macd(i, 200, g.Now_date, '1w')
+            value = is_second_low_gold_cross(macd_day)
+            if value:
+                g.s.append(i)
+        for l in g.s:
+            macd_day = get_macd(l, 200, g.Now_date, '1w')
+            gs_dif = macd_day[0][-2:]
+            gs_dea = macd_day[1][-2:]
+            if gs_dif[-1] > gs_dea[-1] and gs_dif[-2] < gs_dea[-2]:
+                g.s.remove(l)
+
+def c_s(context):
+    g.buys = []
+    g.buy_d = []
+    g.buy = []
+    if len(g.s) != 0:
+        for i in g.s:
+            macd_day = get_macd(i, 200, g.Now_date, '1w')
+            day_dea = macd_day[1][-1:]
+            day_macd = macd_day[2][-1:]
+            macd_30m = get_macd(i, 200, g.Now_date, '60m')
+            value = is_gold_cross(macd_30m)
+            if day_macd[-1] > day_dea[-1] and value:
+                g.buys.append(i)
+                g.buy_d.append(day_dea[-1])
+        lis = g.buy_d
+        max_number = heapq.nlargest(3, lis)
+        max_index = []
+        for t in max_number:
+            index = lis.index(t)
+            max_index.append(index)
+            lis[index] = 0
+        for b in max_index:
+            g.buy.append(g.buys[b])
+        buy_stock(context)
+
+def buy_every30m(context):
+    c_s(context)
+
+def every_bar(context):
+    open_every_bar(context)
+
+def market_sell(context):
+    init_sl = context.portfolio.positions.keys()
+    if len(init_sl) != 0:
+        for i in init_sl:
+            h = attribute_history(i, 3, '1d', ('open', 'close', 'volume'))
+            h1 = h['close'][-1]
+            h2 = h['close'][-2]
+            h3 = h['close'][-3]
+            hv1 = h['volume'][-1]
+            hv2 = h['volume'][-2]
+            ho1 = h['open'][-1]
+            ho2 = h['open'][-2]
+            ho3 = h['open'][-3]
+            if h1 < h2 or h1 < ho1 or hv1 > 1.5 * hv2:
+                order_target_value(i, 0)
+
+def buy_stock(context):
+    if g.buy and len(g.buy) != 0:
+        cash = context.portfolio.available_cash
+        N = len(g.buy)
+        for i in g.buy:
+            order_value(i, cash / N)
+            g.s.remove(i)
+
+def open_every_bar(context):
+    init_sl = context.portfolio.positions.keys()
+    if len(init_sl) != 0:
+        for i in init_sl:
+            cost = context.portfolio.positions[i].avg_cost
+            price = context.portfolio.positions[i].price
+            ret = price / cost - 1
+            if ret >= 0.1:
+                order_target(i, 0)
+
+def filterlist(context):
+    g.all_stocks_list = []
+    g.all_stocks_list = get_all_stocks()
+    g.all_stocks_list = paused_filter(g.all_stocks_list)
+    g.all_stocks_list = delisted_filter(g.all_stocks_list)
+    g.all_stocks_list = st_filter(g.all_stocks_list)
+    g.all_stocks_list = kc_filter(g.all_stocks_list)
+    current_date = context.current_dt.date()
+    g.all_stocks_list = [stock for stock in g.all_stocks_list if (current_date - get_security_info(stock).start_date).days > 60]
+
+def get_all_stocks():
+    df = get_fundamentals(query(valuation.code))
+    return list(df['code'])
+'EXACT_REVIEWED_FUNCTION paused_filter sha256=7784cc4a12643429f5721ae96b0d55a65669a26aae21a7d3fa70d8391dc6838a source=quant/2022年度精选策略/11.林奇PEG选股轮动，十年20倍，有止损模块.txt'
+'EXACT_REVIEWED_FUNCTION delisted_filter sha256=20805e736454c014718a41031ebfbcb2259dd26d95a5fcd3021b50c7b352d6fe source=quant/2022年度精选策略/11.林奇PEG选股轮动，十年20倍，有止损模块.txt'
+'EXACT_REVIEWED_FUNCTION st_filter sha256=808736be82acef4a93b42fc35e68d06db1ecb95e6b2bdaa134b8ec05278db95e source=quant/2022年度精选策略/11.林奇PEG选股轮动，十年20倍，有止损模块.txt'
+
+def kc_filter(security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if stock[0:3] != '688']
+    return security_list
+
+def after_market_close(context):
+    cash = context.portfolio.available_cash
+    init_sl = context.portfolio.positions.keys()
+    g.t += 1
+    if g.t % 10 == 0:
+        g.D_Macd = []
+'EXACT_REVIEWED_FUNCTION MACD sha256=80d10f67deced30297320f419b9d83cf71c9afb1b10bb26fbfd708b015036793 source=quant/2022年度精选策略/53.【指标研究】MACD日、周、月以及分别级别研究（包含低位二次金叉算法）.txt'
+
+def get_macd(stock, count, end_date, unit):
+    data = get_bars(security=stock, count=count, unit=unit, include_now=False, end_dt=end_date, fq_ref_date=True)
+    close = data['close']
+    open = data['open']
+    high = data['high']
+    low = data['low']
+    return MACD(close, 12, 26, 9)
+
+def is_second_low_gold_cross(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    cross_list = []
+    if macdDIFF[-2] > macdDEA[-2] and macdDIFF[-1] < macdDEA[-1] and (macd[-1] > macdDEA[-1]):
+        for i in range(4, len(macd)):
+            if macd[i - 3] < macd[i - 2] < macd[i - 1] < macd[i] and macdDIFF[i - 1] < macdDEA[i - 1] and (macdDIFF[i] > macdDEA[i]):
+                gold_cross = {'id': i, 'name': 'gold_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+                cross_list.append(gold_cross)
+            elif macd[i - 3] > macd[i - 2] > macd[i - 1] > macd[i] and macdDIFF[i - 1] > macdDEA[i - 1] and (macdDIFF[i] < macdDEA[i]):
+                death_cross = {'id': i, 'name': 'death_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+                cross_list.append(death_cross)
+        df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by='id', ascending=False)
+        index_list = []
+        if len(df.index) > 4:
+            index_list = df.index[0:4]
+        else:
+            return False
+        result1 = df.loc[index_list[0]]['name'] == 'death_cross' and df.loc[index_list[0]]['dif'] < 0
+        result2 = df.loc[index_list[1]]['name'] == 'gold_cross' and df.loc[index_list[1]]['dif'] < 0
+        result3 = df.loc[index_list[2]]['name'] == 'death_cross'
+        result4 = df.loc[index_list[0]]['dea'] > df.loc[index_list[1]]['dea']
+        if result1 and result2 and result3 and result4:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+def is_gold_cross(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    cross_list = []
+    if macdDIFF[-2] < macdDEA[-2] and macdDIFF[-1] > macdDEA[-1] and (macdDIFF[-1] < 0):
+        for i in range(4, len(macd)):
+            if macd[i - 3] < macd[i - 2] < macd[i - 1] < macd[i] and macdDIFF[i - 1] < macdDEA[i - 1] and (macdDIFF[i] > macdDEA[i]):
+                gold_cross = {'id': i, 'name': 'gold_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+                cross_list.append(gold_cross)
+            elif macd[i - 3] > macd[i - 2] > macd[i - 1] > macd[i] and macdDIFF[i - 1] > macdDEA[i - 1] and (macdDIFF[i] < macdDEA[i]):
+                death_cross = {'id': i, 'name': 'death_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+                cross_list.append(death_cross)
+        df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by='id', ascending=False)
+        index_list = []
+        if len(df.index) > 4:
+            index_list = df.index[0:4]
+        else:
+            return False
+        result1 = df.loc[index_list[0]]['name'] == 'gold_cross' and df.loc[index_list[0]]['dif'] < 0
+        result2 = df.loc[index_list[1]]['name'] == 'death_cross' and df.loc[index_list[1]]['dif'] < 0
+        result3 = df.loc[index_list[2]]['name'] == 'gold_cross' and df.loc[index_list[2]]['dif'] < 0
+        result4 = df.loc[index_list[3]]['name'] == 'death_cross' and df.loc[index_list[3]]['dif'] > 0
+        result5 = df.loc[index_list[0]]['dea'] > df.loc[index_list[2]]['dea']
+        if result1 and result2 and result3 and result4 and result5:
+            return True
+        else:
+            return False
+    else:
+        return False

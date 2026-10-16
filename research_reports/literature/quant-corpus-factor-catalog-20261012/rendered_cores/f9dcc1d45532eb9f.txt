@@ -1,0 +1,74 @@
+quant/2024年度精选策略2/40.RSI学习贴.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+import datetime
+import statsmodels.api as sm
+import talib
+
+def initialize(context):
+    set_param()
+    run_daily(stock_order, time='9:30')
+
+def stock_order(context):
+    get_RSRS_signal(context)
+    orderStock(context)
+
+def get_RSRS_signal(context):
+    rsi_code = []
+    buys = []
+    sells = []
+    buy_flag = 0
+    pool = g.pool
+    for stockcode in pool:
+        prices = attribute_history(stockcode, 61, '1d', 'close')
+        try:
+            rsi = talib.RSI(prices['close'].values, timeperiod=6)[-1]
+            rsi = int(rsi)
+        except:
+            ris = 100
+        if 15 < rsi < 25:
+            rsi_code.append((rsi, stockcode))
+            buy_flag = 1
+        elif rsi > 85 or rsi < 10:
+            sells.append(stockcode)
+    if buy_flag == 1:
+        rsi_code.sort(key=lambda x: x[0])
+        buys = np.array(rsi_code)
+        g.buy = list(buys[:, 1])
+    else:
+        g.buy = []
+    g.sell = sells
+
+def orderStock(context):
+    buys = g.buy
+    sells = g.sell
+    curr_data_b = get_current_data(buys)
+    curr_data_s = get_current_data(sells)
+    all_value = context.portfolio.total_value
+    for sell_code in context.portfolio.long_positions.keys():
+        if sell_code in sells:
+            if curr_data_s[sell_code].last_price >= curr_data_s[sell_code].high_limit:
+                continue
+            elif context.portfolio.positions[sell_code].closeable_amount > 0:
+                order_target_value(sell_code, 0)
+        if sell_code not in g.pool:
+            order_target_value(sell_code, 0)
+    for buy_code in buys:
+        if buy_code not in context.portfolio.long_positions.keys():
+            cash_value = context.portfolio.available_cash
+            if g.stock_num - len(context.portfolio.positions) > 0:
+                if curr_data_b[buy_code].last_price <= curr_data_b[buy_code].low_limit:
+                    continue
+                else:
+                    buy_value = cash_value / (g.stock_num - len(context.portfolio.positions))
+                    order_target_value(buy_code, buy_value)
+
+def set_param():
+    g.buy = []
+    g.sell = []
+    g.pool = ['603799.XSHG', '300750.XSHE', '601633.XSHG', '603659.XSHG', '002594.XSHE', '603259.XSHG', '601012.XSHG', '000661.XSHE', '600763.XSHG', '300359.XSHE', '300347.XSHE', '300014.XSHE', '300661.XSHE', '300073.XSHE', '002050.XSHE', '002714.XSHE', '601888.XSHG', '002407.XSHE', '002456.XSHE', '300782.XSHE', '000333.XSHE', '002088.XSHE', '600660.XSHG', '002597.XSHE', '002821.XSHE', '600276.XSHG', '600196.XSHG', '002371.XSHE', '300595.XSHE', '300750.XSHE', '600309.XSHG', '002352.XSHE', '300357.XSHE', '300009.XSHE', '300702.XSHE', '002595.XSHE', '300036.XSHE', '300037.XSHE', '601058.XSHG', '601677.XSHG', '601222.XSHG', '002286.XSHE']
+    g.stock_num = 9
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('max_colwidth', 100)

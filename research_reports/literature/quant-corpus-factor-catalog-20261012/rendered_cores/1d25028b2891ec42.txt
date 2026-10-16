@@ -1,0 +1,343 @@
+quant/2023年度精选策略/83.韶华研究之一，布林突破+均线金叉，四年五倍.txt
+from jqdata import *
+from six import BytesIO
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.buylist = []
+    g.selllist = []
+    run_daily(before_market_open, time='before_open')
+    run_daily(market_open, time='open')
+    run_daily(market_close, time='14:55')
+    run_daily(after_market_close, time='20:00')
+    run_daily(after_close_eye, time='21:00')
+    run_daily(after_close_brain, time='22:00')
+
+def before_market_open(context):
+    today_date = context.current_dt.date()
+    lastd_date = get_trade_days(end_date=today_date, count=2)[0]
+    g.buylist = []
+    g.selllist = []
+    df_list = pd.read_csv(BytesIO(read_file('bug_brain.csv')))
+    df_list['date'] = pd.to_datetime(df_list['date']).dt.date
+    df_list = df_list[df_list['date'] == lastd_date]
+    for i in range(len(df_list)):
+        stockcode = df_list.iloc[i, 2]
+        if df_list.iloc[i, 1] == 'buy':
+            if stockcode not in g.buylist:
+                g.buylist.append(stockcode)
+        elif df_list.iloc[i, 1] == 'sell':
+            if stockcode not in g.selllist:
+                g.selllist.append(stockcode)
+
+def market_open(context):
+    current_data = get_current_data()
+    today_date = context.current_dt.date()
+    for key in g.selllist:
+        cost = context.portfolio.positions[key].avg_cost
+        price = context.portfolio.positions[key].price
+        value = context.portfolio.positions[key].value
+        intime = context.portfolio.positions[key].init_time
+        ret = price / cost - 1
+        duration = len(get_trade_days(intime, today_date))
+        if current_data[key].paused != True:
+            if order_target(key, 0) != None:
+                write_file('bug_log.csv', str('%s,开盘清仓,%s,周期:%s,盈利:%s\n' % (context.current_dt.time(), key, duration, ret)), append=True)
+    if context.portfolio.available_cash < 10000:
+        return
+    buy_num = len(g.buylist)
+    all_cash = context.portfolio.available_cash
+    if buy_num == 0:
+        return
+    elif buy_num == 1:
+        cash_perstk = all_cash
+    else:
+        cash_perstk = all_cash / 2
+    for key in g.buylist:
+        if context.portfolio.available_cash < 10000:
+            return
+        if current_data[key].paused != True:
+            if order_target_value(key, cash_perstk) != None:
+                write_file('bug_log.csv', str('%s,开场买入,%s\n' % (context.current_dt.time(), key)), append=True)
+    for key in g.buylist:
+        if key in context.portfolio.positions:
+            g.buylist.remove(key)
+
+def market_close(context):
+    today_date = context.current_dt.date()
+    today_time = context.current_dt.time()
+    lastd_date = get_trade_days(end_date=today_date, count=2)[0]
+    current_data = get_current_data()
+    buy_num = len(g.buylist)
+    for key in context.portfolio.positions:
+        cost = context.portfolio.positions[key].avg_cost
+        price = context.portfolio.positions[key].price
+        value = context.portfolio.positions[key].value
+        intime = context.portfolio.positions[key].init_time
+        ret = price / cost - 1
+        duration = len(get_trade_days(intime, today_date))
+        rise_ratio = ret / duration
+        if key[0:3] == '688' or key[0:3] == '300':
+            if today_date >= datetime.date(2020, 9, 1):
+                rise_ratio = rise_ratio / 2
+        if ret < -0.1:
+            if order_target(key, 0) != None:
+                write_file('bug_log.csv', str('%s,收盘止损卖出,%s,周期:%s,盈利:%s\n' % (today_time, key, duration, ret)), append=True)
+                continue
+        elif ret > 0.5:
+            if order_target(key, 0) != None:
+                write_file('bug_log.csv', str('%s,收盘超盈卖出,%s,周期:%s,盈利:%s\n' % (today_time, key, duration, ret)), append=True)
+                continue
+        if duration > 3 and ret < -0.05:
+            if order_target(key, 0) != None:
+                write_file('bug_log.csv', str('%s,收盘长损卖出,%s,周期:%s,盈利:%s\n' % (today_time, key, duration, ret)), append=True)
+                continue
+        if rise_ratio < 0.015:
+            if buy_num == 0:
+                continue
+            else:
+                if duration < 6 and ret > -0.01:
+                    continue
+                if order_target(key, 0) != None:
+                    write_file('bug_log.csv', str('%s,收盘后慢处理,%s,周期:%s,盈利:%s\n' % (today_time, key, duration, ret)), append=True)
+                    continue
+    if context.portfolio.available_cash < 10000:
+        return
+    for key in g.buylist:
+        if key in context.portfolio.positions or current_data[key].paused == True:
+            continue
+        all_cash = context.portfolio.available_cash
+        if buy_num == 1:
+            if current_data[key].paused != True:
+                if order_target_value(key, all_cash) != None:
+                    write_file('bug_log.csv', str('%s,收盘买入,%s\n' % (context.current_dt.time(), key)), append=True)
+        elif all_cash > 50000:
+            if current_data[key].paused != True:
+                if order_target_value(key, 50000) != None:
+                    write_file('bug_log.csv', str('%s,收盘买入,%s\n' % (context.current_dt.time(), key)), append=True)
+        elif current_data[key].paused != True:
+            if order_target_value(key, all_cash) != None:
+                write_file('bug_log.csv', str('%s,收盘买入,%s\n' % (context.current_dt.time(), key)), append=True)
+        if context.portfolio.available_cash < 10000:
+            return
+
+def after_market_close(context):
+    today_date = context.current_dt.date()
+    for stk in context.portfolio.positions:
+        cost = context.portfolio.positions[stk].avg_cost
+        price = context.portfolio.positions[stk].price
+        value = context.portfolio.positions[stk].value
+        intime = context.portfolio.positions[stk].init_time
+        ret = price / cost - 1
+        duration = len(get_trade_days(intime, today_date))
+        write_file('bug_log.csv', str('股票:%s,共有:%s,入时:%s,成本:%s,现价:%s,收益:%s\n' % (stk, value, intime, cost, price, ret)), append=True)
+    write_file('bug_log.csv', str('%s,总资产:%s,持仓:%s\n' % (context.current_dt.date(), context.portfolio.total_value, context.portfolio.positions_value)), append=True)
+
+def after_close_eye(context):
+    today_date = context.current_dt.date()
+    back_date = get_trade_days(end_date=today_date, count=10)[0]
+    rep_back_date = get_trade_days(end_date=today_date, count=60)[0]
+    all_data = get_current_data()
+    stockcode_list = list(get_all_securities(['stock']).index)
+    stockcode_list = [stockcode for stockcode in stockcode_list if not all_data[stockcode].paused]
+    stockcode_list = [stockcode for stockcode in stockcode_list if not all_data[stockcode].is_st]
+    stockcode_list = [stockcode for stockcode in stockcode_list if '退' not in all_data[stockcode].name]
+    s1_num = len(stockcode_list)
+    df_waiting = pd.read_csv(BytesIO(read_file('bug_eye.csv')))
+    df_waiting['date'] = pd.to_datetime(df_waiting['date']).dt.date
+    df_waiting = df_waiting[(df_waiting['date'] <= today_date) & (df_waiting['date'] >= back_date)]
+    wait_list = df_waiting['code'].values.tolist()
+    s2_num = 0
+    s3_num = 0
+    s4_num = 0
+    for stockcode in stockcode_list:
+        if stockcode in context.portfolio.positions:
+            continue
+        if (today_date - get_security_info(stockcode).start_date).days <= 600:
+            continue
+        s2_num = s2_num + 1
+        if stockcode in wait_list:
+            continue
+        upperband, middleband, lowerband = Bollinger_Bands(stockcode, check_date=today_date, timeperiod=60, nbdevup=2, nbdevdn=2)
+        if (upperband[stockcode] - lowerband[stockcode]) / middleband[stockcode] > 0.1:
+            continue
+        if all_data[stockcode].last_price < upperband[stockcode]:
+            continue
+        s3_num = s3_num + 1
+        Trix_signal, MACD_signal, EMV_signal, KD_signal = Technical_signal(stockcode, today_date)
+        if Trix_signal == 1 or MACD_signal == 1:
+            s4_num = s4_num + 1
+            df_value = get_valuation(stockcode, end_date=today_date, count=1, fields=['circulating_market_cap', 'pe_ratio', 'pb_ratio'])
+            q_f10 = query(finance.STK_SHAREHOLDER_FLOATING_TOP10).filter(finance.STK_SHAREHOLDER_FLOATING_TOP10.code == stockcode, finance.STK_SHAREHOLDER_FLOATING_TOP10.pub_date > rep_back_date).limit(10)
+            df_f10 = finance.run_query(q_f10)
+            sum_f10 = df_f10['share_ratio'].sum()
+            CYF_code = CYF(stockcode, check_date=today_date, N=10, unit='1d', include_now=True)
+            write_file('bug_eye.csv', str('%s,%s,%s,%s,%s,%s,%s\n' % (today_date, stockcode, df_value.iloc[0, 2], df_value.iloc[0, 3], df_value.iloc[0, 4], CYF_code[stockcode], sum_f10)), append=True)
+
+def after_close_brain(context):
+    today_date = context.current_dt.date()
+    all_data = get_current_data()
+    benchcode_titan = '000300.XSHG'
+    benchcode_bug = '000852.XSHG'
+    g.buylist = []
+    g.selllist = []
+    df_waiting = pd.read_csv(BytesIO(read_file('bug_eye.csv')))
+    df_waiting['date'] = pd.to_datetime(df_waiting['date']).dt.date
+    df_waiting = df_waiting[df_waiting['date'] == today_date]
+    df_waiting = df_waiting.sort_values(['cir_m'], ascending=True)
+    df_titan_price = get_price(benchcode_titan, count=30, end_date=today_date, frequency='daily', fields=['close'])
+    df_bug_price = get_price(benchcode_bug, count=30, end_date=today_date, frequency='daily', fields=['close'])
+    rise_titan = (df_titan_price['close'].values[-1] - df_titan_price['close'].values[0]) / df_titan_price['close'].values[0]
+    rise_bug = (df_bug_price['close'].values[-1] - df_bug_price['close'].values[0]) / df_bug_price['close'].values[0]
+    rise_gap = rise_bug - rise_titan
+    rise_titan_last = (df_titan_price['close'].values[-1] - df_titan_price['close'].values[-2]) / df_titan_price['close'].values[-2]
+    rise_bug_last = (df_bug_price['close'].values[-1] - df_bug_price['close'].values[-2]) / df_bug_price['close'].values[-2]
+    rise_gap_last = rise_bug_last - rise_titan_last
+    for i in range(len(df_waiting)):
+        stockcode = df_waiting.iloc[i, 1]
+        cir_m = df_waiting.iloc[i, 2]
+        last_price = all_data[stockcode].last_price
+        pe_ratio = df_waiting.iloc[i, 3]
+        cyf = df_waiting.iloc[i, 5]
+        f10 = df_waiting.iloc[i, 6]
+        if stockcode in context.portfolio.positions:
+            continue
+        if pe_ratio > 200 or cyf > 66 or last_price < 3:
+            continue
+        if rise_bug < -0.05:
+            if rise_bug_last > 0:
+                if cir_m > 56 and pe_ratio > 20 and (cyf > 20):
+                    g.buylist.append(stockcode)
+                    write_file('bug_brain.csv', str('%s,buy,%s\n' % (today_date, stockcode)), append=True)
+                    write_file('bug_log.csv', str('%s,买入信号,%s,%s,%s,%s,%s\n' % (today_date, stockcode, cir_m, pe_ratio, cyf, f10)), append=True)
+                    continue
+            else:
+                continue
+        elif rise_bug <= 0:
+            if cir_m < 160 and cyf > 24 and (f10 > 45):
+                if pe_ratio > 0 and pe_ratio < 22:
+                    g.buylist.append(stockcode)
+                    write_file('bug_brain.csv', str('%s,buy,%s\n' % (today_date, stockcode)), append=True)
+                    write_file('bug_log.csv', str('%s,买入信号,%s,%s,%s,%s,%s\n' % (today_date, stockcode, cir_m, pe_ratio, cyf, f10)), append=True)
+                    continue
+            else:
+                continue
+        elif rise_bug <= 0.07:
+            if rise_gap > -0.01:
+                if cyf > 31 and f10 > 22:
+                    if pe_ratio > 0 and pe_ratio < 44:
+                        g.buylist.append(stockcode)
+                        write_file('bug_brain.csv', str('%s,buy,%s\n' % (today_date, stockcode)), append=True)
+                        write_file('bug_log.csv', str('%s,买入信号,%s,%s,%s,%s,%s\n' % (today_date, stockcode, cir_m, pe_ratio, cyf, f10)), append=True)
+                        continue
+            else:
+                continue
+        elif cir_m < 170 and last_price > 9 and (cyf > 24):
+            g.buylist.append(stockcode)
+            write_file('bug_brain.csv', str('%s,buy,%s\n' % (today_date, stockcode)), append=True)
+            write_file('bug_log.csv', str('%s,买入信号,%s,%s,%s,%s,%s\n' % (today_date, stockcode, cir_m, pe_ratio, cyf, f10)), append=True)
+            continue
+    buy_num = len(g.buylist)
+    for stockcode in context.portfolio.positions:
+        cost = context.portfolio.positions[stockcode].avg_cost
+        price = context.portfolio.positions[stockcode].price
+        value = context.portfolio.positions[stockcode].value
+        intime = context.portfolio.positions[stockcode].init_time
+        ret = price / cost - 1
+        duration = len(get_trade_days(intime, today_date))
+        rise_ratio = ret / duration
+        if (stockcode[0:3] == '688' or stockcode[0:3] == '300') and today_date >= datetime.date(2020, 9, 1):
+            rise_ratio = rise_ratio / 2
+        if ret < -0.1:
+            write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+            write_file('bug_log.csv', str('%s,止损信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+            continue
+        elif ret > 0.5:
+            write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+            write_file('bug_log.csv', str('%s,超盈信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+            continue
+        if duration > 3:
+            if ret < -0.05:
+                write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+                write_file('bug_log.csv', str('%s,长损信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+                continue
+            elif ret < -0.03:
+                Trix_signal, MACD_signal, EMV_signal, KD_signal = Technical_signal(stockcode, today_date)
+                if buy_num == 0:
+                    continue
+                if Trix_signal == -1 or MACD_signal == -1:
+                    write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+                    write_file('bug_log.csv', str('%s,死叉信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+                    continue
+            else:
+                df_price = get_price(stockcode, count=10, end_date=today_date, frequency='daily', fields=['close'])
+                close_max = df_price['close'].max()
+                last_price = df_price['close'].values[-1]
+                if last_price / close_max < 0.9:
+                    if buy_num == 0 and ret < 0.2:
+                        continue
+                    write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+                    write_file('bug_log.csv', str('%s,跟损信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+                    continue
+                df_value = get_valuation(stockcode, count=10, end_date=today_date, fields=['turnover_ratio'])
+                turnover_mean = df_value['turnover_ratio'].mean()
+                turnover_last = df_value['turnover_ratio'].values[0]
+                if turnover_last > 3 and turnover_last > 2.5 * turnover_mean:
+                    if ret < 0.05:
+                        continue
+                    write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+                    write_file('bug_log.csv', str('%s,高换信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+                    continue
+        if rise_ratio < 0.015:
+            if buy_num == 0:
+                continue
+            else:
+                if duration < 2 and ret > -0.04:
+                    continue
+                if duration < 3 and ret > -0.02:
+                    continue
+                if duration < 6 and ret > -0.01:
+                    continue
+                write_file('bug_brain.csv', str('%s,sell,%s\n' % (today_date, stockcode)), append=True)
+                write_file('bug_log.csv', str('%s,后慢信号,%s,周期:%s,盈利:%s\n' % (today_date, stockcode, duration, ret)), append=True)
+
+def Technical_signal(stockcode, today_date):
+    oneday = datetime.timedelta(days=1)
+    yeday_date = today_date - oneday
+    Trix_signal = 0
+    MACD_signal = 0
+    EMV_signal = 0
+    KD_signal = 0
+    TRIX_t, MATRIX_t = TRIX(stockcode, check_date=today_date, N=12, M=9)
+    TRIX_y, MATRIX_y = TRIX(stockcode, check_date=yeday_date, N=12, M=9)
+    TrixDelta_t = MATRIX_t[stockcode] - TRIX_t[stockcode]
+    TrixDelta_y = MATRIX_y[stockcode] - TRIX_y[stockcode]
+    if TRIX_t[stockcode] <= MATRIX_t[stockcode] and TrixDelta_t < TrixDelta_y and (TrixDelta_t <= -0.03):
+        Trix_signal = 1
+    elif TRIX_t[stockcode] >= MATRIX_t[stockcode] and TRIX_y[stockcode] <= MATRIX_y[stockcode]:
+        Trix_signal = 1
+    elif TRIX_t[stockcode] <= MATRIX_t[stockcode] and TRIX_y[stockcode] >= MATRIX_y[stockcode]:
+        Trix_signal = -1
+    DIF_t, DEA_t, MACD_t = MACD(stockcode, check_date=today_date, SHORT=12, LONG=26, MID=9)
+    DIF_y, DEA_y, MACD_y = MACD(stockcode, check_date=yeday_date, SHORT=12, LONG=26, MID=9)
+    MacdDelta_t = DEA_t[stockcode] - DIF_t[stockcode]
+    MacdDelta_y = DEA_y[stockcode] - DIF_y[stockcode]
+    if DIF_t[stockcode] <= DEA_t[stockcode] and MacdDelta_t < MacdDelta_y and (MacdDelta_t <= 0.05):
+        MACD_signal = 1
+    elif DIF_t[stockcode] >= DEA_t[stockcode] and DIF_y[stockcode] <= DEA_y[stockcode]:
+        MACD_signal = 1
+    elif DIF_t[stockcode] <= DEA_t[stockcode] and DIF_y[stockcode] >= DEA_y[stockcode]:
+        MACD_signal = -1
+    EMV_t, MAEMV_t = EMV(stockcode, check_date=today_date, N=14, M=9)
+    EMV_y, MAEMV_y = EMV(stockcode, check_date=yeday_date, N=14, M=9)
+    if EMV_t[stockcode] >= MAEMV_t[stockcode] and EMV_y[stockcode] <= MAEMV_y[stockcode]:
+        EMV_signal = 1
+    elif EMV_t[stockcode] <= MAEMV_t[stockcode] and EMV_y[stockcode] >= MAEMV_y[stockcode]:
+        EMV_signal = -1
+    K_t, D_t = KD(stockcode, check_date=today_date, N=9, M1=3, M2=3)
+    K_y, D_y = KD(stockcode, check_date=yeday_date, N=9, M1=3, M2=3)
+    if K_t[stockcode] >= D_t[stockcode] and K_y[stockcode] <= D_y[stockcode]:
+        KD_signal = 1
+    elif K_t[stockcode] <= D_t[stockcode] and K_y[stockcode] >= D_y[stockcode]:
+        KD_signal = -1
+    return (Trix_signal, MACD_signal, EMV_signal, KD_signal)

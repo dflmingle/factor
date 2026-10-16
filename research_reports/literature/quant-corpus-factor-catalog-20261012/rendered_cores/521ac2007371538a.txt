@@ -1,0 +1,21 @@
+quant/2021年度精选策略/19.简单到发指的股指策略(2013到现在收益10949%).txt
+from jqdata import *
+
+def initialize(context):
+    g.code = 'IF'
+    g.benchmark = '000300.XSHG'
+    run_daily(buy, time='14:55', reference_security='IF8888.CCFX')
+    run_daily(empty, time='10:00', reference_security='IF8888.CCFX')
+
+def buy(context):
+    code = get_dominant_future(g.code)
+    cash = context.portfolio.available_cash / 2
+    order_target_value(code, cash, side='long')
+
+def empty(context):
+    for code in context.portfolio.long_positions:
+        p = context.portfolio.long_positions[code]
+        lots = p.total_amount
+        value = p.price * lots
+        returns = context.portfolio.returns * 100
+        order_target(code, 0, side='long')

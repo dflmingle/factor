@@ -1,0 +1,237 @@
+quant/2022年度精选策略/37.Barra模型初探，A股市场风格解析.txt
+import time
+from datetime import datetime, timedelta
+from jqdata import *
+import numpy as np
+import pandas as pd
+import math
+from statsmodels import regression
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import datetime
+from scipy import stats
+from jqfactor import *
+from scipy.optimize import minimize
+import warnings
+warnings.filterwarnings('ignore')
+plt.style.use('ggplot')
+
+def get_tradeday_list(start, end, frequency=None, count=None):
+    if count != None:
+        df = get_price('000001.XSHG', end_date=end, count=count)
+    else:
+        df = get_price('000001.XSHG', start_date=start, end_date=end)
+    if frequency == None or frequency == 'day':
+        return df.index
+    else:
+        df['year-month'] = [str(i)[0:7] for i in df.index]
+        if frequency == 'month':
+            return df.drop_duplicates('year-month').index
+        elif frequency == 'quarter':
+            df['month'] = [str(i)[5:7] for i in df.index]
+            df = df[(df['month'] == '01') | (df['month'] == '04') | (df['month'] == '07') | (df['month'] == '10')]
+            return df.drop_duplicates('year-month').index
+        elif frequency == 'halfyear':
+            df['month'] = [str(i)[5:7] for i in df.index]
+            df = df[(df['month'] == '01') | (df['month'] == '06')]
+            return df.drop_duplicates('year-month').index
+
+def ShiftTradingDay(date, shift):
+    tradingday = get_all_trade_days()
+    date = datetime.date(int(str(date)[:4]), int(str(date)[5:7]), int(str(date)[8:10]))
+    shiftday_index = list(tradingday).index(date) + shift
+    return tradingday[shiftday_index]
+
+def filter_stock(stockList, date, days=21 * 3, limit=0):
+
+    def delect_stop(stocks, beginDate, n=days):
+        stockList = []
+        beginDate = datetime.datetime.strptime(beginDate, '%Y-%m-%d')
+        for stock in stocks:
+            start_date = get_security_info(stock).start_date
+            if start_date < (beginDate - datetime.timedelta(days=n)).date():
+                stockList.append(stock)
+        return stockList
+    st_data = get_extras('is_st', stockList, count=1, end_date=date)
+    stockList = [stock for stock in stockList if not st_data[stock][0]]
+    stockList = delect_stop(stockList, date)
+    if limit == 1:
+        df = get_price(stockList, end_date=date, fields=['open', 'high_limit', 'low_limit'], count=1).iloc[:, 0, :]
+        df['h_limit'] = df['open'] == df['high_limit']
+        df['l_limit'] = df['open'] == df['low_limit']
+        stockList = [df.index[i] for i in range(len(df)) if not (df.h_limit[i] or df.l_limit[i])]
+    return stockList
+
+def get_industry_exposure(stock_list, date):
+    df = pd.DataFrame(index=get_industries(name='sw_l1').index, columns=stock_list)
+    for stock in stock_list:
+        try:
+            df[stock][get_industry_code_from_security(stock, date=date)] = 1
+        except:
+            continue
+    return df.fillna(0)
+
+def get_industry_code_from_security(security, date=None):
+    industry_index = get_industries(name='sw_l1').index
+    for i in range(0, len(industry_index)):
+        try:
+            index = get_industry_stocks(industry_index[i], date=date).index(security)
+            return industry_index[i]
+        except:
+            continue
+    return u'未找到'
+index = '000905.XSHG'
+date_start = '2016-06-01'
+date_end = '2019-06-04'
+trade_freq = 'month'
+if trade_freq == 'month':
+    date_list = get_tradeday_list(start=date_start, end=date_end, frequency='month', count=None)
+elif trade_freq == 'day':
+    date_list = get_tradeday_list(start=date_start, end=date_end, count=None)
+else:
+    date_day_list = get_tradeday_list(start=date_start, end=date_end, count=None)
+    date_list = [date_day_list[i] for i in range(len(date_day_list)) if i % int(trade_freq) == 0]
+date_list
+
+def get_barra_factor(stock_list, date):
+    factor_name = ['size', 'beta', 'momentum', 'residual_volatility', 'non_linear_size', 'book_to_price_ratio', 'liquidity', 'earnings_yield', 'growth', 'leverage']
+    factor_data = get_factor_values(securities=stock_list, factors=factor_name, end_date=end_date, count=1)
+    df = pd.DataFrame()
+    for f in factor_name:
+        temp_df = pd.DataFrame(factor_data[f]).T
+        df = pd.concat([df, temp_df], axis=1)
+    df.columns = factor_name
+    return df
+factor_data_dict = {}
+for end_date in date_list[:]:
+    end_date = str(end_date)[:10]
+    stocks_list = get_index_stocks(index, date=end_date)
+    factor_data_dict[end_date] = get_barra_factor(stocks_list, end_date)
+factor_data_dict[end_date].head(3)
+import time
+t1 = time.time()
+factor_data_y_dict = {}
+for date_1, date_2 in zip(date_list[:-1], date_list[1:]):
+    d1 = ShiftTradingDay(date_1, 1)
+    d2 = ShiftTradingDay(date_2, 1)
+    factor_df = factor_data_dict[str(date_1)[:10]]
+    pool = list(factor_df.index)
+    pool = filter_stock(pool, str(d1)[:10], days=21 * 3)
+    df_1 = get_price(index, end_date=d1, fields=['open'], count=1)['open']
+    df_2 = get_price(index, end_date=d2, fields=['open'], count=1)['open']
+    index_pct = df_2.values[0] / df_1.values[0] - 1
+    df_1 = get_price(pool, end_date=d1, fields=['open'], count=1)['open']
+    df_2 = get_price(pool, end_date=d2, fields=['open'], count=1)['open']
+    df_3 = pd.concat([df_1, df_2], axis=0).T
+    stock_pct = df_3.iloc[:, 1] / df_3.iloc[:, 0] - 1
+    factor_df = winsorize_med(factor_df, scale=3, inclusive=True, inf2nan=True, axis=0)
+    factor_df = standardlize(factor_df, inf2nan=True, axis=0)
+    factor_df['pct_alpha'] = stock_pct - index_pct
+    factor_df['pct_'] = stock_pct
+    factor_data_y_dict[str(date_1)[:10]] = factor_df
+t2 = time.time()
+df = factor_data_y_dict['2019-05-06']
+df.head(3)
+pool = df.index
+get_size = get_fundamentals(query(valuation.code, valuation.market_cap).filter(valuation.code.in_(pool)), date='2019-05-06')
+get_size.index = get_size['code'].values
+get_size['l_size'] = np.sqrt(get_size['market_cap'])
+get_size['w'] = get_size['l_size'] / sum(get_size['l_size'])
+W = get_size['w'].values.reshape(len(get_size), 1)
+get_size.head(3)
+hy_df = get_industry_exposure(pool, date='2019-05-06').T
+hy_df['c'] = [1] * len(hy_df)
+df_c1 = pd.concat([hy_df, get_size], axis=1)
+ind_name = get_industries(name='sw_l1').index
+all_mkt = sum(df_c1['market_cap'].values)
+ind_w = []
+for ind in ind_name:
+    df_temp = df_c1[df_c1[ind] == 1]
+    r_temp = sum(df_temp['market_cap'].values) / all_mkt
+    ind_w.append(r_temp)
+factor_f_df = pd.DataFrame()
+for d in date_list[:-1]:
+    d = str(d)[:10]
+    factor_df = factor_data_y_dict[d]
+    x = factor_df.iloc[:, :-2]
+    r = factor_df['pct_'].values
+    pool = factor_df.index
+    get_size = get_fundamentals(query(valuation.code, valuation.market_cap).filter(valuation.code.in_(pool)), date=d)
+    get_size.index = get_size['code'].values
+    get_size['l_size'] = np.sqrt(get_size['market_cap'])
+    get_size['w'] = get_size['l_size'] / sum(get_size['l_size'])
+    W = get_size['w'].values.reshape(len(get_size), 1)
+    hy_df = get_industry_exposure(pool, date=d).T
+    hy_df['c'] = [1] * len(hy_df)
+    df_c1 = pd.concat([hy_df, get_size], axis=1)
+    ind_name = get_industries(name='sw_l1').index
+    all_mkt = sum(df_c1['market_cap'].values)
+    ind_w = []
+    for ind in ind_name:
+        df_temp = df_c1[df_c1[ind] == 1]
+        r_temp = sum(df_temp['market_cap'].values) / all_mkt
+        ind_w.append(r_temp)
+    X_ = pd.concat([x, hy_df], axis=1)
+    X = matrix(X_.values)
+    w_m = get_size['market_cap'].values
+    w_i = ind_w
+
+    def func(f):
+        sum_l = []
+        for i in range(len(r)):
+            if str(r[i]) != 'nan':
+                sum_l.append(w_m[i] * (r[i] - np.dot(X[i], f)) ** 2)
+        return sum(sum_l)
+
+    def func_cons(x):
+        return sum(multiply(x[-35:-1], w_i))
+    f0 = np.ones(45) / 10 ** 4
+    bnds = tuple(((-1, 1) for x in f0))
+    cons = {'type': 'eq', 'fun': func_cons}
+    options = {'disp': False, 'maxiter': 1000, 'ftol': 0.0001, 'eps': 0.0001}
+    res = minimize(func, f0, bounds=bnds, constraints=cons, method='SLSQP', options=options)
+    factor_f_df[d] = res['x']
+factor_f_df.head(3)
+factor_f_df.head(3)
+(factor_f_df.iloc[:, :10] + 1).cumprod().plot(figsize=(20, 8))
+((factor_f_df.iloc[:, :10] + 1).cumprod() - 1).iloc[-1, :].plot(kind='bar', figsize=(20, 8))
+((factor_f_df.iloc[:, 10:] + 1).cumprod() - 1).iloc[-1, :].plot(kind='bar', figsize=(20, 8))
+factor_data_50_dict = {}
+factor_name = ['size', 'beta', 'momentum', 'residual_volatility', 'non_linear_size', 'book_to_price_ratio', 'liquidity', 'earnings_yield', 'growth', 'leverage']
+for end_date in date_list[:-1]:
+    end_date = str(end_date)[:10]
+    stocks_list = get_index_stocks(index, date=end_date)
+    pool_ = [stocks_list[i] for i in range(len(stocks_list)) if i % 10 == 0]
+    stocks_list = pool_
+    hy_df = get_industry_exposure(pool_, date=end_date).T
+    hy_df['c'] = [1] * len(hy_df)
+    x = factor_data_y_dict[end_date].loc[pool_, factor_name]
+    df_pct = factor_data_y_dict[end_date].loc[pool_, ['pct_']]
+    X_ = pd.concat([x, hy_df, df_pct], axis=1)
+    factor_data_50_dict[end_date] = X_
+factor_data_50_dict[end_date].head(3)
+factor_f_df = factor_f_df.T
+mark = 1
+for d in date_list[:20]:
+    end_date = str(d)[:10]
+    d1 = factor_data_50_dict[end_date]
+    d2 = factor_f_df[end_date]
+    y_df = pd.DataFrame()
+    y_df['pct_'] = d1['pct_']
+    y_df['p_pct_'] = np.dot(d1.iloc[:, :-1], d2)
+    if mark == 1:
+        y_df_ = y_df
+        mark = 0
+    else:
+        y_df_ = pd.concat([y_df_, y_df], axis=0)
+y_df_.head(3)
+y_df_.plot(x='pct_', y='p_pct_', kind='scatter', figsize=(12, 8))
+end_date = '2019-05-06'
+d3 = factor_data_y_dict[end_date]
+d1 = factor_data_50_dict[end_date].dropna(axis=0)
+d_mean = d1.mean(axis=0)[:10]
+d4 = pd.concat([d3.iloc[:, :10].T, d_mean], axis=1)
+d4['mid'] = [0.5] * len(d4)
+(d4.rank(axis=1)[0] / 500).plot(kind='bar', figsize=(12, 6))
+d4['mid'].plot()
+y_df.plot(figsize=(12, 8))

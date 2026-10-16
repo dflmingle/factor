@@ -1,0 +1,191 @@
+quant/2021年度精选策略/83.识别趋势震荡之神器 MESA最大熵谱分析（一）：滤波器建立.txt
+from jqdatasdk import *
+auth('user_name', 'password')
+import matplotlib.pyplot as plt
+import numpy as np
+import tushare as ts
+import seaborn as sns
+import pandas as pd
+import statsmodels.tsa.api as smt
+from statsmodels.tsa.ar_model import AutoReg, ar_select_order
+import statsmodels.api as sm
+import scipy.stats as scs
+from arch import arch_model
+from statsmodels.tsa.api import acf, pacf, graphics
+import math
+from statsmodels.tsa.stattools import adfuller as ADF
+start_date = '2020-06-01'
+end_date = '2020-07-02'
+df = get_price('000300.XSHG', start_date=start_date, end_date=end_date, frequency='minute')
+df
+df = df.reset_index()
+df
+ADF(df['close'])
+df = df.diff()
+df = df.dropna()
+ADF(df['close'])
+max_range = df.shape[0]
+df_40 = pd.DataFrame()
+for i in range(0, max_range, 6):
+    s = df.iloc[i]
+    df_40 = df_40.append(s, ignore_index=True)
+df_40_close = df_40['close']
+df_40_close
+df_30 = pd.DataFrame()
+for i in range(0, max_range, 8):
+    s = df.iloc[i]
+    df_30 = df_30.append(s, ignore_index=True)
+df_30_close = df_30['close']
+df_20 = pd.DataFrame()
+for i in range(0, max_range, 12):
+    s = df.iloc[i]
+    df_20 = df_20.append(s, ignore_index=True)
+df_20_close = df_20['close']
+df_10 = pd.DataFrame()
+for i in range(0, max_range, 24):
+    s = df.iloc[i]
+    df_10 = df_10.append(s, ignore_index=True)
+df_10_close = df_10['close']
+
+def ts_plot(data, lags=None, title=''):
+    if not isinstance(data, pd.Series):
+        data = pd.Series(data)
+    with plt.style.context('ggplot'):
+        fig = plt.figure(figsize=(10, 8))
+        layout = (3, 2)
+        ts_ax = plt.subplot2grid(layout, (0, 0), colspan=2)
+        acf_ax = plt.subplot2grid(layout, (1, 0))
+        pacf_ax = plt.subplot2grid(layout, (1, 1))
+        qq_ax = plt.subplot2grid(layout, (2, 0))
+        pp_ax = plt.subplot2grid(layout, (2, 1))
+        data.plot(ax=ts_ax)
+        ts_ax.set_title(title)
+        smt.graphics.plot_acf(data, lags=lags, ax=acf_ax, alpha=0.5)
+        acf_ax.set_title('ACF')
+        smt.graphics.plot_pacf(data, lags=lags, ax=pacf_ax, alpha=0.5)
+        pacf_ax.set_title('PACF')
+        sm.qqplot(data, line='s', ax=qq_ax)
+        qq_ax.set_title('QQ')
+        scs.probplot(data, sparams=(data.mean(), data.std()), plot=pp_ax)
+        pp_ax.set_title('PP')
+    return
+max_lag = 10
+Y_10 = df_10['close']
+ts_plot(Y_10, lags=max_lag, title='10 datas per day')
+max_lag = 20
+Y_20 = df_20['close']
+ts_plot(Y_20, lags=max_lag, title='20 datas per day')
+max_lag = 30
+Y_30 = df_30['close']
+ts_plot(Y_30, lags=max_lag, title='30 datas per day')
+max_lag = 40
+Y_40 = df_40['close']
+ts_plot(Y_40, lags=max_lag, title='40 datas per day')
+mod = AutoReg(Y_10, 4)
+res = mod.fit()
+res.aic
+aic_10 = []
+for i in range(1, 10):
+    mod = AutoReg(Y_10, i)
+    res = mod.fit()
+    aic_10.append(res.aic)
+aic_10
+aic_20 = []
+for i in range(1, 10):
+    mod = AutoReg(Y_20, i)
+    res = mod.fit()
+    aic_20.append(res.aic)
+aic_20
+aic_30 = []
+for i in range(1, 10):
+    mod = AutoReg(Y_30, i)
+    res = mod.fit()
+    aic_30.append(res.aic)
+aic_30
+aic_40 = []
+for i in range(1, 10):
+    mod = AutoReg(Y_40, i)
+    res = mod.fit()
+    aic_40.append(res.aic)
+aic_40
+x = range(0, 9)
+y1 = aic_10
+y2 = aic_20
+y3 = aic_30
+y4 = aic_40
+result = smt.AR(Y_40).fit(maxlag=40, ic='aic', trend='nc')
+est_order = smt.AR(Y_40).select_order(maxlag=40, ic='aic', trend='nc')
+mod = AutoReg(Y_40, 2)
+res = mod.fit()
+res.summary()
+phi1 = res.params[1]
+phi2 = res.params[2]
+phi1
+phi2
+alpha1 = phi1
+alpha2 = phi2
+alpha = np.array([alpha1, alpha2])
+sigma = alpha.std()
+sigma
+pi = math.pi
+pi
+e = math.e
+e
+np.exp(complex(1, 5))
+f = np.linspace(0, 0.5, 1000)
+s = lambda f: 2 * sigma / abs(1 - alpha1 * np.exp(complex(0, -1 * 2 * pi * f)) - alpha2 * np.exp(complex(0, -4 * pi * f))) ** 2
+s(0.8) - s(0.2)
+spectral_density = map(s, f)
+spectral_density = list(spectral_density)
+spectral_density
+alpha1 = 0.05
+alpha2 = -0.1
+alpha = np.array([alpha1, alpha2])
+sigma = alpha.std()
+sigma
+s = lambda f: 2 * sigma / abs(1 - alpha1 * np.exp(complex(0, -1 * 2 * pi * f)) - alpha2 * np.exp(complex(0, -4 * pi * f))) ** 2
+spectral_density = map(s, f)
+spectral_density = list(spectral_density)
+max(spectral_density)
+max_index = spectral_density.index(max(spectral_density))
+f = max_index / 1000 * 0.5
+T = 1 / f
+T
+now = datetime.datetime.now()
+
+def Filter(now):
+    time_delta = datetime.timedelta(weeks=4, days=0, hours=0, minutes=0, seconds=0)
+    start_date = now - time_delta
+    end_date = now
+    df = get_price('000300.XSHG', start_date=start_date, end_date=end_date, frequency='minute')
+    df = df.reset_index()
+    df = df.diff()
+    df = df.dropna()
+    max_range = df.shape[0]
+    df_40 = pd.DataFrame()
+    for i in range(0, max_range, 6):
+        s = df.iloc[i]
+        df_40 = df_40.append(s, ignore_index=True)
+    max_lag = 40
+    Y_40 = df_40['close']
+    mod = AutoReg(Y_40, 2)
+    res = mod.fit()
+    phi1 = res.params[1]
+    phi2 = res.params[2]
+    alpha1 = phi1
+    alpha2 = phi2
+    alpha = np.array([alpha1, alpha2])
+    sigma = alpha.std()
+    pi = math.pi
+    f = np.linspace(0, 0.5, 1000)
+    spectrum = lambda f: 2 * sigma / abs(1 - alpha1 * np.exp(complex(0, -1 * 2 * pi * f)) - alpha2 * np.exp(complex(0, -4 * pi * f))) ** 2
+    spectral_density = map(spectrum, f)
+    spectral_density = list(spectral_density)
+    max_index = spectral_density.index(max(spectral_density))
+    f_max = max_index / 1000 * 0.5
+    if f_max == 0:
+        T = math.inf
+    else:
+        T = 1 / f_max
+    return T
+Filter(now)

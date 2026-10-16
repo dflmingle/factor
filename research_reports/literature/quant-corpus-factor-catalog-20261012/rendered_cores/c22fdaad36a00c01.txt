@@ -1,0 +1,55 @@
+quant/2022年度精选策略/67.来自JPMorgan的VaR+EXPMA风险仓位控制.txt
+import pandas as pd
+import numpy as np
+import scipy as sp
+from jqdata import *
+import datetime as dt
+from jqdata import *
+import talib
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.position = 0.0
+    g.change = 0.0
+    run_daily(before_market_open, time='before_open')
+    run_daily(market_open, time='open')
+    run_daily(after_market_close, time='after_close')
+
+def before_market_open(context):
+    g.security = '000300.XSHG'
+    R = 0
+    C = 0
+    R, C, Level = TREND(g.security, context.previous_date)
+    g.change = VaR_posit(g.security, R, C) / 100
+
+def TREND(security, date):
+    EMA12 = EXPMA(security, date, timeperiod=12)[security]
+    EMA50 = EXPMA(security, date, timeperiod=50)[security]
+    level = 1
+    if EMA12 > EMA50:
+        level = 1
+    else:
+        level = 0
+    R = [1.5, 3.8]
+    C = [99.5, 98]
+    return (R[level], C[level], level)
+
+def VaR_posit(security, risk_exposure, CI_alpha):
+    risk_exposure = risk_exposure
+    CI_alpha = CI_alpha
+    risk_money = -1 * risk_exposure
+    price = attribute_history(security, 125, '1d', ['close'])
+    chage = price.pct_change().dropna(axis=0)
+    VaR = np.nanpercentile(chage, 100 - CI_alpha)
+    target_value = risk_money / VaR
+    target_positions = round(target_value / 1, 6)
+    if target_positions >= 100:
+        target_positions = 100
+    return target_positions
+
+def market_open(context):
+    if g.change >= 0:
+        change_value = g.change * context.portfolio.total_value
+        order_target_value(g.security, change_value)
+        g.position = context.portfolio.positions_value / context.portfolio.total_value
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'

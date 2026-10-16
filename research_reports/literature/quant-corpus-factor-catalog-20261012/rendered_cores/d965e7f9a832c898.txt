@@ -1,0 +1,99 @@
+quant/2024年度精选策略1/26.【深度解析 六】高股息率-低PEG-低股价 模型.txt
+import pandas as pd
+from jqdata import *
+
+def initialize(context):
+    g.stock_num = 20
+    g.buylist = []
+    g.high_limit_list = []
+    run_daily(get_high_limit, time='9:00')
+    run_monthly(get_stocks, 1, time='10:00')
+    run_monthly(trade_stocks, 1, time='14:55')
+    run_monthly(show_cap, 1, time='16:00')
+    run_daily(check_high_limit, time='14:40')
+
+def get_stocks(context):
+    by_date = context.previous_date - datetime.timedelta(days=180)
+    stocks = get_all_securities(date=by_date).index.tolist()
+    stocks = filter_all_stocks(context, stocks)
+    stocks = get_dividend_ratio_filter_list(context, stocks, False, 0, 0.25)
+    stocks = get_peg(context, stocks)
+    stocks = filter_highprice_stock(context, stocks)
+    g.buylist = stocks[:g.stock_num]
+
+def trade_stocks(context):
+    cdata = get_current_data()
+    for s in context.portfolio.positions:
+        if s not in g.buylist:
+            order_target(s, 0)
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        psize = context.portfolio.available_cash / (g.stock_num - position_count)
+        for s in g.buylist:
+            if s not in context.portfolio.positions:
+                order_value(s, psize)
+                if len(context.portfolio.positions) == g.stock_num:
+                    break
+
+def show_cap(context):
+    current_data = get_current_data()
+    hold_stocks = context.portfolio.positions.keys()
+    for s in hold_stocks:
+        q = query(valuation).filter(valuation.code == s)
+        df = get_fundamentals(q)
+
+def get_dividend_ratio_filter_list(context, stock_list, sort, p1, p2):
+    time1 = context.previous_date
+    time0 = time1 - datetime.timedelta(days=365)
+    interval = 1000
+    list_len = len(stock_list)
+    q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date >= time0, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(stock_list[:min(list_len, interval)]))
+    df = finance.run_query(q)
+    if list_len > interval:
+        df_num = list_len // interval
+        for i in range(df_num):
+            q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date >= time0, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(stock_list[interval * (i + 1):min(list_len, interval * (i + 2))]))
+            df = df.append(finance.run_query(q))
+    dividend = df.fillna(0)
+    dividend = dividend.groupby('code').sum()
+    temp_list = list(dividend.index)
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(temp_list))
+    cap = get_fundamentals(q, date=time1)
+    cap = cap.set_index('code')
+    DR = pd.concat([dividend, cap], axis=1)
+    DR['dividend_ratio'] = DR['bonus_amount_rmb'] / 10000 / DR['market_cap']
+    DR.sort_values(by='dividend_ratio', ascending=sort, inplace=True)
+    final_list = list(DR.index)[int(p1 * len(DR)):int(p2 * len(DR))]
+    return final_list
+
+def get_peg(context, stocks):
+    q = query(valuation.code).filter(valuation.pe_ratio / indicator.inc_net_profit_year_on_year > -3, valuation.pe_ratio / indicator.inc_net_profit_year_on_year < 3, valuation.code.in_(stocks))
+    df_fundamentals = get_fundamentals(q)
+    stocks = list(df_fundamentals.code)
+    df = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stocks)).order_by(valuation.market_cap.asc()))
+    return list(df.code)
+
+def get_high_limit(context):
+    g.high_limit_list = []
+    hold_list = list(context.portfolio.positions)
+    if hold_list:
+        df = get_price(hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit'], count=1).iloc[:, 0, :]
+        g.high_limit_list = list(df[df['close'] == df['high_limit']].index)
+
+def check_high_limit(context):
+    current_data = get_current_data()
+    if g.high_limit_list:
+        for stock in g.high_limit_list:
+            if current_data[stock].last_price < current_data[stock].high_limit:
+                order_target(stock, 0)
+
+def filter_all_stocks(context, stock_list):
+    curr_data = get_current_data()
+    return [stock for stock in stock_list if not (stock.startswith(('68', '4', '8')) or curr_data[stock].paused or curr_data[stock].is_st or ('ST' in curr_data[stock].name) or ('*' in curr_data[stock].name) or ('退' in curr_data[stock].name) or (curr_data[stock].last_price == curr_data[stock].high_limit) or (curr_data[stock].last_price == curr_data[stock].low_limit))]
+
+def filter_highprice_stock(context, stock_list):
+    df = history(1, unit='1m', field='close', security_list=stock_list)
+    price_list = df.values[0].copy()
+    price_list.sort()
+    price = price_list[int(0.75 * len(df.T))]
+    return [stock for stock in stock_list if df[stock][-1] < price]

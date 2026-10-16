@@ -1,0 +1,11 @@
+from quant_corpus_semantic_review_20261012 import add_authored
+E = {
+    '27.': ('在中证500股票池中复用低资产负债率、适中不良资产率、高优质资产周转率、近四季度ROA改善和低PB/PS选股，同时用指数期货CTA部分按20日波动率与沪深300价格/均线牛熊信号开平仓。','CSI500 quality-asset-efficiency-value stock sleeve + futures CTA volatility/MA regime overlay。','PIT财务、PB/PS、指数期货日线、波动率和交易状态；CTA和股票增强是两套资产级策略。','index_enhancement_cta_duplicate','股票部分与策略2/12相同质量资产效率价值簇，CTA属于资产配置，未形成新股票因子。'),
+    '28.【回顾2】小市值成长股策略更新FROEC': ('按PB低位筛选后计算5季ROE增量，取ROE改善前20%并按流通市值取小盘。','low PB × 5-quarter ROE improvement × small cap。','PB、季度ROE历史、流通市值；PIT季度连接。','growth_quality_size_duplicate','已知质量/成长/规模簇变体，不新增测试。'),
+    '28.【回顾2】小市值成长股策略更新SG': ('使用SG/MS/PEG/turnover_volatility后小市值，三支合并周调仓。','low sales-growth branch + weighted growth score + low PEG × turnover volatility × small cap。','预计算成长/PEG/换手波动因子、流通市值；与策略1/35同源。','small_size_growth_exact_duplicate','与策略1/35近似，不新增测试。'),
+    '29.': ('离线构造行业指标：行业市值加权一年动量相对市场的信息比率；个股40日波动率、换手率、Beta相对全行业均值后做滚动历史zscore，合成拥挤度；行业营收/净利/经营现金流/ROE TTM中位数均值合成景气度。','industry momentum IR + relative 40d volatility/turnover/beta z-score crowding + median TTM sales/profit/OCF/ROE boom score。','外部Excel/SQLite因子库、申万行业成分、历史市值/换手/财务字段；源码为单日行业横截面分析脚本。','industry_momentum_crowding_boom_external_pending','相对行业拥挤度与景气度有潜在新信息，尤其40日波动×换手×Beta相对行业均值合成轴；依赖外部数据且是行业级择时，暂列待复现线索。'),
+    '30.': ('从全A过滤后，买点要求收盘接近近20日最低位、近20日振幅受限、当日不大跌；再按流通市值>50取5只。卖点包括较前收跌5%、跌破日内高点95%、亏损5%或跌破55日均线98%。','oversold bounded-range rebound: close ≤ 1.2×20d low, 20d high ≤ 1.4×20d low, daily return ≥−5%, then size filter。','日线OHLC、流通市值、55日均线、实时价格/日内高点；盘中状态机。','oversold_reversal_intraday_duplicate','已有反转/超跌和小市值路线的短线版本，未形成独立新簇。'),
+    '31.': ('在指数成分中按约250日对数价格回归斜率×R²趋势分数排序取前60，再过滤低于100日均线或存在15%跳空；指数低于200日均线时不买，持仓按ATR风险预算。','250d log-price trend slope×R² + 100d stock MA/gap veto + 200d index MA regime + ATR position sizing。','指数成分、日线OHLC、ATR、均线和跳空；趋势择时/风险仓位。','long_horizon_trend_risk_duplicate','趋势簇已有相近斜率×R²和均线过滤，ATR只是仓位控制。'),
+    '32.': ('在市值<200亿股票中，过滤ST/停牌/科创板/创业板及近期涨跌停，要求20日价格区间接近底部、价格未大幅拉升、近5日成交量无异常放大，再按集合竞价成交量占昨成交量比例排序买入3只。','small-cap bounded-price rebound + no volume spike (max5d volume ≤ 2×mean) + auction-volume/previous-volume ranking。','日线OHLCV、集合竞价tick、涨跌停、总市值；集合竞价数据不在平台标准因子模式。','auction_volume_event_blocked','有成交量稳定性和超跌反弹信息，但核心排序依赖集合竞价高频字段，暂不能标准化复现。'),
+}
+if __name__ == '__main__': add_authored(E, '2024年度精选策略2')

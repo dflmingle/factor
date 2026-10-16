@@ -1,0 +1,27 @@
+quant/2022年度精选策略/45.股指期货跨合约套利.txt
+from jqdata import *
+import datetime as dt
+import numpy as np
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='IF1812.CCFX')
+    run_daily(market_open, time='every_bar')
+
+def before_market_open(context):
+    set_slip_fee(context)
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=c70c2e1e55a76d3f9d84bdc934edda9235a1e4bd6235c299717cfaadd5ae4896 source=quant/2021年度精选策略/57.股指期货套利，这段时间都没有交易分享给大家.txt'
+
+def market_open(context):
+    IF1906 = attribute_history('IF1906.CCFX', 300, unit='1m', fields=['close'], df=True)['close']
+    IF1909 = attribute_history('IF1909.CCFX', 300, unit='1m', fields=['close'], df=True)['close']
+    gap = IF1906 - IF1909
+    IF1906_now = IF1906[-1]
+    IF1909_now = IF1909[-1]
+    gap_now = IF1906_now - IF1909_now
+    if context.portfolio.positions_value == 0:
+        if gap_now > gap.quantile(0.9):
+            order_target('IF1906.CCFX', 1, side='short', close_today=False)
+            order_target('IF1909.CCFX', 1, side='long', close_today=False)
+    elif gap_now < gap.quantile(0.1):
+        order_target('IF1906.CCFX', 0, side='short', close_today=False)
+        order_target('IF1909.CCFX', 0, side='long', close_today=False)

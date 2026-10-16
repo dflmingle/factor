@@ -1,0 +1,63 @@
+quant/2021年度精选策略/32.北向资金A股择时策略（5年16倍）.txt
+import pandas as pd
+from jqdata import finance
+
+def initialize(context):
+    set_params()
+    run_daily(before_market_open, time='07:00', reference_security='IF8888.CCFX')
+    run_daily(market_open, time='09:30', reference_security='IF8888.CCFX')
+
+def set_params():
+    g.future_symbol = 'IF'
+    g.margin_rate = 0.2
+    g.window = 252
+    g.stdev_n = 1.5
+    g.cash_rate = 0.2
+    g.mf, g.upper, g.lower = (None, None, None)
+    g.hold_future = ''
+
+def before_market_open(context):
+    pre_date = (context.current_dt - datetime.timedelta(1)).strftime('%Y-%m-%d')
+    g.mf, g.upper, g.lower = get_boll(pre_date)
+    str_log = '昨日北向资金：%.2f，布林带上下轨：（%.2f，%.2f）' % (g.mf, g.upper, g.lower)
+
+def market_open(context):
+    dom_future = get_dominant_future(g.future_symbol)
+    if get_security_info(dom_future).end_date.strftime('%Y-%m-%d') == context.current_dt.strftime('%Y-%m-%d'):
+        dom_future = get_future_contracts(g.future_symbol)[1]
+    if g.hold_future:
+        if g.hold_future in context.portfolio.positions:
+            if g.mf < g.lower:
+                order_target(g.hold_future, 0)
+                g.hold_future = ''
+            elif g.hold_future != dom_future:
+                order_target(g.hold_future, 0)
+                cash = context.portfolio.total_value * g.cash_rate
+                order_value(dom_future, cash)
+                g.hold_future = dom_future
+        elif g.mf > g.upper:
+            order_target(g.hold_future, 0, side='short')
+            g.hold_future = ''
+        elif g.hold_future != dom_future:
+            order_target(g.hold_future, 0, side='short')
+            cash = context.portfolio.total_value * g.cash_rate
+            order_value(dom_future, cash, side='short')
+            g.hold_future = dom_future
+    if not g.hold_future:
+        cash = context.portfolio.total_value * g.cash_rate
+        if g.mf > g.upper:
+            order_value(dom_future, cash)
+            g.hold_future = dom_future
+
+def get_boll(end_date):
+    table = finance.STK_ML_QUOTA
+    q = query(table.day, table.buy_amount, table.sell_amount, table.quota_daily, table.quota_daily_balance).filter(table.link_id.in_(['310001', '310002']), table.day <= end_date).order_by(table.day)
+    money_df = finance.run_query(q)
+    money_df['net_amount'] = money_df['buy_amount'] - money_df['sell_amount']
+    money_df = money_df.groupby('day')[['net_amount']].sum().iloc[-g.window:]
+    mid = money_df['net_amount'].mean()
+    stdev = money_df['net_amount'].std()
+    upper = mid + g.stdev_n * stdev
+    lower = mid - g.stdev_n * stdev
+    mf = money_df['net_amount'].iloc[-1]
+    return (mf, upper, lower)

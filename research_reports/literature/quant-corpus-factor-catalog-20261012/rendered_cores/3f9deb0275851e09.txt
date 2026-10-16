@@ -1,0 +1,72 @@
+quant/2024年度精选策略1/38.ETF核心资产轮动-添油加醋.txt
+import numpy as np
+import pandas as pd
+'EXACT_REVIEWED_FUNCTION initialize sha256=54c29a9a5ffc18cfb219ec015b00cb4c6233cb1056003de3f8f1beb580af9ecd source=quant/2024年度精选策略1/3.【回顾3】ETF策略之核心资产轮动.txt'
+
+def get_rank(etf_pool):
+    score_list = []
+    for etf in etf_pool:
+        df = attribute_history(etf, g.m_days, '1d', ['close'])
+        y = df['log'] = np.log(df.close)
+        x = df['num'] = np.arange(df.log.size)
+        slope, intercept = np.polyfit(x, y, 1)
+        annualized_returns = math.pow(math.exp(slope), 250) - 1
+        r_squared = 1 - sum((y - (slope * x + intercept)) ** 2) / ((len(y) - 1) * np.var(y, ddof=1))
+        score = annualized_returns * r_squared
+        df2 = attribute_history(etf, g.m_days * 8, '1d', ['close'])
+        y2 = df2['log'] = np.log(df2.close)
+        x2 = df2['num'] = np.arange(df2.log.size)
+        slope2, intercept2 = np.polyfit(x2, y2, 1)
+        annualized_returns2 = math.pow(math.exp(slope2), 250) - 1
+        r_squared2 = 1 - sum((y2 - (slope2 * x2 + intercept2)) ** 2) / ((len(y2) - 1) * np.var(y2, ddof=1))
+        score = score - annualized_returns2 * r_squared2 / 6
+        score_list.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': score_list})
+    df = df.sort_values(by='score', ascending=False)
+    return df
+
+def trade(context):
+    target_num = 1
+    rank_df = get_rank(g.etf_pool)
+    c = max(list(rank_df.score)) - min(list(rank_df.score))
+    if c < 15 and c > 0.1:
+        target_list = list(rank_df.index)[0:target_num]
+    else:
+        target_list = []
+    real_target_list = []
+    for etf in target_list:
+        hl = attribute_history(etf, 18, '1d', ['high', 'low'])
+        if np.polyfit(hl.low, hl.high, 1)[0] > getBeta(context, etf):
+            real_target_list.append(etf)
+    target_list = real_target_list
+    hold_list = list(context.portfolio.positions)
+    for etf in hold_list:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+    if len(target_list) != 0:
+        hold_list = list(context.portfolio.positions)
+        if len(hold_list) < target_num:
+            value = context.portfolio.available_cash / (target_num - len(hold_list))
+            for etf in target_list:
+                if context.portfolio.positions[etf].total_amount == 0:
+                    order_target_value(etf, value)
+
+def getBeta(context, etf):
+    beta = 0
+    if etf == '518880.XSHG':
+        beta = countBeta(context, '518880.XSHG')
+    if etf == '513100.XSHG':
+        beta = countBeta(context, '513100.XSHG')
+    if etf == '159915.XSHE':
+        beta = countBeta(context, '159915.XSHE')
+    if etf == '510180.XSHG':
+        beta = countBeta(context, '510180.XSHG')
+    return beta
+
+def countBeta(context, etf):
+    etf_data = attribute_history(etf, 250, '1d', fields=['high', 'low'])
+    betaList = []
+    for i in range(0, len(etf_data) - 21):
+        df = etf_data.iloc[i:i + 20, :]
+        betaList.append(np.polyfit(df.low, df.high, 1)[0])
+    return mean(betaList) - 2 * std(betaList)

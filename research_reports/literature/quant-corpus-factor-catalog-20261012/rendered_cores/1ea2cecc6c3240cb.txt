@@ -1,0 +1,639 @@
+quant/2021年度精选策略/8.因子分析 营业利润TTM.txt
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import scipy.stats as st
+import time
+from datetime import datetime, timedelta
+from scipy.stats import ttest_ind
+from multiprocessing.dummy import Pool as ThreadPool
+import statsmodels.api as sm
+from pandas import DataFrame, Series
+import jqdata
+sns.set_style('whitegrid')
+import matplotlib
+matplotlib.rcParams['font.family'] = 'serif'
+matplotlib.rcParams['font.serif'] = 'SimHei'
+matplotlib.rcParams['axes.unicode_minus'] = False
+matplotlib.rcParams['font.sans-serif'] = ['FangSong']
+from matplotlib.font_manager import FontProperties
+font = FontProperties(fname='simsun.ttc', size=14)
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+from jqfactor import get_all_factors
+from jqfactor import get_factor_values
+from six import BytesIO
+import pickle
+from IPython.display import HTML, display, clear_output
+import os
+index = 'all'
+start = '2008-01-01'
+end = '2020-07-11'
+interval = 20
+date_list = list(jqdata.get_trade_days(start_date=start, end_date=end))
+trade_date_list = list(filter(lambda x: date_list.index(x) % interval == 0, date_list))
+pre_date_list = list(map(lambda x: jqdata.get_trade_days(end_date=x, count=2)[0], trade_date_list))
+facName = 'operating_profit_ttm'
+
+def get_All_trade_tickers(date):
+    df = get_all_securities(types=['stock'], date=date)
+    daysBefore = jqdata.get_trade_days(end_date=date, count=60)[0]
+    df['60DaysBefore'] = daysBefore
+    df = df[df['start_date'] < df['60DaysBefore']]
+    return df.index.tolist()
+
+def get_idx_cons(idx, date):
+    universe_idx = get_index_stocks(idx, date=date)
+    universe_A = get_All_trade_tickers(date)
+    return list(set(universe_idx) & set(universe_A))
+
+def getPriceData(date):
+    all_stocks = get_all_securities(types=['stock'], date=date).index.tolist()
+    price = get_price(all_stocks, start_date=date, end_date=date, frequency='1d', fields=['close'])['close']
+    return price
+
+def getStockIndustry(fdate):
+    stock_list = get_all_securities(types=['stock'], date=fdate).index.tolist()
+    industry_set = ['801010', '801020', '801030', '801040', '801050', '801080', '801110', '801120', '801130', '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', '801790', '801880', '801890']
+    df = pd.DataFrame(index=stock_list, columns=[fdate])
+    df.index.name = 'code'
+    for i in range(len(industry_set)):
+        industry = get_industry_stocks(industry_set[i], date=fdate)
+        industry = list(set(industry) & set(df.index.tolist()))
+        df[fdate].ix[industry] = industry_set[i]
+    return df.T.fillna('other')
+
+def getStockMktValue(fdate):
+    df = get_factor_data(fdate, 'market_cap', index)
+    df.columns = ['code', 'tradeDate', 'MC']
+    df = df.reset_index()
+    df = df.pivot(index='tradeDate', columns='code', values='MC')
+    return df
+
+def get_factor_data(fdate, factor, index):
+    if index == 'all':
+        stock_list = get_all_securities(types=['stock'], date=fdate).index.tolist()
+    else:
+        stock_list = get_index_stocks(index, date=fdate)
+    factor_data = get_factor_values(securities=stock_list, factors=[factor], start_date=fdate, end_date=fdate)[factor].T
+    factor_data.columns = [factor]
+    factor_data['tradeDate'] = fdate
+    factor_data = factor_data[['tradeDate', factor]]
+    factor_data = factor_data.reset_index()
+    return factor_data
+
+def get_factor_by_day(tdate):
+    cnt = 0
+    while True:
+        try:
+            x = get_factor_data(tdate, facName, index)
+            return x
+        except Exception as e:
+            cnt += 1
+            if cnt >= 3:
+                break
+
+def dateTransform(date_list_to_transform):
+    date_str_list = list(map(lambda x: x.strftime('%Y-%m-%d') if type(x) != str else x, date_list_to_transform))
+    date_list_result = list(map(lambda x: datetime.strptime(x, '%Y-%m-%d'), date_str_list))
+    return date_list_result
+
+def replace_nan_indu(factor, indu):
+    fill_factor = pd.DataFrame()
+    for date in factor.index[:]:
+        factor_array = factor.ix[date, :].to_frame('factor')
+        indu_array = indu.ix[date, :].dropna().to_frame('industryName')
+        factor_array = factor_array.merge(indu_array, left_index=True, right_index=True, how='inner')
+        mid = factor_array.groupby('industryName').median()
+        mid.columns = ['mid_values']
+        factor_array = factor_array.merge(mid, left_on='industryName', right_index=True, how='left')
+        factor_array['factor'][pd.isnull(factor_array['factor'])] = factor_array['mid_values'][pd.isnull(factor_array['factor'])]
+        fill_factor = fill_factor.append(factor_array['factor'].to_frame(date).T)
+    return fill_factor
+
+def get_universe_factor(factor, idx=None, univ=None):
+    universe_factor = pd.DataFrame()
+    if idx is not None:
+        for date in factor.index:
+            universe = get_idx_cons(idx, date)
+            universe_factor = universe_factor.append(factor.loc[date, universe].to_frame(date).T)
+    elif univ is not None:
+        for date in factor.index:
+            universe = univ.loc[date, 'code'].tolist()
+            universe_factor = universe_factor.append(factor.loc[date, universe].to_frame(date).T)
+    else:
+        raise Exception('请指定成分股或域')
+    return universe_factor
+'EXACT_REVIEWED_FUNCTION winsorize sha256=77fe7d5fc090024b55f88463170b26c7e871fd2ab16a09199658b39766981910 source=quant/2020年度精选策略/07 穿越牛熊基业长青的价值精选策略.txt'
+
+def standardize(se):
+    mean = se.mean()
+    std = se.std()
+    se = (se - mean) / std
+    return se
+
+def neutralize(factor_se, market_cap_se, concept_se):
+    stock_list = factor_se.index.tolist()
+    groups = array(concept_se.ix[stock_list].tolist())
+    dummy = sm.categorical(groups, drop=True)
+    market_cap_log = np.log(market_cap_se.ix[stock_list].tolist())
+    X = np.c_[dummy, market_cap_log]
+    y = factor_se.ix[stock_list]
+    model = sm.OLS(y, X)
+    results = model.fit()
+    y_fitted = results.fittedvalues
+    neutralize_factor_se = factor_se - y_fitted
+    return neutralize_factor_se
+
+def pretreat_factor(factor_df, neu=True):
+    pretreat_data = factor_df.copy(deep=True)
+    for dt in pretreat_data.index:
+        market_cap_se = mkt.loc[dt].dropna()
+        stock_list = market_cap_se.index.tolist()
+        concept_se = indu.loc[dt].loc[stock_list]
+        factor_dt = pretreat_data.loc[dt].loc[stock_list].dropna()
+        if neu:
+            pretreat_data.ix[dt] = standardize(neutralize(winsorize(factor_dt), market_cap_se, concept_se))
+        else:
+            pretreat_data.ix[dt] = standardize(winsorize(factor_dt))
+    return pretreat_data
+
+def filter_by_industry(factor, indu):
+    factor_data = factor.copy()
+    for date in factor_data.index.tolist():
+        finance = indu.loc[date, :]
+        finance = finance[finance.isin(['801780', '801790'])].index
+        factor_data.loc[date, finance] = np.nan
+    return factor_data
+
+def keep_by_industry(factor, indu, indu_code):
+    factor_data = factor.copy()
+    for date in factor_data.index.tolist():
+        keep = indu.loc[date, :]
+        keep = keep[keep.isin([indu_code])].index
+        factor_data.loc[date, :] = factor_data.loc[date, keep]
+    return factor_data
+
+def get_group_ret(factor, month_ret, n_quantile=10):
+    cols_mean = [i + 1 for i in range(n_quantile)]
+    cols = cols_mean
+    excess_returns_means = pd.DataFrame(index=month_ret.index[:len(factor + 1)], columns=cols)
+    for t, dt in enumerate(excess_returns_means.index):
+        qt_mean_results = []
+        tmp_factor = factor.loc[dt].dropna()
+        tmp_return = month_ret.loc[dt].dropna()
+        tmp_return = tmp_return.loc[tmp_factor.index]
+        tmp_return_mean = tmp_return.mean()
+        pct_quantiles = 1.0 / n_quantile
+        for i in range(n_quantile):
+            down = tmp_factor.quantile(pct_quantiles * i)
+            up = tmp_factor.quantile(pct_quantiles * (i + 1))
+            i_quantile_index = tmp_factor[(tmp_factor <= up) & (tmp_factor >= down)].index
+            mean_tmp = tmp_return[i_quantile_index].mean()
+            qt_mean_results.append(mean_tmp)
+        excess_returns_means.ix[t] = qt_mean_results
+    return excess_returns_means
+
+def get_group_indu_ret(factor, month_ret, indu, induName, n_quantile=5):
+    cols_mean = [i + 1 for i in range(n_quantile)]
+    cols = cols_mean
+    excess_returns_means = pd.DataFrame(index=month_ret.index[:len(factor + 1)], columns=cols)
+    for t, dt in enumerate(excess_returns_means.index):
+        qt_mean_results = []
+        tmp_indu = indu.loc[dt]
+        stocklist = tmp_indu[tmp_indu == induName].index.tolist()
+        tmp_factor = factor.loc[dt].dropna()
+        stocklist = list(set(tmp_factor.index.tolist()) & set(stocklist))
+        tmp_factor = tmp_factor.loc[stocklist]
+        tmp_return = month_ret.loc[dt]
+        tmp_return = tmp_return.loc[stocklist].dropna()
+        tmp_return_mean = tmp_return.mean()
+        pct_quantiles = 1.0 / n_quantile
+        for i in range(n_quantile):
+            down = tmp_factor.quantile(pct_quantiles * i)
+            up = tmp_factor.quantile(pct_quantiles * (i + 1))
+            i_quantile_index = tmp_factor[(tmp_factor <= up) & (tmp_factor >= down)].index
+            mean_tmp = tmp_return[i_quantile_index].mean()
+            qt_mean_results.append(mean_tmp)
+        excess_returns_means.ix[t] = qt_mean_results
+    return excess_returns_means
+
+def get_long_short_return(group_return, direction=-1):
+    month_return = (group_return.iloc[:, np.sign(direction - 1)] - group_return.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    long_short_return = (month_return.values + 1).cumprod()
+    return pd.Series(long_short_return, index=month_return.index)
+
+def long_short_return_plot(group_return, stock_index, direction=1):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    month_return = (group_return.iloc[:, np.sign(direction - 1)] - group_return.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    ax1.bar(pd.to_datetime(month_return.index), month_return.values)
+    ax1.plot(pd.to_datetime(month_return.index), (month_return.values + 1).cumprod(), color='r')
+    ax1.set_title(u'因子（扣除金融）多空组合累积收益的表现【{0}】'.format(stock_index), fontsize=16, fontproperties=font)
+    return fig
+
+def returns_plot(group_return, title):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    colormap = plt.cm.tab20b
+    ax1.set_prop_cycle(color=[colormap(i) for i in np.linspace(0, 0.9, len(group_return.columns))])
+    ax1.plot(pd.to_datetime(group_return.index), group_return)
+    ax1.set_title(title, fontsize=16, fontproperties=font)
+    cols = group_return.columns.tolist()
+    font1 = FontProperties(fname='simsun.ttc', size=10)
+    ax1.legend(cols, prop=font, loc='upper left', ncol=4)
+    return fig
+
+def group_mean_plot(group_return, stock_index, direction=1):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    month_return = (group_return.iloc[:, np.sign(direction - 1)] - group_return.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    excess_returns_means_dist = group_return.mean()
+    excess_dist_plus = excess_returns_means_dist[excess_returns_means_dist > 0]
+    excess_dist_minus = excess_returns_means_dist[excess_returns_means_dist < 0]
+    lns2 = ax1.bar(excess_dist_plus.index, excess_dist_plus.values, align='center', color='r', width=0.35)
+    lns3 = ax1.bar(excess_dist_minus.index, excess_dist_minus.values, align='center', color='g', width=0.35)
+    ax1.set_xlim(left=0.5, right=len(excess_returns_means_dist) + 0.5)
+    ax1.set_xticks(excess_returns_means_dist.index)
+    ax1.set_title(u'因子分组超额收益【{0}】'.format(stock_index), fontsize=16, fontproperties=font)
+    ax1.grid(True)
+    return fig
+
+def cumprod_return_plot(group_return, stock_index):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    cumprod_return = (group_return + 1).cumprod()
+    ax1.plot(pd.to_datetime(cumprod_return.index), cumprod_return)
+    ax1.set_title(u'因子（扣除金融）累积收益表现【{0}】'.format(stock_index), fontsize=16, fontproperties=font)
+    cols = group_return.columns.tolist()
+    legends = [u'{}分位累积收益'.format(col) for col in cols]
+    ax1.legend(legends, prop=font)
+    return fig
+
+def get_rank_ic(factor, forward_return):
+    common_index = factor.index.intersection(forward_return.index)
+    ic_data = pd.DataFrame(index=common_index, columns=['IC', 'pValue'])
+    for dt in ic_data.index:
+        tmp_factor = factor.ix[dt]
+        tmp_ret = forward_return.ix[dt]
+        cor = pd.DataFrame(tmp_factor)
+        ret = pd.DataFrame(tmp_ret)
+        cor.columns = ['corr']
+        ret.columns = ['ret']
+        cor['ret'] = ret['ret']
+        cor = cor[~pd.isnull(cor['corr'])][~pd.isnull(cor['ret'])]
+        if len(cor) < 5:
+            continue
+        ic, p_value = st.spearmanr(cor['corr'], cor['ret'])
+        ic_data['IC'][dt] = ic
+        ic_data['pValue'][dt] = p_value
+    return ic_data
+
+def ic_line_plot(ic, interval, text):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    ax1.plot(pd.to_datetime(ic.index), ic.values, color='g')
+    ax1.set(ylabel='IC', xlabel='')
+    ax1.axhline(0.0, linestyle='-', color='black', lw=2, alpha=0.8)
+    ax1.set_title(u'{}日因子IC【{}】'.format(interval, text), fontsize=16, fontproperties=font)
+    ymin, ymax = (-0.4, 0.4)
+    curr_ymin, curr_ymax = ax1.get_ylim()
+    ymin = curr_ymin if ymin is None else min(ymin, curr_ymin)
+    ymax = curr_ymax if ymax is None else max(ymax, curr_ymax)
+    ax1.set_ylim([ymin, ymax])
+    return fig
+
+def ic_hist_plot(ic, interval, text):
+    fig = plt.figure(figsize=(8, 16))
+    ax1 = fig.add_subplot(212)
+    sns.distplot(ic.replace(np.nan, 0.0), norm_hist=True, ax=ax1)
+    ax1.axvline(ic.mean(), color='w', linestyle='dashed', linewidth=2)
+    ax1.set_title(u'{}日IC分布直方图【{}】'.format(interval, text), fontsize=16, fontproperties=font)
+    ax1.set_xlim([-1, 1])
+    return fig
+from statsmodels.api import qqplot
+from scipy import stats
+
+def ic_qq_plot(ic, interval, text, theoretical_dist=stats.norm):
+    fig = plt.figure(figsize=(8, 16))
+    ax1 = fig.add_subplot(212)
+    qqplot(ic.replace(np.nan, 0.0).values, theoretical_dist, fit=True, line='45', ax=ax1)
+    ax1.axvline(ic.mean(), color='w', linestyle='dashed', linewidth=2)
+    ax1.set_title(u'{}日IC正态分布qq图【{}】'.format(interval, text), fontsize=16, fontproperties=font)
+    return fig
+
+def get_indu_rank_ic(factor, forward_return, indu, induName):
+    common_index = factor.index.intersection(forward_return.index)
+    ic_data = pd.DataFrame(index=common_index, columns=['IC', 'pValue'])
+    for dt in ic_data.index:
+        tmp_indu = indu.loc[dt]
+        stocklist = tmp_indu[tmp_indu == induName].index.tolist()
+        tmp_factor = factor.loc[dt].dropna()
+        stocklist = list(set(tmp_factor.index.tolist()) & set(stocklist))
+        tmp_factor = factor.ix[dt].ix[stocklist]
+        tmp_ret = forward_return.ix[dt].ix[stocklist]
+        cor = pd.DataFrame(tmp_factor)
+        ret = pd.DataFrame(tmp_ret)
+        cor.columns = ['corr']
+        ret.columns = ['ret']
+        cor['ret'] = ret['ret']
+        cor = cor[~pd.isnull(cor['corr'])][~pd.isnull(cor['ret'])]
+        if len(cor) < 5:
+            continue
+        ic, p_value = st.spearmanr(cor['corr'], cor['ret'])
+        ic_data['IC'][dt] = ic
+        ic_data['pValue'][dt] = p_value
+    return ic_data
+
+def ic_indu_plot(ic_se):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    lns2 = ax1.bar(ic_se.index, ic_se.values, align='center', color='blue', width=0.35)
+    ax1.set_xlim(left=0.5, right=len(ic_se) + 0.5)
+    ax1.set_xticklabels(ic_se.index, rotation=90, fontproperties=font)
+    ax1.set_title(u'因子行业IC', fontsize=16, fontproperties=font)
+    ax1.grid(True)
+    return fig
+
+def get_group_turnover(factor, n_quantile=10):
+    cols_mean = [i + 1 for i in range(n_quantile)]
+    cols = cols_mean
+    quantile_factor = factor.copy()
+    for t, dt in enumerate(quantile_factor.index[:]):
+        tmp_factor = factor.loc[dt].dropna()
+        pct_quantiles = 1.0 / n_quantile
+        for i in range(n_quantile):
+            down = tmp_factor.quantile(pct_quantiles * i)
+            up = tmp_factor.quantile(pct_quantiles * (i + 1))
+            i_quantile_index = tmp_factor[(tmp_factor <= up) & (tmp_factor >= down)].index
+            quantile_factor.loc[dt].loc[i_quantile_index] = int(i)
+    quantile_turnover = pd.DataFrame(columns=cols)
+    for i in range(n_quantile):
+        quant_names = quantile_factor[quantile_factor == i]
+        hold_num_se = quant_names.apply(lambda x: len(x.dropna()), axis=1)
+        not_change_num_se = (quant_names - quant_names.shift(1)).apply(lambda x: len(x.dropna()), axis=1)
+        turnover_ratio = 1 - not_change_num_se / hold_num_se
+        quantile_turnover[i + 1] = turnover_ratio
+    return quantile_turnover
+
+def turnover_ratio_plot(quantile_turnover, interval, text):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    cols = quantile_turnover.columns.tolist()
+    ax1.plot(pd.to_datetime(quantile_turnover.index), quantile_turnover[cols[0]].values, color='g')
+    ax1.plot(pd.to_datetime(quantile_turnover.index), quantile_turnover[cols[-1]].values, color='r')
+    ax1.set_title(u'{}日因子换手率【{}】'.format(interval, text), fontsize=16, fontproperties=font)
+    ax1.legend([u'{}分位换手率'.format(cols[0]), u'{}分位换手率'.format(cols[-1])], prop=font)
+    return fig
+
+def factor_corr_plot(corr_se, interval, text):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    ax1.plot(pd.to_datetime(corr_se.index), corr_se.values, color='b')
+    ax1.set(ylabel='IC', xlabel='')
+    ax1.axhline(0.0, linestyle='-', color='black', lw=2, alpha=0.8)
+    ax1.set_title(u'{}日因子自相关【{}】'.format(interval, text), fontsize=16, fontproperties=font)
+    return fig
+
+def get_easy_factor_report(factor, month_return, direction):
+    columns = list(filter(lambda x: x not in finance, factor.columns))
+    factor_hs300 = get_universe_factor(factor, univ=univ_hs300).loc[:, columns]
+    factor_zz500 = get_universe_factor(factor, univ=univ_zz500).loc[:, columns]
+    factor_hs300_neu = pretreat_factor(factor_hs300)
+    factor_zz500_neu = pretreat_factor(factor_zz500)
+    factor_a_neu = pretreat_factor(factor)
+    rank_ic_hs300 = get_rank_ic(factor_hs300, month_return)
+    rank_ic_zz500 = get_rank_ic(factor_zz500, month_return)
+    rank_ic_a = get_rank_ic(factor, month_return)
+    rank_ic_hs300_mean = rank_ic_hs300['IC'].mean()
+    rank_ic_zz500_mean = rank_ic_zz500['IC'].mean()
+    rank_ic_a_mean = rank_ic_a['IC'].mean()
+    rank_ic_hs300_pvalue = ttest_ind(rank_ic_hs300['IC'].dropna().tolist(), [0] * len(rank_ic_hs300.dropna()))[1]
+    rank_ic_zz500_pvalue = ttest_ind(rank_ic_zz500['IC'].dropna().tolist(), [0] * len(rank_ic_zz500.dropna()))[1]
+    rank_ic_a_pvalue = ttest_ind(rank_ic_a['IC'].dropna().tolist(), [0] * len(rank_ic_a.dropna()))[1]
+    rank_ic_ir_hs300 = rank_ic_hs300['IC'].mean() / rank_ic_hs300['IC'].std()
+    rank_ic_ir_zz500 = rank_ic_zz500['IC'].mean() / rank_ic_zz500['IC'].std()
+    rank_ic_ir_a = rank_ic_a['IC'].mean() / rank_ic_a['IC'].std()
+    rank_ic_neu_hs300 = get_rank_ic(factor_hs300_neu, month_return)
+    rank_ic_neu_zz500 = get_rank_ic(factor_zz500_neu, month_return)
+    rank_ic_neu_a = get_rank_ic(factor_a_neu, month_return)
+    rank_ic_hs300_neu_pvalue = ttest_ind(rank_ic_neu_hs300['IC'].dropna().tolist(), [0] * len(rank_ic_neu_hs300['IC'].dropna()))[1]
+    rank_ic_zz500_neu_pvalue = ttest_ind(rank_ic_neu_zz500['IC'].dropna().tolist(), [0] * len(rank_ic_neu_zz500['IC'].dropna()))[1]
+    rank_ic_a_neu_pvalue = ttest_ind(rank_ic_neu_a['IC'].dropna().tolist(), [0] * len(rank_ic_neu_a['IC'].dropna()))[1]
+    rank_ic_neu_hs300_mean = rank_ic_neu_hs300['IC'].mean()
+    rank_ic_neu_zz500_mean = rank_ic_neu_zz500['IC'].mean()
+    rank_ic_neu_a_mean = rank_ic_neu_a['IC'].mean()
+    rank_ic_ir_neu_hs300 = rank_ic_neu_hs300['IC'].mean() / rank_ic_neu_hs300['IC'].std()
+    rank_ic_ir_neu_zz500 = rank_ic_neu_zz500['IC'].mean() / rank_ic_neu_zz500['IC'].std()
+    rank_ic_ir_neu_a = rank_ic_neu_a['IC'].mean() / rank_ic_neu_a['IC'].std()
+    hs300_excess_returns = get_group_ret(factor_hs300_neu, month_return, n_quantile=10)
+    zz500_excess_returns = get_group_ret(factor_zz500_neu, month_return, n_quantile=10)
+    a_excess_returns = get_group_ret(factor_a_neu, month_return, n_quantile=10)
+    plot_fig(hs300_excess_returns, 'hs300', '1')
+    plot_fig(zz500_excess_returns, 'zz500', '2')
+    plot_fig(a_excess_returns, 'A', '3')
+    hs300_long_short_ret = (hs300_excess_returns.iloc[:, np.sign(direction - 1)] - hs300_excess_returns.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    zz500_long_short_ret = (zz500_excess_returns.iloc[:, np.sign(direction - 1)] - zz500_excess_returns.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    a_long_short_ret = (a_excess_returns.iloc[:, np.sign(direction - 1)] - a_excess_returns.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    hs300_long_short_month_ret = hs300_long_short_ret.mean()
+    zz500_long_short_month_ret = zz500_long_short_ret.mean()
+    a_long_short_month_ret = a_long_short_ret.mean()
+    hs300_long_short_win_ratio = float(len(hs300_long_short_ret[hs300_long_short_ret > 0])) / len(hs300_long_short_ret)
+    zz500_long_short_win_ratio = float(len(zz500_long_short_ret[zz500_long_short_ret > 0])) / len(zz500_long_short_ret)
+    a_long_short_win_ratio = float(len(a_long_short_ret[a_long_short_ret > 0])) / len(a_long_short_ret)
+    hs300_long_short_sharp_ratio = hs300_long_short_ret.mean() / hs300_long_short_ret.std()
+    zz500_long_short_sharp_ratio = zz500_long_short_ret.mean() / zz500_long_short_ret.std()
+    a_long_short_sharp_ratio = a_long_short_ret.mean() / a_long_short_ret.std()
+    hs300_long_short_max_drawdown = max([1 - v / max(1, max((hs300_long_short_ret + 1).cumprod()[:i + 1])) for i, v in enumerate((hs300_long_short_ret + 1).cumprod())])
+    zz500_long_short_max_drawdown = max([1 - v / max(1, max((zz500_long_short_ret + 1).cumprod()[:i + 1])) for i, v in enumerate((zz500_long_short_ret + 1).cumprod())])
+    a_long_short_max_drawdown = max([1 - v / max(1, max((a_long_short_ret + 1).cumprod()[:i + 1])) for i, v in enumerate((a_long_short_ret + 1).cumprod())])
+    report = pd.DataFrame(index=['沪深300', '中证500', '全A'], columns=[['原始因子', '原始因子', '原始因子', '行业和市值中性化后因子', '行业和市值中性化后因子', '行业和市值中性化后因子', '行业和市值中性化后因子', '行业和市值中性化后因子', '行业和市值中性化后因子', '行业和市值中性化后因子'], ['IC', 'IC_IR', 'pvalue', 'IC', 'IC_IR', 'pvalue', '多空组合月度收益', '胜率', '最大回撤', '夏普比率']])
+    report.iloc[:, 0] = [rank_ic_hs300_mean, rank_ic_zz500_mean, rank_ic_a_mean]
+    report.iloc[:, 1] = [rank_ic_ir_hs300, rank_ic_ir_zz500, rank_ic_ir_a]
+    report.iloc[:, 2] = [rank_ic_hs300_pvalue, rank_ic_zz500_pvalue, rank_ic_a_pvalue]
+    report.iloc[:, 3] = [rank_ic_neu_hs300_mean, rank_ic_neu_zz500_mean, rank_ic_neu_a_mean]
+    report.iloc[:, 4] = [rank_ic_ir_neu_hs300, rank_ic_ir_neu_zz500, rank_ic_ir_neu_a]
+    report.iloc[:, 5] = [rank_ic_hs300_neu_pvalue, rank_ic_zz500_neu_pvalue, rank_ic_a_neu_pvalue]
+    report.iloc[:, 6] = [hs300_long_short_month_ret, zz500_long_short_month_ret, a_long_short_month_ret]
+    report.iloc[:, 7] = [hs300_long_short_win_ratio, zz500_long_short_win_ratio, a_long_short_win_ratio]
+    report.iloc[:, 8] = [hs300_long_short_max_drawdown, zz500_long_short_max_drawdown, a_long_short_max_drawdown]
+    report.iloc[:, 9] = [hs300_long_short_sharp_ratio, zz500_long_short_sharp_ratio, a_long_short_sharp_ratio]
+    return report
+
+def group_mean_report_plot(group_return, stock_index, direction=1):
+    fig = plt.figure(figsize=(12, 8))
+    ax1 = fig.add_subplot(212)
+    ax2 = ax1.twinx()
+    ax3 = fig.add_subplot(211)
+    ax2.grid(False)
+    month_return = (group_return.iloc[:, np.sign(direction - 1)] - group_return.iloc[:, -np.sign(direction + 1)]).fillna(0)
+    ax1.bar(pd.to_datetime(month_return.index), month_return.values)
+    ax2.plot(pd.to_datetime(month_return.index), (month_return.values + 1).cumprod(), color='r')
+    ax1.set_title(u'因子在中证全指（扣除金融）的表现【{0}】'.format(stock_index), fontsize=16, fontproperties=font)
+    excess_returns_means_dist = group_return.mean()
+    excess_dist_plus = excess_returns_means_dist[excess_returns_means_dist > 0]
+    excess_dist_minus = excess_returns_means_dist[excess_returns_means_dist < 0]
+    lns2 = ax3.bar(excess_dist_plus.index, excess_dist_plus.values, align='center', color='r', width=0.35)
+    lns3 = ax3.bar(excess_dist_minus.index, excess_dist_minus.values, align='center', color='g', width=0.35)
+    ax3.set_xlim(left=0.5, right=len(excess_returns_means_dist) + 0.5)
+    ax3.set_xticks(excess_returns_means_dist.index)
+    ax3.set_title(u'因子分组超额收益【{0}】'.format(stock_index), fontsize=16, fontproperties=font)
+    ax3.grid(True)
+    return fig
+frame_list = []
+for date in pre_date_list:
+    temp_df = get_factor_data(date, facName, index)
+    frame_list.append(temp_df)
+factor_csv = pd.concat(frame_list, axis=0)
+factor_csv.reset_index(inplace=True, drop=True)
+filename = '2_MyFactorAnalyze/univ.pkl'
+body = read_file(filename)
+univ = pickle.load(BytesIO(body))
+filename = '2_MyFactorAnalyze/univ_zz500.pkl'
+body = read_file(filename)
+univ_zz500 = pickle.load(BytesIO(body))
+filename = '2_MyFactorAnalyze/univ_hs300.pkl'
+body = read_file(filename)
+univ_hs300 = pickle.load(BytesIO(body))
+filename = '2_MyFactorAnalyze/month_return.pkl'
+body = read_file(filename)
+month_return = pickle.load(BytesIO(body))
+filename = '2_MyFactorAnalyze/indu.pkl'
+body = read_file(filename)
+indu = pickle.load(BytesIO(body))
+filename = '2_MyFactorAnalyze/mkt.pkl'
+body = read_file(filename)
+mkt = pickle.load(BytesIO(body))
+month_return.index = dateTransform(month_return.index)
+univ.index = dateTransform(univ.index)
+univ_hs300.index = dateTransform(univ_hs300.index)
+univ_zz500.index = dateTransform(univ_zz500.index)
+indu.index = dateTransform(indu.index)
+mkt.index = dateTransform(mkt.index)
+factor_csv.tradeDate = dateTransform(factor_csv.tradeDate)
+date_df = pd.DataFrame(columns=['trade_date', 'pre_date'])
+date_df['trade_date'] = dateTransform(trade_date_list)
+date_df['pre_date'] = dateTransform(pre_date_list)
+date_df = date_df.set_index('pre_date')
+univ.index = list(map(lambda x: date_df.loc[x].iloc[0], univ.index))
+univ_hs300.index = list(map(lambda x: date_df.loc[x].iloc[0], univ_hs300.index))
+univ_zz500.index = list(map(lambda x: date_df.loc[x].iloc[0], univ_zz500.index))
+indu.index = list(map(lambda x: date_df.loc[x].iloc[0], indu.index))
+mkt.index = list(map(lambda x: date_df.loc[x].iloc[0], mkt.index))
+factor_csv.tradeDate = list(map(lambda x: date_df.loc[x].iloc[0], factor_csv.tradeDate))
+factor_data = factor_csv.pivot(index='tradeDate', columns='code', values=facName)
+factor_data.index = dateTransform(factor_data.index)
+factor_data.head()
+factor = replace_nan_indu(factor_data, indu)
+factor.head()
+factor_neu = pretreat_factor(factor)
+factor_neu.head()
+industry_name_sw1 = {'801740': '国防军工', '801020': '采掘', '801110': '家用电器', '801160': '公用事业', '801770': '通信', '801010': '农林牧渔', '801120': '食品饮料', '801750': '计算机', '801050': '有色金属', '801890': '机械设备', '801170': '交通运输', '801710': '建筑材料', '801040': '钢铁', '801130': '纺织服装', '801880': '汽车', '801180': '房地产', '801230': '综合', '801760': '传媒', '801200': '商业贸易', '801780': '银行', '801140': '轻工制造', '801720': '建筑装饰', '801080': '电子', '801790': '非银金融', '801030': '化工', '801730': '电气设备', '801210': '休闲服务', '801150': '医药生物', 'other': '其他'}
+indu_last = indu.iloc[-1].to_frame('indu')
+fac_last = factor.iloc[-1, :].to_frame('all')
+fac_indu_mean = pd.merge(fac_last, indu_last, how='inner', right_index=True, left_index=True).groupby('indu').mean()
+indu_dist = pd.concat([fac_indu_mean], axis=1)
+fig = plt.figure(figsize=(16, 8))
+for i in range(indu_dist.shape[1]):
+    k = 100 + indu_dist.shape[1] * 10 + i + 1
+    ax = indu_dist.iloc[:, i].plot(kind='barh', ax=fig.add_subplot(k), color='r')
+    if i == 0:
+        s = ax.set_yticklabels([industry_name_sw1[i] for i in indu_dist.index], fontproperties=font)
+        s = ax.set_ylabel(u'行业', fontsize=14, fontproperties=font)
+    fig = plt.gcf()
+factor = filter_by_industry(factor, indu)
+factor_neu = filter_by_industry(factor_neu, indu)
+factor.head()
+factor_neu.head()
+factor_a = get_universe_factor(factor, univ=univ)
+factor_a_neu = get_universe_factor(factor_neu, univ=univ)
+factor_hs300 = get_universe_factor(factor, univ=univ_hs300)
+factor_hs300_neu = get_universe_factor(factor_neu, univ=univ_hs300)
+factor_zz500 = get_universe_factor(factor, univ=univ_zz500)
+factor_zz500_neu = get_universe_factor(factor_neu, univ=univ_zz500)
+factor_datas = [factor_a, factor_a_neu, factor_hs300, factor_hs300_neu, factor_zz500, factor_zz500_neu]
+columns = ['全A', '全A反向', '全A中性化', '全A中性化反向', '沪深300', '沪深300反向', '沪深300中性化', '沪深300中性化反向', '中证500', '中证500反向', '中证500中性化', '中证500中性化反向']
+data = []
+for factor_data_tmp in factor_datas[:]:
+    returns = get_group_ret(factor_data_tmp.iloc[:-1], month_return, n_quantile=10)
+    long_short_return = get_long_short_return(returns)
+    factor_data_tmp_reciprocal = (1.0 / factor_data_tmp).replace([-np.inf, np.inf], np.NaN)
+    reciprocal_returns = get_group_ret(factor_data_tmp_reciprocal.iloc[:-1], month_return, n_quantile=10)
+    reciprocal_long_short_return = get_long_short_return(reciprocal_returns)
+    data.append(long_short_return)
+    data.append(reciprocal_long_short_return)
+all_returns = pd.DataFrame(data, index=columns[:]).T
+fig = returns_plot(all_returns, title='多空收益净值曲线')
+cols_3 = all_returns.iloc[-1].sort_values(ascending=False).index[:3].tolist()
+fig = returns_plot(all_returns[cols_3], title='多空收益净值曲线')
+values = all_returns.iloc[-1][:2].tolist()
+if values[-1] > values[0]:
+    result_factor = factor_a_neu
+    text = '全A中性化'
+else:
+    result_factor = factor_a
+    text = '全A因子'
+industry_name_sw1 = {'801740': '国防军工', '801020': '采掘', '801110': '家用电器', '801160': '公用事业', '801770': '通信', '801010': '农林牧渔', '801120': '食品饮料', '801750': '计算机', '801050': '有色金属', '801890': '机械设备', '801170': '交通运输', '801710': '建筑材料', '801040': '钢铁', '801130': '纺织服装', '801880': '汽车', '801180': '房地产', '801230': '综合', '801760': '传媒', '801200': '商业贸易', '801780': '银行', '801140': '轻工制造', '801720': '建筑装饰', '801080': '电子', '801790': '非银金融', '801030': '化工', '801730': '电气设备', '801210': '休闲服务', '801150': '医药生物'}
+data = []
+count = 1
+for k, v in industry_name_sw1.items():
+    if k == 'other':
+        continue
+    indu_return = get_group_indu_ret(result_factor, month_return, indu, k, n_quantile=10)
+    long_short_return = get_long_short_return(indu_return)
+    long_short_return.name = '{}({})'.format(v, k)
+    count += 1
+    data.append(long_short_return)
+    if count > 2:
+        pass
+indu_returns = pd.DataFrame(data).T
+fig = returns_plot(indu_returns, title='行业多空收益净值曲线')
+cols_4 = indu_returns.iloc[-1].sort_values(ascending=False).index[:4].tolist()
+fig = returns_plot(indu_returns[cols_4], title='行业多空收益净值曲线')
+indu_text = indu_returns.iloc[-1].sort_values(ascending=False).index[0]
+indu_code = indu_text.split('(')[-1].replace(')', '')
+indu_result_factor = keep_by_industry(result_factor, indu, indu_code)
+result_returns = get_group_ret(result_factor.iloc[:-1], month_return, n_quantile=10)
+fig = group_mean_plot(result_returns, text, 1)
+indu_result_returns = get_group_ret(indu_result_factor.iloc[:-1], month_return, n_quantile=10)
+fig = group_mean_plot(indu_result_returns, indu_text, 1)
+fig = cumprod_return_plot(result_returns, text)
+fig = cumprod_return_plot(indu_result_returns, indu_text)
+rank_ic_a = get_rank_ic(result_factor, month_return)
+rank_ic_indu = get_rank_ic(indu_result_factor, month_return)
+fig = ic_line_plot(rank_ic_a['IC'], interval, text)
+fig = ic_line_plot(rank_ic_indu['IC'], interval, indu_text)
+fig = ic_hist_plot(rank_ic_a['IC'], interval, text)
+fig = ic_hist_plot(rank_ic_indu['IC'], interval, indu_text)
+fig = ic_qq_plot(rank_ic_a['IC'], interval, text)
+fig = ic_qq_plot(rank_ic_indu['IC'], interval, indu_text)
+count = 1
+ic_dict = {}
+for k, v in industry_name_sw1.items():
+    ic_data = get_indu_rank_ic(result_factor, month_return, indu, k)
+    ic_mean = ic_data['IC'].mean()
+    ic_dict[v] = ic_mean
+    count += 1
+    if count > 1:
+        pass
+
+def ic_indu_plot(ic_se):
+    fig = plt.figure(figsize=(16, 16))
+    ax1 = fig.add_subplot(212)
+    lns2 = ax1.bar(ic_se.index, ic_se.values, align='center', color='blue', width=0.35)
+    ax1.set_xlim(left=0.5, right=len(ic_se) + 0.5)
+    ax1.set_xticklabels(ic_se.index, rotation=90, fontproperties=font)
+    ax1.set_title(u'因子行业IC', fontsize=16, fontproperties=font)
+    ax1.grid(True)
+    return fig
+ic_se = pd.Series(ic_dict).dropna()
+fig = ic_indu_plot(ic_se)
+corr_se = result_factor.corrwith(result_factor.shift(1), axis=1)
+fig = factor_corr_plot(corr_se, interval, text)
+indu_corr_se = result_factor.corrwith(indu_result_factor.shift(1), axis=1)
+fig = factor_corr_plot(indu_corr_se, interval, indu_text)
+quantile_turnover = get_group_turnover(result_factor, n_quantile=10)
+fig = turnover_ratio_plot(quantile_turnover.iloc[1:], interval, text)
+indu_quantile_turnover = get_group_turnover(indu_result_factor, n_quantile=10)
+fig = turnover_ratio_plot(indu_quantile_turnover.iloc[1:], interval, indu_text)

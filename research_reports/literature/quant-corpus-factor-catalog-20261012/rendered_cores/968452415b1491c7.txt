@@ -1,0 +1,124 @@
+quant/聚宽2025年精选/39干积分-大小盘反复横跳V2.0.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import talib
+import warnings
+warnings.filterwarnings('ignore')
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 5
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    run_daily(prepare_stock_list, '9:05')
+    run_monthly(weekly_adjustment, 1, '9:30')
+    run_daily(check_limit_up, '14:00')
+    run_daily(close_account, '14:30')
+
+def sell_stocks(context):
+    for stock in context.portfolio.positions.keys():
+        if context.portfolio.positions[stock].price >= context.portfolio.positions[stock].avg_cost * 1.4:
+            order_target_value(stock, 0)
+        elif context.portfolio.positions[stock].price < context.portfolio.positions[stock].avg_cost * 0.95:
+            order_target_value(stock, 0)
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_highprice_stock sha256=7a3fb5cac3d26460c3e06c592a8b0035c3f0561fa0904da62a1e1f7a5d336742 source=quant/2024年度精选策略1/13.5年15倍的收益，年化79.93%，可实盘，拿走不谢！.txt'
+
+def get_peg(context, stocks):
+    q = query(valuation.code, indicator.roe, indicator.roa).filter(indicator.roe > 0.15, indicator.roa > 0.1, valuation.code.in_(stocks))
+    df_fundamentals = get_fundamentals(q, date=None)
+    stocks = list(df_fundamentals.code)
+    df = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stocks)).order_by(valuation.market_cap.asc()))
+    choice = list(df.code)
+    return choice
+'EXACT_REVIEWED_FUNCTION get_recent_limit_up_stock sha256=6f96d6fbb6791ab81d101d45811a024a55f8d46cbafc2e879a01c1e7ebc93174 source=quant/2024年度精选策略1/2.“7年40倍”策略扩容到50只.txt'
+
+def SMALL(context):
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    choice = filter_st_stock(stocks)
+    choice = filter_paused_stock(choice)
+    choice = filter_new_stock(context, choice)
+    choice = filter_limitup_stock(context, choice)
+    choice = filter_limitdown_stock(context, choice)
+    choice = filter_highprice_stock(context, choice)
+    choice = get_peg(context, choice)
+    recent_limit_up_list = get_recent_limit_up_stock(context, choice, 40)
+    black_list = list(set(g.hold_list).intersection(set(recent_limit_up_list)))
+    target_list = [stock for stock in choice if stock not in black_list]
+    check_out_lists = target_list[:g.stock_num]
+    return check_out_lists
+
+def BIG(context):
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    choice = filter_st_stock(stocks)
+    choice = filter_paused_stock(choice)
+    choice = filter_new_stock(context, choice)
+    choice = filter_limitup_stock(context, choice)
+    choice = filter_limitdown_stock(context, choice)
+    BIG_stock_list = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stocks), valuation.pe_ratio_lyr.between(0, 30), valuation.ps_ratio.between(0, 8), valuation.pcf_ratio < 10, indicator.eps > 0.3, indicator.roe > 0.1, indicator.net_profit_margin > 0.1, indicator.gross_profit_margin > 0.3, indicator.inc_revenue_year_on_year > 0.25).order_by(valuation.market_cap.desc()).limit(g.stock_num)).set_index('code').index.tolist()
+    return BIG_stock_list
+
+def weekly_adjustment(context):
+    yesterday = context.previous_date
+    now_time = context.current_dt
+    stockList_2000 = get_index_stocks('399303.XSHE', now_time)
+    stockList_500 = get_index_stocks('399905.XSHE', now_time)
+    h_ratio = get_price(stockList_2000, end_date=yesterday, frequency='1d', fields=['close'], count=20)['close']
+    first_row = h_ratio.iloc[0]
+    last_row = h_ratio.iloc[-1]
+    change_BIG = (last_row - first_row) / first_row * 100
+    mean_BIG = np.mean(change_BIG)
+    h_ratio = get_price(stockList_500, end_date=yesterday, frequency='1d', fields=['close'], count=20)['close']
+    first_row = h_ratio.iloc[0]
+    last_row = h_ratio.iloc[-1]
+    change_SMALL = (last_row - first_row) / first_row * 100
+    mean_SMALL = np.mean(change_SMALL)
+    if mean_BIG / mean_SMALL > 1.2:
+        target_list = BIG(context)
+        for stock in g.hold_list:
+            if stock not in target_list and stock not in g.yesterday_HL_list:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+        position_count = len(context.portfolio.positions)
+        target_num = len(target_list)
+        if target_num > position_count:
+            value = context.portfolio.cash / (target_num - position_count)
+            for stock in target_list:
+                if context.portfolio.positions[stock].total_amount == 0:
+                    if open_position(stock, value):
+                        if len(context.portfolio.positions) == target_num:
+                            break
+    else:
+        target_list = SMALL(context)
+        for stock in g.hold_list:
+            if stock not in target_list and stock not in g.yesterday_HL_list:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+        position_count = len(context.portfolio.positions)
+        target_num = len(target_list)
+        if target_num > position_count:
+            value = context.portfolio.cash / (target_num - position_count)
+            for stock in target_list:
+                if context.portfolio.positions[stock].total_amount == 0:
+                    if open_position(stock, value):
+                        if len(context.portfolio.positions) == target_num:
+                            break
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=9620ae3faed8afa4b71539979a57528fb20f48a987e5fb89d6dd0871ab934580 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=a33a2c2079f46745447693f0d71254e014ee7cb801035eed7930ea353f54bd83 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=5e68dad3789f3dcd9dbc75f23be4ae635975bea8cb208d7f9640cf85a81be542 source=quant/2024年度精选策略1/23.wywy1995大神机器学习策略年化提升35pt.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=5c71dd2ad82f718e6f533a9de30896513b7aa3d318a354d439c3f66198a11669 source=quant/2024年度精选策略1/1.差不多得了.txt'

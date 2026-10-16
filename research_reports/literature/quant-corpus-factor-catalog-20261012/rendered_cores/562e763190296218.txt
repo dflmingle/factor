@@ -1,0 +1,170 @@
+quant/2021年度精选策略/35.精选价值策略.txt
+import pandas as pd
+import numpy as np
+from jqdata import *
+
+def initialize(context):
+    g.buy_list = []
+    g.security_max_proportion = 0.2
+    g.max_hold_stocknum = 10
+    g.max_buy_value = None
+    g.max_buy_amount = None
+    g.order_style_str = 'by_cap_mean'
+    g.order_style_value = 100
+    run_monthly(before_market_open, 10, time='before_open', reference_security='000300.XSHG')
+    run_monthly(market_open, 10, time='open', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    temp_list = get_stock_list(context)
+    g.industry_list = ['801010', '801040', '801050', '801080', '801110', '801120', '801130', '801150', '801160', '801200', '801230', '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', '801790']
+    temp_list = industry_filter(context, temp_list, g.industry_list)
+    g.buy_list = get_check_stocks_sort(context, temp_list)
+'EXACT_REVIEWED_FUNCTION market_open sha256=a395d991a7a7c7ed5b57b7e1b0456c22532e8ddfd72f9fe64e221480ef5a3d7c source=quant/2020年度精选策略/07 穿越牛熊基业长青的价值精选策略.txt'
+
+def buy(context, buy_lists):
+    Num = g.max_hold_stocknum - len(context.portfolio.positions)
+    buy_lists = buy_lists[:Num]
+    if len(buy_lists) > 0:
+        cash = Risk_rebalancing(context, buy_lists)
+        stock1 = set(buy_lists)
+        stock2 = set(context.portfolio.positions.keys())
+        buy_lists = stock1 | stock2
+        for stock in buy_lists:
+            order_target_value(stock, cash)
+    return
+
+def sell(context, buy_lists):
+    hold_stock = list(context.portfolio.positions.keys())
+    for s in hold_stock:
+        if s not in buy_lists:
+            order_target_value(s, 0)
+
+def get_check_stocks_sort(context, check_out_lists):
+    df = get_fundamentals(query(valuation.circulating_market_cap, valuation.pe_ratio, valuation.code).filter(valuation.code.in_(check_out_lists)).order_by(valuation.circulating_market_cap.desc()), date=context.previous_date)
+    out_lists = list(df['code'].values)
+    return out_lists
+
+def get_stock_list(context):
+    t1, t2, t3, t4 = statDate_value(context)
+    temp_list = filter_st_paused(context)
+    df1 = get_fundamentals(query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(temp_list)), date=context.previous_date)
+    dfx1 = df1[df1['circulating_market_cap'] > df1['circulating_market_cap'].mean()]
+    l1 = set(dfx1.code.values)
+    df2 = get_fundamentals(query(balance.total_current_assets, balance.total_current_liability, balance.code).filter(valuation.code.in_(temp_list)), statDate=t1)
+    df2.dropna(axis=0, inplace=True)
+    dfx2 = df2[df2['total_current_liability'] != 0]
+    dfx2['cr'] = dfx2['total_current_assets'] / dfx2['total_current_liability']
+    dfx2 = dfx2[dfx2['cr'] > dfx2['cr'].mean()]
+    l2 = set(dfx2.code.values)
+
+    def roe_value(i, date, l2):
+        df = get_fundamentals(query(indicator.code, indicator.roe).filter(indicator.code.in_(l2)), statDate=date)
+        df.rename(columns={'roe': 'roe' + str(i)}, inplace=True)
+        return df
+    df31 = roe_value(1, t1, temp_list)
+    df32 = roe_value(2, t2, temp_list)
+    df33 = roe_value(3, t3, temp_list)
+    df34 = roe_value(4, t4, temp_list)
+    df3 = df31.merge(df32, on='code')
+    df3 = df3.merge(df33, on='code')
+    df3 = df3.merge(df34, on='code')
+    dfx3 = df3[(df3.roe1 >= df3.roe1.mean()) & (df3.roe2 >= df3.roe2.mean()) & (df3.roe3 >= df3.roe3.mean()) & (df3.roe4 >= df3.roe4.mean())]
+    l3 = set(dfx3.code.values)
+    y = int(context.current_dt.year)
+    if context.current_dt.month >= 5:
+        dt1, dt2, dt3 = (str(y - 1), str(y - 2), str(y - 3))
+    else:
+        dt1, dt2, dt3 = (str(y - 2), str(y - 3), str(y - 4))
+
+    def FCF(i, date, stocks):
+        df = get_fundamentals(query(cash_flow.code, cash_flow.net_operate_cash_flow, cash_flow.net_invest_cash_flow).filter(valuation.code.in_(stocks)), statDate=date)
+        df['FCF' + str(i)] = df['net_operate_cash_flow'] + df['net_invest_cash_flow']
+        df.drop(['net_operate_cash_flow', 'net_invest_cash_flow'], axis=1, inplace=True)
+        return df
+    df41 = FCF(1, dt1, temp_list)
+    df42 = FCF(2, dt2, temp_list)
+    df43 = FCF(3, dt3, temp_list)
+    df4 = df41.merge(df42, on='code')
+    df4 = df4.merge(df43, on='code')
+    dfx4 = df4[pd.eval('(df4.FCF1 >0) & (df4.FCF2 >0) & (df4.FCF3 >0)')]
+    l4 = set(dfx4.code.values)
+
+    def REVENUE_value(i, date, l2):
+        df = get_fundamentals(query(indicator.code, indicator.inc_revenue_year_on_year).filter(indicator.code.in_(l2), indicator.inc_revenue_year_on_year > 6, indicator.inc_revenue_year_on_year < 50), statDate=date)
+        df.rename(columns={'inc_revenue_year_on_year': 'inc_revenue_year_on_year' + str(i)}, inplace=True)
+        return df
+    df51 = REVENUE_value(1, t1, temp_list)
+    df52 = REVENUE_value(2, t2, temp_list)
+    df53 = REVENUE_value(3, t3, temp_list)
+    df54 = REVENUE_value(4, t4, temp_list)
+    df5 = df51.merge(df52, on='code')
+    df5 = df5.merge(df53, on='code')
+    df5 = df5.merge(df54, on='code')
+    l5 = set(df5.code.values)
+
+    def profit_value(i, date, l2):
+        df = get_fundamentals(query(indicator.code, indicator.inc_net_profit_to_shareholders_year_on_year).filter(indicator.code.in_(l2), indicator.inc_net_profit_to_shareholders_year_on_year > 6, indicator.inc_revenue_year_on_year < 50), statDate=date)
+        df.rename(columns={'inc_net_profit_to_shareholders_year_on_year': 'inc_net_profit_to_shareholders_year_on_year' + str(i)}, inplace=True)
+        return df
+    df61 = profit_value(1, t1, temp_list)
+    df62 = profit_value(2, t2, temp_list)
+    df63 = profit_value(3, t3, temp_list)
+    df64 = profit_value(4, t4, temp_list)
+    df6 = df61.merge(df62, on='code')
+    df6 = df5.merge(df63, on='code')
+    df6 = df5.merge(df64, on='code')
+    l6 = set(df6.code.values)
+    return list(l1 & l2 & l3 & l4 & l5 & l6)
+'EXACT_REVIEWED_FUNCTION winsorize sha256=77fe7d5fc090024b55f88463170b26c7e871fd2ab16a09199658b39766981910 source=quant/2020年度精选策略/07 穿越牛熊基业长青的价值精选策略.txt'
+
+def statDate_value(context):
+    dt = context.current_dt
+    if 9 > dt.month >= 5:
+        statDate1 = str(dt.year) + 'q1'
+        statDate2 = str(dt.year - 1) + 'q4'
+        statDate3 = str(dt.year - 1) + 'q3'
+        statDate4 = str(dt.year - 1) + 'q2'
+    elif 11 > dt.month >= 9:
+        statDate1 = str(dt.year) + 'q2'
+        statDate2 = str(dt.year) + 'q1'
+        statDate3 = str(dt.year - 1) + 'q4'
+        statDate4 = str(dt.year - 1) + 'q3'
+    elif dt.month >= 11:
+        statDate1 = str(dt.year) + 'q3'
+        statDate2 = str(dt.year) + 'q2'
+        statDate3 = str(dt.year) + 'q1'
+        statDate4 = str(dt.year - 1) + 'q4'
+    else:
+        statDate1 = str(dt.year - 1) + 'q4'
+        statDate2 = str(dt.year - 1) + 'q3'
+        statDate3 = str(dt.year - 1) + 'q2'
+        statDate4 = str(dt.year - 1) + 'q1'
+    return (statDate1, statDate2, statDate3, statDate4)
+'EXACT_REVIEWED_FUNCTION industry_filter sha256=08b12d32e16c78780edd7c76314d8560159ed1759171c2021f5b937f6e3dee7f source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'
+
+def filter_st_paused(context):
+    temp_list = list(get_all_securities(types=['stock']).index)
+    all_data = get_current_data()
+    temp_list = [stock for stock in temp_list if not all_data[stock].paused]
+    temp_list = [stock for stock in temp_list if not all_data[stock].is_st]
+    return temp_list
+
+def Allocation_of_funds(context, buy_lists, max_hold_stocknum, max_buy_value):
+    current_position = len(context.portfolio.positions.keys())
+    if max_hold_stocknum - current_position > 0:
+        num = min(max_hold_stocknum - current_position, len(buy_lists))
+        value = context.portfolio.available_cash / num
+        if not max_buy_value:
+            max_buy_value = context.portfolio.available_cash
+        cash = min(value, max_buy_value)
+    return cash
+
+def Risk_rebalancing(context, buy_lists):
+    tolal_value = context.portfolio.total_value
+    num1 = len(context.portfolio.positions.keys())
+    num2 = len(buy_lists)
+    if num1 + num2 > 0:
+        cash = tolal_value / (num1 + num2)
+    else:
+        cash = tolal_value
+    return cash

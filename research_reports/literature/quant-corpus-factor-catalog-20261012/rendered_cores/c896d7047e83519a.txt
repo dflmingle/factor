@@ -1,0 +1,47 @@
+quant/2024年度精选策略2/47.别人恐惧我贪婪——重视大盘择时.txt
+from jqdata import *
+'EXACT_REVIEWED_FUNCTION initialize sha256=563d58acd01a3483fd3444e8fa39e8f9b5a3de2759bbf78db562410084a38da2 source=quant/2024年度精选策略2/57.别人恐惧我贪婪3——年化20%的股债组合.txt'
+
+def set_parameter():
+    g.pool = []
+    g.stock_num = 50
+    g.buttun = 0
+    g.day = 1
+
+def market_open(context):
+    yesterday = context.previous_date
+    initial_list = get_index_stocks('000905.XSHG', date=yesterday)
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(initial_list)).order_by(valuation.circulating_market_cap.desc())
+    df = get_fundamentals(q)
+    shizhi_list = list(df.code)[0:50]
+    g.pool = shizhi_list
+
+def market_1455(context):
+    current_data_now = get_current_tick('000001.XSHG')
+    t_date = context.current_dt.strftime('%Y-%m-%d')
+    y_date = context.previous_date.strftime('%Y-%m-%d')
+    df = attribute_history('000001.XSHG', count=2, unit='1d', fields=['open', 'close', 'high', 'low', 'volume', 'money'], skip_paused=True, df=True, fq='pre')
+    y1_close = df['close'][0]
+    y2_close = df['close'][1]
+    y_cha = (y2_close - y1_close) / y1_close
+    t_cha = (current_data_now.current - y2_close) / y2_close
+    if y_cha <= -0.015 and t_cha <= -0.015:
+        buy_stock(context, g.pool)
+        g.buttun = 1
+    else:
+        pass
+    if g.buttun == 1:
+        g.day += 1
+    if g.day % 20 == 0:
+        for sell_code in context.portfolio.positions.keys():
+            order_target_value(sell_code, 0)
+        g.day = 1
+        g.buttun = 0
+
+def buy_stock(context, pool):
+    for buy_code in pool:
+        if buy_code not in context.portfolio.long_positions.keys():
+            cash_value = context.portfolio.available_cash
+            if g.stock_num - len(context.portfolio.positions) > 0:
+                buy_value = cash_value / (g.stock_num - len(context.portfolio.positions))
+                order_target_value(buy_code, buy_value)

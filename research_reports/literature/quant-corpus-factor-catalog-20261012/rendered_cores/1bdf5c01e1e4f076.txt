@@ -1,0 +1,117 @@
+quant/2021年度精选策略/7.股债波动平衡.txt
+from jqdata import *
+
+def initialize(context):
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    g.buy_info = df = pd.DataFrame({'cash': [1000.0]}, index=[context.current_dt.date()])
+    g.ratio_y = 1.0
+
+def get_volatility(df, down=False):
+    if len(df) == 0:
+        return float(np.NaN)
+    df['pre'] = df.shift(1)
+    df = df.dropna()
+    df['day_volatility'] = np.log(df.iloc[:, 0] / df['pre'])
+    if down:
+        df.loc[df.day_volatility > 0.0, 'day_volatility'] = 0
+    vol = df['day_volatility'].std()
+    mean = df['day_volatility'].mean()
+    df.loc[df.day_volatility > mean + 3 * vol, 'day_volatility'] = mean + 3 * vol
+    df.loc[df.day_volatility < mean - 3 * vol, 'day_volatility'] = mean - 3 * vol
+    volatility = df['day_volatility'].std() * math.sqrt(250.0) * 100
+    return volatility
+
+def need_balance(context):
+    position = g.position
+    x = 0.0
+    for s in position.index.values:
+        p = position.position[s]
+        r = p
+        if s in context.portfolio.positions.keys():
+            r = context.portfolio.positions[s].value / context.portfolio.total_value
+        x += abs(r - p)
+    return x > 0.05
+
+def rebalance(context):
+    position = g.position
+    sells = []
+    for s in position.index.values:
+        p = position.position[s]
+        r = p
+        if s in context.portfolio.positions:
+            r = context.portfolio.positions[s].value / context.portfolio.total_value
+        if r > p:
+            order_target_value(s, context.portfolio.total_value * p)
+            sells.append(s)
+    for s in position.index.values:
+        p = position.position[s]
+        if s not in sells:
+            order_target_value(s, context.portfolio.total_value * p)
+
+def market_open(context):
+    weekday = context.current_dt.isoweekday()
+    if weekday != 5 and len(context.portfolio.positions) > 0:
+        return
+    stocks = ['161005.XSHE', '163412.XSHE', '511010.XSHG', '513100.XSHG', '513500.XSHG', '518880.XSHG', '159928.XSHE', '512010.XSHG']
+    weights = [15.0, 20.0, 2.0, 15.0, 7.5, 4.0, 25.0, 20.0]
+    waves = []
+    df = history(40, unit='1d', field='close', security_list=stocks, df=True, skip_paused=True, fq='post')
+    for s in stocks:
+        waves.append(get_volatility(df[[s]], False))
+    g.position = pd.DataFrame(data={'weight': weights, 'wave': waves}, index=stocks)
+    g.position['position'] = g.position.weight / g.position.wave ** 2
+    g.position.position = g.position.position / g.position.position.sum()
+    if context.portfolio.available_cash > 200.0 or need_balance(context):
+        rebalance(context)
+
+def compt_df_ratio(df, r, today):
+    total = 0.0
+    for d in df.index:
+        days = (today - d).days
+        total += df.cash[d] * power(r, days * 1.0 / 365)
+    return total
+
+def compt_ratio_y(total_value, r, today):
+    iter = 0.01
+    mincash = 1.0
+    min_r = max(r - 1.0, 0.0)
+    max_r = r + 1.0
+    tv = compt_df_ratio(g.buy_info, r, today)
+    if tv > total_value:
+        max_r = r
+        min_r = max(r - 1.0, 0)
+        while True:
+            tv = compt_df_ratio(g.buy_info, min_r, today)
+            if tv > total_value:
+                max_r = min_r
+                min_r = max(min_r - 1.0, 0)
+            else:
+                break
+    else:
+        min_r = r
+        max_r = r + 1.0
+        while True:
+            tv = compt_df_ratio(g.buy_info, max_r, today)
+            if tv < total_value:
+                min_r = max_r
+                max_r += 1.0
+            else:
+                break
+    while True:
+        r = (min_r + max_r) / 2.0
+        tv = compt_df_ratio(g.buy_info, r, today)
+        if abs(tv - total_value) < mincash:
+            break
+        if tv < total_value:
+            min_r = r
+        else:
+            max_r = r
+    return r
+
+def after_market_close(context):
+    return
+    days = (context.current_dt.date() - context.run_params.start_date).days
+    p = context.portfolio.subportfolios[0]
+    if days > 365:
+        g.ratio_y = compt_ratio_y(p.total_value, g.ratio_y, context.current_dt.date())

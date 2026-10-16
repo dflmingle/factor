@@ -1,0 +1,13 @@
+from quant_corpus_semantic_review_20261012 import add_authored
+E = {
+    '33.': ('盘中扫描前4日涨停、连续大阳/分歧反包形态，结合开盘、前高/前收、涨停价和实时tick在开盘时买入，尾盘按持仓分钟高低点及回撤卖出。','limit-up streak + large-up divergence/rebound intraday pattern。','日线与分钟OHLCV、涨跌停、实时tick；事件驱动。','intraday_limitup_event_duplicate','与已有首阴/连板事件簇重复，非标准截面因子。'),
+    '34.': ('先筛2个月内涨停≥2次、40日涨幅和回撤等形态，再用12个40日价格/量/MACD/涨停特征输入外部LightGBM，预测反弹概率>0.75后买入，盘中止损。','40d limit-up count, rise count, peak timing, drawdown, MACD(1/2/3), low-volatility and volume contraction features + LightGBM rebound probability。','外部训练好的LightGBM模型、40日OHLCV、MACD、涨停数据；源码未给训练样本/模型参数，且明显过拟合。','external_ml_oversold_blocked','有超跌、缩量和波动稳定性信息，但核心模型不可审计/不可复现，不进入正式候选。'),
+    '35.': ('先取全A最小市值20%，用7日归一化价格/成交量模式做DTW距离和K-means原型，选择与历史“未来上涨至少10%”模式距离最小的股票。','DTW distance to K-means prototypes of 7d normalized price-volume patterns with future +10% label。','全A OHLCV、外部K-means/DTW；标签定义、聚类训练窗口和原型滚动方式不固定。','pattern_ml_future_label_blocked','模式匹配和训练原型依赖未来上涨标签，存在样本选择/前视风险，暂不复现。'),
+    '36.': ('根据指数期货贴水率/基差排序，收盘买入贴水较高合约，次日卖出；不是股票选股。','index futures basis/discount ranking。','IF合约期货价格、现货指数、合约到期信息；资产配置。','futures_basis_not_stock_factor','不进入股票因子池。'),
+    '37.': ('盘中识别三阳三阴、连续涨停与谷底形态，用大量日线窗口和分钟tick条件开仓，尾盘按回撤与涨停状态卖出。','multi-day candle sequence + limit-up/valley intraday event conditions。','日线/分钟OHLCV、涨跌停、实时tick；事件驱动。','intraday_candle_event_duplicate','与连板/反包/超跌事件路线重复，不标准复现。'),
+    '38.': ('在ETF池按20日动量选最强，使用RSRS18/600 zscore×R²择时，并加入北向资金净流入阈值决定是否允许交易。','ETF momentum + RSRS18/600 zscore×R² + northbound flow timing。','ETF OHLC、指数RSRS、沪深港股通资金流；资产级择时，与既有RSRS重复。','etf_rsrs_northbound_duplicate','不进入股票截面因子池。'),
+    '39.': ('剔除次新/ST后取PEG最低10%，再取EBIT最低25%、turnover_volatility最低50%，最后按流通市值升序；每周调仓。','low PEG × low EBIT × low turnover volatility × small circulating market cap。','PEG、EBIT、换手波动率、流通市值；预计算因子。','value_quality_size_duplicate','已知估值/盈利/低换手/小市值簇的重复组合，不新增独立簇。'),
+    '43.': ('对4只ETF计算3/5/10/20/30/60日收益线性斜率和1/5/10/20/30/60/90日未来收益，比较跨ETF整体IC与时间分布，结论为10–20日动量对约10日持有最有效、60日可能反向。','ETF momentum slope windows 3–60d; horizon-matched return IC and half-life约9–10日。','4只ETF日线价格；样本极小且不是个股横截面。','etf_momentum_diagnostic_duplicate','是动量参数诊断，不是新股票因子。'),
+    '49.': ('对PEG做MAD去极值后，分别对log市值和申万二级行业做横截面OLS中性化；再对20日换手率标准差做同样市值/行业中性化，取PEG最低20%且换手波动率最低50%，最后小市值排序。','industry- and size-neutral PEG + industry- and size-neutral 20d turnover-volatility residual。','PIT PE/净利润增长、log market cap、申万二级行业、20日turnover_ratio历史；需要动态行业成分和截面回归。','neutralized_peg_turnover_candidate','相较普通PEG×低换手，显式市值/行业中性化可能减少size/industry混杂，具有可测试的新配方；但经济轴仍属估值+低换手，先记录为候选，不自动回测。'),
+}
+if __name__ == '__main__': add_authored(E, '2024年度精选策略2')

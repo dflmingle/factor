@@ -1,0 +1,208 @@
+'''
+优化版2025年收益提高至:70%  (旧版13%)
+# 一.重构版本：
+    1模块化设计：将指标计算、信号生成、交易执行、日志输出拆分为独立函数，结构清晰，易于维护。
+    2详细日志：每日输出完整排名表格（含涨幅、均线、条件标记），明确标注入选/卖出原因，便于调试和跟踪。
+    3代码可读性：变量命名更直观，添加注释，减少冗余计算。
+二.核心逻辑优化：
+    1卖出缓冲：ETF必须连续2天不在涨幅前4才被卖出（g.rank_status.get(etf, 0) >= 2），避免单日波动触发交易。
+    2目标持仓由2 增加到3只，排名阀值由4调成8
+    3ETF扩充标的，根据广泛性
+
+'''
+import pandas as pd
+import talib
+from jqdata import *
+
+def initialize(context):
+    # 基本设置
+    set_option('avoid_future_data', True)
+    set_benchmark('513100.XSHG')
+    set_option('use_real_price', True)
+    log.set_level('order', 'error')
+    
+    # ETF 池（同原文）
+    
+    g.etf = [
+        # 科技
+        '512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG',
+        '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG',
+        '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE',
+        # 新能源
+        '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG',
+        '159755.XSHE', '561160.XSHG',
+        # 医药医疗
+        '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE',
+        '512010.XSHG', '159647.XSHE',
+        # 军工
+        '512660.XSHG', '512710.XSHG',
+        # 传媒游戏
+        '512980.XSHG', '159869.XSHE', '159805.XSHE',
+        # 其他
+        '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG'
+    ]
+    
+    # 策略参数
+    g.etf_num = 3          # 目标持仓数量
+    g.rank_num = 8         # 排名阈值（用于卖出判断）
+    g.min_inc = 0.05       # 最小20日涨幅
+    g.max_inc = 0.20       # 最大20日涨幅（同时作为止盈线）
+    g.longdays = 20        # 长均线周期
+    g.shortdays = 5        # 短均线周期
+    g.rank_status = {}          # 记录每个ETF连续不在涨幅前rank_num的天数
+    
+    # 每日运行函数
+    run_daily(generate_signals, '09:25')   # 生成买卖信号
+    run_daily(execute_trades, '09:30')     # 执行调仓
+    run_daily(log_portfolio, '15:10')      # 收盘输出持仓
+
+    # 用于记录前一日总资产（计算日收益率）
+    g.previous_portfolio_value = context.portfolio.starting_cash
+
+
+def calculate_metrics(etf_list, long_days, short_days):
+    """计算每个ETF的20日涨幅、5日均线、20日均线，返回DataFrame"""
+    inc_list = []
+    ma5_list = []
+    ma20_list = []
+    for etf in etf_list:
+        df = attribute_history(etf, long_days, fields=['close'])
+        inc = (df['close'][-1] / df['close'][0] - 1)
+        ma5 = df['close'].tail(short_days).mean()
+        ma20 = df['close'].mean()
+        inc_list.append(inc)
+        ma5_list.append(ma5)
+        ma20_list.append(ma20)
+    
+    df_metrics = pd.DataFrame({
+        'inc': inc_list,
+        'ma5': ma5_list,
+        'ma20': ma20_list
+    }, index=etf_list)
+    return df_metrics
+    
+def generate_signals(context):
+    """生成当日买入列表和卖出列表（含卖出缓冲，无止损）"""
+    # 1. 计算指标
+    df = calculate_metrics(g.etf, g.longdays, g.shortdays)
+    df = df.sort_values('inc', ascending=False)   # 按涨幅降序
+    
+    # 2. 输出排名日志
+    log.info("=" * 60)
+    log.info("日期：{}   ETF排名及指标（按20日涨幅降序）".format(context.current_dt.strftime('%Y-%m-%d')))
+    log.info("排名   ETF名称                20日涨幅    5日均线    20日均线    ma5>ma20?  买入条件?")
+    for i, (etf, row) in enumerate(df.iterrows()):
+        name = get_security_info(etf).display_name
+        ma5_gt_ma20 = row['ma5'] > row['ma20']
+        buy_condition = ma5_gt_ma20 and (g.min_inc < row['inc'] < g.max_inc)
+        log.info("{:>3}. {:<20} {:>7.2%}   {:>8.2f}   {:>8.2f}   {:^8}   {}".format(
+            i+1, name, row['inc'], row['ma5'], row['ma20'],
+            '是' if ma5_gt_ma20 else '否',
+            '√' if buy_condition else '×'
+        ))
+    
+    # 3. 确定当日涨幅排名前N的ETF
+    top_ranked = df.index[:g.rank_num].tolist()
+    
+    # 4. 更新每个ETF连续不在前N的天数
+    for etf in g.etf:
+        if etf in top_ranked:
+            g.rank_status[etf] = 0
+        else:
+            g.rank_status[etf] = g.rank_status.get(etf, 0) + 1
+    
+    # 5. 确定买入候选（符合条件且涨幅靠前）
+    mask = (df['ma5'] > df['ma20']) & (df['inc'] > g.min_inc) & (df['inc'] < g.max_inc)
+    candidates = df[mask].index.tolist()
+    g.buy_candidates = candidates[:g.etf_num]
+    
+    # 6. 卖出列表：基于涨幅超限 或 连续不在前N天数 >= 2
+    g.sell_list = []
+    for etf in context.portfolio.positions:
+        if etf not in df.index:
+            continue
+        inc = df.loc[etf, 'inc']
+        # 卖出条件1：涨幅超限
+        if inc > g.max_inc:
+            g.sell_list.append(etf)
+        # 卖出条件2：连续不在前N天数 >= 2（缓冲）
+        elif g.rank_status.get(etf, 0) >= 2:
+            g.sell_list.append(etf)
+    
+    # 7. 从买入候选列表中剔除即将卖出的ETF
+    g.buy_list = [etf for etf in g.buy_candidates if etf not in g.sell_list]
+    
+    # 8. 输出买卖决策日志
+    log.info("-" * 60)
+    log.info("【买入候选列表】（符合条件且涨幅前{}）: {}".format(g.etf_num,
+          [get_security_info(e).display_name for e in g.buy_candidates]))
+    log.info("【最终买入列表】（剔除即将卖出的）: {}".format(
+          [get_security_info(e).display_name for e in g.buy_list]))
+    log.info("【卖出列表】: {}".format(
+          [get_security_info(e).display_name for e in g.sell_list]))
+    
+    if g.sell_list:
+        for etf in g.sell_list:
+            if etf in context.portfolio.positions:
+                if etf in df.index:
+                    inc = df.loc[etf, 'inc']
+                    if inc > g.max_inc:
+                        reason = "涨幅超过{:.0%}".format(g.max_inc)
+                    elif g.rank_status.get(etf, 0) >= 2:
+                        reason = "连续{}天不在涨幅前{}".format(g.rank_status[etf], g.rank_num)
+                    else:
+                        reason = "未知原因（可能已不在持仓中）"
+                else:
+                    reason = "ETF数据缺失"
+                log.info("   卖出 {}：{}".format(get_security_info(etf).display_name, reason))
+    log.info("=" * 60)
+
+def execute_trades(context):
+    """根据买卖列表执行调仓"""
+    # 先卖出
+    for etf in g.sell_list:
+        order_target_value(etf, 0)
+        log.info("执行卖出：{}，清仓".format(get_security_info(etf).display_name))
+    
+    # 再买入（若当前持仓数小于目标持仓数）
+    current_positions = len(context.portfolio.positions)
+    if current_positions < g.etf_num:
+        cash_per_etf = context.portfolio.available_cash / (g.etf_num - current_positions)
+        for etf in g.buy_list:
+            order_target_value(etf, cash_per_etf)
+            log.info("执行买入：{}，目标市值 {:.2f}".format(
+                get_security_info(etf).display_name, cash_per_etf))
+            # 每买入一只更新持仓数，达到目标即停止
+            if len(context.portfolio.positions) >= g.etf_num:
+                break
+    else:
+        log.info("当前持仓数已达到目标{}，无需买入".format(g.etf_num))
+
+
+def log_portfolio(context):
+    """收盘输出持仓明细和收益率"""
+    log.info("=" * 60)
+    log.info("收盘持仓详情（时间：{}）".format(context.current_dt.strftime('%Y-%m-%d %H:%M')))
+    if len(context.portfolio.positions) == 0:
+        log.info("当前无持仓")
+    else:
+        log.info("{:<20}  {:<12}  {:<10}  {:<10}  {:<10}".format(
+            "ETF名称", "买入日期", "买入价格", "现价", "收益率"))
+        for position in context.portfolio.positions.values():
+            name = get_security_info(position.security).display_name
+            buy_date = position.init_time.date()
+            buy_price = position.avg_cost
+            current_price = position.price
+            ret = (current_price / buy_price - 1) * 100
+            log.info("{:<20}  {}  {:>8.3f}   {:>8.3f}   {:>7.2f}%".format(
+                name, buy_date, buy_price, current_price, ret))
+    
+    # 计算总收益率和当日收益率
+    total_ret = (context.portfolio.portfolio_value / context.portfolio.starting_cash - 1) * 100
+    daily_ret = (context.portfolio.portfolio_value / g.previous_portfolio_value - 1) * 100
+    g.previous_portfolio_value = context.portfolio.portfolio_value
+    
+    log.info("-" * 60)
+    log.info("累计收益率：{:.2f}%".format(total_ret))
+    log.info("今日收益率：{:.2f}%".format(daily_ret))
+    log.info("=" * 60)

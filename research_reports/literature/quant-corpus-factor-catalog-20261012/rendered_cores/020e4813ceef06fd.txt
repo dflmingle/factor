@@ -1,0 +1,206 @@
+quant/2022年度精选策略/47.基于随机森林和XGBoost的多因子模型分析.txt
+import pandas as pd
+import numpy as np
+import math
+import jqdata
+import time
+import datetime
+from jqfactor import standardlize
+from jqfactor import winsorize_med
+from jqfactor import get_factor_values
+from jqfactor import neutralize
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.feature_selection import SelectPercentile, f_classif
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
+from jqlib.technical_analysis import *
+from xgboost.sklearn import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import seaborn as sns
+'EXACT_REVIEWED_FUNCTION delete_stop sha256=55721ec6070d0010dabe4bbdc0f1e5af972aab658bd2438ef12aa0c7bd840b7a source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+'EXACT_REVIEWED_FUNCTION delete_st sha256=e4658d81b7ef6b793268ba39d44dce3dd9a314b45b0f021f4d9e5c0b23782f28 source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+peroid = 'M'
+start_date = '2014-02-01'
+end_date = '2019-01-31'
+train_length = 48
+industry_code = ['HY001', 'HY002', 'HY003', 'HY004', 'HY005', 'HY006', 'HY007', 'HY008', 'HY009', 'HY010', 'HY011']
+securities_list = delete_stop(get_index_stocks('000985.XSHG'), start_date, 90)
+securities_list = delete_st(securities_list, start_date)
+jqfactors_list = ['current_ratio', 'net_profit_to_total_operate_revenue_ttm', 'gross_income_ratio', 'roe_ttm', 'roa_ttm', 'total_asset_turnover_rate', 'net_operating_cash_flow_coverage', 'net_operate_cash_flow_ttm', 'net_profit_ttm', 'cash_to_current_liability', 'operating_revenue_growth_rate', 'non_recurring_gain_loss', 'operating_revenue_ttm', 'net_profit_growth_rate']
+
+def get_jq_factor(date):
+    factor_data = get_factor_values(securities=securities_list, factors=jqfactors_list, count=1, end_date=date)
+    df_jq_factor = pd.DataFrame(index=securities_list)
+    for i in factor_data.keys():
+        df_jq_factor[i] = factor_data[i].iloc[0, :]
+    return df_jq_factor
+q = query(valuation.code, valuation.market_cap, valuation.circulating_market_cap, valuation.pe_ratio, valuation.pb_ratio, valuation.pcf_ratio, valuation.ps_ratio, balance.total_assets, balance.total_liability, balance.development_expenditure, balance.dividend_payable, balance.fixed_assets, balance.total_non_current_liability, income.operating_profit, income.total_profit, indicator.net_profit_to_total_revenue, indicator.inc_revenue_year_on_year, indicator.inc_net_profit_year_on_year, indicator.roe, indicator.roa, indicator.gross_profit_margin).filter(valuation.code.in_(securities_list))
+'EXACT_REVIEWED_FUNCTION get_period_date sha256=a53b94eb59dc525036db75cb0e24d1fbc2b8d82a20eb148f74d52091475ec62b source=quant/2021年度精选策略/12.机器学习用于量化分析.txt'
+
+def initialize_df(df, date):
+    df['net_assets'] = df['total_assets'] - df['total_liability']
+    df_new = pd.DataFrame(index=securities_list)
+    df_new['EP'] = df['pe_ratio'].apply(lambda x: 1 / x)
+    df_new['BP'] = df['pb_ratio'].apply(lambda x: 1 / x)
+    df_new['SP'] = df['ps_ratio'].apply(lambda x: 1 / x)
+    df_new['DP'] = df['dividend_payable'] / (df['market_cap'] * 100000000)
+    df_new['RD'] = df['development_expenditure'] / (df['market_cap'] * 100000000)
+    df_new['CFP'] = df['pcf_ratio'].apply(lambda x: 1 / x)
+    df_new['CMV'] = np.log(df['circulating_market_cap'])
+    df_new['financial_leverage'] = df['total_assets'] / df['net_assets']
+    df_new['debtequityratio'] = df['total_non_current_liability'] / df['net_assets']
+    df_new['cashratio'] = df['cash_to_current_liability']
+    df_new['currentratio'] = df['current_ratio']
+    df_new['NI'] = df['net_profit_to_total_operate_revenue_ttm']
+    df_new['GPM'] = df['gross_income_ratio']
+    df_new['ROE'] = df['roe_ttm']
+    df_new['ROA'] = df['roa_ttm']
+    df_new['asset_turnover'] = df['total_asset_turnover_rate']
+    df_new['net_operating_cash_flow'] = df['net_operating_cash_flow_coverage']
+    df_new['Sales_G_q'] = df['operating_revenue_growth_rate']
+    df_new['Profit_G_q'] = df['net_profit_growth_rate']
+    df_new['RSI'] = pd.Series(RSI(securities_list, date, N1=20))
+    dif, dea, macd = MACD(securities_list, date, SHORT=10, LONG=30, MID=15)
+    df_new['DIF'] = pd.Series(dif)
+    df_new['DEA'] = pd.Series(dea)
+    df_new['MACD'] = pd.Series(macd)
+    return df_new
+dateList = get_period_date(peroid, start_date, end_date)
+df_jq_factor = {}
+df_q_factor = {}
+df_factor_pre_train = {}
+for date in dateList:
+    df_jq_factor = get_jq_factor(date)
+    df_q_factor = get_fundamentals(q, date=date)
+    df_q_factor.index = df_q_factor['code']
+    df_factor_pre_train[date] = pd.concat([df_q_factor, df_jq_factor], axis=1)
+    df_factor_pre_train[date] = initialize_df(df_factor_pre_train[date], date)
+'EXACT_REVIEWED_FUNCTION get_industry_name sha256=c9726e05239a37f562934b17b1b5733160a88375853703dfe7c3a8d57e84b413 source=quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt'
+'EXACT_REVIEWED_FUNCTION replace_nan_indu sha256=04f064c8d8a29623f632738b915e8d07e2ef10a77e6ba512b87d92fd170bda26 source=quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt'
+
+def data_preprocessing(factor_data, stockList, industry_code, date):
+    factor_data = winsorize_med(factor_data, scale=5, inf2nan=False, axis=0)
+    factor_data = replace_nan_indu(factor_data, stockList, industry_code, date)
+    factor_data = neutralize(factor_data, date=date, axis=0)
+    factor_data = standardlize(factor_data, axis=0)
+    return factor_data
+df_factor_train = {}
+for date in dateList:
+    df_factor_train[date] = data_preprocessing(df_factor_pre_train[date], securities_list, industry_code, date)
+train_data = pd.DataFrame()
+for date in dateList[:train_length]:
+    traindf = df_factor_train[date]
+    data_close = get_price(securities_list, date, dateList[dateList.index(date) + 1], '1d', 'close')['close']
+    traindf['pchg'] = data_close.iloc[-1] / data_close.iloc[0] - 1
+    traindf = traindf.dropna()
+    traindf = traindf.sort_values(by=['pchg'], ascending=False)
+    traindf = traindf.iloc[:int(len(traindf['pchg']) / 10 * 3), :].append(traindf.iloc[int(len(traindf['pchg']) / 10 * 7):, :])
+    traindf['label'] = list(traindf['pchg'].apply(lambda x: 1 if x > np.mean(list(traindf['pchg'])) else -1))
+    if train_data.empty:
+        train_data = traindf
+    else:
+        train_data = train_data.append(traindf)
+test_data = {}
+for date in dateList[train_length:-1]:
+    testdf = df_factor_train[date]
+    stockList = list(testdf.index)
+    data_close = get_price(stockList, date, dateList[dateList.index(date) + 1], '1d', 'close')['close']
+    testdf['pchg'] = data_close.iloc[-1] / data_close.iloc[0] - 1
+    testdf = testdf.dropna()
+    testdf = testdf.sort_values(by=['pchg'], ascending=False)
+    testdf = testdf.iloc[:int(len(traindf['pchg']) / 10 * 3), :].append(testdf.iloc[int(len(testdf['pchg']) / 10 * 7):, :])
+    testdf['label'] = list(testdf['pchg'].apply(lambda x: 1 if x > np.mean(list(testdf['pchg'])) else -1))
+    test_data[date] = testdf
+y_train = train_data['label']
+X_train = train_data.copy()
+del X_train['pchg']
+del X_train['label']
+transform = SelectPercentile(f_classif)
+model = XGBClassifier()
+model_pipe = Pipeline(steps=[('ANOVA', transform), ('model', model)])
+score_means = list()
+score_stds = list()
+percentiles = (10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+for percentile in percentiles:
+    model_pipe.set_params(ANOVA__percentile=percentile)
+    this_scores = cross_val_score(model_pipe, X_train, y_train, cv=5, n_jobs=-1)
+    score_means.append(this_scores.mean())
+    score_stds.append(this_scores.std())
+transform = SelectPercentile(f_classif, percentile=80)
+model = XGBClassifier()
+model_pipe = Pipeline(steps=[('ANOVA', transform), ('model', model)])
+cv = StratifiedKFold(5)
+parameters = [3, 4, 5, 6, 7, 8]
+score_methods = ['roc_auc', 'f1']
+for parameter in parameters:
+    t1 = time.time()
+    score_list = list()
+    for score_method in score_methods:
+        model_pipe.set_params(model__max_depth=parameter)
+        score_tmp = cross_val_score(model_pipe, X_train, y_train, scoring=score_method, cv=cv, n_jobs=-1)
+        score_list.append(score_tmp)
+    score_matrix = pd.DataFrame(np.array(score_list), index=score_methods)
+    score_mean = score_matrix.mean(axis=1).rename('mean')
+    score_std = score_matrix.std(axis=1).rename('std')
+    score_pd = pd.concat([score_matrix, score_mean, score_std], axis=1)
+    t2 = time.time()
+    tt = t2 - t1
+transform.fit(X_train, y_train)
+X_train_final = transform.transform(X_train)
+model = RandomForestClassifier(n_estimators=500, max_depth=4, random_state=0)
+model.fit(X_train_final, y_train)
+model = XGBClassifier(max_depth=1, subsample=0.9, random_state=0)
+model.fit(X_train_final, y_train)
+factor_predict_corr = pd.DataFrame()
+for date in dateList[train_length:-1]:
+    test_feature = test_data[date].copy()
+    del test_feature['pchg']
+    del test_feature['label']
+    test_feature['predict'] = list(test_sample_predict[date])
+    factor_predict_corr[date] = test_feature.corr()['predict']
+factor_predict_corr = factor_predict_corr.iloc[:-1]
+ax = fig.add_subplot(111)
+sns.set()
+ax = sns.heatmap(factor_predict_corr)
+test_sample_predict = {}
+test_sample_score = []
+test_sample_accuracy = []
+test_sample_roc_auc = []
+test_sample_date = []
+for date in dateList[train_length:-1]:
+    y_test = test_data[date]['label']
+    X_test = test_data[date].copy()
+    del X_test['pchg']
+    del X_test['label']
+    X_test_final = transform.transform(X_test)
+    y_pred_tmp = model.predict(X_test_final)
+    y_pred = pd.DataFrame(y_pred_tmp, columns=['label_predict'])
+    y_pred_proba = pd.DataFrame(model.predict_proba(X_test_final), columns=['pro1', 'pro2'])
+    y_pred.set_index(X_test.index, inplace=True)
+    y_pred_proba.set_index(X_test.index, inplace=True)
+    predict_pd = pd.concat((X_test, y_pred, y_pred_proba), axis=1)
+    test_sample_date.append(date)
+    test_sample_predict[date] = y_pred_tmp
+    test_sample_accuracy.append(accuracy_score(y_test, y_pred))
+    test_sample_roc_auc.append(roc_auc_score(y_test, y_pred))
+xs_date = [datetime.datetime.strptime(d, '%Y-%m-%d').date() for d in test_sample_date]
+ys_auc = test_sample_roc_auc
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+plt.gcf().autofmt_xdate()
+xs_date = [datetime.datetime.strptime(d, '%Y-%m-%d').date() for d in test_sample_date]
+ys_score = test_sample_accuracy
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+plt.gcf().autofmt_xdate()
+f = plt.figure(figsize=(15, 10))
+sns.set(style='whitegrid')
+data1 = pd.DataFrame(ys_auc, xs_date, columns={'AUC'})
+data2 = pd.DataFrame(ys_score, xs_date, columns={'accuracy'})
+data = pd.concat([data1, data2], sort=False)
+sns.lineplot(data=data, palette='tab10', linewidth=2.5)
+model = XGBClassifier(max_depth=1, subsample=0.9, random_state=0)
+model.fit(X_train, y_train)
+fig = plt.figure(figsize=(15, 10))
+n_features = X_train.shape[1]

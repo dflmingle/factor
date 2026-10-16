@@ -1,0 +1,237 @@
+quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt
+import jqdata
+from jqlib.technical_analysis import *
+import operator
+import datetime
+import talib
+import numpy as np
+import pandas as pd
+
+def market_cap():
+    wholeA = get_fundamentals(query(valuation.code).filter(valuation.market_cap < 500))
+    wholeAList = list(wholeA['code'])
+    return wholeAList
+
+def filter_stock_limit(stock_list):
+    curr_data = get_current_data()
+    for stock in stock_list:
+        price = curr_data[stock].day_open
+        if price >= curr_data[stock].high_limit:
+            stock_list.remove(stock)
+    return stock_list
+
+def filter_new_and_ST(stock_list, context):
+    df = get_all_securities(types=['stock'], date=context.current_dt)
+    df = df[(df['start_date'] > (context.current_dt - timedelta(days=100)).date()) | df['display_name'].str.contains('ST') | df['display_name'].str.contains('退') | df['display_name'].str.contains('\\*')]
+    return list(set(stock_list).difference(set(df.index)))
+
+def check_stocks(context):
+    g.check_out_lists = market_cap()
+    g.check_out_lists = filter_new_and_ST(g.check_out_lists, context)
+    longhu = get_billboard_list(stock_list=g.check_out_lists, end_date=context.previous_date, count=30)
+    g.check_out_lists = list(set(g.check_out_lists).intersection(set(longhu['code'])))
+
+def initialize(context):
+    pass
+
+def before_trading_start(context):
+    check_stocks(context)
+    g.preorderlist = []
+    g.selllist = {}
+    for sec in context.portfolio.positions:
+        historys = attribute_history(sec, fields=['close', 'pre_close'], count=1)
+        sellitem = {}
+        sellitem['pre_close'] = historys['pre_close'][-1]
+        sellitem['sec'] = sec
+        g.selllist[sec] = sellitem
+    g.tracklist = zhangting(context, 2, 12)
+
+def handle_data(context, data):
+    if g.tracklist:
+        cash = context.portfolio.available_cash
+        if cash > 1000:
+            count = decisionOrder(context, g.tracklist, data)
+            if count > 0:
+                pass
+    selllogic(context, data)
+    buying(context, data)
+
+def selllogic(context, data):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == 13 and minute == 42:
+        for sec in g.selllist.copy():
+            lastprice = get_bars(sec, count=1, include_now=False, fields=['low', 'close', 'date'])
+            secprice = get_bars(sec, end_dt=context.current_dt, count=1, fields=['date', 'low', 'close', 'high', 'open'], include_now=True)
+            openprice = secprice['open'][0]
+            lowprice = secprice['low'][0]
+            closeprice = secprice['close'][0]
+            precloseprice = lastprice['close'][0]
+            if (closeprice - precloseprice) / precloseprice >= 0.096:
+                continue
+            order_target(sec, 0)
+            del g.selllist[sec]
+
+def decisionOrder(context, tracklistbottom, data):
+    if not tracklistbottom:
+        return 0
+    hour = context.current_dt.hour
+    minu = context.current_dt.minute
+    if hour > 10:
+        return 0
+    mincount = 20
+    if hour == 9:
+        mincount = min(max(minu - 30, 1), mincount)
+    else:
+        mincount = mincount
+    count = 0
+    for bottom in tracklistbottom.copy():
+        currentprice = get_current_data()[bottom.stock].last_price
+        if currentprice == data[bottom.stock].high_limit:
+            continue
+        open_price = get_current_data()[bottom.stock].day_open
+        if open_price > currentprice:
+            continue
+        open_price = get_current_data()[bottom.stock].day_open
+        rate = (currentprice - bottom.last_close_price) / bottom.last_close_price
+        if rate < 0.05:
+            continue
+        g.preorderlist.append(bottom)
+        tracklistbottom.remove(bottom)
+        count = count + 1
+    return count
+
+def buying(context, data):
+    if context.current_dt.hour > 13 and context.current_dt.minute > 45:
+        return
+    for item in g.preorderlist.copy():
+        currentprice = data[item.stock].close
+        if currentprice < data[item.stock].high_limit:
+            buy(context, item.stock)
+            g.preorderlist.remove(item)
+            return
+
+def buy(context, stock):
+    count = 2
+    if stock in context.portfolio.positions:
+        return
+    if len(context.portfolio.positions) >= count:
+        return
+    buy_cash = context.portfolio.total_value / count
+    order_target_value(stock, buy_cash)
+
+def zhangting(context, n, m):
+    ztlist = []
+    g.tracklist = []
+    finalbuylist = []
+    finalbuylistobject = {}
+    for sec in g.check_out_lists:
+        count = 0
+        historys = attribute_history(sec, fields=['close', 'pre_close', 'high', 'low', 'open', 'high_limit'], count=m, df=False)
+        close = historys['close'][-1]
+        last_data_close = historys['pre_close'][-1]
+        if (close - last_data_close) / last_data_close > 0.03:
+            continue
+        haslianxu = False
+        islastzt = False
+        lianxuid = 0
+        isok = False
+        alllen = m
+        for i in range(m - 1, 0, -1):
+            limit = historys['high_limit'][i]
+            close = historys['close'][i]
+            limit1 = historys['high_limit'][i - 1]
+            close1 = historys['close'][i - 1]
+            if limit == close and limit1 == close1:
+                isok = True
+                lianxuid = i
+        if not isok:
+            continue
+        max_id, max_price = max(enumerate(historys['high'][lianxuid:]), key=operator.itemgetter(1))
+        min_id, min_price = min(enumerate(historys['low'][lianxuid:]), key=operator.itemgetter(1))
+        max_id = max_id + lianxuid
+        min_id = min_id + lianxuid
+        if alllen - min_id > 2:
+            continue
+        if (max_price - min_price) / min_price < 0.2:
+            continue
+        if alllen - max_id < 3:
+            continue
+        haschonggao = False
+        for i in range(max_id + 1, alllen):
+            last_data_close = historys['pre_close'][i]
+            limit = historys['high_limit'][i]
+            close = historys['close'][i]
+            high = historys['high'][i]
+            if (high - last_data_close) / last_data_close > 0.045:
+                haschonggao = True
+        if not haschonggao:
+            continue
+        yanxiancount = 0
+        for ix in range(max_id + 1, alllen):
+            last_data_close = historys['pre_close'][i]
+            close_today = historys['close'][i]
+            open_today = historys['open'][i]
+            if close_today < open_today or close_today < last_data_close:
+                continue
+            day_gain = (close_today - last_data_close) / last_data_close
+            if day_gain >= 0.052:
+                hasyanxian = True
+                yanxiancount = yanxiancount + 1
+                xianyanid = i
+        if yanxiancount > 1:
+            continue
+        isok = False
+        for i in range(-1, -3, -1):
+            lastopenprice = historys['close'][i]
+            lastopenprice = historys['open'][i]
+            lasthighprice = historys['high'][i]
+            lastlowprice = historys['low'][i]
+            lastcloseprice = historys['close'][i]
+            lastpreclose = historys['pre_close'][i]
+            isyingxian = yingxian(lastopenprice, lastcloseprice, lasthighprice, lastlowprice, lastpreclose)
+            if isyingxian:
+                isok = True
+                break
+        if isok:
+            bottom = CWBotton()
+            bottom.inix(historys['close'][-1], sec)
+            finalbuylist.append(sec)
+            g.tracklist.append(bottom)
+    return g.tracklist
+
+class CWBotton:
+
+    def inix(self, last_close_price, stock):
+        self.last_close_price = last_close_price
+        self.stock = stock
+
+def yingxian(open, close, high, low, preclose):
+    if close > open or close > preclose:
+        return False
+    if (preclose - close) / preclose < 0.03:
+        return False
+    return True
+
+def shangyingxian(open, close, high, low):
+    if (high - max(open, close)) / max(open, close) > 0.02:
+        return True
+    return False
+
+def Txian(open, close, high, low):
+    shiti = round(max(abs(open - close), 0.001), 3)
+    shangyin = round(max(abs(high - max(close, open)), 0.001), 3)
+    xiaying = round(max(abs(min(open, close) - low), 0.001), 3)
+    if (high - low) / open > 0.9:
+        return False
+    if xiaying / shiti >= 1.9 and xiaying / shangyin >= 2:
+        return True
+    return False
+
+def bdebugprint(str):
+    if 1:
+        pass
+
+def buyprint(str):
+    if 1:
+        pass

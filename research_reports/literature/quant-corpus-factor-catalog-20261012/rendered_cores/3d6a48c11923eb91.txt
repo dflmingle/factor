@@ -1,0 +1,95 @@
+quant/聚宽2025年精选/40高股息策略.txt
+import pandas as pd
+from jqdata import *
+from sqlalchemy.sql.expression import or_
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.days = 0
+    g.stock_num = 10
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_weekly(my_Trader, 1, time='09:30')
+    run_daily(check_limit_up, time='14:00')
+
+def get_dividend_ratio_filter_list(context, stock_list):
+
+    def helper(stock_list, time0, time1):
+        interval = 1000
+        list_len = len(stock_list)
+        q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date >= time0, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(stock_list[:min(list_len, interval)]))
+        df = finance.run_query(q)
+        if list_len > interval:
+            df_num = list_len // interval
+            for i in range(df_num):
+                q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date > time0, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(stock_list[interval * (i + 1):min(list_len, interval * (i + 2))]))
+                temp_df = finance.run_query(q)
+                df = df.append(temp_df)
+        dividend = df.fillna(0)
+        dividend = dividend.set_index('code')
+        dividend = dividend.groupby('code').sum()
+        temp_list = list(dividend.index)
+        q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(temp_list))
+        cap = get_fundamentals(q, date=time1)
+        cap = cap.set_index('code')
+        DR = pd.concat([dividend, cap], axis=1, sort=False)
+        DR['dividend_ratio'] = DR['bonus_amount_rmb'] / 10000 / DR['market_cap']
+        DR = DR.sort_values(by=['dividend_ratio'], ascending=False)
+        return DR
+    curr_DR = pd.DataFrame()
+    for i in range(5):
+        time1 = context.previous_date if i == 0 else time0
+        time0 = time1 - datetime.timedelta(days=365)
+        DR = helper(stock_list, time0, time1)
+        stock_list = list(DR.index)
+        if i == 0:
+            curr_DR = DR
+    final_DR = curr_DR.reindex(stock_list)
+    return final_DR
+
+def my_Trader(context):
+    g.days = 0
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    df = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stocks), indicator.inc_operation_profit_year_on_year > 0).order_by(valuation.market_cap.asc()))
+    stocks = list(df.code)
+    DR = get_dividend_ratio_filter_list(context, stocks)
+    df = pd.DataFrame(index=DR.index)
+    df['dividend_ratio'] = DR['dividend_ratio']
+    industry_infos = get_industry(security=list(DR.index), date=dt_last)
+    for stock in industry_infos.keys():
+        if 'sw_l1' not in industry_infos[stock]:
+            continue
+        df.loc[stock, 'industry'] = industry_infos[stock]['sw_l1']['industry_code']
+    df = df.groupby('industry').apply(lambda x: x.nlargest(2, 'dividend_ratio'))
+    stocks = list(df.index.levels[1])
+    df = DR.loc[stocks][['dividend_ratio']].sort_values(by='dividend_ratio', ascending=False)
+    stocks = list(df[df['dividend_ratio'] > 0.03].index)
+    stocks = filter_st_stock(stocks)
+    stocks = filter_paused_stock(stocks)
+    stocks = filter_limitup_stock(context, stocks)
+    stocks = filter_limitdown_stock(context, stocks)
+    buylist = stocks
+    current_data = get_current_data()
+    for stock in context.portfolio.positions:
+        if stock not in buylist and stock not in g.high_limit_list:
+            order = order_target_value(stock, 0)
+            if order != None:
+                pass
+    if len(context.portfolio.positions) >= g.stock_num:
+        return
+    value = context.portfolio.total_value / g.stock_num
+    for stock in buylist:
+        if stock not in context.portfolio.positions and DR.loc[stock]['dividend_ratio'] > 0.04:
+            order = order_target_value(stock, value)
+            if order != None:
+                pass
+        if len(context.portfolio.positions) >= g.stock_num:
+            break
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=2697930f141c467accd721565ad85ef5f61cad0d6604e9688b5f455d5556a59e source=quant/2024年度精选策略1/28.正黄旗大妈选股法，修改版，年化92%.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=db344776998e25df32d470ac98fbc940aae858e72dcf78422c8449e2140ee82b source=quant/2024年度精选策略1/9.持仓95只大容量小市值，媲美金元顺安元启.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'

@@ -1,0 +1,92 @@
+quant/量化策略/量化策略/ETF轮动策略2026/02稳健型ETF策略-调优版-25年27.txt
+import pandas as pd
+import numpy as np
+import math
+from jqdata import *
+from jqlib.technical_analysis import MACD
+
+def initialize(context):
+    g.weights = [0.25, 0.2, 0.25, 0.15, 0.15]
+    run_monthly(on_start, 1, '9:35')
+
+def get_macd_M(stock, check_date):
+    dif, dea, macd = MACD(stock, check_date=check_date, SHORT=12, LONG=26, MID=9, unit='1M', include_now=False)
+    return macd[stock]
+
+def year_start(context):
+    dt = context.current_dt
+    year = dt.year
+    trade_days = get_trade_days(start_date=str(year) + '-01-01', end_date=str(year) + '-12-31')
+    first_day = trade_days[0]
+    return 1 if dt.month == first_day.month and dt.day == first_day.day else 0
+
+def get_zf(context):
+    etf = '510880.XSHG'
+    dt = context.current_dt
+    year = dt.year
+    last_year = year - 1
+    trade_days = get_trade_days(start_date=str(last_year) + '-01-01', end_date=str(last_year) + '-12-31')
+    if len(trade_days) == 0:
+        return 0.0
+    last_day = trade_days[-1]
+    df_last = get_price(etf, start_date=last_day, end_date=last_day, frequency='1d', fields=['close'], panel=False)
+    if df_last.empty:
+        return 0.0
+    price_last = df_last['close'].iloc[-1]
+    df_today = attribute_history(etf, 1, '1d', ['close'])
+    price_today = df_today['close'][-1]
+    zf = (price_today - price_last) / price_last * 100
+    return round(zf, 2)
+
+def on_start(context):
+    yesterday = context.current_dt
+    macd_300 = get_macd_M('000300.XSHG', yesterday)
+    macd_100 = get_macd_M('513100.XSHG', yesterday)
+    macd_49 = get_macd_M('159949.XSHE', yesterday)
+    macd_88 = get_macd_M('518880.XSHG', yesterday)
+    zf = get_zf(context)
+    if macd_49 > 0:
+        s1 = '159949.XSHE'
+    elif macd_100 > 0:
+        s1 = '513100.XSHG'
+    elif zf > -7:
+        s1 = '510880.XSHG'
+    else:
+        s1 = '511010.XSHG'
+    if zf > -7:
+        s2 = '510880.XSHG'
+    else:
+        s2 = '511010.XSHG'
+    if macd_88 > 0:
+        s3 = '518880.XSHG'
+    elif macd_300 > 0 and zf > -6:
+        s3 = '510880.XSHG'
+    else:
+        s3 = '518880.XSHG'
+    s4 = '511010.XSHG'
+    s5 = '511880.XSHG'
+    target_stocks = [s1, s2, s3, s4, s5]
+    weights = g.weights
+    if year_start(context) == 1:
+        for security in list(context.portfolio.positions.keys()):
+            order_target_value(security, 0)
+    total_value = context.portfolio.total_value
+    target_dict = {}
+    for i, stock in enumerate(target_stocks):
+        target_dict[stock] = target_dict.get(stock, 0) + total_value * weights[i]
+    current_stocks = set(context.portfolio.positions.keys())
+    all_stocks = set(target_dict.keys()) | current_stocks
+    for stock in all_stocks:
+        target = target_dict.get(stock, 0)
+        order_target_value(stock, target)
+        current_pos = context.portfolio.positions[stock].total_amount
+        if target > 0 and current_pos > 0:
+            pass
+        elif target == 0 and current_pos > 0:
+            pass
+        elif target > 0 and current_pos == 0:
+            pass
+    for stock in sorted(context.portfolio.positions.keys()):
+        pos = context.portfolio.positions[stock]
+        if pos.total_amount > 0:
+            pass

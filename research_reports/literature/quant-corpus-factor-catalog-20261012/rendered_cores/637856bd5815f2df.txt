@@ -1,0 +1,100 @@
+quant/2022年度精选策略/46.指数择时与仓位管理策略初探.txt
+from jqdata import *
+import talib as tb
+import statsmodels.api as sm
+
+def initialize(context):
+    set_params(context)
+    set_tutle_params(context)
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=fb674383d7b825a635aaa8059d4d2564e67dec1c38c6c005542d4e5f978bf5e8 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+
+def set_params(context):
+    g.security = '000300.XSHG'
+    g.N = 18
+    g.M = 1100
+    g.init = False
+    g.buy = 0.7
+    g.sell = -0.7
+    g.ans = []
+    g.ans_rightdev = []
+    previous_date = context.current_dt - datetime.timedelta(days=2)
+    prices = get_price(g.security, '2005-01-05', previous_date, '1d', ['high', 'low'])
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+
+def set_tutle_params(context):
+    g.break_price = 0
+    g.sys = 0
+    g.unit_limit = 4
+    g.position_level = 0
+    g.ceof = 0.5
+
+def ATR(high, low, close, pos):
+    atrValue = tb.ATR(high, low, close, timeperiod=14)[-1]
+    absAtr = atrValue * 1
+    unit = 0.01 * pos / absAtr
+    amount = unit * close[-1]
+    return (atrValue, unit, amount)
+
+def market_open(context):
+    security = g.security
+    price_data = get_bars(security, count=20, unit='1d', fields=['close', 'high', 'low'])
+    total_value = context.portfolio.total_value
+    atr, vol, amount = ATR(price_data['high'], price_data['low'], price_data['close'], total_value)
+    beta = 0
+    r2 = 0
+    if g.init:
+        g.init = False
+    else:
+        prices = attribute_history(security, g.N, '1d', ['high', 'low'])
+        highs = prices.high
+        lows = prices.low
+        X = sm.add_constant(lows)
+        model = sm.OLS(highs, X)
+        beta = model.fit().params[1]
+        g.ans.append(beta)
+        r2 = model.fit().rsquared
+        g.ans_rightdev.append(r2)
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    zscore_rightdev = zscore * beta * r2
+    current_price = get_current_data()[g.security].last_price
+    price_base = max(attribute_history(g.security, 20, '1d', 'close')['close'])
+    if zscore_rightdev > g.buy and g.sys == 0:
+        order_value(security, amount)
+        g.sys += int(vol)
+        g.break_price = current_price
+        g.top_price = current_price
+        g.position_level += 1
+    elif zscore_rightdev > g.buy and g.sys != 0:
+        if current_price >= g.break_price + 0.1 * g.ceof * atr and g.position_level <= g.unit_limit - 1:
+            order_value(security, int(vol * current_price))
+            g.sys += int(vol)
+            g.position_level += 1
+            g.break_price = g.break_price + 0.1 * g.ceof * atr
+        elif current_price <= g.break_price - g.ceof * atr and g.position_level >= 1:
+            order_value(security, -int(vol * current_price))
+            g.sys -= int(vol)
+            g.position_level -= 1
+            g.break_price = g.break_price - g.ceof * atr
+    elif zscore_rightdev < g.sell and len(context.portfolio.positions.keys()) > 0:
+        for s in context.portfolio.positions.keys():
+            order_target(security, 0)
+            g.break_price = 0
+            g.sys = 0
+            g.position_level = 0
+    position_last = context.portfolio.available_cash
+    position_last_pct = 1 - position_last / context.portfolio.total_value

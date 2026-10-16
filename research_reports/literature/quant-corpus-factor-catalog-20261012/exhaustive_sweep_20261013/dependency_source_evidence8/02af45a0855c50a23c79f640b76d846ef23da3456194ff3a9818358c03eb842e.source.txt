@@ -1,0 +1,375 @@
+# 策略名称：多品种ETF动量轮动+EPO优化（Ptrade版）
+# 运行频率：分钟（每天09:31执行，只在每月第一个交易日调仓）
+# 说明：使用前复权价格计算动量，EPO优化权重，每月调仓一次
+# 仓位控制：回测使用总资产比例，实盘使用剩余现金 × g.position_pct
+
+import numpy as np
+import pandas as pd
+import math
+import datetime
+from scipy.linalg import solve
+
+def initialize(context):
+    # ========== 基础设置 ==========
+    set_benchmark('000300.XSHG')                 # 沪深300，使用PTrade真实后缀
+    set_slippage(0.002)
+    set_commission(commission_ratio=0.0002, min_commission=5, type='etf')
+
+    # ========== 策略参数 ==========
+    g.stock_num = 3                # 持有ETF数量
+    g._lambda = 10                 # EPO 风险厌恶系数
+    g.w = 0.2                      # 收缩权重
+    g.m_days = 34                  # 动量参考天数
+    g.optim_window = 1000          # EPO优化回看天数
+
+    # ========== 仓位控制参数（仅实盘生效）==========
+    g.position_pct = 1.0           # 实盘买入总金额 = 剩余现金 × 仓位比例（1.0表示满仓）
+
+    # ========== ETF池（长后缀，与get_positions()返回格式一致）==========
+    g.etf_pool = [
+        '512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG',
+        '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG',
+        '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE',
+        '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG',
+        '159755.XSHE', '561160.XSHG',
+        '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE',
+        '512010.XSHG', '159647.XSHE',
+        '512660.XSHG', '512710.XSHG',
+        '512980.XSHG', '159869.XSHE', '159805.XSHE',
+        '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG'
+    ]
+
+    set_universe(g.etf_pool)
+
+    g.is_real = is_trade()
+    if g.is_real:
+        # 实盘：每天9:31调用trade，内部判断每月第一个交易日
+        run_daily(context, trade, time='09:31')
+
+def handle_data(context, data):
+    """回测：每分钟执行，只在09:31调用trade，内部判断调仓日"""
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 9 and current_dt.minute == 31:
+        trade(context, data)
+
+# ========== 每月第一个交易日判断（兼容PTrade）==========
+def is_first_trading_day_of_month(date):
+    """
+    判断给定日期是否为当月第一个交易日。
+    PTrade可能没有get_trading_day_by_date，采用稳健方法：
+    获取当月1日及之后若干天的交易日，若date等于第一个交易日则返回True。
+    """
+    first_day = date.replace(day=1)
+    # 获取从first_day开始的下一个交易日（可能当天就是交易日）
+    try:
+        # 方法1：尝试使用get_trading_day_by_date（部分PTrade版本支持）
+        first_trading_day_str = get_trading_day_by_date(first_day.strftime('%Y%m%d'), 0)
+        return date.strftime('%Y%m%d') == first_trading_day_str
+    except Exception:
+        # 方法2：通过get_history获取前两天的数据，判断date是否为交易日且前一个交易日不属于当月
+        # 简单做法：如果date是当月1号且当天有交易，则认为是第一个交易日（不严谨但够用）
+        # 更准确：获取date前一个交易日，判断是否属于上个月
+        try:
+            # 获取date前一个交易日
+            prev_day = get_trading_day_by_date(date.strftime('%Y%m%d'), -1)
+            if prev_day:
+                prev_date = datetime.datetime.strptime(prev_day, '%Y%m%d').date()
+                if prev_date.month != date.month:
+                    return True
+            return False
+        except:
+            # 最简回退：每月1号调仓（不够准确，但保证策略能运行）
+            return date.day == 1
+
+def trade(context, data=None):
+    # 每月第一个交易日才执行调仓
+    if not is_first_trading_day_of_month(context.blotter.current_dt):
+        return
+
+    # ---------- 1. 动量选股 ----------
+    target_list, score_df = get_rank(g.etf_pool)
+    if not target_list:
+        # 无符合条件的ETF，清仓所有（使用get_positions获取所有持仓）
+        positions = get_positions()
+        for code, pos in positions.items():
+            if pos.amount != 0:
+                order_target_value(code, 0)
+                log.info('【卖出】%s（无符合条件的ETF）' % code)
+        return
+
+    target_list = target_list[:g.stock_num]
+
+    log.info('=' * 50)
+    log.info('调仓日 %s 筛选结果（前%d只）：' % (context.blotter.current_dt.strftime('%Y-%m-%d'), g.stock_num))
+    for etf in target_list:
+        log.info('  %s : 得分 = %.6f' % (etf, score_df.loc[etf, 'score']))
+    log.info('=' * 50)
+
+    # ---------- 2. 卖出不在目标列表的持仓（使用get_positions）----------
+    positions = get_positions()   # 返回长后缀，与target_list一致
+    for code, pos in positions.items():
+        if pos.amount != 0 and code not in target_list:
+            #print(f"code: {code}")
+            # 获取可卖数量
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+
+            if sellable <= 0:
+                log.info('【卖出跳过】%s，可用数量为0' % code)
+                continue
+
+            order_target_value(code, 0)
+            if not g.is_real and data is not None:
+                # 注意：data中可能使用短后缀，这里直接使用code（长后缀）获取价格可能失败
+                # 回测中推荐使用 data[code].open，但需确保data的键是长后缀；若不确定，可用get_history获取最新价
+                try:
+                    price = data[code].open
+                except:
+                    price = None
+                log.info('【卖出】%s，可卖数量:%.0f股，价格:%.3f' % (code, sellable, price if price else 0))
+            else:
+                log.info('【卖出】%s，可卖数量:%.0f股' % (code, sellable))
+        elif pos.amount != 0 and code in target_list:
+            log.info('【持有】%s（继续持有）' % code)
+
+    # ---------- 3. EPO优化权重 ----------
+    end_date = context.blotter.current_dt
+    weights = run_optimization(target_list, end_date)
+    if weights is None:
+        log.error('EPO优化失败，本次调仓跳过')
+        return
+
+    log.info('EPO优化权重：%s' % weights)
+
+    # ---------- 4. 买入（区分实盘/回测，应用仓位控制）----------
+    if g.is_real:
+        # 实盘：总买入金额 = 剩余现金 × 仓位比例
+        total_buy_cash = context.portfolio.cash * g.position_pct
+        if total_buy_cash <= 0:
+            log.warning('【仓位控制】剩余现金为0或仓位比例为0，放弃买入')
+            return
+        log.info('【仓位控制】剩余现金: %.2f，使用比例: %.1f%%，总买入金额: %.2f' %
+                 (context.portfolio.cash, g.position_pct * 100, total_buy_cash))
+        # 按权重分配每只ETF的目标金额
+        for i, etf in enumerate(target_list):
+            target_value = total_buy_cash * weights[i]
+            # 获取当前价格（实盘用get_snapshot）
+            snapshot = get_snapshot(etf)
+            price = snapshot.get(etf, {}).get('last_px', None) if snapshot else None
+            if price is None or price <= 0:
+                log.warning('【买入跳过】%s，无法获取有效价格' % etf)
+                continue
+            min_amount = price * 100
+            if target_value < min_amount:
+                log.warning('【买入跳过】%s，目标金额 %.2f 不足100股（需 %.2f）' % (etf, target_value, min_amount))
+                continue
+            order_target_value(etf, target_value)
+            log.info('【买入】%s，目标金额：%.2f，价格：%.3f（权重：%.4f）' % (etf, target_value, price, weights[i]))
+    else:
+        # 回测：按总资产比例分配（也应用仓位比例，使回测与实盘逻辑一致）
+        total_value = context.portfolio.portfolio_value * g.position_pct
+        if total_value <= 0:
+            log.warning('【仓位控制】总资产为0，放弃买入')
+            return
+        for i, etf in enumerate(target_list):
+            target_value = total_value * weights[i]
+            # 回测中从data获取价格（注意：data的键可能是短后缀，需适配）
+            # 由于 target_list 是长后缀，而 data 中可能使用短后缀，这里做兼容处理
+            price = None
+            if data is not None:
+                # 先尝试直接用长后缀获取
+                if etf in data:
+                    price = data[etf].open
+                else:
+                    # 尝试转换为短后缀
+                    short_code = etf.replace('.XSHG', '.SS').replace('.XSHE', '.SZ')
+                    if short_code in data:
+                        price = data[short_code].open
+            if price is None or price <= 0:
+                log.warning('【买入跳过】%s，无法获取价格' % etf)
+                continue
+            min_amount = price * 100
+            if target_value < min_amount:
+                log.warning('【买入跳过】%s，目标金额 %.2f 不足100股（需 %.2f）' % (etf, target_value, min_amount))
+                continue
+            order_target_value(etf, target_value)
+            log.info('【买入】%s，目标金额：%.2f，价格：%.3f（权重：%.4f）' % (etf, target_value, price, weights[i]))
+
+# ========== 动量计算函数（PTrade适配）==========
+def get_rank(etf_pool):
+    """
+    计算每只ETF的动量得分，返回得分>0的ETF列表及得分DataFrame
+    完全兼容PTrade的结构化数组返回格式
+    """
+    scores = []
+    for etf in etf_pool:
+        hist = get_history(g.m_days, '1d', 'close', etf, fq='pre', is_dict=True)
+        if etf not in hist:
+            scores.append(-np.inf)
+            continue
+        data_arr = hist[etf]
+        if len(data_arr) < g.m_days:
+            scores.append(-np.inf)
+            continue
+
+        # 安全提取收盘价（兼容字段名和位置索引）
+        try:
+            close_arr = data_arr['close']
+        except (KeyError, ValueError):
+            close_arr = np.array([x[1] for x in data_arr])
+
+        # 过滤无效值
+        close_arr = close_arr[~np.isnan(close_arr)]
+        if len(close_arr) < g.m_days:
+            scores.append(-np.inf)
+            continue
+
+        y = np.log(close_arr)
+        n = len(y)
+        x = np.arange(n)
+        slope, intercept = np.polyfit(x, y, 1)
+        annualized_returns = math.pow(math.exp(slope), 250) - 1
+        residuals = y - (slope * x + intercept)
+        ss_res = np.sum(residuals ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+        score = annualized_returns * r_squared
+        scores.append(score)
+
+    df = pd.DataFrame(index=etf_pool, data={'score': scores})
+    df = df.sort_values('score', ascending=False).dropna()
+    filtered = [etf for etf in df.index if df.loc[etf, 'score'] > 0]
+    return filtered, df
+
+# ========== EPO 优化函数（不变）==========
+def epo(x, signal, lambda_, method='anchored', w=0.2, anchor=None, normalize=True):
+    """
+    锚定EPO模型，计算最优权重
+    x: DataFrame，行为日期，列为资产，值为收益率
+    signal: 预期收益信号（Series或array）
+    lambda_: 风险厌恶系数
+    w: 收缩权重
+    anchor: 先验权重（锚定权重）
+    """
+    n = x.shape[1]
+    vcov = x.cov()
+    corr = x.corr()
+    I = np.eye(n)
+    std = np.sqrt(np.diag(vcov))
+    V = np.diag(std ** 2)
+    s = signal.values if isinstance(signal, pd.Series) else signal
+    a = anchor
+
+    shrunk_cor = ((1 - w) * corr.values) + (w * I)
+    cov_tilde = np.diag(std) @ shrunk_cor @ np.diag(std)
+    inv_shrunk_cov = solve(cov_tilde, np.eye(n))
+
+    if method == 'anchored':
+        gamma = np.sqrt(a.T @ cov_tilde @ a) / np.sqrt(s.T @ inv_shrunk_cov @ cov_tilde @ inv_shrunk_cov @ s)
+        epo_weights = inv_shrunk_cov @ (((1 - w) * gamma * s) + (w * V @ a))
+    else:
+        epo_weights = (1 / lambda_) * inv_shrunk_cov @ s
+
+    if normalize:
+        epo_weights = np.maximum(epo_weights, 0)
+        if np.sum(epo_weights) > 0:
+            epo_weights = epo_weights / np.sum(epo_weights)
+    return epo_weights
+
+# ========== 优化函数（PTrade适配，替换get_price为get_history）==========
+def run_optimization(stocks, end_date):
+    """
+    获取目标ETF的历史收益率，计算先验锚定权重（低波倾向），调用EPO优化
+    完全基于get_history，兼容PTrade的结构化数组
+    """
+    if len(stocks) == 0:
+        return None
+
+    # 使用get_history获取最近g.optim_window个交易日的数据
+    # 注意：get_history不支持end_date参数，默认取最新数据，正好满足需求
+    price_dict = get_history(g.optim_window, '1d', 'close', stocks, fq='pre', is_dict=True)
+    if not price_dict:
+        log.warning('获取价格数据失败，无法优化')
+        return None
+
+    close_series = {}
+    for code in stocks:
+        if code not in price_dict:
+            continue
+        data_arr = price_dict[code]
+        if len(data_arr) < 10:
+            continue
+
+        # 提取收盘价和日期
+        try:
+            closes = data_arr['close']
+            # 日期字段名可能是 'datetime' 或 'date'
+            if 'datetime' in data_arr.dtype.names:
+                dates = data_arr['datetime']
+            elif 'date' in data_arr.dtype.names:
+                dates = data_arr['date']
+            else:
+                # 按位置：第一列是日期
+                dates = np.array([x[0] for x in data_arr])
+        except (KeyError, ValueError):
+            closes = np.array([x[1] for x in data_arr])
+            dates = np.array([x[0] for x in data_arr])
+
+        # 转为pandas Series，索引为日期
+        date_objs = []
+        for d in dates:
+            # 日期可能是整数如20250102，转为字符串再解析
+            try:
+                date_str = str(int(d))
+                date_objs.append(datetime.datetime.strptime(date_str, '%Y%m%d'))
+            except:
+                date_objs.append(d)  # 如果已经是datetime对象
+        close_series[code] = pd.Series(closes, index=date_objs)
+
+    if not close_series:
+        log.warning('无有效价格数据')
+        return None
+
+    close_df = pd.DataFrame(close_series).dropna(how='all')
+    if close_df.empty or len(close_df) < 10:
+        log.warning('收盘价数据不足，无法优化')
+        return None
+
+    returns = close_df.pct_change().dropna()
+    if len(returns) < 2:
+        log.warning('收益率数据不足，无法优化')
+        return None
+
+    returns = returns.dropna(axis=1, how='all')
+    if returns.shape[1] != len(stocks):
+        log.warning('部分股票数据不足，已剔除，当前可用股票：%s' % list(returns.columns))
+        if returns.shape[1] == 0:
+            return None
+
+    # 计算先验锚定权重（低波动倾向）
+    try:
+        cov_matrix = returns.cov()
+        d = np.diag(cov_matrix.values)
+        if np.any(np.isnan(d)):
+            log.warning('协方差矩阵包含NaN，使用等权重作为先验')
+            anchor = np.ones(len(returns.columns)) / len(returns.columns)
+        else:
+            with np.errstate(divide='ignore'):
+                inv_std = 1.0 / np.sqrt(d)
+                inv_std[np.isinf(inv_std)] = 0
+            if np.sum(inv_std) == 0:
+                anchor = np.ones(len(returns.columns)) / len(returns.columns)
+            else:
+                anchor = inv_std / np.sum(inv_std)
+    except Exception as e:
+        log.warning('计算先验权重失败：%s，使用等权重' % str(e))
+        anchor = np.ones(len(returns.columns)) / len(returns.columns)
+
+    signal = returns.mean()
+    weights = epo(x=returns, signal=signal, lambda_=g._lambda, method='anchored',
+                  w=g.w, anchor=anchor, normalize=True)
+    return weights

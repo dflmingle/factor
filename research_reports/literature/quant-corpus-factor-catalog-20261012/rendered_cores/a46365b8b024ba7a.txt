@@ -1,0 +1,207 @@
+quant/2024年度精选策略2/69.场内基金定投价值平均增强策略，年化30%+.txt
+import jqdata
+from jqlib.technical_analysis import *
+import datetime as dt
+import numpy as np
+
+def initialize(context):
+    g.init_status = False
+    g.totalmoney = context.portfolio.available_cash
+    g.money = g.totalmoney * 0.2 / 8
+    g.index = '000300.XSHG'
+    g.security = '510300.XSHG'
+    g.index = '399006.XSHE'
+    g.security = '159915.XSHE'
+    g.index = '399324.XSHE'
+    g.security = '159905.XSHE'
+    g.r = 0
+    g.cost = 0
+    g.count = 0
+    g.high = 0.01
+    g.down = 0.01
+    g.take_profit_flag = 0
+    g.last_month_dwjz = 0
+    g.last_month_value = 0
+    g.bought_price = 0
+    g.sold_price = 0
+    g.new_dwjz = 0
+    g.take_profit_value = 0
+    g.take_profit_days = 0
+    g.buy_avg_cost = 0
+    g.month_growth_rate = 1.005
+    g.investments = np.array([])
+    run_daily(init_position, time='open')
+    run_daily(take_profit, time='open')
+    run_monthly(target_mv, 1, time='open+30m')
+    run_monthly(compute_value, 2, time='open')
+    run_monthly(compute_profit, -1, time='close')
+
+def before_trading(context):
+    pass
+
+def after_trading_end(context):
+    if g.init_status == False:
+        return
+    if context.portfolio.positions[g.security].total_amount > 0:
+        dwjz = context.portfolio.positions[g.security].price
+        g.high = max(g.high, dwjz)
+        g.down = 1 - dwjz / g.high
+        if g.buy_avg_cost == 0:
+            avg_cost = context.portfolio.positions[g.security].avg_cost
+        else:
+            avg_cost = g.buy_avg_cost
+        g.r = 100 * (dwjz / avg_cost - 1)
+    elif context.portfolio.positions[g.security].total_amount == 0:
+        g.r = 0
+        g.high = 0
+    if g.take_profit_days > 0:
+        g.take_profit_days += 1
+
+def take_profit(context):
+    date_now = context.previous_date
+    if g.r > 40 and g.down > 0.09:
+        g.r = 1
+        g.down = 0.01
+        rate0 = max_increase(date_now)[0]
+        take_profit_rate = 1
+        g.high = 0
+        g.buy_avg_cost = 0
+        g.last_month_value = 0
+        if rate0 > 90:
+            g.init_status = False
+        else:
+            g.take_profit_days = 1
+        amount = take_profit_rate * context.portfolio.positions[g.security].total_amount
+        g.take_profit_value = take_profit_rate * context.portfolio.positions[g.security].value
+        g.sold_price = 10000
+        g.bought_price = 0
+        g.take_profit_value = get_cur_money(g.take_profit_value)
+        order_value(g.security, -g.take_profit_value)
+        g.investments = np.append(g.investments, g.take_profit_value)
+        g.take_profit_flag = 1
+    elif g.r > 100 or max_increase1y(date_now) > 75:
+        g.r = 1
+        g.down = 0.01
+        take_profit_rate = 1
+        amount = take_profit_rate * context.portfolio.positions[g.security].total_amount
+        g.take_profit_value = take_profit_rate * context.portfolio.positions[g.security].value
+        g.take_profit_value = get_cur_money(g.take_profit_value)
+        order_value(g.security, -g.take_profit_value)
+        g.investments = np.append(g.investments, g.take_profit_value)
+        g.take_profit_flag = 1
+        g.init_status = False
+        g.high = 0
+        g.sold_price = 10000
+        g.bought_price = 0
+
+def get_cur_money(money):
+    cur_data = get_current_data()
+    price = cur_data[g.security].last_price
+    g.bought_price = price
+    money = money * 0.01 // price * 100 * price
+    return money
+
+def init_position(context):
+    if g.take_profit_days > 0:
+        g.take_profit_days = 0
+        g.totalmoney = context.portfolio.available_cash
+        g.money = g.totalmoney * 0.5 / 16
+        money = get_cur_money(g.totalmoney * 0.5)
+        order_value(g.security, money)
+        refresh_trade_price(context.current_dt, 'buy')
+        g.init_status = True
+        g.last_month_value = money * g.month_growth_rate
+        g.investments = np.append(g.investments, -money)
+        g.count = 1
+    if g.init_status:
+        return
+    date_now = context.previous_date
+    rate1 = max_increase(date_now)[1]
+    if rate1 < 0.318:
+        g.totalmoney = context.portfolio.available_cash
+        g.money = g.totalmoney * 0.2 / 10
+        money = get_cur_money(g.totalmoney * 0.7)
+        order_value(g.security, money)
+        refresh_trade_price(context.current_dt, 'buy')
+        g.init_status = True
+        g.last_month_value = money * g.month_growth_rate
+        g.investments = np.append(g.investments, -money)
+        g.count = 1
+
+def target_mv(context):
+    if g.init_status == False:
+        return
+    cash = context.portfolio.available_cash
+    value = context.portfolio.positions[g.security].value
+    total_amount = context.portfolio.positions[g.security].total_amount
+    if total_amount > 0:
+        g.new_dwjz = value / total_amount
+    if g.count == 0:
+        g.count = 1
+    elif g.count != 0 and g.take_profit_flag == 0:
+        thismonth = g.money - (value - g.last_month_value)
+        if thismonth > 0 and cash > 1000 and (context.portfolio.positions[g.security].price < g.sold_price):
+            if thismonth / g.money > 5:
+                thismonth = 5 * g.money
+            if thismonth > cash:
+                thismonth = cash
+            thismonth = get_cur_money(thismonth)
+            order_value(g.security, thismonth)
+            refresh_trade_price(context.current_dt, 'buy')
+            g.investments = np.append(g.investments, -thismonth)
+        elif thismonth <= 0 and context.portfolio.positions[g.security].price > context.portfolio.positions[g.security].avg_cost and (context.portfolio.positions[g.security].price > g.bought_price):
+            if -thismonth / g.money > 5:
+                thismonth = -5 * g.money
+            thismonth = get_cur_money(-thismonth)
+            order_value(g.security, -thismonth)
+            refresh_trade_price(context.current_dt, 'sell')
+            g.bought_price = 0
+            g.investments = np.append(g.investments, thismonth)
+    elif g.count != 0 and g.take_profit_flag == 1:
+        g.take_profit_flag = 0
+
+def compute_value(context):
+    if g.init_status == False:
+        return
+    g.last_month_value = context.portfolio.positions[g.security].value * g.month_growth_rate
+    if context.portfolio.positions[g.security].total_amount > 0:
+        g.take_profit = context.portfolio.positions[g.security].value / context.portfolio.positions[g.security].total_amount
+
+def compute_profit(context):
+    if g.init_status == False:
+        return
+    if context.run_params.end_date.year == context.current_dt.year and context.current_dt.month == context.run_params.end_date.month:
+        g.investments = np.append(g.investments, context.portfolio.positions[g.security].value)
+        irr = np.irr(g.investments)
+        yearlyreturn = np.power(1 + irr, 12) - 1
+
+def refresh_trade_price(datetime1, buy_or_sell):
+    price = get_price(g.security, end_date=datetime1, frequency='1m', fields='close', count=1, panel=False)['close'][-1]
+    if buy_or_sell == 'buy':
+        g.bought_price = price
+    elif buy_or_sell == 'sell':
+        g.sold_price = price
+
+def max_increase1y(date):
+    days = 250 * 1
+    h = get_price(g.index, end_date=date, frequency='1d', fields='close', count=days, panel=False)
+    h0 = h['close'].idxmax()
+    max0 = h['close'].max()
+    min0 = h['close'].loc[h0:].min()
+    return (max0 / min0 - 1) * 100
+
+def max_increase(date):
+    date_now = date
+    days = 250 * 1.5
+    h = get_price(g.index, end_date=date, frequency='1d', fields='close', count=250 * 1.5, panel=False)
+    h0 = h['close'].idxmax()
+    max0 = h['close'].max()
+    min0 = h['close'].loc[h0:].min()
+    h = get_price(g.index, end_date=h0, frequency='1d', fields='close', count=250 * 2.5, panel=False)
+    min1 = h['close'].min()
+    l1 = h['close'].idxmin()
+    growth0 = max0 - min1
+    rate0 = max0 / min1 * 100 - 100
+    down0 = max0 - min0
+    rate1 = 1 - down0 / growth0
+    return (rate0, rate1)

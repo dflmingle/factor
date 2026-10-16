@@ -1,0 +1,415 @@
+quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt
+import math
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, Series
+import pickle
+import time
+import datetime
+import jqdata
+import talib as tb
+import sklearn
+from sklearn.decomposition import PCA
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestRegressor, RandomForestClassifier
+from sklearn import cross_validation, metrics, svm, preprocessing
+from sklearn.metrics import mean_squared_error
+from sklearn.cross_validation import train_test_split
+from sklearn.grid_search import GridSearchCV
+from sklearn.svm import SVR
+from sklearn.externals import joblib
+from sklearn.model_selection import learning_curve
+from sklearn.linear_model import LinearRegression
+'\n二八小市值择时买卖\n\n配置指定频率的调仓日，在调仓日每日指定时间，计算沪深300指数和中证500指数当前的20日涨\n幅，如果2个指数的20日涨幅有一个为正，则进行选股调仓，之后如此循环往复。\n\n止损策略：\n\n    大盘止损：(可选)\n        1. 每分钟取大盘前130日的最低价和最高价，如果最高大于最低的两倍则清仓，停止交易。\n        2. 每分钟判断大盘是否呈现三只黑鸦止损，如果是则当天清仓并停止交易，第二天停止交\n           易一天。\n\n    个股止损：(可选)\n        每分钟判断个股是否从持仓后的最高价回撤幅度，如果超过个股回撤阈值，则平掉该股持仓\n\n    二八止损：(必需)\n        每日指定时间，计算沪深300指数和中证500指数当前的20日涨幅，如果2个指数涨幅都为负，\n        则清仓，重置调仓计数，待下次调仓条件满足再操作\n'
+from six import StringIO
+import tradestat
+from ind import *
+
+def get_blacklist():
+    blacklist = ['600656.XSHG', '300372.XSHE', '600403.XSHG', '600421.XSHG', '600733.XSHG', '300399.XSHE', '600145.XSHG', '002679.XSHE', '000020.XSHE', '002330.XSHE', '300117.XSHE', '300135.XSHE', '002566.XSHE', '002119.XSHE', '300208.XSHE', '002237.XSHE', '002608.XSHE', '000691.XSHE', '002694.XSHE', '002715.XSHE', '002211.XSHE', '000788.XSHE', '300380.XSHE', '300028.XSHE', '000668.XSHE', '300033.XSHE', '300126.XSHE', '300340.XSHE', '300344.XSHE', '002473.XSHE']
+    return blacklist
+
+def before_trading_start(context):
+    cur_time = context.previous_date
+    cur_time = datetime.datetime.strftime(cur_time, '%Y-%m-%d')
+    g.stocks = g.data_.where(g.data_ == 1).loc[cur_time, :].dropna(axis=0).index.values
+
+def after_trading_end(context):
+    g.trade_stat.report(context)
+    reset_day_param()
+    orders = get_open_orders()
+    for _order in orders.values():
+        pass
+    pass
+
+def initialize(context):
+    g.trade_stat = tradestat.trade_stat()
+    set_param()
+    g.day_count = 0
+    g.last_high = {}
+    if g.is_market_stop_loss_by_price:
+        g.is_day_stop_loss_by_price = False
+    g.is_last_day_3_black_crows = False
+    if g.is_market_stop_loss_by_3_black_crows:
+        g.cur_drop_minute_count = 0
+    if g.is_rank_stock:
+        if g.rank_stock_count > g.pick_stock_count:
+            g.rank_stock_count = g.pick_stock_count
+    if g.is_stock_stop_loss or g.is_stock_stop_profit:
+        g.pct_change = {}
+    if g.is_market_stop_loss_by_28_index:
+        g.minute_count_28index_drop = 0
+    if g.is_equity_curve_protect:
+        g.is_day_curve_protect = False
+    g.time1 = time.time()
+    file = StringIO(read_file('pre_result_csv.csv'))
+    g.data_ = pd.read_csv(file, index_col=0)
+    log_param()
+
+def set_param():
+    g.period = 3
+    g.adjust_position_hour = 14
+    g.adjust_position_minute = 50
+    g.pick_stock_count = 100
+    g.pick_by_pe = False
+    if g.pick_by_pe:
+        g.max_pe = 200
+        g.min_pe = 0
+    g.pick_by_eps = False
+    if g.pick_by_eps:
+        g.min_eps = 0
+    g.filter_gem = False
+    g.filter_blacklist = False
+    g.is_rank_stock = False
+    if g.is_rank_stock:
+        g.rank_stock_count = 20
+    g.buy_stock_count = 5
+    g.index2 = '000016.XSHG'
+    g.index8 = '399333.XSHE'
+    g.index_growth_rate = 0.01
+    g.bbands = True
+    g.ema = True
+    g.cci = True
+    g.kd = True
+    g.dif = True
+    g.macd = True
+    g.rsi = True
+    g.bais = True
+    g.is_market_stop_loss_by_price = False
+    if g.is_market_stop_loss_by_price:
+        g.index_4_stop_loss_by_price = '000001.XSHG'
+    g.index_4_stop_loss_by_3_black_crows = '000001.XSHG'
+    g.is_market_stop_loss_by_3_black_crows = False
+    if g.is_market_stop_loss_by_3_black_crows:
+        g.dst_drop_minute_count = 60
+    g.is_market_stop_loss_by_28_index = False
+    if g.is_market_stop_loss_by_28_index:
+        g.dst_minute_count_28index_drop = 30
+    g.is_stock_stop_loss = False
+    g.is_stock_stop_profit = False
+    g.is_equity_curve_protect = False
+    if g.is_equity_curve_protect:
+        g.value_list = []
+
+def log_param():
+    if g.pick_by_pe:
+        pass
+    if g.pick_by_eps:
+        pass
+    if g.filter_blacklist:
+        pass
+    if g.is_rank_stock:
+        pass
+    if g.is_market_stop_loss_by_price:
+        pass
+    if g.is_market_stop_loss_by_3_black_crows:
+        pass
+    if g.is_market_stop_loss_by_28_index:
+        pass
+
+def reset_day_param():
+    if g.is_market_stop_loss_by_price:
+        g.is_day_stop_loss_by_price = False
+    g.is_last_day_3_black_crows = False
+    if g.is_market_stop_loss_by_3_black_crows:
+        g.cur_drop_minute_count = 0
+    if g.is_market_stop_loss_by_28_index:
+        g.minute_count_28index_drop = 0
+    if g.is_stock_stop_loss or g.is_stock_stop_profit:
+        g.pct_change.clear()
+    if g.is_equity_curve_protect:
+        g.is_day_curve_protect = False
+
+def handle_data(context, data):
+    if g.is_market_stop_loss_by_price:
+        if market_stop_loss_by_price(context, g.index_4_stop_loss_by_price):
+            return
+    if g.is_market_stop_loss_by_3_black_crows:
+        if market_stop_loss_by_3_black_crows(context, g.index_4_stop_loss_by_3_black_crows, g.dst_drop_minute_count):
+            return
+    if g.is_market_stop_loss_by_28_index:
+        if market_stop_loss_by_28_index(context, g.dst_minute_count_28index_drop):
+            return
+    if g.is_stock_stop_loss:
+        stock_stop_loss(context, data)
+    if g.is_stock_stop_profit:
+        stock_stop_profit(context, data)
+    if g.is_equity_curve_protect:
+        if equity_curve_protect(context):
+            return
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if g.is_equity_curve_protect:
+        if hour == 14 and minute == 59:
+            g.value_list.append(context.portfolio.total_value)
+    if hour == g.adjust_position_hour and minute == g.adjust_position_minute:
+        do_handle_data(context, data)
+
+def do_handle_data(context, data):
+    gr_index2 = get_growth_rate(g.index2)
+    gr_index8 = get_growth_rate(g.index8)
+    if gr_index2 <= g.index_growth_rate and gr_index8 <= g.index_growth_rate:
+        clear_position(context)
+        g.day_count = 0
+    else:
+        if g.day_count % g.period == 0 and g.day_count >= 0:
+            buy_stocks = g.stocks
+            adjust_position(context, buy_stocks)
+        g.day_count += 1
+
+def market_stop_loss_by_price(context, index):
+    if not g.is_day_stop_loss_by_price:
+        h = attribute_history(index, 160, unit='1d', fields=('close', 'high', 'low'), skip_paused=True)
+        low_price = h.low.min()
+        high_price = h.high.max()
+        if high_price > 2.2 * low_price and h['close'][-1] < h['close'][-4] and (h['close'][-1] > h['close'][-100]):
+            g.is_day_stop_loss_by_price = True
+    if g.is_day_stop_loss_by_price:
+        clear_position(context)
+        g.day_count = 0
+    return g.is_day_stop_loss_by_price
+
+def equity_curve_protect(context):
+    if not g.is_day_curve_protect:
+        cur_value = context.portfolio.total_value
+        if len(g.value_list) >= 20:
+            last_value = g.value_list[-20]
+            if cur_value < last_value * 0.99:
+                g.is_day_curve_protect = True
+    if g.is_day_curve_protect:
+        clear_position(context)
+        del g.value_list[:]
+        g.day_count = -1
+    return g.is_day_curve_protect
+
+def market_stop_loss_by_3_black_crows(context, index, n):
+    if g.is_last_day_3_black_crows:
+        if get_growth_rate(index, 1) < 0:
+            g.cur_drop_minute_count += 1
+        if g.cur_drop_minute_count >= n:
+            if g.cur_drop_minute_count == n:
+                pass
+            clear_position(context)
+            g.day_count = 0
+            return True
+    return False
+
+def is_3_black_crows(stock):
+    h = attribute_history(stock, 4, '1d', ('close', 'open'), skip_paused=True, df=False)
+    h_close = list(h['close'])
+    h_open = list(h['open'])
+    if len(h_close) < 4 or len(h_open) < 4:
+        return False
+    if h_close[-4] > h_open[-4] and (h_close[-1] < h_open[-1] and h_close[-2] < h_open[-2] and (h_close[-3] < h_open[-3])):
+        return True
+    return False
+
+def market_stop_loss_by_28_index(context, count):
+    gr_index2 = get_growth_rate(g.index2)
+    gr_index8 = get_growth_rate(g.index8)
+    if gr_index2 <= g.index_growth_rate and gr_index8 <= g.index_growth_rate:
+        if g.minute_count_28index_drop == 0:
+            pass
+        g.minute_count_28index_drop += 1
+    elif g.minute_count_28index_drop < count:
+        g.minute_count_28index_drop = 0
+    if g.minute_count_28index_drop >= count:
+        if g.minute_count_28index_drop == count:
+            pass
+        clear_position(context)
+        g.day_count = 0
+        return True
+    return False
+
+def stock_stop_loss(context, data):
+    for stock in context.portfolio.positions.keys():
+        cur_price = data[stock].close
+        if g.last_high[stock] < cur_price:
+            g.last_high[stock] = cur_price
+        threshold = get_stop_loss_threshold(stock, g.period)
+        if cur_price < g.last_high[stock] * (1 - threshold):
+            position = context.portfolio.positions[stock]
+            if close_position(position):
+                g.day_count = 0
+
+def stock_stop_profit(context, data):
+    for stock in context.portfolio.positions.keys():
+        position = context.portfolio.positions[stock]
+        cur_price = data[stock].close
+        threshold = get_stop_profit_threshold(stock, g.period)
+        if cur_price > position.avg_cost * (1 + threshold):
+            position = context.portfolio.positions[stock]
+            if close_position(position):
+                g.day_count = 0
+
+def get_pct_change(security, n, m):
+    pct_change = None
+    if security in g.pct_change.keys():
+        pct_change = g.pct_change[security]
+    else:
+        h = attribute_history(security, n, unit='1d', fields='close', skip_paused=True)
+        pct_change = h['close'].pct_change(m)
+        g.pct_change[security] = pct_change
+    return pct_change
+
+def get_stop_loss_threshold(security, n=3):
+    pct_change = get_pct_change(security, 250, n)
+    maxd = pct_change.min()
+    avgd = pct_change.mean()
+    bstd = (maxd + avgd) / 2
+    if not isnan(bstd):
+        if bstd != 0:
+            return abs(bstd)
+        elif maxd < 0:
+            return abs(maxd)
+    return 0.079
+
+def get_stop_profit_threshold(security, n=3):
+    pct_change = get_pct_change(security, 250, n)
+    maxr = pct_change.max()
+    if not isnan(maxr) and maxr != 0:
+        return abs(maxr)
+    return 0.3
+'EXACT_REVIEWED_FUNCTION get_growth_rate sha256=69ee8a047ebf0fcf463295b42347e1bc44ff2d61d99a77063317032415ae28ed source=quant/2020年度精选策略/38 一个简单的跟踪聪明钱策略.txt'
+
+def get_close_price(security, n, unit='1d'):
+    return attribute_history(security, n, unit, 'close', True)['close'][0]
+
+def open_position(security, value):
+    order = order_target_value_(security, value)
+    if order != None and order.filled > 0:
+        cur_price = get_close_price(security, 1, '1m')
+        g.last_high[security] = cur_price
+        return True
+    return False
+
+def close_position(position):
+    security = position.security
+    order = order_target_value_(security, 0)
+    if order != None:
+        if order.filled > 0:
+            g.trade_stat.watch(security, order.filled, position.avg_cost, position.price)
+        if order.status == OrderStatus.held and order.filled == order.amount:
+            if security in g.last_high:
+                g.last_high.pop(security)
+            return True
+    return False
+
+def clear_position(context):
+    if context.portfolio.positions:
+        for stock in context.portfolio.positions.keys():
+            position = context.portfolio.positions[stock]
+            close_position(position)
+
+def order_target_value_(security, value):
+    if value == 0:
+        pass
+    return order_target_value(security, value)
+
+def filter_paused_stock(stock_list):
+    current_data = get_current_data()
+    return [stock for stock in stock_list if not current_data[stock].paused]
+
+def filter_st_stock(stock_list):
+    current_data = get_current_data()
+    return [stock for stock in stock_list if not current_data[stock].is_st and 'ST' not in current_data[stock].name and ('*' not in current_data[stock].name) and ('退' not in current_data[stock].name)]
+
+def filter_limitup_stock(context, stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    current_data = get_current_data()
+    return [stock for stock in stock_list if stock in context.portfolio.positions.keys() or last_prices[stock][-1] < current_data[stock].high_limit]
+
+def filter_limitdown_stock(context, stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    current_data = get_current_data()
+    return [stock for stock in stock_list if stock in context.portfolio.positions.keys() or last_prices[stock][-1] > current_data[stock].low_limit]
+
+def filter_blacklist_stock(context, stock_list):
+    blacklist = get_blacklist()
+    return [stock for stock in stock_list if stock not in blacklist]
+
+def filter_gem_stock(context, stock_list):
+    return [stock for stock in stock_list if stock[0:3] != '300']
+
+def filter_by_growth_rate(stock_list, n):
+    return [stock for stock in stock_list if get_growth_rate(stock, n) > 0]
+
+def rank_stocks(data, stock_list):
+    dst_stocks = {}
+    for stock in stock_list:
+        h = attribute_history(stock, 130, unit='1d', fields=('close', 'high', 'low'), skip_paused=True)
+        low_price_130 = h.low.min()
+        high_price_130 = h.high.max()
+        avg_15 = data[stock].mavg(15, field='close')
+        cur_price = data[stock].close
+        score = cur_price - low_price_130 + (cur_price - high_price_130) + (cur_price - avg_15)
+        dst_stocks[stock] = score
+    df = pd.DataFrame(dst_stocks.values(), index=dst_stocks.keys())
+    df.columns = ['score']
+    df = df.sort(columns='score', ascending=True)
+    return df.index
+
+def filter_new_stock(stock_list):
+    stocks = get_all_securities(['stock'])
+    stocks = stocks[context.current_dt.date() - stocks.start_date > datetime.timedelta(90)].index
+    return stocks
+
+def pick_stocks(context, data):
+    q = query(valuation.code)
+    if g.pick_by_pe:
+        q = q.filter(valuation.pe_ratio > g.min_pe, valuation.pe_ratio < g.max_pe)
+    if g.pick_by_eps:
+        q = q.filter(indicator.eps > g.min_eps)
+    q = q.order_by(valuation.market_cap.asc()).limit(g.pick_stock_count)
+    df = get_fundamentals(q)
+    stock_list = list(df['code'])
+    if g.filter_gem:
+        stock_list = filter_gem_stock(context, stock_list)
+    if g.filter_blacklist:
+        stock_list = filter_blacklist_stock(context, stock_list)
+    stock_list = filter_paused_stock(stock_list)
+    stock_list = filter_st_stock(stock_list)
+    stock_list = filter_limitup_stock(context, stock_list)
+    stock_list = filter_limitdown_stock(context, stock_list)
+    if g.is_rank_stock:
+        if len(stock_list) > g.rank_stock_count:
+            stock_list = stock_list[:g.rank_stock_count]
+        if len(stock_list) > 0:
+            stock_list = rank_stocks(data, stock_list)
+    if len(stock_list) > g.buy_stock_count:
+        stock_list = stock_list[:g.buy_stock_count]
+    return stock_list
+
+def adjust_position(context, buy_stocks):
+    for stock in context.portfolio.positions.keys():
+        if stock not in buy_stocks:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    if g.buy_stock_count > position_count:
+        value = context.portfolio.cash / (g.buy_stock_count - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == g.buy_stock_count:
+                        break

@@ -1,0 +1,69 @@
+quant/量化策略/量化策略/ETF轮动策略2026/05动量最强ETF轮动策略-调优版-25年83.txt
+import numpy as np
+import pandas as pd
+import math
+
+def initialize(context):
+    g.etf_pool = ['512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE', '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE', '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG', '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG', '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512660.XSHG', '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE', '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG']
+    g.momentum_days = 25
+    g.top_n = 2
+    g.min_avg_amount = 10000000
+    g.amount_lookback = 20
+    run_daily(trade, '9:30')
+
+def MOM(etf, days):
+    df = attribute_history(etf, days, '1d', ['close'])
+    if df is None or len(df) < days:
+        return -np.inf
+    y = np.log(df['close'].values)
+    n = len(y)
+    x = np.arange(n)
+    weights = np.linspace(1, 2, n)
+    slope, intercept = np.polyfit(x, y, 1, w=weights)
+    annualized_returns = math.pow(math.exp(slope), 250) - 1
+    residuals = y - (slope * x + intercept)
+    weighted_residuals = weights * residuals ** 2
+    total_var = np.sum(weights * (y - np.mean(y)) ** 2)
+    if total_var == 0:
+        return 0
+    r_squared = 1 - np.sum(weighted_residuals) / total_var
+    score = annualized_returns * r_squared
+    return score
+
+def filter_low_liquidity(etf_list, context):
+    valid = []
+    for etf in etf_list:
+        df = attribute_history(etf, g.amount_lookback, '1d', ['money'], skip_paused=True)
+        if df is None or len(df) < g.amount_lookback:
+            continue
+        avg_amount = df['money'].mean()
+        if avg_amount >= g.min_avg_amount:
+            valid.append(etf)
+    return valid
+
+def get_rank(etf_pool, context):
+    scores = []
+    for etf in etf_pool:
+        score = MOM(etf, g.momentum_days)
+        scores.append(score)
+    df = pd.DataFrame(index=etf_pool, data={'score': scores})
+    df = df.sort_values('score', ascending=False)
+    for i in range(min(5, len(df))):
+        pass
+    top_list = list(df.index[:g.top_n])
+    return top_list
+
+def trade(context):
+    valid_pool = filter_low_liquidity(g.etf_pool, context)
+    if not valid_pool:
+        return
+    target_list = get_rank(valid_pool, context)
+    current_hold = list(context.portfolio.positions.keys())
+    for etf in current_hold:
+        if etf not in target_list:
+            order_target_value(etf, 0)
+    to_buy = [etf for etf in target_list if etf not in current_hold]
+    if to_buy:
+        cash_per = context.portfolio.available_cash / len(to_buy)
+        for etf in to_buy:
+            order_target_value(etf, cash_per)

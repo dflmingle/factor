@@ -1,0 +1,170 @@
+quant/2021年度精选策略/13.7年40倍，模拟超过两年，年化高回撤低.txt
+from __future__ import division
+from bwlist import *
+import math
+
+def set_param():
+    g.stocknum = 4
+    g.bearpercent = 0.3
+    g.bearposition = True
+    g.sellrank = 10
+    g.buyrank = 9
+    g.tradeday = 300
+    g.increase1d = 0.087
+    g.tradevaluemin = 0.01
+    g.tradevaluemax = 1000
+    g.pbmin = 0.01
+    g.pbmax = 30
+    g.weights = [5, 5, 8, 4, 10]
+    g.MA = ['000001.XSHG', 10]
+    g.choose_time_signal = True
+    g.threshold = 0.003
+    g.buyagain = 5
+'EXACT_REVIEWED_FUNCTION get_growth_rate sha256=69ee8a047ebf0fcf463295b42347e1bc44ff2d61d99a77063317032415ae28ed source=quant/2020年度精选策略/38 一个简单的跟踪聪明钱策略.txt'
+
+def get_growth_rate60(security):
+    price60d = attribute_history(security, 60, '1d', 'close', False)['close'][0]
+    pricenow = get_close_price(security, 1, '1m')
+    if not isnan(pricenow) and (not isnan(price60d)) and (price60d != 0):
+        return pricenow / price60d
+    else:
+        return 100
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def get_close_price(security, n, unit='1d'):
+    return attribute_history(security, n, unit, 'close')['close'][0]
+
+def close_position(security):
+    order = order_target_value(security, 0)
+    if order != None and order.status == OrderStatus.held:
+        g.sold_stock[security] = 0
+
+def clear_position(context):
+    if context.portfolio.positions:
+        for stock in context.portfolio.positions.keys():
+            close_position(stock)
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=4816bfed9587e210ded81c6e288a6b9d00544cc261697b889abe16b77ed6ed1b source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_new_stock(context, stock_list):
+    return [stock for stock in stock_list if context.previous_date - datetime.timedelta(days=g.tradeday) > get_security_info(stock).start_date]
+
+def filter_increase1d(stock_list):
+    return [stock for stock in stock_list if get_close_price(stock, 1) / get_close_price(stock, 2) < 1 + g.increase1d]
+
+def filter_buyagain(stock_list):
+    return [stock for stock in stock_list if stock not in g.sold_stock.keys()]
+
+def get_stock_list(context):
+    df = get_fundamentals(query(valuation.code).filter(valuation.pb_ratio.between(g.pbmin, g.pbmax)).order_by(valuation.circulating_market_cap.asc()).limit(1000)).dropna()
+    stock_list = list(df['code'])
+    stock_list = filter_gem_stock(context, stock_list)
+    stock_list = filter_st_stock(stock_list)
+    stock_list = filter_paused_stock(stock_list)
+    stock_list = filter_limitup_stock(context, stock_list)
+    stock_list = filter_new_stock(context, stock_list)
+    stock_list = filter_increase1d(stock_list)
+    stock_list = filter_buyagain(stock_list)
+    return stock_list
+
+def get_stock_rank_m_m(stock_list):
+    rank_stock_list = get_fundamentals(query(valuation.code, valuation.market_cap, valuation.circulating_market_cap).filter(valuation.code.in_(stock_list)).order_by(valuation.circulating_market_cap.asc()).limit(100))
+    volume5d = [attribute_history(stock, 1200, '1m', 'volume', df=False)['volume'].sum() for stock in rank_stock_list['code']]
+    increase60d = [get_growth_rate60(stock) for stock in rank_stock_list['code']]
+    current_price = [get_close_price(stock, 1, '1m') for stock in rank_stock_list['code']]
+    min_price = min(current_price)
+    min_increase60d = min(increase60d)
+    min_circulating_market_cap = min(rank_stock_list['circulating_market_cap'])
+    min_market_cap = min(rank_stock_list['market_cap'])
+    min_volume = min(volume5d)
+    totalcount = [[i, math.log(min_volume / volume5d[i]) * g.weights[3] + math.log(min_price / current_price[i]) * g.weights[2] + math.log(min_circulating_market_cap / rank_stock_list['circulating_market_cap'][i]) * g.weights[1] + math.log(min_market_cap / rank_stock_list['market_cap'][i]) * g.weights[0] + math.log(min_increase60d / increase60d[i]) * g.weights[4]] for i in rank_stock_list.index]
+    totalcount.sort(key=lambda x: x[1])
+    return [rank_stock_list['code'][totalcount[-1 - i][0]] for i in range(min(g.sellrank, len(rank_stock_list)))]
+
+def my_adjust_position(context, hold_stocks):
+    if g.choose_time_signal and (not g.isbull):
+        free_value = context.portfolio.total_value * g.bearpercent
+        maxpercent = 1.3 / g.stocknum * g.bearpercent
+    else:
+        free_value = context.portfolio.total_value
+        maxpercent = 1.3 / g.stocknum
+    buycash = free_value / g.stocknum
+    for stock in context.portfolio.positions.keys():
+        current_data = get_current_data()
+        price1d = get_close_price(stock, 1)
+        nosell_1 = context.portfolio.positions[stock].price >= current_data[stock].high_limit
+        sell_2 = stock not in hold_stocks
+        if sell_2 and (not nosell_1):
+            close_position(stock)
+        else:
+            current_percent = context.portfolio.positions[stock].value / context.portfolio.total_value
+            if current_percent > maxpercent:
+                order_target_value(stock, buycash)
+
+def mybuy(context):
+    if not g.nohold:
+        hold_stocks = filter_buyagain(g.chosen_stock_list)
+        if g.choose_time_signal and (not g.isbull):
+            free_value = context.portfolio.total_value * g.bearpercent
+            minpercent = 0.7 / g.stocknum * g.bearpercent
+        else:
+            free_value = context.portfolio.total_value
+            minpercent = 0.7 / g.stocknum
+        buycash = free_value / g.stocknum
+        for i in range(min(g.buyrank, len(hold_stocks))):
+            free_cash = free_value - context.portfolio.positions_value
+            if hold_stocks[i] not in get_blacklist() and free_cash > context.portfolio.total_value / (g.stocknum * 10):
+                if hold_stocks[i] in context.portfolio.positions.keys():
+                    current_percent = context.portfolio.positions[hold_stocks[i]].value / context.portfolio.total_value
+                    if current_percent >= minpercent:
+                        continue
+                    tobuy = min(free_cash, buycash - context.portfolio.positions[hold_stocks[i]].value)
+                else:
+                    tobuy = min(buycash, free_cash)
+                order_value(hold_stocks[i], tobuy)
+
+def get_bull_bear_signal_minute():
+    nowindex = get_close_price(g.MA[0], 1, '1m')
+    MAold = (attribute_history(g.MA[0], g.MA[1] - 1, '1d', 'close', True)['close'].sum() + nowindex) / g.MA[1]
+    if g.isbull:
+        if nowindex * (1 + g.threshold) <= MAold:
+            g.isbull = False
+    elif nowindex > MAold * (1 + g.threshold):
+        g.isbull = True
+
+def before_trading_start(context):
+    for stock in g.sold_stock.keys():
+        if g.sold_stock[stock] >= g.buyagain - 1:
+            del g.sold_stock[stock]
+        else:
+            g.sold_stock[stock] += 1
+    g.chosen_stock_list = get_stock_list(context)
+
+def myscheduler():
+    set_param()
+    unschedule_all()
+    run_daily(gogogo, '14:50')
+    run_daily(mybuy, '14:55')
+
+def after_code_changed(context):
+    myscheduler()
+
+def initialize(context):
+    myscheduler()
+    g.isbull = False
+    g.chosen_stock_list = []
+    g.nohold = True
+    g.sold_stock = {}
+
+def gogogo(context):
+    get_bull_bear_signal_minute()
+    if g.isbull:
+        pass
+    if g.choose_time_signal and (not g.isbull) and (not g.bearposition) or len(g.chosen_stock_list) < 10:
+        clear_position(context)
+        g.nohold = True
+    else:
+        g.chosen_stock_list = get_stock_rank_m_m(g.chosen_stock_list)
+        my_adjust_position(context, g.chosen_stock_list)
+        g.nohold = False

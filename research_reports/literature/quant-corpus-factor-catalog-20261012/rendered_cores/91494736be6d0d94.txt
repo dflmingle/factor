@@ -1,0 +1,78 @@
+quant/2024年度精选策略1/69.人工智能早晨十字星模型反转形态预测.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import pandas as pd
+import torch
+import torch.nn as nn
+from tqdm import tqdm
+industry_code = ['HY001', 'HY002', 'HY003', 'HY004', 'HY005', 'HY006', 'HY007', 'HY008', 'HY009', 'HY010', 'HY011']
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 3
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    run_daily(prepare_stock_list, '9:05')
+    run_weekly(weekly_adjustment, 1, '9:30')
+    run_daily(check_limit_up, '14:00')
+    run_daily(close_account, '14:50')
+'EXACT_REVIEWED_FUNCTION min_max_scaling sha256=042e7efaed35df82d089e48e513952a2c986fbf5f5c7b80a6d7df18047bf1ada source=quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+model_path1 = 'ZCSZX_0.pt'
+model_path2 = 'ZCSZX_1.pt'
+model_path3 = 'ZCSZX_2.pt'
+
+class model(nn.Module):
+    """EXACT_REVIEWED_FUNCTION __init__ sha256=2cc3b62b7d20bee200cc2cbb275cac70fe41aa0d898ddd04eb89b6fd9753e53c source=quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt"""
+    'EXACT_REVIEWED_FUNCTION forward sha256=4bebd04b532850724bc86a563cb90a08ef908f34f3535c2a7c8fc6d9c2c7047a source=quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt'
+import io
+buffer = io.BytesIO(read_file(model_path1))
+model_t1 = model()
+model_t1.load_state_dict(torch.load(buffer))
+model_t1.eval()
+buffer = io.BytesIO(read_file(model_path2))
+model_t2 = model()
+model_t2.load_state_dict(torch.load(buffer))
+model_t2.eval()
+buffer = io.BytesIO(read_file(model_path3))
+model_t3 = model()
+model_t3.load_state_dict(torch.load(buffer))
+model_t3.eval()
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    today = context.current_dt
+    initial_list = get_all_securities('stock', today).index.tolist()
+    initial_list = filter_all_stock2(context, initial_list)
+    tensor_list = []
+    for i in initial_list:
+        df = attribute_history(i, 60, '1d')
+        df_tensor = torch.Tensor(df.values)
+        tensor_list.append(df_tensor)
+    stacked_tensor = torch.stack(tensor_list)
+    tensor_list = []
+    with torch.no_grad():
+        output1 = model_t1(stacked_tensor)
+        output2 = model_t2(stacked_tensor)
+        output3 = model_t3(stacked_tensor)
+        output = output1 + output2 + output3
+        output = output[:, 1]
+    data = {'ID': initial_list, 'score': output.squeeze().tolist()}
+    df = pd.DataFrame(data)
+    N = g.stock_num
+    top_N_rows = df.nlargest(N, 'score')
+    top_N_IDs = top_N_rows['ID'].tolist()
+    return top_N_IDs
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=a1df4d22629f85082f6938646725ae0af4cf6af55d2ed3c1cfcb9fc9e3e100b7 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=567b55b599315577a70e4597a9953134852042a6b90fb33c0befa1276b4a5292 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_all_stock2 sha256=0216adab1a867ac1b72ce98a5ab893f574db4fb04e7edf33374f774036f68ace source=quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=a33a2c2079f46745447693f0d71254e014ee7cb801035eed7930ea353f54bd83 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION get_industry_name sha256=c9726e05239a37f562934b17b1b5733160a88375853703dfe7c3a8d57e84b413 source=quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt'
+'EXACT_REVIEWED_FUNCTION replace_nan_indu sha256=04f064c8d8a29623f632738b915e8d07e2ef10a77e6ba512b87d92fd170bda26 source=quant/2021年度精选策略/28.XGBoost模型多因子策略分享.txt'
+'EXACT_REVIEWED_FUNCTION data_preprocessing sha256=005c9fc8c6a11148782c56843db9554e621f7eb3702ab98130dea3aaab9be879 source=quant/2024年度精选策略1/56.双人工智能配合，样本外夏普3.9.txt'

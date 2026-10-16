@@ -1,0 +1,97 @@
+quant/2024年度精选策略1/11.低价小盘简单有效.txt
+from jqdata import *
+from jqfactor import get_factor_values
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.stock_num = 10
+    g.limit_up_list = []
+    g.hold_list = []
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_weekly(weekly_adjustment, weekday=1, time='9:30', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:00', reference_security='000300.XSHG')
+    run_daily(print_position_info, time='15:10', reference_security='000300.XSHG')
+
+def get_factor_filter_list(context, stock_list, jqfactor, sort, p1, p2):
+    yesterday = context.previous_date
+    score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+    df = pd.DataFrame(columns=['code', 'score'])
+    df['code'] = stock_list
+    df['score'] = score_list
+    df = df.dropna()
+    df.sort_values(by='score', ascending=sort, inplace=True)
+    filter_list = list(df.code)[int(p1 * len(df)):int(p2 * len(df))]
+    return filter_list
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    initial_list = get_all_securities().index.tolist()
+    initial_list = filter_new_stock(context, initial_list)
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_st_stock(initial_list)
+    price_list1 = get_factor_filter_list(context, initial_list, 'price_no_fq', True, 0, 0.1)
+    df = get_price(initial_list, start_date=yesterday, end_date=yesterday, fields=['close'], fq='pre', panel=False)
+    df = df.sort_values(by='close', ascending=True)
+    price_list2 = list(df.code)[int(0 * len(df)):int(0.1 * len(df))]
+    q = query(valuation.code, valuation.circulating_market_cap, indicator.eps).filter(valuation.code.in_(price_list1)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q, date=yesterday)
+    df = df[df['eps'] > 0]
+    final_list = list(df.code)[:15]
+    return final_list
+
+def prepare_stock_list(context):
+    g.hold_list = []
+    for position in list(context.portfolio.positions.values()):
+        stock = position.security
+        g.hold_list.append(stock)
+    if g.hold_list != []:
+        df = get_price(g.hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit'], count=1, panel=False, fill_paused=False)
+        df = df[df['close'] == df['high_limit']]
+        g.high_limit_list = list(df.code)
+    else:
+        g.high_limit_list = []
+
+def weekly_adjustment(context):
+    target_list = get_stock_list(context)
+    target_list = filter_paused_stock(target_list)
+    target_list = filter_limitup_stock(context, target_list)
+    target_list = filter_limitdown_stock(context, target_list)
+    target_list = target_list[:min(g.stock_num, len(target_list))]
+    for stock in g.hold_list:
+        if stock not in target_list and stock not in g.high_limit_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+
+def check_limit_up(context):
+    now_time = context.current_dt
+    if g.high_limit_list != []:
+        for stock in g.high_limit_list:
+            current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close', 'high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            if current_data.iloc[0, 0] < current_data.iloc[0, 1]:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_kcbj_stock(stock_list):
+    for stock in stock_list[:]:
+        if stock[0] == '4' or stock[0] == '8' or stock[:2] == '68':
+            stock_list.remove(stock)
+    return stock_list
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=e1156ef5376990f768d29303164d87a15e602d5861ac54d0fb47bf5120261b3c source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=c55d81f9ae93e9528bed6bbf6d7d9504dd411d50e2d5fd0c8e639642b4fd584e source=quant/2023年度精选策略/21.截止到21年12月依然有效的小市值适配因子.txt'

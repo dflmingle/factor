@@ -1,0 +1,440 @@
+quant/量化策略/量化策略/首板向上趋势策略2026/04首板-固定点入场-教科书复盘.txt
+import pandas as pd
+import numpy as np
+import datetime as dt
+from datetime import datetime, timedelta
+from jqdata import *
+
+def initialize(context):
+    g.params = {'profit_threshold': 9.7, 'min_turnover': 0.03, 'ma60_deviation': 1.1, 'vol_ratio': 2.0, 'shrink_ratio': 0.6, 'max_wait_days': 10, 'stop_loss_ratio': 0.85, 'ma_near_threshold': 0.02, 'vol_increase_ratio': 1.1, 'min_hold_days_before_sell': 3, 'max_price': 100, 'min_price': 3, 'num': 5, 'profit_target_ratio': 0.3}
+    g.first_board = {}
+    g.buy_signals = {}
+    g.positions = {}
+    g.processed_stocks = set()
+    run_daily(before_market_open, time='9:20')
+    run_daily(check_buy_signals, time='9:45')
+    run_daily(check_sell_signals, time='14:30')
+    run_daily(after_market_close, time='15:05')
+
+def transform_date(date, format_type='d'):
+    if isinstance(date, str):
+        if format_type == 'd':
+            return datetime.datetime.strptime(date, '%Y-%m-%d').date()
+    elif isinstance(date, datetime):
+        if format_type == 'd':
+            return date.date()
+    return date
+
+def filter_new_stock(initial_list, date, days=90):
+    d_date = transform_date(date, 'd')
+    result = []
+    for stock in initial_list:
+        try:
+            security_info = get_security_info(stock)
+            if security_info and d_date - security_info.start_date > dt.timedelta(days=days):
+                result.append(stock)
+        except:
+            continue
+    return result
+
+def filter_st_paused_stock(initial_list, date):
+    current_data = get_current_data()
+    result = []
+    for stock in initial_list:
+        try:
+            stock_data = current_data[stock]
+            if stock_data is None:
+                continue
+            if not stock_data.is_st and (not stock_data.paused) and ('退' not in str(stock_data.name)):
+                result.append(stock)
+        except:
+            continue
+    return result
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def filter_paused_stock(initial_list, date):
+    if not initial_list:
+        return []
+    try:
+        df = get_price(initial_list, end_date=date, frequency='daily', fields=['paused'], count=1, panel=False, fill_paused=True)
+        df = df[df['paused'] == 0]
+        paused_list = list(df.code)
+        return paused_list
+    except:
+        return initial_list
+
+def get_hl_stock(initial_list, date):
+    if not initial_list:
+        return []
+    try:
+        df = get_price(initial_list, end_date=date, frequency='daily', fields=['close', 'high_limit'], count=1, panel=False, fill_paused=False, skip_paused=False)
+        df = df.dropna()
+        df = df[abs(df['close'] - df['high_limit']) / df['high_limit'] < 0.002]
+        hl_list = list(df.code)
+        return hl_list
+    except:
+        return []
+
+def get_trading_days_since(context, start_date_str):
+    try:
+        start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        current_date = context.current_dt.date()
+        if start_date >= current_date:
+            return 0
+        trade_days = get_trade_days(start_date=start_date, end_date=current_date)
+        return len(trade_days) - 1
+    except Exception as e:
+        return 999
+
+def is_reversal_candle(df):
+    if df is None or len(df) < 2:
+        return False
+    latest = df.iloc[-1]
+    prev = df.iloc[-2]
+    candle_body = abs(latest['close'] - latest['open'])
+    candle_body_ratio = candle_body / latest['open'] if latest['open'] != 0 else 0
+    if latest['close'] > latest['open']:
+        lower_shadow = latest['open'] - latest['low']
+        upper_shadow = latest['high'] - latest['close']
+    else:
+        lower_shadow = latest['close'] - latest['low']
+        upper_shadow = latest['high'] - latest['open']
+    prev_pct = (prev['close'] - df.iloc[-3]['close']) / df.iloc[-3]['close'] if len(df) >= 3 else 0
+    is_doji = candle_body_ratio < 0.01 and lower_shadow > 0 and (upper_shadow > 0)
+    is_small_yang = latest['close'] > latest['open'] and candle_body_ratio < 0.03
+    is_hammer = lower_shadow > candle_body * 2 and upper_shadow < candle_body * 0.3 and (prev_pct < -0.02)
+    is_morning_star = prev['close'] < prev['open'] and (prev['open'] - prev['close']) / prev['open'] > 0.02 and (latest['close'] > latest['open']) and (candle_body_ratio < 0.02)
+    return is_doji or is_small_yang or is_hammer or is_morning_star
+
+def before_market_open(context):
+    current_date = context.current_dt.strftime('%Y-%m-%d')
+    yesterday = context.previous_date.strftime('%Y-%m-%d')
+    stock_list = get_all_securities(['stock']).index.tolist()
+    stock_list = filter_kcbj_stock(stock_list)
+    stock_list = filter_new_stock(stock_list, yesterday, days=90)
+    stock_list = filter_st_paused_stock(stock_list, current_date)
+    hl_stocks = get_hl_stock(stock_list, yesterday)
+    board_count = 0
+    daily_boards = []
+    for stock in hl_stocks:
+        df = attribute_history(stock, 120, '1d', ['close', 'high', 'low', 'volume', 'money'], skip_paused=True)
+        if len(df) < 60:
+            continue
+        yesterday_data = df.iloc[-1]
+        prev_day_data = df.iloc[-2]
+        if yesterday_data['close'] > g.params['max_price'] or yesterday_data['close'] < g.params['min_price']:
+            continue
+        pct_change = (yesterday_data['close'] / prev_day_data['close'] - 1) * 100
+        turnover = yesterday_data['volume'] * yesterday_data['close'] / yesterday_data['money'] if yesterday_data['money'] > 0 else 0
+        ma60 = df['close'].mean()
+        vol_ma20 = df['volume'][-20:].mean()
+        limit_days = 0
+        for i in range(1, 26):
+            if i >= len(df):
+                break
+            day_data = df.iloc[-1 - i]
+            prev_day = df.iloc[-2 - i] if i + 1 < len(df) else None
+            if prev_day is not None:
+                day_high_limit = get_high_limit(stock, prev_day['close'])
+                if abs(day_data['close'] - day_high_limit) / day_high_limit < 0.001:
+                    limit_days += 1
+        is_first_limit = limit_days == 0
+        is_not_one_word = turnover > 0.03
+        is_low_position = yesterday_data['close'] > ma60 * 0.9 and yesterday_data['close'] < ma60 * 1.3
+        is_volume_spike = yesterday_data['volume'] > vol_ma20 * 2
+        if is_not_one_word and is_low_position and is_volume_spike and is_first_limit:
+            g.first_board[stock] = {'date': current_date, 'board_date': yesterday, 'volume': yesterday_data['volume'], 'price': yesterday_data['close'], 'ma60': ma60, 'pct_change': pct_change, 'turnover': turnover}
+            board_count += 1
+            daily_boards.append(stock)
+
+def get_high_limit(stock, prev_close):
+    if stock.startswith('30'):
+        return round(prev_close * 1.2, 2)
+    elif stock.startswith('68'):
+        return round(prev_close * 1.2, 2)
+    elif stock.startswith('4') or stock.startswith('8'):
+        return round(prev_close * 1.3, 2)
+    else:
+        return round(prev_close * 1.1, 2)
+
+def check_buy_signals(context):
+    current_date = context.current_dt.strftime('%Y-%m-%d')
+    buy_list = []
+    for stock, info in list(g.first_board.items()):
+        if stock in context.portfolio.positions or stock in g.buy_signals:
+            continue
+        days_passed = get_trading_days_since(context, info['board_date'])
+        if days_passed < 2:
+            continue
+        if days_passed > g.params['max_wait_days']:
+            del g.first_board[stock]
+            continue
+        current_data = get_current_data()
+        if stock not in current_data or current_data[stock].paused:
+            continue
+        current_price = current_data[stock].last_price
+        board_price = info['price']
+        drop_percent = (board_price - current_price) / board_price * 100
+        if drop_percent < 6 or drop_percent > 15:
+            continue
+        df = attribute_history(stock, 30, '1d', ['close', 'high', 'low', 'volume', 'open'], skip_paused=True)
+        if len(df) < 20:
+            continue
+        latest = df.iloc[-1]
+        prev = df.iloc[-2]
+        ma5 = df['close'][-5:].mean()
+        ma10 = df['close'][-10:].mean()
+        ma20 = df['close'][-20:].mean()
+        vol_shrink = latest['volume'] < info['volume'] * 0.6
+        near_ma10 = abs(latest['close'] - ma10) / ma10 < 0.02
+        near_ma20 = abs(latest['close'] - ma20) / ma20 < 0.02
+        is_below_ma20 = latest['close'] < ma20 * (1 - 0.02)
+        near_support = is_below_ma20
+        reversal = is_reversal_candle(df)
+        is_below_ratio = 0.02
+        is_below_ma20 = latest['close'] < ma20 * (1 - is_below_ratio)
+        price_up = prev is not None and latest['close'] > prev['close']
+        if len(df) >= 4:
+            recent_lows = df['low'].iloc[-4:-1].min()
+            low_not_new = latest['low'] > recent_lows * 0.99
+        else:
+            low_not_new = True
+        if len(df) >= 5:
+            lows_3days = df['low'].iloc[-5:-2].min()
+            lows_2days = df['low'].iloc[-3:-1].min()
+            tow_days_new_low = lows_2days > lows_3days * 0.99
+        else:
+            tow_days_new_low = True
+        con1 = [price_up, low_not_new, tow_days_new_low]
+        score1 = sum(con1)
+        reversal = is_reversal_candle(df)
+        if vol_shrink and is_below_ma20 and (reversal or score1 >= 2):
+            g.buy_signals[stock] = {'date': current_date, 'price': latest['close'], 'stop_loss_ratio': g.params['stop_loss_ratio'], 'ma5': ma5, 'ma10': ma10, 'ma20': ma20, 'days_passed': days_passed, 'support_line': f'跌破20日线{0.02 * 100:.0f}%'}
+            buy_list.append(stock)
+            pct_from_board = (latest['close'] / info['price'] - 1) * 100
+    if buy_list:
+        buy_list.sort(key=lambda x: abs(g.buy_signals[x]['days_passed'] - 4))
+        num = g.params['num'] - len(context.portfolio.positions)
+        buy_list = buy_list[:num]
+        execute_buy(context, buy_list)
+
+def execute_buy(context, buy_list):
+    current_date = context.current_dt.strftime('%Y-%m-%d')
+    cash = context.portfolio.available_cash
+    if cash <= 0 or len(buy_list) == 0:
+        return
+    per_stock_cash = cash / g.params['num']
+    for stock in buy_list:
+        if stock not in g.buy_signals:
+            continue
+        signal_info = g.buy_signals[stock]
+        if signal_info['date'] != current_date:
+            continue
+        current_data = get_current_data()
+        if stock not in current_data:
+            continue
+        current_price = current_data[stock].last_price
+        amount = int(per_stock_cash / (current_price * 100)) * 100
+        if amount >= 100:
+            order_target_value(stock, per_stock_cash)
+            stop_loss_price = current_price * signal_info['stop_loss_ratio']
+            g.positions[stock] = {'buy_date': current_date, 'buy_price': current_price, 'stop_loss': stop_loss_price, 'stop_loss_ratio': signal_info['stop_loss_ratio'], 'ma5': signal_info['ma5'], 'ma10': signal_info['ma10']}
+            del g.buy_signals[stock]
+            if stock in g.first_board:
+                del g.first_board[stock]
+
+def check_sell_signals(context):
+    if len(context.portfolio.positions) == 0:
+        return
+    current_date = context.current_dt.strftime('%Y-%m-%d')
+    for stock in list(context.portfolio.positions.keys()):
+        position = context.portfolio.positions[stock]
+        if position.total_amount == 0:
+            continue
+        current_data = get_current_data()
+        if stock not in current_data:
+            continue
+        current_price = current_data[stock].last_price
+        df = attribute_history(stock, 10, '1d', ['close', 'high', 'low', 'volume'], skip_paused=True)
+        if len(df) < 5:
+            continue
+        ma5 = df['close'][-5:].mean()
+        sell_signal = False
+        reason = ''
+        if stock in g.positions:
+            if current_price >= position.avg_cost * (1 + g.params['profit_target_ratio']):
+                sell_signal = True
+                profit_pct = (current_price / position.avg_cost - 1) * 100
+                reason = f'止盈触发 (盈利{profit_pct:.1f}%)'
+        if stock in g.positions:
+            stop_loss = g.positions[stock]['stop_loss']
+            if current_price < stop_loss:
+                sell_signal = True
+                loss_pct = (current_price / position.avg_cost - 1) * 100
+                reason = f'止损触发 (亏损{loss_pct:.1f}%)'
+        if not sell_signal:
+            latest = df.iloc[-1]
+            prev = df.iloc[-2]
+            avg_vol = df['volume'][-5:-1].mean() if len(df) >= 5 else df['volume'].mean()
+            vol_surge = latest['volume'] > avg_vol * 1.5
+            price_drop = (latest['close'] - prev['close']) / prev['close'] < -0.04
+            if vol_surge and price_drop:
+                sell_signal = True
+                reason = '高位放量下跌'
+        if sell_signal:
+            profit_pct = (current_price / position.avg_cost - 1) * 100
+            if not hasattr(g, 'sold_stocks'):
+                g.sold_stocks = {}
+            buy_date = g.positions.get(stock, {}).get('buy_date', 'unknown')
+            g.sold_stocks[stock] = {'stock': stock, 'sell_date': current_date, 'sell_price': current_price, 'sell_reason': reason, 'profit_pct': profit_pct / 100, 'buy_date': buy_date, 'buy_price': position.avg_cost}
+            order_target(stock, 0)
+            if stock in g.positions:
+                del g.positions[stock]
+
+def after_market_close(context):
+    current_date = context.current_dt.strftime('%Y-%m-%d')
+    for stock in list(g.first_board.keys()):
+        days_passed = get_trading_days_since(context, g.first_board[stock]['board_date'])
+        if days_passed > g.params['max_wait_days']:
+            del g.first_board[stock]
+    if len(context.portfolio.positions) > 0:
+        for stock in context.portfolio.positions:
+            pos = context.portfolio.positions[stock]
+            profit_pct = (pos.price / pos.avg_cost - 1) * 100
+    if is_last_day_of_backtest(context):
+        analyze_sold_stocks_simple(context)
+
+def is_last_day_of_backtest(context):
+    end_date = context.run_params.end_date
+    current_date = context.current_dt.date()
+    if end_date is None:
+        return False
+    return current_date >= end_date
+
+def analyze_sold_stocks_simple(context):
+    if not hasattr(g, 'sold_stocks') or len(g.sold_stocks) == 0:
+        return
+    current_date = context.current_dt.strftime('%Y-%m-%d')
+    end_date = context.run_params.end_date.strftime('%Y-%m-%d')
+    analysis_data = []
+    for stock, info in g.sold_stocks.items():
+        sell_date = info['sell_date']
+        sell_price = info['sell_price']
+        sell_reason = info['sell_reason']
+        profit_pct = info['profit_pct'] * 100
+        try:
+            df = get_price(stock, start_date=sell_date, end_date=end_date, frequency='daily', fields=['close'], skip_paused=True)
+            if len(df) > 1:
+                sell_day_price = df['close'].iloc[0]
+                future_returns = []
+                for i in range(1, min(61, len(df))):
+                    future_return = (df['close'].iloc[i] / sell_day_price - 1) * 100
+                    future_returns.append(future_return)
+                final_return = future_returns[-1] if future_returns else 0
+                max_gain = max(future_returns) if future_returns else 0
+                max_loss = min(future_returns) if future_returns else 0
+                track_days = len(future_returns)
+                analysis_data.append({'stock': stock, 'sell_date': sell_date, 'sell_reason': sell_reason, 'profit_pct': profit_pct, 'track_days': track_days, 'final_return': final_return, 'max_gain': max_gain, 'max_loss': max_loss, 'is_sell_early': final_return > 20})
+        except Exception as e:
+            continue
+    if analysis_data:
+        for data in analysis_data:
+            sell_early_flag = '⚠️是' if data['is_sell_early'] else '否'
+        reasons = {}
+        for data in analysis_data:
+            reason = data['sell_reason']
+            if reason not in reasons:
+                reasons[reason] = []
+            reasons[reason].append(data)
+        for reason, datas in reasons.items():
+            avg_profit = np.mean([d['profit_pct'] for d in datas])
+            avg_future = np.mean([d['final_return'] for d in datas])
+            avg_max_gain = np.mean([d['max_gain'] for d in datas])
+            avg_max_loss = np.mean([d['max_loss'] for d in datas])
+            win_rate = len([d for d in datas if d['final_return'] > 0]) / len(datas) * 100
+            sell_early_rate = len([d for d in datas if d['is_sell_early']]) / len(datas) * 100
+        all_future = [d['final_return'] for d in analysis_data]
+        all_profit = [d['profit_pct'] for d in analysis_data]
+        if len(analysis_data) >= 5:
+            worst_reason = min(reasons.items(), key=lambda x: np.mean([d['final_return'] for d in x[1]]))
+            best_reason = max(reasons.items(), key=lambda x: np.mean([d['final_return'] for d in x[1]]))
+            sell_early_count = len([d for d in analysis_data if d['is_sell_early']])
+            if sell_early_count > 0:
+                sell_early_rate = sell_early_count / len(analysis_data) * 100
+    buy_timing_data = []
+    for stock, info in g.sold_stocks.items():
+        if 'buy_date' not in info or info['buy_date'] == 'unknown':
+            continue
+        buy_date = info['buy_date']
+        sell_date = info['sell_date']
+        sell_reason = info['sell_reason']
+        try:
+            buy_date_obj = datetime.datetime.strptime(buy_date, '%Y-%m-%d')
+            start_date = (buy_date_obj - timedelta(days=20)).strftime('%Y-%m-%d')
+            df = get_price(stock, start_date=start_date, end_date=sell_date, frequency='daily', fields=['close', 'low'], skip_paused=True)
+            if len(df) < 20:
+                continue
+            buy_idx = None
+            for i, date in enumerate(df.index):
+                if date.strftime('%Y-%m-%d') == buy_date:
+                    buy_idx = i
+                    break
+            if buy_idx is None:
+                continue
+            buy_price = df['close'].iloc[buy_idx]
+            if buy_idx > 0:
+                prev_5day_min = df['low'].iloc[max(0, buy_idx - 5):buy_idx].min()
+                prev_5day_min_pct = (prev_5day_min / buy_price - 1) * 100
+            else:
+                prev_5day_min_pct = 0
+            if buy_idx > 0:
+                prev_10day_min = df['low'].iloc[max(0, buy_idx - 10):buy_idx].min()
+                prev_10day_min_pct = (prev_10day_min / buy_price - 1) * 100
+            else:
+                prev_10day_min_pct = 0
+            post_5day_min = df['low'].iloc[buy_idx:min(len(df), buy_idx + 6)].min()
+            post_5day_min_pct = (post_5day_min / buy_price - 1) * 100
+            post_10day_min = df['low'].iloc[buy_idx:min(len(df), buy_idx + 11)].min()
+            post_10day_min_pct = (post_10day_min / buy_price - 1) * 100
+            is_best_timing = prev_5day_min_pct >= -3 and post_5day_min_pct >= -3
+            timing_suggestion = '当前合适'
+            if prev_10day_min_pct < -5 and post_5day_min_pct < -3:
+                timing_suggestion = '建议延后买入'
+            elif prev_5day_min_pct > -2 and post_10day_min_pct < -5:
+                timing_suggestion = '建议提前买入'
+            buy_timing_data.append({'stock': stock, 'buy_date': buy_date, 'sell_reason': sell_reason, 'buy_price': buy_price, 'prev_5day_min_pct': prev_5day_min_pct, 'prev_10day_min_pct': prev_10day_min_pct, 'post_5day_min_pct': post_5day_min_pct, 'post_10day_min_pct': post_10day_min_pct, 'is_best_timing': is_best_timing, 'timing_suggestion': timing_suggestion})
+        except Exception as e:
+            continue
+    if buy_timing_data:
+        for data in buy_timing_data:
+            pass
+        best_timing_count = len([d for d in buy_timing_data if d['is_best_timing']])
+        suggestions = {}
+        for data in buy_timing_data:
+            suggestion = data['timing_suggestion']
+            if suggestion not in suggestions:
+                suggestions[suggestion] = []
+            suggestions[suggestion].append(data)
+        for suggestion, datas in suggestions.items():
+            pass
+        avg_prev_5 = np.mean([d['prev_5day_min_pct'] for d in buy_timing_data])
+        avg_prev_10 = np.mean([d['prev_10day_min_pct'] for d in buy_timing_data])
+        avg_post_5 = np.mean([d['post_5day_min_pct'] for d in buy_timing_data])
+        avg_post_10 = np.mean([d['post_10day_min_pct'] for d in buy_timing_data])
+        if avg_post_5 < -5:
+            pass
+        elif avg_post_5 > -3:
+            pass
+        if avg_prev_5 < -5:
+            pass
+        reason_timing = {}
+        for data in buy_timing_data:
+            reason = data['sell_reason']
+            if reason not in reason_timing:
+                reason_timing[reason] = []
+            reason_timing[reason].append(data)
+        for reason, datas in reason_timing.items():
+            if len(datas) < 3:
+                continue
+            avg_post_5 = np.mean([d['post_5day_min_pct'] for d in datas])
+            best_ratio = len([d for d in datas if d['is_best_timing']]) / len(datas) * 100

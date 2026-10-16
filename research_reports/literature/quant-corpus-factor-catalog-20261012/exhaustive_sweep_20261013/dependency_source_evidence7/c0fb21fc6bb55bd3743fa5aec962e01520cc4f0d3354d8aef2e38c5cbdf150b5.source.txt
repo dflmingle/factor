@@ -1,0 +1,173 @@
+# 策略名称：中小板小市值轮动策略（Ptrade版）
+# 运行频率：分钟（每天09:31执行）
+# 说明：每日从中小板成分股中筛选流通市值最小的股票，等权重投资
+# 新增参数：g.position_pct（仅实盘生效），买入金额 = 剩余现金 × 仓位比例
+# 2025年100%
+
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    # 基础设置
+    set_benchmark('399101.XSHE')                     # 基准：中小板综指
+    set_slippage(0.002)                              # 固定滑点
+    set_commission(commission_ratio=0.0003, min_commission=5, type='stock')
+
+    # 策略参数
+    g.index_code = '399101.XSHE'                     # 中小板指数代码
+    g.buy_stock_count = 5                            # 持仓股票数量
+    g.screen_count = 15                              # 初选数量（买入数量的3倍）
+
+    # ========== 新增仓位控制参数（仅实盘生效）==========
+    g.position_pct = 0.1           # 实盘买入总金额 = 剩余现金 × 0.1（可修改）
+    # ===============================================
+
+    #set_universe([])                                 # 初始股票池为空
+
+    # 标记实盘/回测
+    g.is_real = is_trade()
+
+    # 实盘：每天 09:31 执行调仓（run_daily 调用的函数只能接收 context，无 data）
+    if g.is_real:
+        run_daily(context, trade, time='09:31')
+
+    # 收盘后记录持仓（仅在回测中执行，实盘可选）
+    if not g.is_real:
+        run_daily(context, log_hold, time='15:00')
+
+def before_trading_start(context, data):
+    """盘前处理：获取指数成分股、计算流通市值、过滤ST和停牌股、确定目标持仓。"""
+    # 1. 获取中小板指数成分股
+    all_stocks = get_index_stocks(g.index_code)
+    if not all_stocks:
+        log.warning('未获取到指数成分股')
+        g.target_stocks = []
+        return
+
+    # 2. 获取流通市值并排序，取最小的 screen_count 只
+    try:
+        # 使用上一个交易日的估值数据，避免未来函数
+        df = get_fundamentals(all_stocks, 'valuation', fields='float_value',
+                              date=context.previous_date, is_dataframe=True)
+        if df is None or df.empty:
+            log.warning('未获取到基本面数据')
+            g.target_stocks = []
+            return
+        df = df.sort_values('float_value', ascending=True)
+        candidate_stocks = list(df.index[:g.screen_count])
+    except Exception as e:
+        log.error('获取流通市值失败: %s' % str(e))
+        g.target_stocks = []
+        return
+
+    # 3. 过滤 ST 股和停牌股（该函数只能在 before_trading_start 中调用）
+    filtered = filter_stock_by_status(candidate_stocks, ["ST", "HALT", "DELISTING"])
+    if not filtered:
+        log.warning('过滤后无可用股票')
+        g.target_stocks = []
+        return
+
+    # 4. 取前 buy_stock_count 只作为目标持仓
+    g.target_stocks = filtered[:g.buy_stock_count]
+    log.info('盘前筛选完成，目标持仓: %s' % g.target_stocks)
+
+def handle_data(context, data):
+    """回测专用：每分钟执行，只在 09:31 调用 trade 并传递 data。"""
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 9 and current_dt.minute == 31:
+        trade(context, data)
+
+def trade(context, data=None):
+    """
+    调仓函数：卖出不在目标列表的股票，等权重买入目标股票。
+    回测时 data 参数有效（来自 handle_data），实盘时 data 为 None。
+    新增逻辑：
+    1. 每年1月、4月不交易（跳过所有买卖）
+    2. 卖出时若股票涨停（check_limit返回1），则跳过卖出
+    """
+    # ========== 新增：1月和4月不交易 ==========
+    current_month = context.blotter.current_dt.month
+    if current_month ==4:
+        log.info('当前月份为 %d 月，策略暂停交易' % current_month)
+        return
+    # ========================================
+
+    if not g.target_stocks:
+        log.info('目标持仓为空，跳过调仓')
+        return
+
+    log.info('=' * 50)
+    log.info('调仓日: %s' % context.blotter.current_dt.strftime('%Y-%m-%d %H:%M'))
+    log.info('目标持仓: %s' % g.target_stocks)
+
+    current_hold = list(context.portfolio.positions.keys())
+
+    # ---------- 卖出不在目标列表的持仓（涨停不卖，仅当check_limit==1时跳过）----------
+    for stock in current_hold:
+        if stock not in g.target_stocks:
+            pos = context.portfolio.positions[stock]
+            # 获取可卖数量：实盘用 sellable_amount，回测用 amount
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+
+            if sellable <= 0:
+                log.info('【卖出跳过】%s，可用数量为0' % stock)
+                continue
+
+            # 使用PTrade原生API check_limit判断股票是否涨停
+            # 返回值：1=涨停，0=正常，-1=跌停，2=触板涨停，-2=触板跌停
+            limit_status = check_limit(stock)
+            
+            # 只有精确的涨停状态(1)才跳过卖出，触板涨停(2)可以卖出
+            if limit_status == 1:
+                log.info('【卖出跳过】%s 当前处于涨停状态，暂不卖出' % stock)
+                continue
+
+            order_target_value(stock, 0)
+            log.info('【卖出】%s，可卖数量:%.0f股' % (stock, sellable))
+
+    # ---------- 买入：区分实盘/回测，应用仓位控制 ----------
+    if len(g.target_stocks) == 0:
+        return
+
+    if g.is_real:
+        # 实盘：总买入金额 = 剩余现金 × 仓位比例
+        total_buy_cash = context.portfolio.cash * g.position_pct
+        if total_buy_cash <= 0:
+            log.warning('【仓位控制】剩余现金为0或仓位比例为0，放弃买入')
+            return
+        log.info('【仓位控制】剩余现金: %.2f，使用比例: %.1f%%，总买入金额: %.2f' %
+                 (context.portfolio.cash, g.position_pct * 100, total_buy_cash))
+        target_value_per_stock = total_buy_cash / len(g.target_stocks)
+    else:
+        # 回测：按总资产等分（原逻辑）
+        total_value = context.portfolio.portfolio_value
+        target_value_per_stock = total_value / len(g.target_stocks)
+
+    for stock in g.target_stocks:
+        # 获取当前价格：回测用 data，实盘用 get_snapshot
+        if not g.is_real and data is not None:
+            price = data[stock].open
+        else:
+            snapshot = get_snapshot(stock)
+            price = snapshot.get(stock, {}).get('last_px') if snapshot else None
+
+        if price is None or price <= 0:
+            log.warning('【买入跳过】%s，无法获取有效价格' % stock)
+            continue
+
+        min_amount = price * 100
+        if target_value_per_stock >= min_amount:
+            order_target_value(stock, target_value_per_stock)
+            log.info('【买入】%s，目标金额:%.2f，价格:%.3f' % (stock, target_value_per_stock, price))
+        else:
+            log.warning('【买入跳过】%s，目标金额 %.2f 不足100股（需 %.2f）' % (stock, target_value_per_stock, min_amount))
+
+def log_hold(context):
+    """收盘后记录持仓（仅在回测中执行，实盘可选）"""
+    if context.portfolio.positions:
+        log.info('收盘持仓: %s' % list(context.portfolio.positions.keys()))

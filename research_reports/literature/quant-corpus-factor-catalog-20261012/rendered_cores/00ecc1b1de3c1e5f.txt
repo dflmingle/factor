@@ -1,0 +1,489 @@
+quant/2024年度精选策略2/85.价值策略重开，再次向Jqz1226致敬.txt
+from jqdata import *
+import statsmodels.api as sm
+import pandas as pd
+import numpy as np
+import datetime
+import scipy.stats as stats
+import warnings
+warnings.filterwarnings('ignore')
+
+def initialize(context):
+    set_param(context)
+    run_monthly(mode2_pe_check_month, 1, time='09:00')
+    run_weekly(mode2_pe_check_week, 1, time='09:05')
+    run_daily(before_markt_open, time='09:10', reference_security='000300.XSHG')
+    run_daily(before_markt_open_trade_sell, time='09:16', reference_security='000300.XSHG')
+    run_daily(before_markt_open_trade_buy, time='09:26', reference_security='000300.XSHG')
+    run_daily(markt_open_trade, time='09:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '10:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '11:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '13:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '14:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_holds, '14:50', reference_security='000300.XSHG')
+    run_daily(during_markt_open_trade, time='10:00', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=1, time='14:50', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=2, time='14:50', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=3, time='14:50', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=4, time='14:50', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def set_param(context):
+    set_base_param(context)
+    set_mode1_param(context)
+    set_mode2_param(context)
+
+def set_base_param(context):
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('max_colwidth', 100)
+    g.security = '000300.XSHG'
+    g.etf_list = '511880.XSHG'
+    g.days_number = 15
+    g.old_portfolio_values = []
+    g.days_count = 0
+    g.risk_incr_pct = 0.1
+    g.risk_flag = 0
+    g.risky_stocks = []
+
+def set_mode1_param(context):
+    g.mode1_buy_list = []
+    g.mode1_stock_num = 5
+    g.mode1_flag = 0
+    g.fin = pd.DataFrame()
+
+def set_mode2_param(context):
+    g.mode2_temp_list = []
+    g.mode2_buy_list = []
+    g.mode2_stock_num = 2
+    g.mode2_flag = 0
+
+def before_markt_open(context):
+    if g.mode2_flag == 1:
+        mode2_check_stock(context)
+    else:
+        mode1_check_rsrs(context)
+
+def mode1_check_rsrs(context):
+    previous_date = context.current_dt - datetime.timedelta(days=1)
+    hs300_data = get_price('000300.XSHG', end_date=previous_date, count=1150, fields=['high', 'low'])
+    hs300_rsrs = calc_rsrs(hs300_data['high'].values, hs300_data['low'].values, hs300_data['high'].index, 800, 18)
+    zscore_rightdev = hs300_rsrs.RSRS_negative_r.iloc[-1]
+    if zscore_rightdev > 0.7:
+        g.mode1_flag = 1
+    if zscore_rightdev < -0.7:
+        g.mode1_flag = 0
+    if g.mode1_flag == 1:
+        mode1_check_stock(context)
+    if g.mode1_flag == 0:
+        pass
+
+def before_markt_open_trade_sell(context):
+    etf_list = g.etf_list
+    if len(g.old_portfolio_values) == g.days_number:
+        incr_rate = (g.old_portfolio_values[-6] - g.old_portfolio_values[-11]) / g.old_portfolio_values[-11]
+    else:
+        incr_rate = 0
+    if incr_rate >= g.risk_incr_pct:
+        sell_list = context.portfolio.positions.keys()
+        sell_list = [s for s in sell_list if s != etf_list]
+        dp_df_2w = attribute_history(count=2, unit='5d', security='000300.XSHG')
+        dp_stock_last_2w = dp_df_2w.iloc[0]
+        dp_stock_last_1w = dp_df_2w.iloc[1]
+        dp_cr_last_2w = (dp_stock_last_2w.close - dp_stock_last_2w.open) / dp_stock_last_2w.open
+        dp_ub_rate_last_1w = 0
+        dp_ba_rate_last_1w = 0
+        if dp_stock_last_1w.close >= dp_stock_last_1w.open:
+            dp_ub_rate_last_1w = (dp_stock_last_1w.high - dp_stock_last_1w.close) / (dp_stock_last_1w.close - dp_stock_last_1w.open + 1e-05)
+        else:
+            dp_ub_rate_last_1w = (dp_stock_last_1w.high - dp_stock_last_1w.open) / (dp_stock_last_1w.open - dp_stock_last_1w.close + 1e-05)
+        if dp_stock_last_1w.close <= dp_stock_last_1w.open:
+            dp_ba_rate_last_1w = (dp_stock_last_1w.open - dp_stock_last_1w.close) / (dp_stock_last_1w.high - dp_stock_last_1w.low + 1e-05)
+        if dp_cr_last_2w >= 0.04 and (dp_ub_rate_last_1w > 2 or dp_ba_rate_last_1w > 1 / 3):
+            g.risk_flag = 1
+            g.days_count = 0
+            for sell_code in sell_list:
+                df_2w = attribute_history(count=2, unit='5d', security=sell_code)
+                stock_last_2w = df_2w.iloc[0]
+                stock_last_1w = df_2w.iloc[1]
+                cr_last_2w = (stock_last_2w.close - stock_last_2w.open) / stock_last_2w.open
+                ub_rate_last_1w = 0
+                ba_rate_last_1w = 0
+                if stock_last_1w.close >= stock_last_1w.open:
+                    ub_rate_last_1w = (stock_last_1w.high - stock_last_1w.close) / (stock_last_1w.close - stock_last_1w.open + 1e-05)
+                else:
+                    ub_rate_last_1w = (stock_last_1w.high - stock_last_1w.open) / (stock_last_1w.open - stock_last_1w.close + 1e-05)
+                if stock_last_1w.close <= stock_last_1w.open:
+                    ba_rate_last_1w = (stock_last_1w.open - stock_last_1w.close) / (stock_last_1w.high - stock_last_1w.low + 1e-05)
+                if cr_last_2w >= 0.09 and (ub_rate_last_1w > 2 or ba_rate_last_1w > 1 / 3):
+                    code_number = context.portfolio.positions[sell_code].closeable_amount
+                    if code_number > 0:
+                        last_price = history(1, unit='1d', field='close', security_list=sell_code).iloc[-1, 0]
+                        limit_price = last_price * 0.91
+                        order_target_value(sell_code, 0, LimitOrderStyle(limit_price))
+                        g.risky_stocks.append(sell_code)
+    mode1_buy_list = g.mode1_buy_list
+    all_value = context.portfolio.total_value
+    if g.mode1_flag == 0 and g.mode2_flag == 0:
+        sell_list = context.portfolio.positions.keys()
+        sell_list = [s for s in sell_list if s != etf_list]
+        for sell_code in sell_list:
+            last_price = history(1, unit='1d', field='close', security_list=sell_code).iloc[-1, 0]
+            limit_price = last_price * 0.91
+            order_target_value(sell_code, 0, LimitOrderStyle(limit_price))
+    if g.mode1_flag == 1:
+        sell_list = context.portfolio.long_positions.keys()
+        sell_list = [s for s in sell_list if s not in g.mode2_buy_list]
+        sell_list = [s for s in sell_list if s not in g.mode1_buy_list]
+        for sell_code in sell_list:
+            last_price = history(1, unit='1d', field='close', security_list=sell_code).iloc[-1, 0]
+            limit_price = last_price * 0.91
+            order_target_value(sell_code, 0, LimitOrderStyle(limit_price))
+    if g.mode2_flag == 1:
+        sell_list = context.portfolio.long_positions.keys()
+        sell_list = [s for s in sell_list if s not in g.mode2_buy_list]
+        for sell_code in sell_list:
+            last_price = history(1, unit='1d', field='close', security_list=sell_code).iloc[-1, 0]
+            limit_price = last_price * 0.91
+            order_target_value(sell_code, 0, LimitOrderStyle(limit_price))
+
+def before_markt_open_trade_buy(context):
+    etf_list = g.etf_list
+    mode1_buy_list = g.mode1_buy_list
+    all_value = context.portfolio.total_value
+    current_data = get_current_data()
+    if g.mode1_flag == 1 and g.risk_flag == 0:
+        for buy_code in g.mode1_buy_list:
+            if buy_code not in context.portfolio.long_positions.keys():
+                cash_value = context.portfolio.available_cash
+                buy_value = all_value / g.mode1_stock_num
+                if cash_value > buy_value / 3:
+                    if cash_value > buy_value:
+                        buy_value_num = buy_value
+                    else:
+                        buy_value_num = cash_value
+                    current_data = get_current_data()
+                    limit_price = current_data[buy_code].last_price * 1.02
+                    order_target_value(buy_code, buy_value_num, LimitOrderStyle(limit_price))
+                else:
+                    break
+    if g.mode2_flag == 1 and g.risk_flag == 0:
+        for buy_code in g.mode2_buy_list:
+            if buy_code not in context.portfolio.long_positions.keys():
+                cash_value = context.portfolio.available_cash
+                buy_value = all_value / g.mode2_stock_num
+                if cash_value > buy_value / 3:
+                    if cash_value > buy_value:
+                        buy_value_num = buy_value
+                    else:
+                        buy_value_num = cash_value
+                    current_data = get_current_data()
+                    limit_price = current_data[buy_code].last_price * 1.02
+                    order_target_value(buy_code, buy_value_num, LimitOrderStyle(limit_price))
+                else:
+                    break
+
+def markt_open_trade(context):
+    etf_list = g.etf_list
+    all_value = context.portfolio.total_value
+    cash_value = context.portfolio.available_cash
+    current_data = get_current_data()
+    if g.mode2_flag == 1 and g.risk_flag == 0:
+        for buy_code in g.mode2_buy_list:
+            if buy_code not in context.portfolio.long_positions.keys():
+                cash_value = context.portfolio.available_cash
+                buy_value = all_value / g.mode2_stock_num
+                if cash_value > buy_value / 3:
+                    if cash_value > buy_value:
+                        buy_value_num = buy_value
+                    else:
+                        buy_value_num = cash_value
+                    current_data = get_current_data()
+                    limit_price = current_data[buy_code].last_price * 1.02
+                    order_target_value(buy_code, buy_value_num, LimitOrderStyle(limit_price))
+                else:
+                    break
+    if g.mode1_flag == 1 and g.risk_flag == 0:
+        for buy_code in g.mode1_buy_list:
+            if buy_code not in context.portfolio.long_positions.keys():
+                cash_value = context.portfolio.available_cash
+                buy_value = all_value / g.mode1_stock_num
+                if cash_value > buy_value / 3:
+                    if cash_value > buy_value:
+                        buy_value_num = buy_value
+                    else:
+                        buy_value_num = cash_value
+                    current_data = get_current_data()
+                    limit_price = current_data[buy_code].last_price * 1.02
+                    order_target_value(buy_code, buy_value_num, LimitOrderStyle(limit_price))
+                else:
+                    break
+
+def during_markt_open_trade(context):
+    etf_list = g.etf_list
+    cash_value = context.portfolio.available_cash
+    if cash_value > 10000:
+        current_data = get_current_data()
+        if cash_value > current_data[etf_list].last_price * 101:
+            order_target_value(etf_list, cash_value)
+    cash_value = context.portfolio.available_cash
+
+def before_markt_close_trade(context):
+    etf_list = g.etf_list
+    sell_list = context.portfolio.positions.keys()
+    if etf_list in sell_list:
+        order_target_value(etf_list, 0)
+
+def after_market_close(context):
+    if g.days_count < 20:
+        g.days_count = g.days_count + 1
+    else:
+        g.risky_stocks = []
+        g.days_count = 0
+        g.risk_flag = 0
+    g.old_portfolio_values.append(context.portfolio.portfolio_value)
+    if len(g.old_portfolio_values) > g.days_number:
+        g.old_portfolio_values.pop(0)
+    if len(context.portfolio.positions.keys()) != 0:
+        current_data = get_current_data()
+        for s in context.portfolio.positions.keys():
+            name = current_data[s].name
+            cost = context.portfolio.positions[s].avg_cost
+            price = context.portfolio.positions[s].price
+            total_amount = context.portfolio.positions[s].total_amount
+            total_amount_value = context.portfolio.positions[s].total_amount * cost
+            avg_cost = context.subportfolios[0].long_positions[s].avg_cost
+            syl = (price / cost - 1) * 100
+    current_returns = 100 * context.portfolio.returns
+
+def mode1_check_stock(context):
+    s_stat_date = mode1_controlBasic(context)
+    df_fin = mode1_controlReport(s_stat_date, 6)
+    mode1_stocks_rank(df_fin)
+
+def mode1_controlBasic(context):
+    q = query(income.code).filter(income.net_profit > 0, valuation.pe_ratio > 0, valuation.pe_ratio < 35, balance.total_liability / balance.total_assets < 0.9)
+    primary_stks = list(get_fundamentals(q)['code'])
+    notcall = finance.run_query(query(finance.STK_COMPANY_INFO.code).filter(finance.STK_COMPANY_INFO.industry_id.in_(['J66', 'J67J69', 'K70', 'N78', 'O79'])))
+    notcall_stks = list(notcall['code'])
+    date_500days_ago = context.previous_date - datetime.timedelta(days=500)
+    compinfo = finance.run_query(query(finance.STK_LIST.code).filter(finance.STK_LIST.code.in_(primary_stks), ~finance.STK_LIST.code.in_(notcall_stks), finance.STK_LIST.start_date < date_500days_ago, finance.STK_LIST.state_id == 301001))
+    call_stks = list(compinfo['code'])
+    q = query(income.statDate, income.code).filter(income.code.in_(call_stks))
+    rets = get_fundamentals(q)
+    rets = rets.set_index('code')
+    return rets.statDate
+
+def mode1_controlReport(s, period):
+    stat_date_stocks = {sd: [stock for stock in s.index if s[stock] == sd] for sd in set(s.values)}
+    qt = query(income.statDate, income.code, income.operating_revenue, indicator.adjusted_profit, balance.bill_receivable, balance.account_receivable, balance.advance_peceipts)
+    data_quarters = [[], [], []]
+    for stat_date in stat_date_stocks.keys():
+        lqt = qt.filter(balance.code.in_(stat_date_stocks[stat_date]))
+        arr_quarters = mode1_get_past_quarters(stat_date, period)
+        for i in range(len(arr_quarters)):
+            df_two_quarter = pd.DataFrame()
+            for statq in arr_quarters[i]:
+                oneData = get_fundamentals(lqt, statDate=statq)
+                if len(oneData) > 0:
+                    df_two_quarter = df_two_quarter.append(oneData)
+            if len(df_two_quarter) > 0:
+                df_two_quarter = df_two_quarter.fillna(0)
+                data_quarters[i].append(df_two_quarter)
+    df_qr01 = pd.concat(data_quarters[0]) if len(data_quarters[0]) > 1 else data_quarters[0][0]
+    df_qr23 = pd.concat(data_quarters[1]) if len(data_quarters[1]) > 1 else data_quarters[1][0]
+    df_qr45 = pd.concat(data_quarters[2]) if len(data_quarters[2]) > 1 else data_quarters[2][0]
+    df_year = df_qr01.append(df_qr23)
+    group_by_code = df_year.groupby('code')
+    df_year_count = group_by_code[['statDate']].count()
+    df_year_sum = group_by_code[['operating_revenue', 'adjusted_profit']].sum()
+    df_year_mean = group_by_code[['account_receivable', 'bill_receivable', 'advance_peceipts']].mean()
+    df_year_code = pd.concat([df_year_count, df_year_sum, df_year_mean], axis=1)
+    df_year_code['receivable'] = df_year_code['account_receivable'] + df_year_code['bill_receivable'] - df_year_code['advance_peceipts']
+    df_year_code['ar_turnover_rate'] = df_year_code['operating_revenue'] / df_year_code['receivable'].replace(0, np.inf)
+    df_year_code = df_year_code[(df_year_code.statDate == 4) & ((df_year_code['ar_turnover_rate'] > 6.0) | (df_year_code['ar_turnover_rate'] <= 0))]
+    df_qr01_code = df_qr01.groupby('code')[['adjusted_profit']].sum()
+    df_qr01_code.columns = ['qr01']
+    df_qr23_code = df_qr23.groupby('code')[['adjusted_profit']].sum()
+    df_qr23_code.columns = ['qr23']
+    df_qr45_code = df_qr45.groupby('code')[['adjusted_profit']].sum()
+    df_qr45_code.columns = ['qr45']
+    df_comp = pd.concat([df_qr01_code, df_qr23_code, df_qr45_code], axis=1)
+    df_comp['hb'] = df_comp['qr01'] / df_comp['qr23']
+    df_comp['tb'] = df_comp['qr01'] / df_comp['qr45']
+    df_rets = pd.concat([df_year_code[['adjusted_profit']], df_comp[['hb', 'tb']]], axis=1, join_axes=[df_year_code.index]).dropna()
+    return df_rets
+
+def mode1_stocks_rank(df_fin):
+    if len(df_fin) <= 0:
+        return
+    q_cap = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(list(df_fin.index)))
+    df_cap = get_fundamentals(q_cap).set_index('code')
+    df_pe = pd.concat([df_fin, df_cap], axis=1)
+    df_pe['pe'] = df_pe['market_cap'] * 100000000 / df_pe['adjusted_profit']
+    df_pe = df_pe[(df_pe['pe'] < 20) & (df_pe['pe'] > 0)]
+    df_pe = df_pe.sort(['pe'], ascending=True).reset_index(drop=False)
+    df_pe['pes'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe = df_pe.sort(['hb'], ascending=False).reset_index(drop=True)
+    df_pe['hbs'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe = df_pe.sort(['tb'], ascending=False).reset_index(drop=True)
+    df_pe['tbs'] = 100 - df_pe.index * 100 / len(df_pe)
+    df_pe['s'] = df_pe['pes'] * 1.0 + df_pe['hbs'] * 0.5 + df_pe['tbs'] * 0.4
+    df_pe = df_pe.sort(['s'], ascending=False).reset_index(drop=True)
+    g.mode1_buy_list = list(df_pe.code[:10])
+    current_data = get_current_data()
+    if len(g.mode1_buy_list) > 0:
+        i = 0
+        for s in g.mode1_buy_list:
+            i += 1
+            if i < 10:
+                pass
+
+def mode1_get_past_quarters(stat_date, num):
+    date_stat = datetime.datetime.strptime(stat_date, '%Y-%m-%d').date()
+    year = date_stat.year
+    month = date_stat.month
+    list_quarter = []
+    for i in range(num):
+        if month < 3:
+            year -= 1
+            month = 12
+        quarter = (month - 1) // 3 + 1
+        list_quarter.append('{}q{}'.format(year, quarter))
+        month -= 3
+    return np.array(list_quarter).reshape(3, 2)
+
+def calc_rsrs(high, low, index, M, N):
+    start = len(high) - M
+    arr_ret = np.empty([M, 5], dtype=np.float32)
+    for i in np.arange(0, M):
+        x = low[start + i - N + 1:start + i + 1]
+        y = high[start + i - N + 1:start + i + 1]
+        A = np.vstack((x, np.ones(len(x)))).T
+        model, resid = np.linalg.lstsq(A, y)[:2]
+        r2 = 1 - resid / (y.size * y.var())
+        arr_ret[i, 0] = model[0]
+        arr_ret[i, 1] = r2
+    arr_ret[:, 2] = stats.zscore(arr_ret[-M:, 0])
+    arr_ret[:, 3] = arr_ret[-M:, 2] * arr_ret[-M:, 1]
+    arr_ret[:, 4] = arr_ret[-M:, 0] * arr_ret[-M:, 3]
+    df1 = pd.DataFrame(arr_ret, columns=['rsrs', 'r2', 'zscore', 'RSRS_revise', 'RSRS_negative_r'], index=index[-M:])
+    return df1
+
+def mode2_pe_check_month(context):
+    g.mode2_temp_list = []
+    g.mode2_buy_list = []
+    start = '2005-01-01'
+    end = context.previous_date
+    time_list = list(pd.date_range(start, end, freq='M'))
+    sector = '000300.XSHG'
+    pe_data = []
+    for date in time_list:
+        _ret_val = np.nan
+        stocks = get_index_stocks(sector, date=date)
+        if stocks:
+            q = query(valuation.code, valuation.market_cap, valuation.pe_ratio).filter(valuation.code.in_(stocks))
+            df = get_fundamentals(q, date)
+            _ret_val = avg_calc(df)
+        if not np.isnan(_ret_val):
+            pe_data.append(_ret_val)
+        pe_arr = np.array(pe_data)
+        zws_50 = np.median(pe_arr)
+    g.mode2_flag = 0
+    if len(pe_arr) >= 3:
+        if pe_arr[-2] < pe_arr[-1] < zws_50:
+            g.mode2_flag = 1
+
+def mode2_pe_check_week(context):
+    start = '2009-01-01'
+    end = context.previous_date
+    time_list = list(pd.date_range(start, end, freq='w-mon'))[-5:]
+    sector = '000300.XSHG'
+    pe_data = []
+    for date in time_list:
+        _ret_val = np.nan
+        stocks = get_index_stocks(sector, date=date)
+        if stocks:
+            q = query(valuation.code, valuation.market_cap, valuation.pe_ratio).filter(valuation.code.in_(stocks))
+            df = get_fundamentals(q, date)
+            _ret_val = avg_calc(df)
+        if not np.isnan(_ret_val):
+            pe_data.append(_ret_val)
+        pe_arr = np.array(pe_data)
+    g.mode2_flag = 0
+    if len(pe_arr) >= 3:
+        if pe_arr[-2] > pe_arr[-1]:
+            g.mode2_flag = 0
+
+def mode2_check_stock(context):
+    deltadays = 120
+    delta_date = context.previous_date - datetime.timedelta(deltadays)
+    stock_list = list(get_all_securities(types=['stock'], date=delta_date).index)
+    h = history(8, '1d', 'close', stock_list)
+    s = h.iloc[-1] / h.iloc[0]
+    s.sort(ascending=False)
+    stock_list = list(s[s > 1.2].index)
+    curr_data = get_current_data()
+    stock_list = [stock for stock in stock_list if not (curr_data[stock].day_open == curr_data[stock].high_limit or curr_data[stock].day_open == curr_data[stock].low_limit or curr_data[stock].paused or curr_data[stock].is_st or ('ST' in curr_data[stock].name) or ('*' in curr_data[stock].name) or ('退' in curr_data[stock].name) or stock.startswith('688'))]
+    if len(stock_list) > 0:
+        df_bb = get_billboard_list(stock_list, end_date=context.previous_date, count=1)
+        s_bb = df_bb.groupby('code')['net_value'].sum()
+        for stock in s_bb.index:
+            if s_bb.loc[stock] < -100000000:
+                stock_list.remove(stock)
+    g.mode2_temp_list = stock_list[:5]
+    g.mode2_buy_list = g.mode2_temp_list + [code for code in g.mode2_buy_list if code not in g.mode2_temp_list]
+    current_data = get_current_data()
+    if len(g.mode2_buy_list) > 0:
+        i = 0
+        for s in g.mode2_buy_list:
+            i += 1
+            if i < 10:
+                pass
+
+def mode2_stop_loss(context):
+    current_data = get_current_data()
+    sell_list = context.portfolio.positions
+    sell_list = [s for s in sell_list if s not in g.mode1_buy_list]
+    for stock in sell_list:
+        if context.portfolio.positions[stock].closeable_amount > 0:
+            n_pre_close = attribute_history(stock, 1, '1d', 'close', df=False)['close'][-1]
+            if current_data[stock].last_price < 0.94 * n_pre_close:
+                order_target(stock, 0)
+
+def mode2_stop_holds(context):
+    current_data = get_current_data()
+    sell_list = context.portfolio.positions
+    sell_list = [s for s in sell_list if s not in g.mode1_buy_list]
+    for stock in sell_list:
+        if context.portfolio.positions[stock].closeable_amount > 0:
+            n_pre_close = attribute_history(stock, 1, '1d', 'close', df=False)['close'][-1]
+            if current_data[stock].last_price < 1.04 * n_pre_close:
+                order_target(stock, 0)
+
+def avg_calc(df):
+    try:
+        avg = sum(df['market_cap']) / sum(df['market_cap'] / df['pe_ratio'])
+    except:
+        avg = np.nan
+    return avg
+
+def after_code_changed(context):
+    unschedule_all()
+    run_monthly(mode2_pe_check_month, 1, time='09:00')
+    run_weekly(mode2_pe_check_week, 1, time='09:05')
+    run_daily(before_markt_open, time='09:10', reference_security='000300.XSHG')
+    run_daily(before_markt_open_trade_sell, time='09:16', reference_security='000300.XSHG')
+    run_daily(before_markt_open_trade_buy, time='09:28', reference_security='000300.XSHG')
+    run_daily(markt_open_trade, time='09:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '10:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '11:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '13:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_loss, '14:30', reference_security='000300.XSHG')
+    run_daily(mode2_stop_holds, '14:50', reference_security='000300.XSHG')
+    run_daily(during_markt_open_trade, time='10:00', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=1, time='14:50', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=2, time='14:50', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=3, time='14:50', reference_security='000300.XSHG')
+    run_weekly(before_markt_close_trade, weekday=4, time='14:50', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')

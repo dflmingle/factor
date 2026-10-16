@@ -1,0 +1,110 @@
+quant/2024年度精选策略2/71.期货日内策略三价均线结合ATR指标.txt
+from jqdata import *
+import talib as ta
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.security = 'IF9999.CCFX'
+    g.main_symbol = get_dominant_future('IF')
+    g.atr_length = 14
+    g.ma_length = 20
+    g.ma_short_length = 5
+    g.ma_up = False
+    g.ma_down = False
+    g.is_position = False
+    g.ma = []
+    g.ma_short = []
+    g.signal_long = False
+    run_daily(before_market_open, time='09:00', reference_security='IF8888.CCFX')
+    run_daily(market_open, time='every_bar', reference_security='IF8888.CCFX')
+    run_daily(after_market_close, time='15:30', reference_security='IF8888.CCFX')
+
+def before_market_open(context):
+    g.main_symbol = get_dominant_future('IF')
+    momentumAverage = get_momentumAverage(g.main_symbol, 2, context.previous_date)
+    if momentumAverage > 0:
+        g.signal_long = True
+    else:
+        g.signal_long = False
+
+def market_open(context):
+    dt = context.current_dt
+    dt_lastMinute = dt - datetime.timedelta(minutes=1)
+    if dt.hour == 9:
+        return
+    if dt.hour == 14 and dt.minute == 59:
+        if g.is_position:
+            if g.signal_long:
+                order_target(g.main_symbol, 0)
+            else:
+                order_target(g.main_symbol, 0, side='short')
+            g.is_position = False
+        return
+    g.ma = get_ma(g.main_symbol, g.ma_length, 4, dt_lastMinute)
+    g.ma_short = get_ma(g.main_symbol, g.ma_short_length, 4, dt_lastMinute)
+    atr = get_atr(g.main_symbol, g.atr_length, 4, dt_lastMinute)
+    g.tr = atr['tr'][-1]
+    g.atr = atr['atr'][-1]
+    g.ma_up = is_ma_up(g.ma)
+    g.ma_down = is_ma_down(g.ma)
+    if g.signal_long:
+        if g.ma_up and g.ma_short[-2] < g.ma[-2] and (g.ma_short[-1] > g.ma[-1]) and (not g.is_position):
+            order_value(g.main_symbol, context.portfolio.available_cash)
+            g.is_position = True
+        elif g.is_position and (g.ma_short[-2] > g.ma[-2] and g.ma_short[-1] < g.ma[-1] or g.ma_short[-1] - g.ma[-1] > 3 * g.atr):
+            order_target(g.main_symbol, 0)
+            g.is_position = False
+    elif g.ma_down and g.ma_short[-2] > g.ma[-2] and (g.ma_short[-1] < g.ma[-1]) and (not g.is_position):
+        order_value(g.main_symbol, context.portfolio.available_cash, side='short')
+        g.is_position = True
+    elif g.is_position and (g.ma_short[-2] < g.ma[-2] and g.ma_short[-1] > g.ma[-1] or g.ma[-1] - g.ma_short[-1] > 3 * g.atr):
+        order_target(g.main_symbol, 0, side='short')
+        g.is_position = False
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+
+def get_ma(stock, sma_length, duration, end_date):
+    hist = get_price(stock, count=sma_length + duration, end_date=end_date, frequency='1m', fields=['high', 'low', 'close'])
+    average = (hist['high'] + hist['low'] + hist['close']) / 3
+    ma = ta.MA(average, sma_length)
+    return ma[sma_length:]
+
+def get_atr(stock, atr_length, duration, end_date):
+    data = get_price(stock, count=atr_length + duration, end_date=end_date, frequency='1m', fields=['high', 'low', 'close'])
+    data['yes_close'] = data['close'].shift(1)
+    data.dropna(inplace=True)
+    data['high_low'] = data['high'] - data['low']
+    data['high_close'] = abs(data['high'] - data['yes_close'])
+    data['low_close'] = abs(data['low'] - data['yes_close'])
+    data['tr'] = data[['high_low', 'high_close', 'low_close']].max(axis=1)
+    data['atr'] = ta.MA(data['tr'], atr_length)
+    return data[['tr', 'atr']]
+
+def is_ma_up(ma_day):
+    n = 1
+    for i in range(len(ma_day) - 1):
+        if ma_day[i] <= ma_day[i + 1]:
+            n = n + 1
+    return n == len(ma_day)
+
+def is_ma_down(ma_day):
+    n = 1
+    for i in range(len(ma_day) - 1):
+        if ma_day[i] >= ma_day[i + 1]:
+            n = n + 1
+    return n == len(ma_day)
+
+def get_rsi(stock, timePeriod, end_date):
+    df = get_price(stock, count=timePeriod + 1, end_date=end_date, frequency='daily', fields=['close'])
+    close = df['close'].values
+    df['RSI'] = ta.RSI(close, timeperiod=timePeriod)
+    rsi = df['RSI'][-1]
+    return rsi
+
+def get_momentumAverage(stock, period, end_date):
+    df = get_price(stock, count=period + 1, end_date=end_date, frequency='daily', fields=['close'])
+    df['ret'] = df['close'].diff(1)
+    df['momentumAverage'] = df['ret'].rolling(period).mean()
+    return df['momentumAverage'][-1]
+'EXACT_REVIEWED_FUNCTION get_CCFX_end_date sha256=68d1d2166c7739a5ca3c5864963df9cb1f5edf8d1c2a50befec1cd4ecc85544e source=quant/2021年度精选策略/71.【股指策略】【研报复现】周内与日内结合CTA.txt'
+'EXACT_REVIEWED_FUNCTION position_auto_switch sha256=06d6c5818b529b5424930bf0ca28dac0c4d81c14a600e4213714892d4bb9a17b source=quant/2021年度精选策略/72.【股指期货】收盘折溢价策略.txt'

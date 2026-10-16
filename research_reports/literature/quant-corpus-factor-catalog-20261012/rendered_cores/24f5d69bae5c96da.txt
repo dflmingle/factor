@@ -1,0 +1,276 @@
+quant/2021年度精选策略/69.（12.3更新v1.2）朱虽自用1号（神虽顶底+趋势）.txt
+from jqdata import *
+top = [False] * 199
+topgender = [False] * 199
+buttom = [False] * 199
+buttomgender = [False] * 199
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000001.XSHG')
+    run_daily(market_open, time='14:30', reference_security='000001.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000001.XSHG')
+
+def ema(c_list, n):
+    y_list = []
+    _n = 1
+    for i in range(len(c_list)):
+        if _n == 1:
+            y = c_list[0]
+        elif _n > 1 and _n <= n:
+            y = c_list[i] * 2 / (_n + 1) + (1 - 2 / (_n + 1)) * y_list[-1]
+        else:
+            y = c_list[i] * 2 / (n + 1) + (1 - 2 / (n + 1)) * y_list[-1]
+        y_list.append(y)
+        _n = _n + 1
+    return y_list
+
+def macdx(c_list):
+    dif = np.array(ema(c_list, 12)) - np.array(ema(c_list, 26))
+    dea = ema(dif, 9)
+    macd = (dif - dea) * 2
+    return [dif, dea, macd]
+
+def trend(high, low):
+    shortLong = ema(high, 25)
+    shortShort = ema(low, 25)
+    longLong = ema(high, 90)
+    longShort = ema(low, 90)
+    return [shortLong, shortShort, longLong, longShort]
+
+def hasCross(data):
+    deadcross = []
+    goldcross = []
+    for i in range(1, len(data)):
+        if macdx(data)[2][i] < 0 and macdx(data)[2][i - 1] >= 0:
+            deadcross.append(True)
+        else:
+            deadcross.append(False)
+        if macdx(data)[2][i] > 0 and macdx(data)[2][i - 1] <= 0:
+            goldcross.append(True)
+        else:
+            goldcross.append(False)
+    return [deadcross, goldcross]
+
+def barslast(xlist):
+    barslast = []
+    for i in range(len(xlist)):
+        if xlist[i] == True:
+            barslast.append(199 - i)
+    return barslast
+
+def core_ssdd(deads, golds, close, top, topgender, buttom, buttomgender):
+    dif = macdx(close)[0]
+    if deads[-1] > golds[-1]:
+        lastreds = close[-golds[-2]:-deads[-1]]
+        lastredsdif = dif[-golds[-2]:-deads[-1]]
+        secondreds = close[-golds[-3]:-deads[-2]]
+        secondredsdif = dif[-golds[-3]:-deads[-2]]
+        maxredsdif = max(dif[-golds[-1]:])
+        maxlastredsdif = max(lastredsdif)
+        maxsecondredsdif = max(secondredsdif)
+        if barslast(top) and barslast(top)[-1] == 1:
+            if dif[-1] <= dif[-2] * 0.99:
+                topgender.append(True)
+            elif barslast(topgender) and barslast(topgender)[-1] == 1 and (dif[-1] <= dif[-2] * 1.01):
+                topgender.append(True)
+            else:
+                topgender.append(False)
+        else:
+            topgender.append(False)
+        if dif[-1] <= maxlastredsdif and maxredsdif <= maxlastredsdif:
+            if close[-1] > max(lastreds):
+                top.append(True)
+            elif barslast(top) and barslast(top)[-1] == 1:
+                top.append(True)
+            else:
+                top.append(False)
+        elif dif[-1] > maxlastredsdif and dif[-1] < maxsecondredsdif and (maxredsdif < maxsecondredsdif):
+            if close[-1] > max(secondreds):
+                top.append(True)
+            elif barslast(top) and barslast(top)[-1] == 1:
+                top.append(True)
+            else:
+                top.append(False)
+        else:
+            top.append(False)
+    elif deads[-1] == 1 and (barslast(top) and barslast(top)[-1] == 1):
+        if barslast(top) and barslast(top)[-1] == 1:
+            if dif[-1] <= dif[-2] * 0.99:
+                top.append(False)
+                topgender.append(True)
+            else:
+                top.append(False)
+                topgender.append(False)
+        else:
+            top.append(False)
+            topgender.append(False)
+    else:
+        top.append(False)
+        topgender.append(False)
+    if deads[-1] < golds[-1]:
+        lastgreens = close[-deads[-2]:-golds[-1]]
+        lastgreensdif = dif[-deads[-2]:-golds[-1]]
+        secondgreens = close[-deads[-3]:-golds[-2]]
+        secondgreensdif = dif[-deads[-3]:-golds[-2]]
+        mingreensdif = min(dif[-deads[-1]:])
+        minlastgreensdif = min(lastgreensdif)
+        minsecondgreensdif = min(secondgreensdif)
+        if barslast(buttom) and barslast(buttom)[-1] == 1:
+            if dif[-1] >= dif[-2] * 0.99:
+                buttomgender.append(True)
+            elif barslast(buttomgender) and barslast(buttomgender)[-1] == 1 and (dif[-1] >= dif[-2] * 1.01):
+                buttomgender.append(True)
+            else:
+                buttomgender.append(False)
+        else:
+            buttomgender.append(False)
+        if dif[-1] >= minlastgreensdif and mingreensdif >= minlastgreensdif:
+            if close[-1] < min(lastgreens):
+                buttom.append(True)
+            elif barslast(buttom) and barslast(buttom)[-1] == 1:
+                buttom.append(True)
+            else:
+                buttom.append(False)
+        elif dif[-1] < minlastgreensdif and dif[-1] >= minsecondgreensdif and (mingreensdif >= minsecondgreensdif):
+            if close[-1] < min(lastgreens):
+                buttom.append(True)
+            elif barslast(buttom) and barslast(buttom)[-1] == 1:
+                buttom.append(True)
+            else:
+                buttom.append(False)
+        else:
+            buttom.append(False)
+    elif golds[-1] == 1 and (barslast(buttom) and barslast(buttom)[-1] == 1):
+        if barslast(buttom) and barslast(buttom)[-1] == 1:
+            if dif[-1] >= dif[-2] * 0.99:
+                buttom.append(False)
+                buttomgender.append(True)
+            else:
+                buttom.append(False)
+                buttomgender.append(False)
+        else:
+            buttom.append(False)
+            buttomgender.append(False)
+    else:
+        buttom.append(False)
+        buttomgender.append(False)
+    buttom.pop(0)
+    buttomgender.pop(0)
+    top.pop(0)
+    topgender.pop(0)
+    return [top, topgender, buttom, buttomgender]
+
+def isContinuous(xlist):
+    if len(xlist) == 1:
+        return True
+    else:
+        for i in range(1, len(xlist)):
+            if xlist[i - 1] - xlist[i] != 1:
+                return False
+        return True
+
+def findSublist(xlist):
+    while not isContinuous(xlist):
+        xlist.pop(0)
+    return xlist
+
+def tradeHelper1(golds, topgender):
+    lasttg = topgender[-golds[-1]:]
+    n = len(lasttg)
+    lasttg = np.append([False] * (199 - n), lasttg)
+    tgsublist = findSublist(barslast(lasttg))
+    if -tgsublist[0] + 24 > 0:
+        return True
+
+def tradeHelper2(deads, buttomgender):
+    lastbg = buttomgender[-deads[-1]:]
+    n = len(lastbg)
+    lastbg = np.append([False] * (199 - n), lastbg)
+    bgsublist = findSublist(barslast(lastbg))
+    if -bgsublist[0] + 24 > 0:
+        return True
+
+def isRealT(close, deads, golds):
+    dif = macdx(close)[0]
+    lastredsdif = dif[-golds[-1]:-deads[-1]]
+    secondredsdif = dif[-golds[-2]:-deads[-2]]
+    thirdredsdif = dif[-golds[-3]:-deads[-3]]
+    maxlastredsdif = max(lastredsdif)
+    maxsecondredsdif = max(secondredsdif)
+    maxthirdredsdif = max(thirdredsdif)
+    if maxlastredsdif <= maxsecondredsdif or maxlastredsdif <= maxthirdredsdif:
+        return True
+
+def isRealB(close, deads, golds):
+    dif = macdx(close)[0]
+    lastgreensdif = dif[-deads[-1]:-golds[-1]]
+    secondgreensdif = dif[-deads[-2]:-golds[-2]]
+    thirdgreensdif = dif[-deads[-3]:-golds[-3]]
+    minlastgreensdif = min(lastgreensdif)
+    minsecondgreensdif = min(secondgreensdif)
+    minthirdgreensdif = min(thirdgreensdif)
+    if minlastgreensdif >= minsecondgreensdif or minlastgreensdif >= minthirdgreensdif:
+        return True
+
+def before_market_open(context):
+    if context.current_dt >= datetime.datetime(2017, 1, 1):
+        g.security = '399001.XSHE'
+    else:
+        g.security = '000001.XSHG'
+
+def market_open(context):
+    global top, topgender, buttom, buttomgender
+    security = g.security
+    today_data = get_bars(security, count=1, unit='1m', fields=['close', 'high', 'low'])
+    cash = context.portfolio.available_cash
+    tv = context.portfolio.total_value
+    datas = get_bars(security, count=199, unit='1d', fields=['close', 'high', 'low'])
+    closes = np.append(datas['close'], today_data['close'][-1])
+    highs = np.append(datas['high'], today_data['high'][-1])
+    lows = np.append(datas['low'], today_data['low'][-1])
+    trends = trend(highs, lows)
+    list1 = hasCross(closes)[0]
+    list2 = hasCross(closes)[1]
+    deads = barslast(list1)
+    golds = barslast(list2)
+    res = core_ssdd(deads, golds, closes, top, topgender, buttom, buttomgender)
+    top = res[0]
+    topgender = res[1]
+    buttom = res[2]
+    buttomgender = res[3]
+    current_price = today_data['close'][-1]
+    security = '159901.XSHE'
+    if (topgender[-1] or buttomgender[-1]) and (not (topgender[-2] or buttomgender[-2])):
+        if topgender[-1]:
+            if current_price * 0.76 < trends[1][-1] and current_price * 0.76 < trends[3][-1]:
+                order_target_value(security, 0)
+        elif buttomgender[-1]:
+            if current_price * 1.5 > trends[0][-1] and current_price * 1.5 > trends[2][-1]:
+                order_target_value(security, tv)
+    elif topgender[-2] or buttomgender[-2]:
+        if topgender[-2]:
+            if topgender[-1]:
+                pass
+            elif deads[-1] < golds[-1]:
+                pass
+            elif deads[-1] > golds[-1] and top[-1] == True:
+                pass
+        elif buttomgender[-1]:
+            pass
+        elif deads[-1] > golds[-1]:
+            pass
+        elif deads[-1] < golds[-1] and buttom[-1] == True:
+            pass
+    elif barslast(topgender) and min(barslast(topgender)) < golds[-1] and tradeHelper1(golds, topgender) and (deads[-1] < golds[-1] and isRealT(closes, deads, golds) or (deads[-1] > golds[-1] and top[-1])):
+        pass
+    elif barslast(buttomgender) and min(barslast(buttomgender)) < deads[-1] and tradeHelper2(deads, buttomgender) and (deads[-1] > golds[-1] and isRealB(closes, deads, golds) or (deads[-1] < golds[-1] and buttom[-1])):
+        pass
+    elif current_price < trends[1][-1] and current_price < trends[3][-1]:
+        order_target_value(security, 0)
+    elif current_price > trends[0][-1] and current_price < trends[3][-1]:
+        order_target_value(security, 0.4 * tv)
+    elif current_price > trends[2][-1] and current_price < trends[1][-1]:
+        order_target_value(security, 0.6 * tv)
+    elif current_price > trends[0][-1] and current_price > trends[2][-1]:
+        order_target_value(security, tv)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

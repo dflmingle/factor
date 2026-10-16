@@ -1,0 +1,110 @@
+quant/聚宽2025年精选/88WY大神的“龙头打板”策略小改.txt
+from jqdata import *
+from jqfactor import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+
+def initialize(context):
+    g.ps = 10
+    g.jqfactor = 'VOL5'
+    g.sort = True
+    g.notBuylst = []
+    run_daily(get_stock_list, '9:01')
+    run_daily(buy, '09:30')
+    run_daily(stoploss, '10:30')
+    run_daily(stoploss, '13:00')
+    run_daily(stoploss, '14:00')
+    run_daily(sell, 'every_bar')
+    run_daily(print_position_info, '15:02')
+
+def get_stock_list(context):
+    date = context.previous_date
+    date = transform_date(date, 'str')
+    initial_list = prepare_stock_list(date)
+    hl_list = get_hl_stock(initial_list, date)
+    ccd = get_continue_count_df(hl_list, date, 20) if len(hl_list) != 0 else pd.DataFrame(index=[], data={'count': [], 'extreme_count': []})
+    M = ccd['count'].max() if len(ccd) != 0 else 0
+    ccd0 = pd.DataFrame(index=[], data={'count': [], 'extreme_count': []})
+    CCD = ccd[ccd['count'] == M] if M != 0 else ccd0
+    lt = list(CCD.index)
+    df = get_factor_filter_df(context, lt, g.jqfactor, g.sort)
+    stock_list = list(df.index)
+    stock_list = remove_values(stock_list, g.notBuylst)
+    g.target_list = stock_list[:g.ps - len(context.portfolio.positions)]
+
+def remove_values(list1, list2):
+    return [value for value in list1 if value not in list2]
+'EXACT_REVIEWED_FUNCTION buy sha256=53fcbdb5f701ab4fd9546428a931f2115eec8b125b84db6d7607c055520028a7 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+
+def sell(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if minute > 50 and hour == 14:
+        for s in hold_list:
+            if not current_data[s].last_price == current_data[s].high_limit:
+                if context.portfolio.positions[s].closeable_amount != 0:
+                    start_date = transform_date(context.portfolio.positions[s].init_time, 'str')
+                    target_date = get_shifted_date(start_date, 2, 'T')
+                    current_date = transform_date(context.current_dt, 'str')
+                    cost = context.portfolio.positions[s].avg_cost
+                    price = context.portfolio.positions[s].price
+                    ret = 100 * (price / cost - 1)
+                    if current_date >= target_date or ret < 0:
+                        if current_data[s].last_price > current_data[s].low_limit:
+                            order_target_value(s, 0)
+
+def stoploss(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    for s in hold_list:
+        issell = False
+        if context.portfolio.positions[s].closeable_amount != 0:
+            cost = context.portfolio.positions[s].avg_cost
+            price = context.portfolio.positions[s].price
+            ret = 100 * (price / cost - 1)
+            if ret < 0:
+                if current_data[s].last_price > current_data[s].low_limit:
+                    order_target_value(s, 0)
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=af3d460f1664c95ce103c45e4aa82266d06e53a12e8d79da1097ddbc84e6bd04 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_extreme_limit_stock sha256=e43531991a1b1cd14bfe0ac8337c3942976c2f39683c74c0d66f7ad17913dcbd source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=56e537db6fd28b7921a9ea3d0d02ce5d54a0b27871c0225470ed712658edcd3c source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_init_emo_count sha256=710ec44eb3e72049846ffccf4063cda49142f4e583ab3c370a1d896fc023b992 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hot_concept sha256=9ff956452dd0266717251258b62c8dbaa438dcaba1ff13d67121d9071930cfe6 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_concept_stock sha256=1663c7b81d39ee616fac85d7e01ad8c584870561cf3c4f417e290013a450381b source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=1b44687e21b10ff448ccffd8adc7bcbc28701bc3e2f9bc81b42cad20cd893c18 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+
+def get_hl_notlow_stock(initial_list, date):
+    df = get_price(initial_list, end_date=date, frequency='daily', fields=['close', 'high_limit', 'low'], count=1, panel=False, fill_paused=False, skip_paused=False)
+    df = df.dropna()
+    df = df[df['close'] == df['high_limit']]
+    df = df[df['low'] < df['high_limit']]
+    hl_list = list(df.code)
+    return hl_list
+'EXACT_REVIEWED_FUNCTION get_hl_count_df sha256=696c4e8a4997343a84c8e7a5b8252c7661feaf6aede50f6e911dd8a94cd767ce source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_continue_count_df sha256=ed4b85c92a7f497f105c05129f66dce38db5bc17142e183ec8dde223f2f7ad05 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_factor_filter_df sha256=46740650f40790703f941edc66749be8b9b0115ed08f68ef8c3a02087054cb85 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+
+def print_position_info(context):
+    position_percent = 100 * context.portfolio.positions_value / context.portfolio.total_value
+    today_buylist = []
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount
+        today_amount = position.today_amount
+        if today_amount > 0:
+            today_buylist.append(securities)
+    g.notBuylst = remove_values(g.target_list, today_buylist)

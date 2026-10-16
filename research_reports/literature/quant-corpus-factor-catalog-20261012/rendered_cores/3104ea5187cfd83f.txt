@@ -1,0 +1,68 @@
+quant/聚宽2025年精选/29穿越牛熊2.0(非小市值)年化50%的cta策略.txt
+from jqdata import *
+
+def initialize(context):
+    g.tradecode = ''
+    g.flag = 0
+    run_monthly(month_open, -5, time='9:01', reference_security='I8888.XDCE')
+    run_daily(day_open, time='9:02', reference_security='I8888.XDCE')
+    return
+
+def get_近月合约(date):
+    ftpd = get_all_securities(['futures'])
+    ftpd['start_date'] = [str(d)[0:10] for d in ftpd['start_date'].tolist()]
+    ftpd['end_date'] = [str(d)[0:10] for d in ftpd['end_date'].tolist()]
+    ftpd['pz'] = [str(x)[0:-4].upper() for x in ftpd['name'].tolist()]
+    ftpd['month'] = [str(x)[-2:] for x in ftpd['name'].tolist()]
+    ftpd = ftpd[ftpd['pz'] == 'I']
+    month1 = str(100 + (int(date[-5:-3]) + 1) % 12)[1:]
+    month2 = str(100 + (int(date[-5:-3]) + 2) % 12)[1:]
+    if month1 == '00':
+        month1 = '12'
+    if month2 == '00':
+        month2 = '12'
+    ftpd = ftpd[(ftpd['start_date'] < date) & (ftpd['end_date'] > date)]
+    code1 = ftpd[ftpd['month'] == month1].index.tolist()[0]
+    code2 = ftpd[ftpd['month'] == month2].index.tolist()[0]
+    return (code1, code2)
+
+def month_open(context):
+    date = str(context.current_dt.date())[0:10]
+    code1, code2 = get_近月合约(date)
+    g.tradecode = code2
+    if code1 in context.portfolio.positions.keys():
+        order_target(code1, 0, side='long')
+    if isdown(context) == -1:
+        g.flag = 0
+        return
+    total_value = context.portfolio.total_value
+    price = get_bars(g.tradecode, 1, unit='1d', fields=['close'])[0][0]
+    amount = int(total_value / (price * 100))
+    order_target(g.tradecode, amount, side='long')
+    g.flag = 1
+    return
+
+def day_open(context):
+    if g.tradecode == '':
+        return
+    if isdown(context) == -1 and g.flag == 1:
+        order_target(g.tradecode, 0, side='long')
+        g.flag = 0
+        return
+    if isdown(context) == 0 and g.flag == 0:
+        total_value = context.portfolio.total_value
+        price = get_bars(g.tradecode, 1, unit='1d', fields=['close'])[0][0]
+        amount = int(total_value / (price * 100))
+        order_target(g.tradecode, amount, side='long')
+        g.flag = 1
+    return
+
+def isdown(context):
+    pricedata = get_bars('I8888.XDCE', 60, unit='1d', fields=['close'], df=True)
+    price = pricedata.iloc[-1, 0]
+    ma20 = pricedata.iloc[-20:, 0].mean()
+    ma60 = pricedata['close'].mean()
+    if price < ma20 and ma20 < ma60:
+        return -1
+    else:
+        return 0

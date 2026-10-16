@@ -1,0 +1,73 @@
+quant/2024年度精选策略1/39.大资金优质股策略，总收益1217%！无小市值因子！.txt
+from jqfactor import neutralize
+from jqfactor import winsorize
+from jqfactor import standardlize
+import pandas as pd
+import statsmodels.api as sm
+from jqdata import *
+from jqfactor import get_factor_values
+import datetime
+
+def initialize(context):
+    g.stock_num = 8
+    g.limit_days = 20
+    g.hold_list = []
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_monthly(monthly_adjustment, monthday=1, time='9:30', reference_security='000300.XSHG')
+    run_daily(check_limit_up, time='14:00', reference_security='000300.XSHG')
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    by_date = context.previous_date - datetime.timedelta(days=375)
+    initial_list = get_all_securities(date=by_date).index.tolist()
+    initial_list = filter_kcb_stock(initial_list)
+    sample = filter_st_stock(initial_list)
+    q = query(valuation.code, (cash_flow.net_operate_cash_flow - cash_flow.subtotal_invest_cash_outflow) / 100000000, (cash_flow.net_operate_cash_flow - cash_flow.subtotal_invest_cash_outflow) / (valuation.market_cap * 100000000), indicator.roe, indicator.net_profit_margin, indicator.inc_net_profit_year_on_year, valuation.circulating_market_cap).filter(valuation.code.in_(sample), (cash_flow.net_operate_cash_flow - cash_flow.subtotal_invest_cash_outflow) / (valuation.market_cap * 100000000) > 0.02, indicator.adjusted_profit > 0, indicator.roe > 3, indicator.net_profit_margin > 10, indicator.inc_net_profit_to_shareholders_year_on_year > 5).order_by((cash_flow.net_operate_cash_flow - cash_flow.subtotal_invest_cash_outflow) / (valuation.market_cap * 100000000).desc())
+    df = get_fundamentals(q, date=None)
+    df.columns = ['code', '自由现金流（亿元）', 'FCF/市值(排序列)', 'roe', '净利率', '归母净利润YOY', '流通市值']
+    df.index = df.code.values
+    del df['code']
+    df
+    factors_list = ['FCF/市值(排序列)', 'roe']
+    df['score'] = 0
+    for factor in factors_list:
+        df[factor] = winsorize(df[factor], qrange=[0.05, 0.93], inclusive=True, inf2nan=True, axis=0)
+        df[factor] = neutralize(df[factor], how=['jq_l1', 'market_cap'], date=None, axis=0)
+        df[factor] = standardlize(df[factor], inf2nan=True, axis=0)
+        df['score'] = df['score'] + df[factor]
+    df3 = df.sort_values('score', ascending=False).iloc[:10]
+    WNS1_list = df3.index.tolist()
+    return WNS1_list
+
+def prepare_stock_list(context):
+    g.hold_list = list(context.portfolio.positions)
+    g.high_limit_list = []
+    if g.hold_list:
+        df = get_price(g.hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'paused'], count=1, panel=False)
+        g.high_limit_list = df.query('close==high_limit and paused==0')['code'].tolist()
+
+def monthly_adjustment(context):
+    target_list = get_stock_list(context)
+    target_list = filter_paused_stock(target_list)
+    target_list = filter_limit_stock(context, target_list)
+    for stock in g.hold_list:
+        if stock not in target_list and stock not in g.high_limit_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = g.stock_num
+    if target_num > position_count:
+        value = context.portfolio.available_cash / (target_num - position_count)
+        for stock in target_list:
+            if stock not in context.portfolio.positions:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) >= g.stock_num:
+                        break
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=d9ab99f569e9c1de25656befa261643c45390bbe8e3b2571b2adb2a8054361de source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=c8229093b9ca4e7aafa45470f93924c19038e4a06a7d0aa1879e8dc6bacdc223 source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'
+'EXACT_REVIEWED_FUNCTION filter_limit_stock sha256=c8effe6f7601be6d042ec9efe1256c46d24986465ed81a33c6f50c3b0e576c06 source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcb_stock sha256=369d015d2767909b8954c4bfe54ee601eb7276122b06137782ab24bfbd14892b source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=98077390b007810cb14e2de6102ce7d2386463aca11468db551a4627614f53f7 source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=d128780205561645ce0a4a3b4ebf17bbe7a9f2ef8858ce4dbe4deebcbe2332e7 source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'

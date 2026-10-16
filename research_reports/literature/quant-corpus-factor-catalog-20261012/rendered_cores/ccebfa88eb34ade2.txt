@@ -1,0 +1,52 @@
+quant/2022年度精选策略/83.穿越十年牛熊：沪深300成分股配合macd的价投择时策略.txt
+import numpy as np
+from jqdata import *
+import talib
+from datetime import datetime, date
+
+def initialize(context):
+    g.runtime = '9:30'
+    g.idx = '000300.XSHG'
+    g.buylist = []
+    g.idxwarn = False
+    run_daily(deal, time=g.runtime, reference_security='000300.XSHG')
+
+def kData(context, stock, countNum):
+    return attribute_history(stock, count=countNum, unit='1d', fields=['open', 'close', 'high', 'low', 'volume', 'money', 'high_limit', 'low_limit'], skip_paused=True, df=False, fq='pre')
+
+def macdSignal(context, idx='000001.XSHG'):
+    pdata = kData(context, idx, 40)
+    idxc = pdata['close']
+    price = array(idxc)
+    macd = talib.MACD(price, fastperiod=5, slowperiod=15, signalperiod=7)[-1]
+    if sum(macd[-15:]) > 0:
+        if sum([x > 0 for x in macd[-15:-5]]) > 4:
+            if idx == '000001.XSHG' and macd[-1] > 0:
+                return 0
+            elif sum(macd[-5:]) > 0:
+                return (sum(macd[-15:]) - abs(sum(macd[-5:]))) * 100
+    return 2
+
+def deal(context):
+    holdnum = 3
+    g.idxwarn = macdSignal(context)
+    stock_count = len(list(context.portfolio.positions.keys()))
+    if stock_count > 0 and g.idxwarn > 2:
+        for stock in context.portfolio.positions:
+            order_target(stock, 0)
+    if g.idxwarn != 0 or stock_count > holdnum:
+        return
+    g.buylist = []
+    q = query(valuation.code, valuation.pe_ratio, valuation.circulating_cap).filter(valuation.code.in_(get_index_stocks(g.idx)))
+    df = get_fundamentals(q)
+    for s in df.code.tolist():
+        msig = macdSignal(context, s)
+        if msig > 2:
+            g.buylist.append([s, msig])
+    if len(g.buylist) == 0:
+        return
+    g.buylist = sorted(g.buylist, key=lambda x: x[1], reverse=False)[:holdnum - stock_count + 1]
+    cash = context.portfolio.total_value / len(g.buylist)
+    for s in g.buylist:
+        stock = s[0]
+        order_value(stock, cash)

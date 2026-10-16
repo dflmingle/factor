@@ -1,0 +1,21 @@
+quant/2020年度精选策略/91 Stoch（KDJ）——大盘择时.txt
+import talib
+import pandas as pd
+import numpy as np
+import math
+from sklearn.svm import SVR
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import learning_curve
+'EXACT_REVIEWED_FUNCTION initialize sha256=9bf1ddfbf60049ec1b38a6ee22bdf7b99b9e00ee6e5b021bf58f41bd022d21cc source=quant/2020年度精选策略/76 MACD——大盘择时.txt'
+
+def handle_data(context, data):
+    cash = context.portfolio.cash
+    for stock in context.stocks:
+        h = attribute_history(stock, 60, '1d', ('high', 'low', 'close'))
+        slowk, slowd = talib.STOCH(h['high'].values, h['low'].values, h['close'].values, fastk_period=17, slowk_period=9, slowk_matype=0, slowd_period=7, slowd_matype=0)
+        current_position = context.portfolio.positions[stock].amount
+        current_price = data[stock].price
+        if slowk[-1] < 80 and slowk[-2] > 80 and (current_position >= 0) or (slowk[-1] > 20 and slowk[-1] < 80 and (slowk[-1] < slowd[-1]) and (current_position >= 0)):
+            order_target(stock, 0)
+        elif slowk[-1] > 20 and slowk[-2] < 20 and (current_position <= 0) or (slowk[-1] > 20 and slowk[-1] > 80 and (slowk[-1] > slowd[-1]) and (current_position <= 0)):
+            order_value(stock, cash)

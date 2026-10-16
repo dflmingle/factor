@@ -1,0 +1,149 @@
+quant/2024年度精选策略2/58.ETF动量轮动RSRS与北上择时-股债平衡-盘中止损.txt
+from jqdata import *
+import numpy as np
+from pykalman import KalmanFilter
+
+def initialize(context):
+    g.stock_pool = ['510050.XSHG', '510500.XSHG', '510300.XSHG', '512100.XSHG', '159949.XSHE', '163417.XSHE', '161005.XSHE']
+    g.stock_num = 1
+    g.momentum_day = 20
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.score_threshold = 0.7
+    g.slope_series = initial_slope_series()
+    g.checktime = '13:00'
+    g.checktime2 = '13:50'
+    g.hold = ''
+    run_daily(my_trade, time='9:30', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+    run_daily(hold_check, time=g.checktime)
+
+def hold_check(context):
+    N = 20
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if context.portfolio.positions:
+        if hour == int(g.checktime.split(':')[0]) and minute == int(g.checktime.split(':')[-1]):
+            for stk in context.portfolio.positions:
+                dt = attribute_history(stk, N + 2, '60m', ['close'])
+                dt['man'] = dt.close / dt.close.rolling(N).mean()
+                if dt.man[-1] < 1.0:
+                    order_target_value(stk, 0)
+                    g.hold = stk
+    else:
+        return
+'EXACT_REVIEWED_FUNCTION get_rank sha256=e247c5544f757ed17115a8f169922da011be9276c26b0e058d91dde069180aee source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION initial_slope_series sha256=805881cbfcf95441e57e788c901e503f8a556b7afe47d9cb65127ce16706c840 source=quant/2023年度精选策略/29.价值成长轮动策略.txt'
+
+def get_timing_signal(context, stock):
+    get_north_money(context)
+    data = attribute_history(g.ref_stock, 18, '1d', ['high', 'low', 'volume'])
+    intercept, slope, r2 = get_ols(data.low, data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    if g.north_money >= 0:
+        if rsrs_score > g.score_threshold:
+            return 'BUY'
+        elif rsrs_score < -g.score_threshold:
+            return 'SELL'
+        else:
+            return 'KEEP'
+    else:
+        return 'SELL'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=ff389f7c66135b57bd0e3985861e520815f16bd818f86c6f3076a0e92260b0d2 source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=17eb752a92056238278b3c87d4d4d78d9c255bd6d25884013035c3867f3ad21a source=quant/2024年度精选策略2/50.ETF动量轮动RSRS择时-V2.1.txt'
+
+def my_trade(context):
+    stock_list(context)
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == 9 and minute == 30:
+        check_out_list = get_rank(context, g.stock_pool)
+        timing_signal = get_timing_signal(context, g.ref_stock)
+        if timing_signal == 'SELL' and len(context.portfolio.positions) > 1:
+            for stock in context.portfolio.positions:
+                if stock not in ['511010.XSHG', '511260.XSHG', '513100.XSHG']:
+                    position = context.portfolio.positions[stock]
+                    close_position(position)
+        elif timing_signal == 'BUY' or timing_signal == 'KEEP':
+            df = history(40, unit='1d', field='close', security_list=g.stocks, df=True, skip_paused=True, fq='post')
+            pre_price = df.iloc[-1]
+            price_ratio = (pre_price / g.base_price).to_dict()
+            waves = calc_volatility(df)
+            g.position = pd.DataFrame(data={'weight': g.weights, 'wave': waves})
+            g.position['position'] = g.position.weight / g.position.wave ** 2
+            g.position['position'] = g.position['position'] / g.position['position'].sum()
+            g.position['position'].loc[g.position['position'] < 0.05] = 0.0
+            g.position['position'] = g.position['position'] / g.position['position'].sum()
+            if context.portfolio.available_cash > context.portfolio.total_value * 0.02 or need_balance(context):
+                rebalance(context)
+        else:
+            pass
+'EXACT_REVIEWED_FUNCTION check_lose sha256=70aae961f2bf92e1f0ce8c852c6974dd0cb6f4c56b14979e454d760c577659d3 source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=73dd0b225b79125998a6988076a4218a550fa612b090a8db46acb6553a0986bb source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'
+
+def get_north_money(context):
+    yesterday = context.previous_date
+    n_sh = finance.run_query(query(finance.STK_ML_QUOTA).filter(finance.STK_ML_QUOTA.day >= '2013-01-10', finance.STK_ML_QUOTA.day <= yesterday, finance.STK_ML_QUOTA.link_id == 310001).order_by(finance.STK_ML_QUOTA.day.desc()).limit(10))
+    n_sz = finance.run_query(query(finance.STK_ML_QUOTA).filter(finance.STK_ML_QUOTA.day >= '2017-01-10', finance.STK_ML_QUOTA.day <= yesterday, finance.STK_ML_QUOTA.link_id == 310002).order_by(finance.STK_ML_QUOTA.day.desc()).limit(10))
+    total_net_in = 0
+    for i in range(0, 2):
+        if str(yesterday) > '2017-01-10':
+            sh_in = n_sh['buy_amount'][i] - n_sh['sell_amount'][i]
+            sz_in = n_sz['buy_amount'][i] - n_sz['sell_amount'][i]
+            amount = sh_in + sz_in
+            total_net_in += amount
+        else:
+            sh_in = n_sh['buy_amount'][i] - n_sh['sell_amount'][i]
+            amount = sh_in
+            total_net_in += amount
+    g.north_money = total_net_in
+
+def stock_list(context):
+    g.stocks = []
+    check_out_list = []
+    check_out_list.append(get_rank(context, g.stock_pool)[0])
+    check_out_list.append('513100.XSHG')
+    check_out_list.append('511260.XSHG')
+    g.stocks = check_out_list
+    stocksdata = [20, 20, 0.5]
+    g.weights = pd.Series(stocksdata, index=g.stocks)
+    df = history(1, unit='1d', field='close', security_list=g.stocks, df=True, skip_paused=True, fq='post')
+    g.base_price = df.iloc[0]
+
+def calc_volatility(df):
+    df_return = np.log(df / df.shift(1)).dropna()
+    s_std = df_return.std()
+    s_mean = df_return.mean()
+    for code in df_return.columns:
+        df_return[code].loc[df_return[code] > s_mean[code] + 3 * s_std[code]] = s_mean[code] + 3 * s_std[code]
+        df_return[code].loc[df_return[code] < s_mean[code] - 3 * s_std[code]] = s_mean[code] - 3 * s_std[code]
+    return df_return.std() * math.sqrt(250.0) * 100
+'EXACT_REVIEWED_FUNCTION need_balance sha256=b640e4f9b7f7c034c68a9c147d2757a4e69c6e0101eee8fe964614ca7cadfb12 source=quant/2021年度精选策略/7.股债波动平衡.txt'
+
+def rebalance(context):
+    p = g.position
+    sells = []
+    cur = get_current_data()
+    for code in p.index.values:
+        position = p.position.loc[code]
+        target_value = context.portfolio.total_value * position
+        if code in context.portfolio.positions:
+            old_position = context.portfolio.positions[code].value / context.portfolio.total_value
+            if old_position > position:
+                if cur[code].last_price * 100 < abs(context.portfolio.positions[code].value - context.portfolio.total_value * position):
+                    order_target_value(code, context.portfolio.total_value * position)
+                    sells.append(code)
+    for code in p.index.values:
+        position = p.position.loc[code]
+        target_value = context.portfolio.total_value * position
+        add_value = target_value - context.portfolio.positions[code].value if code in context.portfolio.positions else target_value
+        can_add_value = add_value if context.portfolio.available_cash > add_value else context.portfolio.available_cash
+        can_buy = code not in context.portfolio.positions and cur[code].last_price * 100 < context.portfolio.total_value * position or (code in context.portfolio.positions and cur[code].last_price * 100 < abs(context.portfolio.positions[code].value - context.portfolio.total_value * position))
+        if code not in sells and can_buy and (can_add_value > cur[code].last_price * 100):
+            order_value(code, can_add_value)

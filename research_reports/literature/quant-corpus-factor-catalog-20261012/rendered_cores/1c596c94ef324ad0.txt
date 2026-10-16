@@ -1,0 +1,51 @@
+quant/2023年度精选策略/95.【复现】高频价量相关性，意想不到的选股因子.txt
+from jqdata import *
+from jqlib.optimizer import *
+import pandas as pd
+import numpy as np
+from dateutil.parser import parse
+from typing import Tuple, List
+from six import BytesIO
+from sklearn.decomposition import PCA
+enable_profile()
+
+def initialize(context):
+    set_params(context)
+    set_variables()
+    set_backtest()
+    run_daily(TradeFunc, time='10:30', reference_security='000300.XSHG')
+
+def set_params(context):
+    g.hold_num = 200
+    g.factor_name = 'pv_corr'
+    g.is_in_index = None
+
+def set_variables():
+    g.factor_df = pd.read_csv(BytesIO(read_file('cpv.csv')), index_col=[0, 1], parse_dates=['date'])
+
+def set_backtest():
+    set_redeem_latency(day=2, type='open_fund')
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=7e6c8f38f4512852c9ef49bc17cde2234562d5a81ab20d60623feb283f6ea990 source=quant/2021年度精选策略/61.【复现】扩散指标择时.txt'
+
+def TradeFunc(context):
+    trade_date = context.previous_date
+    if trade_date in g.factor_df.index.levels[0]:
+        if g.factor_name == 'pca_pv':
+            pca = PCA(n_components=1)
+            v = g.factor_df.loc[trade_date].fillna(0).values
+            pca_v = pca.fit_transform(v)
+            pca_pv = pd.DataFrame(pca_v, index=g.factor_df.loc[trade_date].index, columns=['pca_pv'])
+            frame = -pca_pv['pca_pv']
+        else:
+            frame = g.factor_df.loc[trade_date, g.factor_name]
+        if g.is_in_index is None:
+            target_code = frame.nsmallest(g.hold_num).index.tolist()
+        else:
+            cons_symbol = get_index_stocks(g.is_in_index)
+            target_code = frame.reindex(cons_symbol).nsmallest(g.hold_num).index.tolist()
+        for hold in context.portfolio.long_positions:
+            if hold not in target_code:
+                order_target(hold, 0)
+        every_stock = context.portfolio.total_value / len(target_code)
+        for stock in target_code:
+            order_target_value(stock, every_stock)

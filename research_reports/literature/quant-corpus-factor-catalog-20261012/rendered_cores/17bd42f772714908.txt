@@ -1,0 +1,208 @@
+quant/量化策略/量化策略/首板回调买入策略2026/09涨停回调止盈止损-25年30.62.txt
+from jqdata import *
+import numpy as np
+import datetime
+
+def initialize(context):
+    g.stock_num = 10
+    g.stop_profit_min = 0.1
+    g.stop_profit_max = 0.15
+    g.stop_loss = -0.03
+    g.lookback_days = 10
+    g.volume_ratio = 1.3
+    g.buy_stocks = []
+    g.holding_stocks = {}
+    run_daily(check_stocks, time='14:50')
+    run_daily(trade, time='14:55')
+    run_weekly(print_summary, weekday=1, time='09:30')
+
+def get_limit_rate(stock):
+    if stock.startswith('30'):
+        return 1.2
+    elif stock.startswith('688'):
+        return 1.2
+    else:
+        return 1.1
+
+def is_limit_up(prev_close, today_close, today_high, stock):
+    limit_rate = get_limit_rate(stock)
+    limit_price = round(prev_close * limit_rate, 2)
+    close_diff = abs(today_close - limit_price)
+    high_diff = abs(today_high - limit_price)
+    tolerance = 0.02
+    return close_diff <= tolerance or high_diff <= tolerance
+
+def check_limit_up_history(hist_data, stock, lookback_days=10):
+    if len(hist_data) < lookback_days + 1:
+        return (False, False, 0)
+    limit_up_count = 0
+    today_is_limit = False
+    has_limit_in_past = False
+    for i in range(lookback_days):
+        if -2 - i < -len(hist_data):
+            break
+        prev_close = hist_data['close'].iloc[-2 - i]
+        today_close = hist_data['close'].iloc[-1 - i]
+        today_high = hist_data['high'].iloc[-1 - i]
+        if is_limit_up(prev_close, today_close, today_high, stock):
+            limit_up_count += 1
+            if i == 0:
+                today_is_limit = True
+            else:
+                has_limit_in_past = True
+    return (has_limit_in_past, today_is_limit, limit_up_count)
+
+def check_stocks(context):
+    g.buy_stocks = []
+    all_stocks = get_all_securities(['stock']).index.tolist()
+    current_data = get_current_data()
+    filtered_stocks = []
+    for stock in all_stocks:
+        if current_data[stock].is_st:
+            continue
+        if current_data[stock].paused:
+            continue
+        if current_data[stock].last_price < 3:
+            continue
+        filtered_stocks.append(stock)
+    checked_count = 0
+    selected_count = 0
+    for stock in filtered_stocks:
+        checked_count += 1
+        if checked_count % 200 == 0:
+            pass
+        try:
+            hist_data = attribute_history(stock, count=20, unit='1d', fields=['close', 'high', 'low', 'volume'], skip_paused=True)
+            if len(hist_data) < 20:
+                continue
+            has_limit_in_past, today_is_limit, limit_up_count = check_limit_up_history(hist_data, stock, g.lookback_days)
+            if not has_limit_in_past:
+                continue
+            if limit_up_count > 2:
+                continue
+            if today_is_limit:
+                continue
+            ma5 = hist_data['close'].rolling(window=5).mean()
+            ma10 = hist_data['close'].rolling(window=10).mean()
+            current_close = hist_data['close'].iloc[-1]
+            prev_close = hist_data['close'].iloc[-2]
+            current_ma5 = ma5.iloc[-1]
+            prev_ma5 = ma5.iloc[-2]
+            current_ma10 = ma10.iloc[-1]
+            prev_ma10 = ma10.iloc[-2]
+            current_volume = hist_data['volume'].iloc[-1]
+            avg_volume_20 = hist_data['volume'].rolling(window=20).mean().iloc[-1]
+            condition_a = current_close > current_ma10 and prev_close > prev_ma10
+            if not condition_a:
+                continue
+            condition_b = prev_close <= prev_ma5 * 1.01 and current_close > current_ma5
+            if not condition_b:
+                continue
+            condition_c = current_volume > avg_volume_20 * g.volume_ratio
+            if not condition_c:
+                continue
+            ma_distance = abs(current_ma5 - current_ma10) / current_ma10
+            condition_d = ma_distance > 0.01
+            if not condition_d:
+                continue
+            recent_high = hist_data['high'].iloc[-5:].max()
+            drawdown = (recent_high - current_close) / recent_high
+            condition_e = drawdown > 0.05
+            if not condition_e:
+                continue
+            g.buy_stocks.append(stock)
+            selected_count += 1
+            limit_rate = get_limit_rate(stock)
+            limit_percent = (limit_rate - 1) * 100
+            if len(g.buy_stocks) >= g.stock_num * 3:
+                break
+        except Exception as e:
+            continue
+
+def trade(context):
+    positions_to_sell = []
+    for stock in list(context.portfolio.positions.keys()):
+        if stock not in g.holding_stocks:
+            continue
+        position = context.portfolio.positions[stock]
+        current_data = get_current_data()
+        if stock not in current_data:
+            continue
+        current_price = current_data[stock].last_price
+        buy_price = g.holding_stocks[stock]['buy_price']
+        returns = (current_price - buy_price) / buy_price
+        sell_reason = ''
+        if returns >= g.stop_profit_min:
+            if returns <= g.stop_profit_max:
+                sell_reason = f'达到止盈点{returns:.2%}'
+            elif returns > g.stop_profit_max:
+                sell_reason = f'盈利超过最大止盈{returns:.2%}'
+        elif returns <= g.stop_loss:
+            sell_reason = f'触发止损{returns:.2%}'
+        if sell_reason:
+            positions_to_sell.append((stock, sell_reason, returns, buy_price, current_price))
+    for stock, reason, returns, buy_price, current_price in positions_to_sell:
+        order_target_value(stock, 0)
+        if stock in g.holding_stocks:
+            del g.holding_stocks[stock]
+    if len(g.buy_stocks) == 0:
+        return
+    available_cash = context.portfolio.available_cash
+    current_position_count = len(context.portfolio.positions)
+    if current_position_count >= g.stock_num:
+        return
+    max_buy_count = min(g.stock_num - current_position_count, len(g.buy_stocks))
+    buy_candidates = g.buy_stocks[:max_buy_count]
+    if len(buy_candidates) == 0:
+        return
+    cash_per_stock = available_cash * 0.95 / len(buy_candidates)
+    for stock in buy_candidates:
+        if stock in context.portfolio.positions:
+            continue
+        current_data = get_current_data()
+        if stock not in current_data:
+            continue
+        stock_data = current_data[stock]
+        current_price = stock_data.last_price
+        if stock_data.paused:
+            continue
+        if stock_data.is_st:
+            continue
+        try:
+            hist_data = attribute_history(stock, count=3, unit='1d', fields=['close', 'volume'], skip_paused=True)
+            if len(hist_data) < 3:
+                continue
+            ma5 = hist_data['close'].rolling(window=5).mean()
+            if current_price <= ma5.iloc[-1]:
+                continue
+        except Exception as e:
+            continue
+        amount = int(cash_per_stock / current_price / 100) * 100
+        if amount >= 100:
+            order_id = order(stock, amount)
+            if order_id is not None:
+                g.holding_stocks[stock] = {'buy_price': current_price, 'buy_date': context.current_dt.date()}
+
+def print_summary(context):
+    if len(context.portfolio.positions) > 0:
+        total_profit = 0
+        for stock in context.portfolio.positions:
+            if stock in g.holding_stocks:
+                position = context.portfolio.positions[stock]
+                current_price = get_current_data()[stock].last_price
+                buy_price = g.holding_stocks[stock]['buy_price']
+                returns = (current_price - buy_price) / buy_price
+                profit = position.total_amount * (current_price - buy_price)
+                total_profit += profit
+                hold_days = (context.current_dt.date() - g.holding_stocks[stock]['buy_date']).days
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=cba288debed02204eaaaa4b1fc527fbb03fd0517ca6672f3297104a742b3482b source=quant/2020年度精选策略/33 买入每个行业市值最大的股票.txt'
+
+def after_trading_end(context):
+    total_value = context.portfolio.total_value
+    if hasattr(g, 'prev_total_value'):
+        daily_pnl = total_value - g.prev_total_value
+        daily_return = daily_pnl / g.prev_total_value if g.prev_total_value > 0 else 0
+    g.prev_total_value = total_value
+
+def handle_data(context, data):
+    pass

@@ -1,0 +1,114 @@
+quant/聚宽2025年精选/95学习贴《一个完整的-深度学习-神经网络pipeline》.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import pandas as pd
+import torch
+import torch.nn as nn
+from tqdm import tqdm
+from sklearn.preprocessing import MinMaxScaler
+
+def initialize(context):
+    g.no_trading_today_signal = False
+    g.stock_num = 3
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    run_daily(prepare_stock_list, '9:05')
+    run_monthly(weekly_adjustment, 1, '9:30')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=089a7608cd4bec5ad61aac6a6b89dbd0e98be405c69ea2e3414e33a3f935bf55 source=quant/2024年度精选策略1/5.尝试用机器学习批量生产小盘策略.txt'
+model_path = 'model_baseline.pt'
+import io
+buffer = io.BytesIO(read_file(model_path))
+
+class model(nn.Module):
+
+    def __init__(self, fc1_size=2000, fc2_size=1000, fc3_size=100, fc1_dropout=0.2, fc2_dropout=0.2, fc3_dropout=0.2, num_of_classes=50):
+        super(model, self).__init__()
+        self.f_model = nn.Sequential(nn.Linear(3296, fc1_size), nn.BatchNorm1d(fc1_size), nn.ReLU(), nn.Dropout(fc1_dropout), nn.Linear(fc1_size, fc2_size), nn.BatchNorm1d(fc2_size), nn.ReLU(), nn.Dropout(fc2_dropout), nn.Linear(fc2_size, fc3_size), nn.BatchNorm1d(fc3_size), nn.ReLU(), nn.Dropout(fc3_dropout), nn.Linear(fc3_size, 1))
+        self.conv_layers1 = nn.Sequential(nn.Conv1d(6, 16, kernel_size=1), nn.BatchNorm1d(16), nn.Dropout(fc3_dropout), nn.ReLU(), nn.MaxPool1d(kernel_size=2), nn.Conv1d(16, 32, kernel_size=1), nn.BatchNorm1d(32), nn.Dropout(fc3_dropout), nn.ReLU())
+        self.conv_2D = nn.Sequential(nn.Conv2d(1, 16, kernel_size=2), nn.BatchNorm2d(16), nn.Dropout(fc3_dropout), nn.ReLU(), nn.MaxPool2d(kernel_size=2), nn.Conv2d(16, 32, kernel_size=2), nn.BatchNorm2d(32), nn.Dropout(fc3_dropout), nn.ReLU())
+        hidden_dim = 32
+        self.lstm = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=4, batch_first=True, bidirectional=True)
+        hidden_dim = 1
+        self.l = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=4, batch_first=True, bidirectional=True)
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+            if isinstance(module, nn.Conv1d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+
+    def forward(self, x):
+        apply = torch.narrow(x, dim=-1, start=0, length=1).squeeze(1)
+        redeem = torch.narrow(x, dim=-1, start=1, length=1).squeeze(1)
+        apply, _ = self.l(apply)
+        redeem, _ = self.l(redeem)
+        apply = torch.reshape(apply, (apply.shape[0], apply.shape[1] * apply.shape[2]))
+        redeem = torch.reshape(redeem, (redeem.shape[0], redeem.shape[1] * redeem.shape[2]))
+        ZFF = torch.narrow(x, dim=-1, start=2, length=1).squeeze(1)
+        HS = torch.narrow(x, dim=-1, start=3, length=1).squeeze(1)
+        ZFF, _ = self.l(ZFF)
+        HS, _ = self.l(HS)
+        ZFF = torch.reshape(ZFF, (ZFF.shape[0], ZFF.shape[1] * ZFF.shape[2]))
+        HS = torch.reshape(HS, (HS.shape[0], HS.shape[1] * HS.shape[2]))
+        xx = x.unsqueeze(1)
+        xx = self.conv_2D(xx)
+        xx = torch.reshape(xx, (xx.shape[0], xx.shape[1] * xx.shape[2] * xx.shape[3]))
+        x = x.transpose(1, 2)
+        x = self.conv_layers1(x)
+        out = x.transpose(1, 2)
+        out2, _ = self.lstm(out)
+        out2 = torch.reshape(out2, (out2.shape[0], out2.shape[1] * out2.shape[2]))
+        IN = torch.cat((xx, out2, apply, redeem, ZFF, HS), dim=1)
+        out = self.f_model(IN)
+        return out
+model_t1 = model()
+model_t1.load_state_dict(torch.load(buffer))
+model_t1.eval()
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    today = context.current_dt
+    initial_list = get_all_securities('etf', yesterday).index.tolist()
+    tensor_list = []
+    ID = []
+    for i in initial_list:
+        df = attribute_history(i, 60, '1d')
+        df = df.dropna()
+        if len(df) == 60:
+            with torch.no_grad():
+                scaler = MinMaxScaler()
+                normalized_data = scaler.fit_transform(df)
+                normalized_df = pd.DataFrame(normalized_data, columns=df.columns)
+                df_tensor = torch.Tensor(normalized_df.values)
+                reshaped_tensor = df_tensor.unsqueeze(0)
+                output = model_t1(reshaped_tensor)
+                tensor_list.extend(output.cpu().numpy().astype(float)[0])
+                ID.append(i)
+    data = {'ID': ID, 'score': tensor_list}
+    df = pd.DataFrame(data)
+    top_N_rows = df.nlargest(g.stock_num, 'score')
+    top_N_IDs = top_N_rows['ID'].tolist()
+    return top_N_IDs
+
+def weekly_adjustment(context):
+    target_list = get_stock_list(context)
+    for stock in g.hold_list:
+        if stock not in target_list and stock not in g.yesterday_HL_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)
+    position_count = len(context.portfolio.positions)
+    target_num = len(target_list)
+    if target_num > position_count:
+        value = context.portfolio.cash / (target_num - position_count)
+        for stock in target_list:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(stock, value):
+                    if len(context.portfolio.positions) == target_num:
+                        break
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'

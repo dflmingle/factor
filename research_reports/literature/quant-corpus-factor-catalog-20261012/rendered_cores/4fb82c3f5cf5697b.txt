@@ -1,0 +1,66 @@
+quant/聚宽2025年精选/22带上止损的核心资产轮动才更安心，低回撤，高收益率.txt
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.etf_pool = ['518880.XSHG', '513100.XSHG', '159915.XSHE', '510180.XSHG']
+    g.m_days = 25
+    g.etf_info = initial_etf_info(g.etf_pool, 100)
+    g.etf_pre = None
+    run_daily(update_etf_table, '7:00')
+    run_daily(trade, '9:30')
+
+def initial_etf_info(etf_pool, ndays=100):
+    etf_info = {}
+    for etf in etf_pool:
+        etf_df = attribute_history(etf, ndays, '1d', ['close'], skip_paused=True, df=True, fq='pre')
+        etf_info[etf] = list(etf_df.close)
+    return etf_info
+
+def update_etf_table(context):
+    for etf in g.etf_pool:
+        etf_df = attribute_history(etf, 1, '1d', ['close'], skip_paused=True, df=True, fq='pre')
+        g.etf_info[etf].append(etf_df.close[-1])
+        g.etf_info[etf].pop(0)
+
+def evaluate_etf_worth(m_etf, is_hold=1):
+    is_worth = 0
+    if m_etf == None:
+        return is_worth
+    cur_p = g.etf_info[m_etf][-1]
+    max10_p = max(g.etf_info[m_etf][-10:])
+    max_p = max(g.etf_info[m_etf])
+    cur2max = cur_p / max_p
+    cur2max10 = cur_p / max10_p
+    cur2yes = cur_p / g.etf_info[m_etf][-2]
+    mean4 = np.mean(g.etf_info[m_etf][-4:])
+    if is_hold == 1:
+        if cur2yes <= 0.96:
+            is_worth = 0
+        else:
+            is_worth = 1
+    elif cur_p >= mean4:
+        is_worth = 1
+    else:
+        is_worth = 0
+    return is_worth
+'EXACT_REVIEWED_FUNCTION get_rank sha256=bc4c31cf4c75a233d48ca7100a9a5eefbbcd8a97945fe033c969f974711cf677 source=quant/2024年度精选策略1/3.【回顾3】ETF策略之核心资产轮动.txt'
+
+def trade(context):
+    sel_etf = get_rank(g.etf_pool)[0]
+    hold_etf = None
+    hold_list = list(context.portfolio.positions)
+    if len(hold_list) > 0:
+        hold_etf = hold_list[0]
+    sel_worth = evaluate_etf_worth(sel_etf, 0)
+    hold_worth = evaluate_etf_worth(hold_etf, 1)
+    if hold_etf != None:
+        g.etf_pre = hold_etf
+        if sel_etf not in hold_list:
+            order_target_value(hold_etf, 0)
+        elif hold_worth == 0:
+            order_target_value(hold_etf, 0)
+    if sel_etf != g.etf_pre:
+        order_target_value(sel_etf, context.portfolio.available_cash)
+    elif len(hold_list) == 0 and sel_etf == g.etf_pre and (sel_worth == 1):
+        order_target_value(sel_etf, context.portfolio.available_cash)

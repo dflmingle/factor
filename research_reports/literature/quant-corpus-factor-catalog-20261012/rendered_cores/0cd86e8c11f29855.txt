@@ -1,0 +1,72 @@
+quant/2024年度精选策略2/70.（股票交易模板）小市值-EPS-成长因子选股.txt
+from jqdata import *
+from jqfactor import get_factor_values
+
+def initialize(context):
+    g.stock_num = 5
+    run_weekly(before_market_open, weekday=1, time='9:00', reference_security='000300.XSHG')
+    run_weekly(market_open, weekday=1, time='9:30', reference_security='000300.XSHG')
+    run_weekly(after_market_close, weekday=1, time='15:00', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    stock_list = get_stock_list(context)
+    stock_list = stock_list[:g.stock_num]
+    g.security = stock_list
+
+def market_open(context):
+    buy_stocks = [stock for stock in g.security]
+    for stock in context.portfolio.positions:
+        if stock not in g.security:
+            position = context.portfolio.positions[stock]
+            security = position.security
+            order = order_target_value(security, 0)
+        else:
+            buy_stocks.remove(stock)
+    buy_stocks_num = len(buy_stocks)
+    if buy_stocks_num > 0:
+        value = context.portfolio.cash / buy_stocks_num
+        for stock in buy_stocks:
+            order_target_value(stock, value)
+
+def after_market_close(context):
+    trades = get_trades()
+    for _trade in trades.values():
+        pass
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount
+
+def filter_stock(context, stock_list):
+    current_data = get_current_data()
+    yesterday = context.previous_date
+    stock_list = [stock for stock in stock_list if not yesterday - get_security_info(stock).start_date < datetime.timedelta(days=250)]
+    stock_list = [stock for stock in stock_list if stock[0:3] != '688']
+    stock_list = [stock for stock in stock_list if not current_data[stock].is_st]
+    stock_list = [stock for stock in stock_list if not 'ST' in current_data[stock].name]
+    stock_list = [stock for stock in stock_list if not '*' in current_data[stock].name]
+    stock_list = [stock for stock in stock_list if not '退' in current_data[stock].name]
+    stock_list = [stock for stock in stock_list if not current_data[stock].paused]
+    stock_list = [stock for stock in stock_list if not current_data[stock].day_open >= current_data[stock].high_limit]
+    stock_list = [stock for stock in stock_list if not current_data[stock].day_open <= current_data[stock].low_limit]
+    return stock_list
+
+def get_stock_list(context):
+    yesterday = context.previous_date
+    initial_list = get_all_securities().index.tolist()
+    initial_list = filter_stock(context, initial_list)
+    jqfactor = 'growth'
+    score_list = get_factor_values(initial_list, jqfactor, end_date=yesterday, count=1)[jqfactor].iloc[0].tolist()
+    df = pd.DataFrame(columns=['code', 'score'])
+    df['code'] = initial_list
+    df['score'] = score_list
+    df = df.dropna()
+    df.sort_values(by='score', ascending=False, inplace=True)
+    x_list = list(df.code)[0:int(0.1 * len(initial_list))]
+    q = query(valuation.code, valuation.circulating_market_cap, indicator.eps).filter(valuation.code.in_(x_list), indicator.eps > 0).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q)
+    final_list = list(df.code)
+    return final_list

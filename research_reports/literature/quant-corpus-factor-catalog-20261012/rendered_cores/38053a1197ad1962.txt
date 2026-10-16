@@ -1,0 +1,262 @@
+quant/2022年度精选策略/62.商品期货多因子 全市场对冲模型.txt
+from jqdata import *
+import talib
+from math import isnan
+import re
+from jqfactor import get_factor_values
+from jqfactor import standardlize
+from jqfactor import winsorize_med
+from six import StringIO
+
+def initialize(context):
+    set_parameter(context)
+    set_future_list(context)
+    csv_setting(context)
+    run_daily(before_market_open, time='before_open', reference_security=get_future_code('RB'))
+    run_weekly(market_open, 1, time='open', reference_security=get_future_code('RB'))
+    run_weekly(Trade, 1, time='open', reference_security=get_future_code('RB'))
+    run_daily(after_market_close, time='after_close', reference_security=get_future_code('RB'))
+
+def set_parameter(context):
+    g.domMonth = {'MA': ['01', '05', '09'], 'IC': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'IF': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'IH': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'TF': ['03', '06', '09', '12'], 'T': ['03', '06', '09', '12'], 'CU': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'AL': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'ZN': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'PB': ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], 'NI': ['01', '05', '09'], 'SN': ['01', '05', '09'], 'AU': ['06', '12'], 'AG': ['06', '12'], 'RB': ['01', '05', '10'], 'HC': ['01', '05', '10'], 'BU': ['06', '09', '12'], 'RU': ['01', '05', '09'], 'M': ['01', '05', '09'], 'Y': ['01', '05', '09'], 'A': ['01', '05', '09'], 'P': ['01', '05', '09'], 'C': ['01', '05', '09'], 'CS': ['01', '05', '09'], 'JD': ['01', '05', '09'], 'L': ['01', '05', '09'], 'V': ['01', '05', '09'], 'PP': ['01', '05', '09'], 'J': ['01', '05', '09'], 'JM': ['01', '05', '09'], 'I': ['01', '05', '09'], 'SR': ['01', '05', '09'], 'CF': ['01', '05', '09'], 'ZC': ['01', '05', '09'], 'FG': ['01', '05', '09'], 'TA': ['01', '05', '09'], 'MA': ['01', '05', '09'], 'OI': ['01', '05', '09'], 'RM': ['01', '05', '09'], 'SF': ['01', '05', '09'], 'SM': ['01', '05', '09'], 'AP': ['01', '05', '10']}
+    g.LastRealPrice = {}
+    g.HighPrice = {}
+    g.LowPrice = {}
+    g.future_list = []
+    g.TradeLots = {}
+    g.PriceArray = {}
+    g.Price_dict = {}
+    g.MappingReal = {}
+    g.MappingIndex = {}
+    g.StatusTimer = {}
+    g.ATR = {}
+    g.CurrentPrice = 0
+    g.Price_DaysAgo = 0
+    g.Momentum = {}
+    g.ClosePrice = {}
+    g.ILLIQ = {}
+    g.MarginRate = 0.1
+    g.Score = {}
+    g.MappingNext = {}
+    g.NextPrice = {}
+    g.RealPrice = {}
+    g.RollYield = {}
+    g.Volume = {}
+    g.VSTD_Volume = {}
+    g.SkewPrice = {}
+    g.Skew = {}
+    g.Basis = {}
+    g.Hycc = {}
+    g.ATRWindow = 20
+    g.MomentumWindow = 30
+    g.ILLIQWindow = 10
+    g.Range = 0.3
+    g.NATR_stop = 2
+    g.instruments = ['AL', 'NI', 'CU', 'PB', 'AG', 'RU', 'MA', 'PP', 'TA', 'L', 'V', 'M', 'P', 'Y', 'OI', 'C', 'CS', 'JD', 'SR', 'HC', 'J', 'I', 'SF', 'RB', 'ZC', 'FG']
+
+def csv_setting(context):
+    body1 = read_file('Basis_xzh1.csv')
+    df1 = pd.read_csv(StringIO(body1))
+    df1.fillna(0)
+    df1.index = df1['Unnamed: 0']
+    del df1['Unnamed: 0']
+    g.df1 = df1[g.instruments]
+    body2 = read_file('hycc_TS3.csv')
+    df2 = pd.read_csv(StringIO(body2))
+    df2.fillna(0)
+    df2.index = df2['Unnamed: 0']
+    del df2['Unnamed: 0']
+    g.df2 = df2[g.instruments]
+
+def set_future_list(context):
+    for ins in g.instruments:
+        idx = get_future_code(ins)
+        dom = get_dominant_future(ins)
+        g.MappingIndex[ins] = idx
+        g.MappingReal[ins] = dom
+        g.StatusTimer[ins] = 0
+        if dom == '':
+            pass
+        elif dom not in g.future_list:
+            g.future_list.append(dom)
+            g.HighPrice[dom] = False
+            g.LowPrice[dom] = False
+
+def before_market_open(context):
+    for ins in g.instruments:
+        dom = get_dominant_future(ins)
+        if dom == '':
+            pass
+        else:
+            if dom == g.MappingReal[ins]:
+                pass
+            else:
+                replace_old_futures(context, ins, dom)
+                g.future_list.append(dom)
+                g.HighPrice[dom] = False
+                g.LowPrice[dom] = False
+            g.TradeLots[dom] = get_lots(context.portfolio.starting_cash / 10, ins)
+
+def market_open(context):
+    for ins in g.instruments:
+        get_nextDom(context, ins)
+        if g.MappingReal[ins] != '':
+            IndexFuture = g.MappingIndex[ins]
+            RealFuture = g.MappingReal[ins]
+            NextFuture = g.MappingNext[ins]
+            end_date = get_CCFX_end_date(RealFuture)
+            if context.current_dt.date() == end_date:
+                return
+            else:
+                g.LastRealPrice[RealFuture] = attribute_history(RealFuture, 1, '1d', ['close'])['close'][-1]
+                g.PriceArray[IndexFuture] = attribute_history(IndexFuture, max(g.MomentumWindow, max(g.ILLIQWindow, g.ATRWindow)) + 5, '1d', ['close', 'open', 'high', 'low'])
+                g.NextPrice[NextFuture] = attribute_history(NextFuture, 1, '1d', ['close'])
+                g.RealPrice[RealFuture] = attribute_history(RealFuture, 1, '1d', ['close'])
+                if len(g.PriceArray[IndexFuture]) < 1:
+                    return
+                else:
+                    g.close = np.array(g.PriceArray[IndexFuture]['close'])
+                    g.high = np.array(g.PriceArray[IndexFuture]['high'])
+                    g.low = np.array(g.PriceArray[IndexFuture]['low'])
+                    g.ATR[IndexFuture] = talib.ATR(g.high, g.low, g.close, g.ATRWindow)[-1]
+                    g.ClosePrice[ins] = g.PriceArray[IndexFuture]['close']
+                    g.CurrentPrice = g.ClosePrice[ins][-1]
+                    g.Price_DaysAgo = g.ClosePrice[ins][-g.MomentumWindow]
+                    g.Momentum[ins] = g.CurrentPrice / g.Price_DaysAgo
+                    FP = get_extras('futures_positions', IndexFuture, end_date=context.current_dt, df=True, count=max(g.MomentumWindow, max(g.ILLIQWindow, g.ATRWindow)))
+                    ILLIQ = 0
+                    for i in range(g.ILLIQWindow):
+                        ILLIQ += abs(1 - g.close[-i - 1] / g.close[-i - 2]) / FP[IndexFuture][-i - 1]
+                    g.ILLIQ[ins] = -ILLIQ
+                    g.PriceNext = g.NextPrice[NextFuture]['close'][-1]
+                    g.PriceCurrent = g.RealPrice[RealFuture]['close'][-1]
+                    NextDate = re.findall('\\d+\\d*', NextFuture)
+                    RealDate = re.findall('\\d+\\d*', RealFuture)
+                    if NextDate[0][:2] > RealDate[0][:2]:
+                        g.DM = int(NextDate[0][-2:]) + 12 - int(RealDate[0][-2:])
+                    else:
+                        g.DM = int(NextDate[0][-2:]) - int(RealDate[0][-2:])
+                    g.RollYield[ins] = (g.PriceCurrent - g.PriceNext) / g.PriceNext / g.DM
+                    g.Volume[ins] = attribute_history(IndexFuture, 180, '1d', ['volume'])['volume']
+                    try:
+                        g.VSTD_Volume[ins] = g.Volume[ins].std() / g.Volume[ins].mean()
+                    except:
+                        pass
+                    g.SkewPrice[ins] = attribute_history(IndexFuture, 180, '1d', ['close'])['close']
+                    g.Skew[ins] = get_Skew(g.SkewPrice[ins])
+                    sort_basis(context)
+                    sort_hycc(context)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+
+def Trade(context):
+    BuyList, SellList = rank_futures(context)
+    for ins in g.instruments:
+        RealFuture = g.MappingReal[ins]
+        IndexFuture = g.MappingIndex[ins]
+        if RealFuture in g.LastRealPrice.keys():
+            if ins in BuyList and context.portfolio.long_positions[RealFuture].total_amount == 0:
+                if context.portfolio.long_positions[RealFuture].total_amount != 0:
+                    pass
+                order_target(RealFuture, 0, side='short')
+                order_target(RealFuture, g.TradeLots[RealFuture], side='long')
+                g.HighPrice[RealFuture] = g.LastRealPrice[RealFuture]
+                g.LowPrice[RealFuture] = False
+            elif ins in SellList and context.portfolio.short_positions[RealFuture].total_amount == 0:
+                if context.portfolio.short_positions[RealFuture].total_amount != 0:
+                    pass
+                order_target(RealFuture, 0, side='long')
+                order_target(RealFuture, g.TradeLots[RealFuture], side='short')
+                g.LowPrice[RealFuture] = g.LastRealPrice[RealFuture]
+                g.HighPrice[RealFuture] = False
+            elif ins not in BuyList and RealFuture in context.portfolio.long_positions.keys():
+                order_target(RealFuture, 0, side='long')
+            elif ins not in SellList and RealFuture in context.portfolio.short_positions.keys():
+                order_target(RealFuture, 0, side='short')
+            else:
+                TrailingStop(context, RealFuture, IndexFuture)
+
+def TrailingStop(context, RealFuture, IndexFuture):
+    long_positions = context.portfolio.long_positions
+    short_positions = context.portfolio.short_positions
+    if RealFuture in long_positions.keys():
+        if long_positions[RealFuture].total_amount > 0:
+            if g.HighPrice[RealFuture]:
+                g.HighPrice[RealFuture] = max(g.HighPrice[RealFuture], g.LastRealPrice[RealFuture])
+                if g.LastRealPrice[RealFuture] < g.HighPrice[RealFuture] - g.NATR_stop * g.ATR[IndexFuture]:
+                    order_target(RealFuture, 0, side='long')
+    if RealFuture in short_positions.keys():
+        if short_positions[RealFuture].total_amount > 0:
+            if g.LowPrice[RealFuture]:
+                g.LowPrice[RealFuture] = min(g.LowPrice[RealFuture], g.LastRealPrice[RealFuture])
+                if g.LastRealPrice[RealFuture] > g.LowPrice[RealFuture] + g.NATR_stop * g.ATR[IndexFuture]:
+                    order_target(RealFuture, 0, side='short')
+
+def get_nextDom(context, ins):
+    dom = get_dominant_future(ins)
+    if dom != '':
+        YD = re.findall('\\d+\\d*', dom)
+        try:
+            nextDomMonth = g.domMonth[ins][g.domMonth[ins].index(YD[0][-2:]) + 1]
+            g.MappingNext[ins] = dom.replace(YD[0][-2:], nextDomMonth)
+        except:
+            if YD[:2] != YD[-2:]:
+                nextDomMonth = g.domMonth[ins][0]
+                nextDom = dom.replace(YD[0][:2], str(int(YD[0][:2]) + 1))
+                g.MappingNext[ins] = nextDom.replace(YD[0][-2:], g.domMonth[ins][0])
+            else:
+                NewYD = str(int(YD[0]) + 100).replace(YD[0][-2:], g.domMonth[ins][0])
+                g.MappingNext[ins] = dom.replace(YD[0], NewYD)
+    else:
+        pass
+'EXACT_REVIEWED_FUNCTION replace_old_futures sha256=b85ffd4002a4326bf2a7d48ce7c726bc75321f274c138d91edef0f0b36136909 source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+
+def rank_futures(context):
+    future_list = []
+    for ins in g.instruments:
+        future = get_dominant_future(ins)
+        future_list.append(future)
+    statements = pd.DataFrame([g.Momentum, g.ILLIQ, g.RollYield, g.VSTD_Volume, g.Skew, g.Basis, g.Hycc]).T
+    statements.columns = ['Momentum', 'ILLIQ', 'RollYield', 'VSTD_Volume', 'Skew', 'Basis', 'Hycc']
+    statements['Momentum_rank'] = statements['Momentum'].rank()
+    statements['ILLIQ_rank'] = statements['ILLIQ'].rank()
+    statements['RollYield_rank'] = statements['RollYield'].rank()
+    statements['VSTD_rank'] = statements['VSTD_Volume'].rank()
+    statements['Skew_rank'] = statements['Skew'].rank()
+    statements['Basis_rank'] = statements['Basis'].rank()
+    statements['Hycc_rank'] = statements['Hycc'].rank()
+    data_final = 1 * statements['Momentum_rank'] + 1 * statements['ILLIQ_rank'] + 1 * statements['RollYield_rank'] - 1 * statements['VSTD_rank'] - 1 * statements['Skew_rank'] - 1 * statements['Basis_rank'] - 0 * statements['Hycc_rank']
+    data_final.sort(ascending=False)
+    stocklist_head = list(data_final.index)[:int(len(list(data_final.index)) * g.Range)]
+    stocklist_tail = list(data_final.index)[-int(len(list(data_final.index)) * g.Range) - 1:]
+    return (stocklist_head, stocklist_tail)
+
+def sort_basis(context):
+    date = context.current_dt.strftime('%Y-%m-%d')
+    jc_today_df1 = g.df1.loc[date, :].dropna(how='any')
+    for ins in jc_today_df1.keys():
+        g.Basis[ins] = jc_today_df1[ins]
+
+def sort_hycc(context):
+    date = context.current_dt.strftime('%Y-%m-%d')
+    jc_today_df2 = g.df2.loc[date, :].dropna(how='any')
+    for ins in jc_today_df2.keys():
+        g.Hycc[ins] = jc_today_df2[ins]
+
+def get_Skew(data_):
+    n = len(data_)
+    niu = 0.0
+    niu2 = 0.0
+    niu3 = 0.0
+    for a in data_:
+        niu += a
+        niu2 += a ** 2
+        niu3 += a ** 3
+    niu /= n
+    niu2 /= n
+    niu3 /= n
+    sigma = math.sqrt(niu2 - niu * niu)
+    skew = (niu3 - 3 * niu * sigma ** 2 - niu ** 3) / sigma ** 3
+    return skew
+'EXACT_REVIEWED_FUNCTION get_future_code sha256=880f0a2ae1c1aaa68d6cf028a482c24511791858cf6837d4d54af1e2a599988a source=quant/2020年度精选策略/04 趋势交易能赚钱吗？商品期货动量效应挖掘初探.txt'
+'EXACT_REVIEWED_FUNCTION get_lots sha256=7fe807ab634c4c0099b7fba35446fef0cf29a9482a94d1cca9962aa1823dc763 source=quant/2020年度精选策略/20 分钟K线数据重构 ATR自适应通道 请高手来迭代.txt'
+'EXACT_REVIEWED_FUNCTION get_CCFX_end_date sha256=3f51e351e323a8a18c9f762883224926e127627ed1f0cdae88126a3d9ba7fa33 source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

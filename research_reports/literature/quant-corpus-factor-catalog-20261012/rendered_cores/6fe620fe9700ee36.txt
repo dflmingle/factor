@@ -1,0 +1,454 @@
+quant/2022年度精选策略/40.第三期研报复现——Eden666.txt
+from jqdata import *
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import *
+import time
+import statsmodels.api as sm
+from sklearn.preprocessing import scale
+import warnings
+warnings.filterwarnings('ignore')
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
+TRD = pd.read_excel('TRD20090101-20101231.xlsx')
+CSMAR_market = TRD[TRD['综合市场类型'] == 5]
+CSMAR_market.index = CSMAR_market.datetime
+del CSMAR_market['Market_return_rate.1']
+CSMAR_market_sample = CSMAR_market[(CSMAR_market.datetime > '2010-10-12') & (CSMAR_market.datetime <= '2010-11-06')].sort_values('datetime', ascending=True)
+t0 = time.time()
+pharmaceutical_industry_stock = get_industry_stocks('801150', date='2010-11-06')
+pharmaceutical_industry = pd.DataFrame([])
+for i in pharmaceutical_industry_stock:
+    close = get_price(i, start_date='2010-10-13', end_date='2010-11-06', fields='close')
+    pharmaceutical_industry[i] = close.close
+A600867 = get_price('600867.XSHG', start_date='2010-10-13', end_date='2010-11-06')
+CriValue_600867 = finance.run_query(query(finance.SW1_DAILY_PRICE).filter(finance.SW1_DAILY_PRICE.code == '801150', finance.SW1_DAILY_PRICE.date < '2010-11-06', finance.SW1_DAILY_PRICE.date > '2010-10-12'))
+CriValue_600867.index = A600867.index
+pharmaceutical_industry_rate = pharmaceutical_industry.pct_change(1).fillna(0)
+CSAD_list = pd.DataFrame([0] * len(pharmaceutical_industry_rate))
+for i in range(len(pharmaceutical_industry_rate)):
+    CSAD = abs(pharmaceutical_industry_rate.iloc[i, :] - CSMAR_market_sample.Market_return_rate[i]).sum() / len(pharmaceutical_industry_rate.iloc[i, :])
+    CSAD_list.iloc[i, :] = CSAD
+A600867_close = scale(A600867.close)
+pharmaceutical_industry = scale(CriValue_600867.close)
+CSAD = scale(CSAD_list)
+market_sample_rate = scale(CSMAR_market_sample.Market_return_rate)
+dataframe = pd.DataFrame([A600867_close, pharmaceutical_industry, CSAD], index=['A600867_close', 'pharmaceutical_industry', 'CSAD']).T
+dataframe.index = CriValue_600867.index
+t1 = time.time()
+fig = plt.subplots(figsize=(13, 8))
+t0 = time.time()
+
+def get_SZ_CriValue():
+    A399107 = get_index_stocks('399107.XSHE', date='2019-09-01')
+    A399107_market_value = pd.DataFrame([])
+    for i in A399107:
+        q = query(valuation.circulating_market_cap).filter(valuation.code == i)
+        panel = get_fundamentals_continuously(q, end_date='2019-09-01', count=3100)
+        stock_market = panel.minor_xs(i)
+        stock = i[0:6]
+        A399107_market_value[stock] = stock_market.circulating_market_cap
+    A399107_market_value = A399107_market_value.fillna(0)
+    A399107_market_value['market_cap'] = [0] * len(A399107_market_value)
+    for i in range(len(A399107_market_value.index)):
+        A399107_market_value['market_cap'][i] = A399107_market_value.iloc[i, :].sum()
+    return A399107_market_value
+A399107 = get_SZ_CriValue()
+t1 = time.time()
+t0 = time.time()
+
+def get_SH_CriValue():
+    A000002 = get_index_stocks('000002.XSHG', date='2019-09-01')
+    A000002_market_value = pd.DataFrame([])
+    for i in A000002:
+        q = query(valuation.circulating_market_cap).filter(valuation.code == i)
+        panel = get_fundamentals_continuously(q, end_date='2019-09-01', count=3100)
+        stock_market = panel.minor_xs(i)
+        stock = i[0:6]
+        A000002_market_value[stock] = stock_market.circulating_market_cap
+    A000002_market_value = A000002_market_value.fillna(0)
+    A000002_market_value['market_cap'] = [0] * len(A000002_market_value)
+    for i in range(len(A000002_market_value.index)):
+        A000002_market_value['market_cap'][i] = A000002_market_value.iloc[i, :].sum()
+    return A000002_market_value
+A000002 = get_SH_CriValue()
+t1 = time.time()
+sz = pd.DataFrame(A399107.market_cap)
+sh = pd.DataFrame(A000002.market_cap)
+real_market = pd.concat([sz, sh], axis=1)
+real_market.columns = ['深证', '上证']
+real_market.index = A000002.index
+real_market['all'] = real_market['深证'] + real_market['上证']
+ASH_market_return = get_price('000002.XSHG', start_date='2006-12-06', end_date='2019-09-01', fields='close').pct_change(1).fillna(0)
+ASZ_market_return = get_price('399107.XSHE', start_date='2006-12-06', end_date='2019-09-01', fields='close').pct_change(1).fillna(0)
+real_market['R深证'], real_market['R上证'] = (ASZ_market_return, ASH_market_return)
+Rm = real_market['深证'] / real_market['all'] * real_market['R深证'] + real_market['上证'] / real_market['all'] * real_market['R上证']
+Rm = Rm[Rm.index >= '2007-01-01']
+Rm_sample = Rm[(Rm.index > '2008-12-31') & (Rm.index <= '2010-12-31')]
+Rm_sample_Var = np.var(Rm_sample)
+CSMAR_Var = np.var(CSMAR_market.Market_return_rate)
+corr = Rm_sample.corr(CSMAR_market.Market_return_rate)
+ASH_market_rate_sample = get_price('000002.XSHG', start_date='2008-12-31', end_date='2010-12-31', fields='close').pct_change(1).dropna()
+ASZ_market_rate_sample = get_price('399107.XSHE', start_date='2008-12-31', end_date='2010-12-31', fields='close').pct_change(1).dropna()
+Sub_Rm_sample = (ASZ_market_rate_sample + ASH_market_rate_sample) / 2
+Sub_Rm_Var = np.var(Sub_Rm_sample.close)
+CSMAR_Var = np.var(CSMAR_market.Market_return_rate)
+
+def get_stocks_interval(code, interval_time):
+    datetime = interval_time
+    stock_timelist = []
+    if len(code) == 11:
+        for h in datetime:
+            index_list = get_index_stocks(code, date=h)
+            stock_timelist.append(index_list)
+        stock_timelist = pd.DataFrame(stock_timelist).T
+        stock_timelist.columns = datetime
+    elif len(code) == 6:
+        for h in datetime:
+            industry_list = get_industry_stocks(code, date=h)
+            stock_timelist.append(industry_list)
+        stock_timelist = pd.DataFrame(stock_timelist).T
+        stock_timelist.columns = datetime
+    return stock_timelist
+
+def get_stocks_section(stocks, interval_time):
+    datetime = interval_time
+    start = datetime[0]
+    end = datetime[-1]
+    stocks_timelist = stocks
+    ASH_market_rate = get_price('000002.XSHG', start_date=start, end_date=end, fields='close').pct_change(1).fillna(0)
+    ASZ_market_rate = get_price('399107.XSHE', start_date=start, end_date=end, fields='close').pct_change(1).fillna(0)
+    Sub_Rm = (ASZ_market_rate + ASH_market_rate) / 2
+    stocks_CSAD = pd.DataFrame([], columns=['CSAD'])
+    for i in range(len(stocks_timelist.columns) - 1):
+        year = stocks_timelist.columns[i + 1]
+        current_stock = list(filter(None, stocks_timelist[year]))
+        stocks_rate = pd.DataFrame([], columns=['CSAD'])
+        for k in current_stock:
+            if stocks_timelist.columns[i] != end:
+                stock_close = get_price(k, start_date=stocks_timelist.columns[i], end_date=stocks_timelist.columns[i + 1], fields='close')
+                stocks_rate[k] = stock_close.close
+            elif stocks_timelist.columns[i] == end:
+                pass
+        stocks_rate = stocks_rate.pct_change(1).fillna(0)
+        for j in range(len(stocks_rate)):
+            times = stocks_rate.iloc[j, :].name.strftime('%Y-%m-%d')
+            stocks_section_CASD = abs(stocks_rate.iloc[j, 1:] - Sub_Rm.loc[times].values).sum() / len(stocks_rate.iloc[j, 1:])
+            stocks_rate.CSAD[j] = stocks_section_CASD
+        CSAD_data = pd.DataFrame(stocks_rate.CSAD)
+        stocks_CSAD = stocks_CSAD.append(CSAD_data)
+    return stocks_CSAD
+interval_time = ['2007-01-01', '2008-01-01', '2009-01-01', '2010-01-01', '2011-01-01', '2012-01-01', '2013-01-01', '2014-01-01', '2015-01-01', '2016-01-01', '2017-01-01', '2018-01-01', '2019-01-01', '2019-09-01']
+t0 = time.time()
+stocks = get_stocks_interval('000300.XSHG', interval_time)
+HS300_CSAD_section = get_stocks_section(stocks, interval_time)
+t1 = time.time()
+
+def get_stocks_belta(target_CSAD, interval_time):
+    datetime = interval_time
+    start = datetime[0]
+    end = datetime[-1]
+    target_CSAD = target_CSAD
+    ASH_market_rate = get_price('000002.XSHG', start_date=start, end_date=end, fields='close').pct_change(1).fillna(0)
+    ASZ_market_rate = get_price('399107.XSHE', start_date=start, end_date=end, fields='close').pct_change(1).fillna(0)
+    Sub_Rm = (ASZ_market_rate + ASH_market_rate) / 2
+    CSAD = target_CSAD.CSAD
+    x1 = []
+    x2 = []
+    market_data = abs(Sub_Rm)
+    for i in range(len(CSAD))[22:]:
+        x = market_data.iloc[i - 22:i]
+        y = CSAD.iloc[i - 22:i]
+        X = np.column_stack((x ** 2, x))
+        X = sm.add_constant(X)
+        model = sm.OLS(y, X)
+        results = model.fit()
+        x1.append(results.params[1])
+        x2.append(results.params[2])
+    belta = pd.DataFrame(x1, index=CSAD.index[22:], columns=['x1'])
+    return belta
+HS300_belta = get_stocks_belta(HS300_CSAD_section, interval_time)
+fig = plt.subplots(figsize=(13, 8))
+
+def get_analysis_frame(target_code, belta_frame, interval_time):
+    code = target_code
+    belta = belta_frame
+    belta = pd.DataFrame(belta, columns=[code])
+    start = interval_time[0]
+    end = interval_time[-1]
+    if len(code) == 11:
+        target = get_price(code, start_date=start, end_date=end, fields='close')
+        R_target = target.pct_change(1).fillna(0)
+    elif len(code) == 6:
+        q = finance.run_query(query(finance.SW1_DAILY_PRICE).filter(finance.SW1_DAILY_PRICE.code == code, finance.SW1_DAILY_PRICE.date > start, finance.SW1_DAILY_PRICE.date < end))
+        target = pd.DataFrame(list(q.close), index=q.date, columns=['close'])
+        R_target = target.pct_change(1).fillna(0)
+    R_MA22 = R_target.rolling(22, min_periods=22).mean()
+    MA30 = target.rolling(30, min_periods=30).mean()
+    MA10 = target.rolling(10, min_periods=10).mean()
+    MA5 = target.rolling(5, min_periods=5).mean()
+    belta['MA5'] = MA5
+    belta['MA10'] = MA10
+    belta['MA30'] = MA30
+    belta['R_MA22'] = R_MA22
+    belta['quantile-0.1'] = belta[code].rolling(180, min_periods=180).quantile(0.1)
+    belta['quantile-0.05'] = belta[code].rolling(180, min_periods=180).quantile(0.05)
+    belta['quantile-0.025'] = belta[code].rolling(180, min_periods=180).quantile(0.025)
+    belta = belta.fillna(method='bfill')
+    return belta
+name = '000300.XSHG'
+HS300_belta.columns = [name]
+x1_negative = get_analysis_frame(name, HS300_belta[name], interval_time)
+R_300 = get_price('000300.XSHG', start_date='2007-01-01', end_date='2019-09-01', fields=['low', 'close'])
+signal_01 = pd.DataFrame([])
+for i in range(len(x1_negative)):
+    if x1_negative[name][i] < x1_negative['quantile-0.025'][i] and x1_negative.R_MA22[i] > 0:
+        signl = pd.DataFrame(x1_negative.iloc[i, :]).T
+        signal_01 = signal_01.append(signl)
+Y = R_300.loc[signal_01.index].low
+X = signal_01.index
+fig = plt.subplots(figsize=(13, 8))
+for x in X:
+    loc = int(Y.loc[x])
+    c = range(loc - 400, loc + 400)
+signal_02 = pd.DataFrame([])
+for i in range(len(x1_negative)):
+    if x1_negative[name][i] < x1_negative['quantile-0.1'][i] and x1_negative.R_MA22[i] > 0:
+        signl = pd.DataFrame(x1_negative.iloc[i, :]).T
+        signal_02 = signal_02.append(signl)
+Y = R_300.loc[signal_02.index].low
+X = signal_02.index
+fig = plt.subplots(figsize=(13, 8))
+for x in X:
+    loc = int(Y.loc[x])
+    c = range(loc - 400, loc + 400)
+signal_03 = pd.DataFrame([])
+for i in range(len(x1_negative)):
+    if x1_negative[name][i] < x1_negative['quantile-0.1'][i] and x1_negative.MA30[i] > x1_negative.MA30[i - 30] and (x1_negative.R_MA22[i] > 0):
+        eden = pd.DataFrame(x1_negative.iloc[i, :]).T
+        signal_03 = signal_03.append(eden)
+Y = R_300.loc[signal_03.index].low
+X = signal_03.index
+fig = plt.subplots(figsize=(13, 8))
+for x in X:
+    loc = int(Y.loc[x])
+    c = range(loc - 400, loc + 400)
+long_signal = pd.DataFrame([])
+for i in range(len(x1_negative)):
+    if x1_negative[name][i] < x1_negative['quantile-0.1'][i] and x1_negative.MA30[i] > x1_negative.MA30[i - 30] and (x1_negative.R_MA22[i] > 0):
+        long = pd.DataFrame(x1_negative.iloc[i, :]).T
+        long_signal = long_signal.append(long)
+short_signal = pd.DataFrame([])
+for i in range(len(x1_negative)):
+    if x1_negative[name][i] < x1_negative['quantile-0.1'][i] and x1_negative.MA30[i] < x1_negative.MA30[i - 5] and (x1_negative.R_MA22[i] < 0):
+        short = pd.DataFrame(x1_negative.iloc[i, :]).T
+        short_signal = short_signal.append(short)
+Y_long = R_300.loc[long_signal.index].low
+X_long = long_signal.index
+Y_short = R_300.loc[short_signal.index].low
+X_short = short_signal.index
+fig = plt.subplots(figsize=(13, 8))
+for long in X_long:
+    loc = int(Y_long.loc[long])
+    c = range(loc - 400, loc + 400)
+for short in X_short:
+    loc = int(Y_short.loc[short])
+    c = range(loc - 600, loc + 600)
+
+def get_signal(industry_code, direction, interval_time):
+    industry = industry_code
+    time = interval_time
+    all_belta = pd.DataFrame([])
+    for i in industry:
+        blanket_stocks = get_stocks_interval(i, time)
+        stocks_section = get_stocks_section(blanket_stocks, time)
+        belta = get_stocks_belta(stocks_section, time)
+        all_belta[i] = belta.x1
+    signal_group = {}
+    if direction == 'buy':
+        for k in industry:
+            signal = pd.DataFrame([])
+            frame = get_analysis_frame(k, all_belta[k], time)
+            for i in range(len(frame)):
+                if frame[k][i] < frame['quantile-0.1'][i] and frame.MA30[i] > frame.MA30[i - 30] and (frame.R_MA22[i] > 0):
+                    long = pd.DataFrame(frame.iloc[i, :]).T
+                    signal = signal.append(long)
+            signal_group[k] = signal
+    elif direction == 'sell':
+        for k in industry:
+            signal = pd.DataFrame([])
+            frame = get_analysis_frame(k, all_belta[k], time)
+            for i in range(len(frame)):
+                if frame[k][i] < frame['quantile-0.1'][i] and frame.MA30[i] < frame.MA30[i - 5] and (frame.R_MA22[i] < 0):
+                    short = pd.DataFrame(frame.iloc[i, :]).T
+                    signal = signal.append(short)
+            signal_group[k] = signal
+    return signal_group
+
+def get_back_analysis_data(daliy_rate, cum_rate, code, days):
+    rate = cum_rate
+    Daliy_rate = np.array(daliy_rate)
+    re = []
+    for k in range(len(rate)):
+        retreat = max(rate.iloc[k, 0] - rate.iloc[k:, 0])
+        re.append(retreat)
+    max_retreat = max(re)
+    earn = rate.iloc[-1, -1] - 1
+    annual_return = earn * 365 / days
+    ex_pct_close = Daliy_rate - 0.04 / 252
+    sharpe = ex_pct_close.mean() * math.sqrt(252) / ex_pct_close.std()
+    analysis_datas = [earn, annual_return, max_retreat, sharpe]
+    back_analysis_data = pd.DataFrame(analysis_datas, index=['收益率', '年化收益率', '最大回撤', '夏普比率'], columns=[code]).T
+    return back_analysis_data
+
+def get_backtest_gain(code_list, direction, interval_time):
+    to = time.time()
+    signal_group = get_signal(code_list, direction, interval_time)
+    color = ['red', 'orange', 'yellow', 'green', 'blue', 'purple']
+    back_revenue = pd.DataFrame()
+    start = interval_time[0]
+    end = interval_time[-1]
+    gain_dict = {}
+    keys = list(signal_group.keys())
+    for i in range(len(keys)):
+        stock = keys[i]
+        if len(stock) == 11:
+            index = get_price(stock, start_date=start, end_date=end, fields='close')
+            back_data = index.pct_change(1)
+        elif len(stock) == 6:
+            q = finance.run_query(query(finance.SW1_DAILY_PRICE).filter(finance.SW1_DAILY_PRICE.code == stock, finance.SW1_DAILY_PRICE.date > start, finance.SW1_DAILY_PRICE.date < end))
+            change_index_format = get_price('000001.XSHG', start_date=start, end_date=end, fields='close')
+            industry = pd.DataFrame(list(q.close), index=change_index_format.index, columns=['close'])
+            back_data = industry.pct_change(1)
+        signal_time = signal_group[stock].index
+        backtest = [NaN] * len(back_data.index)
+        for j in signal_time:
+            row = int(np.where(back_data.index == j)[0])
+            if direction == 'buy':
+                backtest[row + 1:row + 23] = back_data.iloc[row + 1:row + 23].close
+            elif direction == 'sell':
+                backtest[row + 1:row + 8] = back_data.iloc[row + 1:row + 8].close * -1
+        backtest = pd.DataFrame(backtest, index=back_data.index, columns=['b_s'])
+        backtest = backtest.fillna(0)
+        R_backtest = backtest
+        gain_dict[keys[i]] = R_backtest
+        R_backtest.iloc[0, 0] = 1
+        R_cum = R_backtest.cumsum()
+        R_backtest.iloc[0, 0] = 0
+        days = len(pd.date_range(start, end))
+        revenue = get_back_analysis_data(R_backtest, R_cum, keys[i], days)
+        back_revenue = back_revenue.append(revenue)
+    return (gain_dict, back_revenue)
+index_code = ['000001.XSHG', '000016.XSHG', '000300.XSHG', '000905.XSHG', '399101.XSHE', '399006.XSHE']
+interval_time = ['2007-01-01', '2008-01-01', '2009-01-01', '2010-01-01', '2011-01-01', '2012-01-01', '2013-01-01', '2014-01-01', '2015-01-01', '2016-01-01', '2017-01-01', '2018-01-01', '2019-01-01', '2019-09-01']
+t0 = time.time()
+long_back_rate, long_back_revenue = get_backtest_gain(index_code, 'buy', interval_time)
+short_back_rate, short_back_revenue = get_backtest_gain(index_code, 'sell', interval_time)
+back_rate = [long_back_rate, short_back_rate]
+back_revenue = [long_back_revenue, short_back_revenue]
+index_colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple']
+for k in range(0, 2):
+    fig = plt.figure(figsize=(13, 8))
+    ax1 = fig.add_subplot(1, 1, 1)
+    keys = list(back_rate[k].keys())
+    for i in range(len(keys)):
+        target = keys[i]
+        target_back_rate = back_rate[k][target]
+        target_back_rate.iloc[0, 0] = 1
+        target_back_rate_cum = target_back_rate.cumsum()
+        ax1.plot(target_back_rate_cum, index_colors[i])
+    ax1.axhline(1.0, linestyle='-', color='black', lw=1)
+    if k == 0:
+        pass
+    elif k == 1:
+        pass
+t1 = time.time()
+fig = plt.figure(figsize=(13, 5))
+ax2 = fig.add_subplot(1, 1, 1)
+long_keys = list(long_back_rate.keys())
+for i in range(len(long_keys)):
+    sample = long_back_rate[keys[i]].loc['2009-06-30':'2009-07-30']
+    sample = sample.reset_index(drop=True)
+    cum_sample = sample.cumsum()
+    ax2.plot(cum_sample, index_colors[i])
+fig = plt.figure(figsize=(13, 5))
+ax2 = fig.add_subplot(1, 1, 1)
+short_keys = list(short_back_rate.keys())
+for i in range(len(short_keys)):
+    sample = short_back_rate[keys[i]].loc['2008-09-30':'2008-10-29']
+    sample = sample.reset_index(drop=True)
+    cum_sample = sample.cumsum()
+    ax2.plot(cum_sample, index_colors[i])
+Cycle = ['801020', '801030', '801040', '801050', '801710', '801720', '801730', '801890', '801170', '801180', '801160']
+Consumption = ['801180', '801110', '801130', '801200', '801120', '801150', '801210', '801140', '801010']
+Growth = ['801080', '801770', '801760', '801750', '801740']
+Finance = ['801780', '801790']
+times = ['2014-03-01', '2015-01-01', '2016-01-01', '2017-01-01', '2018-01-01', '2019-01-01', '2019-09-01']
+t0 = time.time()
+Cycle_long_back_rate, Cycle_long_back_revenue = get_backtest_gain(Cycle, 'buy', times)
+Cycle_short_back_rate, Cycle_short_back_revenue = get_backtest_gain(Cycle, 'sell', times)
+Growth_long_back_rate, Growth_long_back_revenue = get_backtest_gain(Growth, 'buy', times)
+Growth_short_back_rate, Growth_short_back_revenue = get_backtest_gain(Growth, 'sell', times)
+Consumption_long_back_rate, Consumption_long_back_revenue = get_backtest_gain(Consumption, 'buy', times)
+Consumption_short_back_rate, Consumption_short_back_revenue = get_backtest_gain(Consumption, 'sell', times)
+Finance_long_back_rate, Finance_long_back_revenue = get_backtest_gain(Finance, 'buy', times)
+Finance_short_back_rate, Finance_short_back_revenue = get_backtest_gain(Finance, 'sell', times)
+t1 = time.time()
+industry_long_list = [Cycle_long_back_rate, Growth_long_back_rate, Consumption_long_back_rate, Finance_long_back_rate]
+industry_short_list = [Cycle_short_back_rate, Growth_short_back_rate, Consumption_short_back_rate, Finance_short_back_rate]
+for industry in industry_long_list:
+    keys = list(industry.keys())
+    industry['avg_rate'] = industry[keys[0]]
+    for i in range(len(keys) - 1):
+        industry['avg_rate'] += industry[keys[i + 1]]
+for industry in industry_short_list:
+    keys = list(industry.keys())
+    industry['avg_rate'] = industry[keys[0]]
+    for i in range(len(keys) - 1):
+        industry['avg_rate'] += industry[keys[i + 1]]
+Cycle_avg_long_rate = Cycle_long_back_rate['avg_rate'] / 11
+Consumption_avg_long_rate = Consumption_long_back_rate['avg_rate'] / 5
+Growth_avg_long_rate = Growth_long_back_rate['avg_rate'] / 9
+Finance_avg_long_rate = Finance_long_back_rate['avg_rate'] / 2
+industry_colors = ['magenta', 'lime', 'darkorchid', 'darkorange']
+industry_avg_long_list = [Cycle_avg_long_rate, Consumption_avg_long_rate, Growth_avg_long_rate, Finance_avg_long_rate]
+classfiy_name = ['Cycle', 'Consumption', 'Growth', 'Finance']
+industry_long_data = pd.DataFrame()
+for avg in range(0, 4):
+    analysis = get_back_analysis_data(industry_avg_long_list[avg], industry_avg_long_list[avg].cumsum() + 1, classfiy_name[avg], 2011)
+    industry_long_data = industry_long_data.append(analysis)
+fig = plt.figure(figsize=(13, 8))
+ax3 = fig.add_subplot(1, 1, 1)
+for avg in range(0, 4):
+    ax3.plot(industry_avg_long_list[avg].cumsum() + 1, industry_colors[avg])
+ax3.axhline(1.0, linestyle='-', color='black', lw=1)
+fig = plt.figure(figsize=(13, 6))
+ax4 = fig.add_subplot(1, 1, 1)
+for i in range(len(industry_avg_long_list)):
+    sample = industry_avg_long_list[i].loc['2014-11-20':'2014-12-21']
+    sample = sample.reset_index(drop=True)
+    cum_sample = sample.cumsum()
+    ax4.plot(cum_sample, industry_colors[i])
+Cycle_avg_short_rate = Cycle_short_back_rate['avg_rate'] / 11
+Consumption_avg_short_rate = Consumption_short_back_rate['avg_rate'] / 5
+Growth_avg_short_rate = Growth_short_back_rate['avg_rate'] / 9
+Finance_avg_short_rate = Finance_short_back_rate['avg_rate'] / 2
+industry_avg_short_list = [Cycle_avg_short_rate, Consumption_avg_short_rate, Growth_avg_short_rate, Finance_avg_short_rate]
+industry_short_data = pd.DataFrame()
+for avg in range(0, 4):
+    analysis = get_back_analysis_data(industry_avg_short_list[avg], industry_avg_short_list[avg].cumsum() + 1, classfiy_name[avg], 2011)
+    industry_short_data = industry_short_data.append(analysis)
+fig = plt.figure(figsize=(13, 8))
+ax3 = fig.add_subplot(1, 1, 1)
+for avg in range(0, 4):
+    ax3.plot(industry_avg_short_list[avg].cumsum() + 1, industry_colors[avg])
+ax3.axhline(1.0, linestyle='-', color='black', lw=1)
+fig = plt.figure(figsize=(13, 6))
+ax5 = fig.add_subplot(1, 1, 1)
+for i in range(len(industry_avg_short_list)):
+    sample = industry_avg_short_list[i].loc['2017-03-25':'2017-04-29']
+    sample = sample.reset_index(drop=True)
+    cum_sample = sample.cumsum()
+    ax5.plot(cum_sample, industry_colors[i])
+ax5.axhline(0, linestyle='-', color='black', lw=1)

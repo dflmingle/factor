@@ -1,0 +1,18 @@
+quant/2020年度精选策略/66 高于MA10买入低于MA20卖出回测半年收益率20.4%.txt
+import jqdata
+
+def initialize(context):
+    g.security = '000333.XSHE'
+
+def handle_data(context, data):
+    security = g.security
+    close_data1 = attribute_history(security, 20, '1d', ['close'])
+    close_data2 = attribute_history(security, 10, '1d', ['close'])
+    MA10 = close_data2['close'].mean()
+    MA5 = close_data1['close'].mean()
+    current_price = close_data1['close'][-1]
+    cash = context.portfolio.cash
+    if current_price > 1.01 * MA10:
+        order_value(security, cash)
+    elif current_price < MA5 and context.portfolio.positions[security].closeable_amount > 0:
+        order_target(security, 0)

@@ -1,0 +1,230 @@
+quant/量化策略/量化策略/龙头追涨策略2026/01龙头股-最高板策略.txt
+from jqdata import *
+from jqfactor import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+
+def initialize(context):
+    g.up_level = 2
+    g.factors_config = [{'factor': 'market_cap', 'sort': True}, {'factor': 'VOL5', 'sort': False}]
+    g.stop_loss = -7
+    g.holds = 3
+    run_daily(get_stock_list, '9:10')
+    run_daily(buy, '09:30')
+    run_daily(sell_v3, '14:50')
+    run_daily(print_position_info, '15:02')
+
+def get_stock_list(context):
+    date = context.previous_date
+    date = transform_date(date, 'str')
+    initial_list = prepare_stock_list(date)
+    hl_list = get_hl_stock(initial_list, date)
+    ccd = get_continue_count_df(hl_list, date, 20) if len(hl_list) != 0 else pd.DataFrame(index=[], data={'count': [], 'extreme_count': []})
+    if len(ccd) > 0:
+        sorted_ccd = ccd.sort_values(by='count', ascending=False)
+        rank = 1
+        for stock in sorted_ccd.index:
+            count = sorted_ccd.loc[stock, 'count']
+            extreme = sorted_ccd.loc[stock, 'extreme_count']
+            name = get_security_info(stock).display_name
+            rank += 1
+    max_count = ccd['count'].max()
+    threshold = max(2, max_count - g.up_level)
+    candidate_stocks = ccd[ccd['count'] >= threshold].index.tolist()
+    df = get_factor_filter_df_V2(context, candidate_stocks, 'market_cap', 'VOL5', True, False, top_n=10)
+    stock_list = list(df.index)
+    g.target_list = stock_list[:g.holds - len(context.portfolio.positions)]
+
+def buy(context):
+    current_data = get_current_data()
+    value = context.portfolio.total_value / g.holds
+    for s in g.target_list:
+        if context.portfolio.available_cash / current_data[s].last_price > 100:
+            if current_data[s].last_price == current_data[s].high_limit:
+                order_value(s, value, LimitOrderStyle(current_data[s].day_open))
+                name = get_security_info(s).display_name
+            else:
+                order_value(s, value, MarketOrderStyle(current_data[s].day_open))
+                name = get_security_info(s).display_name
+
+def sell_v3(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        position = context.portfolio.positions[s]
+        name = get_security_info(s).display_name
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        current_value = position.value
+        is_limit_up = current_data[s].last_price == current_data[s].high_limit
+        is_limit_down = current_data[s].last_price == current_data[s].low_limit
+        if is_limit_up:
+            continue
+        if is_limit_down:
+            continue
+        start_date = transform_date(position.init_time, 'str')
+        current_date = transform_date(context.current_dt, 'str')
+        start_dt = dt.datetime.strptime(start_date, '%Y-%m-%d')
+        current_dt = dt.datetime.strptime(current_date, '%Y-%m-%d')
+        hold_days = (current_dt - start_dt).days
+        sell_reason = ''
+        sell_amount = 0
+        if ret < g.stop_loss:
+            sell_amount = current_value
+            sell_reason = f'止损({ret:.2f}%)'
+        elif ret >= 20:
+            sell_amount = current_value
+            sell_reason = f'止盈({ret:.2f}%)'
+        elif ret >= 10:
+            sell_amount = current_value * 0.5
+            sell_reason = f'部分止盈({ret:.2f}%)'
+        elif ret >= 5:
+            sell_amount = current_value * 0.3
+            sell_reason = f'初步止盈({ret:.2f}%)'
+        elif hold_days >= 5 and ret < 0:
+            sell_amount = current_value
+            sell_reason = f'时间止损({hold_days}天)'
+        if sell_amount > 0:
+            if sell_amount >= current_value * 0.95:
+                order_target_value(s, 0)
+            else:
+                target_value = current_value - sell_amount
+                order_target_value(s, target_value)
+
+def sell(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        name = get_security_info(s).display_name
+        if not current_data[s].last_price == current_data[s].high_limit:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                start_date = transform_date(context.portfolio.positions[s].init_time, 'str')
+                target_date = get_shifted_date(start_date, 2, 'T')
+                current_date = transform_date(context.current_dt, 'str')
+                cost = context.portfolio.positions[s].avg_cost
+                price = context.portfolio.positions[s].price
+                ret = 100 * (price / cost - 1)
+                sell_reason = []
+                if current_date >= target_date:
+                    sell_reason.append(f'持有时间达标(买入日:{start_date})')
+                if ret > 0:
+                    sell_reason.append(f'已盈利({ret:.2f}%)')
+                if sell_reason:
+                    if current_data[s].last_price > current_data[s].low_limit:
+                        order_target_value(s, 0)
+
+def log_selection_process(context, initial_list, hl_list, ccd, M, lt, df, final_list):
+    date = context.current_dt.strftime('%Y-%m-%d')
+    if len(initial_list) > 0:
+        pass
+    if len(hl_list) > 0:
+        pass
+    if len(ccd) > 0:
+        ccd_sorted = ccd.sort_values(by='count', ascending=False)
+        for stock in ccd_sorted.index[:10]:
+            count = ccd_sorted.loc[stock, 'count']
+            extreme = ccd_sorted.loc[stock, 'extreme_count']
+            name = get_security_info(stock).display_name
+        if len(ccd_sorted) > 10:
+            pass
+    if M > 0:
+        for stock in lt:
+            count = ccd.loc[stock, 'count']
+            extreme = ccd.loc[stock, 'extreme_count']
+            name = get_security_info(stock).display_name
+        all_sorted = ccd.sort_values(by='count', ascending=False)
+        rank = 1
+        for stock in all_sorted.index[:15]:
+            count = all_sorted.loc[stock, 'count']
+            extreme = all_sorted.loc[stock, 'extreme_count']
+            name = get_security_info(stock).display_name
+            is_max = '★' if count == M else ''
+            rank += 1
+    if len(df) > 0:
+        df_sorted = df.sort_values(by='score', ascending=True)
+        for i, (stock, row) in enumerate(df_sorted.iterrows()):
+            if i < 10:
+                score = row['score']
+                name = get_security_info(stock).display_name
+                star = '★' if stock in final_list else ''
+        if len(df_sorted) > 10:
+            pass
+    if len(final_list) > 0:
+        for i, stock in enumerate(final_list):
+            name = get_security_info(stock).display_name
+            factor_value = df.loc[stock, 'score'] if stock in df.index else 'N/A'
+            count = ccd.loc[stock, 'count'] if stock in ccd.index else 0
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=af3d460f1664c95ce103c45e4aa82266d06e53a12e8d79da1097ddbc84e6bd04 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_extreme_limit_stock sha256=e43531991a1b1cd14bfe0ac8337c3942976c2f39683c74c0d66f7ad17913dcbd source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=56e537db6fd28b7921a9ea3d0d02ce5d54a0b27871c0225470ed712658edcd3c source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_init_emo_count sha256=710ec44eb3e72049846ffccf4063cda49142f4e583ab3c370a1d896fc023b992 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hot_concept sha256=9ff956452dd0266717251258b62c8dbaa438dcaba1ff13d67121d9071930cfe6 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_concept_stock sha256=1663c7b81d39ee616fac85d7e01ad8c584870561cf3c4f417e290013a450381b source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=1b44687e21b10ff448ccffd8adc7bcbc28701bc3e2f9bc81b42cad20cd893c18 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_count_df sha256=696c4e8a4997343a84c8e7a5b8252c7661feaf6aede50f6e911dd8a94cd767ce source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_continue_count_df sha256=ed4b85c92a7f497f105c05129f66dce38db5bc17142e183ec8dde223f2f7ad05 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def get_factor_filter_df(context, stock_list, jqfactor, sort):
+    if len(stock_list) != 0:
+        yesterday = context.previous_date
+        score_list = get_factor_values(stock_list, jqfactor, end_date=yesterday, count=1)
+        score_list = score_list[jqfactor].iloc[0].tolist()
+        df = pd.DataFrame(index=stock_list, data={'score': score_list}).dropna()
+        df = df.sort_values(by='score', ascending=sort)
+    else:
+        df = pd.DataFrame(index=[], data={'score': []})
+    return df
+
+def get_factor_filter_df_V1(context, stock_list, factors_config):
+    if len(stock_list) == 0:
+        return pd.DataFrame()
+    yesterday = context.previous_date
+    current_stocks = stock_list.copy()
+    df_factors = pd.DataFrame(index=current_stocks)
+    for i, factor_info in enumerate(factors_config):
+        factor_code = factor_info['factor']
+        factor_name = f'factor_{i}'
+        factor_values = get_factor_values(current_stocks, factor_code, end_date=yesterday, count=1)
+        df_factors[factor_name] = factor_values[factor_code].iloc[0].tolist()
+    df_factors = df_factors.dropna()
+    current_df = df_factors.copy()
+    for i, factor_info in enumerate(factors_config):
+        factor_name = f'factor_{i}'
+        sort_ascending = factor_info['sort']
+        current_df = current_df.sort_values(by=factor_name, ascending=sort_ascending)
+        factor_code = factor_info['factor']
+    return current_df
+
+def get_factor_filter_df_V2(context, stock_list, jqfactor1, jqfactor2, sort1, sort2, top_n=100):
+    if len(stock_list) != 0:
+        yesterday = context.previous_date
+        factor1_values = get_factor_values(stock_list, jqfactor1, end_date=yesterday, count=1)
+        factor2_values = get_factor_values(stock_list, jqfactor2, end_date=yesterday, count=1)
+        df = pd.DataFrame(index=stock_list)
+        df['factor1'] = factor1_values[jqfactor1].iloc[0].tolist()
+        df['factor2'] = factor2_values[jqfactor2].iloc[0].tolist()
+        df = df.dropna()
+        df = df.sort_values(by='factor1', ascending=sort1)
+        df_top = df.head(top_n)
+        df_top = df_top.sort_values(by='factor2', ascending=sort2)
+        return df_top
+    else:
+        return pd.DataFrame()
+
+def print_position_info(context):
+    position_percent = 100 * context.portfolio.positions_value / context.portfolio.total_value
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        name = get_security_info(securities).display_name
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount

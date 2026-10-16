@@ -1,0 +1,56 @@
+quant/聚宽2025年精选/72量化进阶学习笔记——打板策略.txt
+from jqlib.technical_analysis import *
+from jqfactor import *
+from jqdata import *
+import datetime as dt
+import pandas as pd
+
+def initialize(context):
+    run_daily(buy, '09:30')
+    run_daily(stoploss, '10:30')
+    run_daily(stoploss, '13:00')
+    run_daily(stoploss, '14:00')
+    run_daily(sellNew, 'every_bar')
+'EXACT_REVIEWED_FUNCTION buy sha256=410798cfe59b18939617f06cce614ae64751a4b36f2cd470e2f4117252af999d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION sell sha256=3408bac53772817ae735f38c7301837be655bf0ad957f8122f54f403c5a8478b source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def stoploss(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        if context.portfolio.positions[s].closeable_amount != 0:
+            cost = context.portfolio.positions[s].avg_cost
+            price = context.portfolio.positions[s].price
+            ret = 100 * (price / cost - 1)
+            if ret < 0:
+                if current_data[s].last_price > current_data[s].low_limit:
+                    order_target_value(s, 0)
+
+def sellNew(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if minute > 50 and hour == 14:
+        for s in hold_list:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                start_date = transform_date(context.portfolio.positions[s].init_time, 'str')
+                target_date = get_shifted_date(start_date, 2, 'T')
+                current_date = transform_date(context.current_dt, 'str')
+                cost = context.portfolio.positions[s].avg_cost
+                price = context.portfolio.positions[s].price
+                ret = 100 * (price / cost - 1)
+                if current_date >= target_date or ret < 0:
+                    if current_data[s].last_price > current_data[s].low_limit:
+                        order_target_value(s, 0)
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=cc5170b437b6e4dfa16ff48d4f9d14ff4634058918cbe24e0152163b569e1063 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=56e537db6fd28b7921a9ea3d0d02ce5d54a0b27871c0225470ed712658edcd3c source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=4fa3a13fa8a42f2598513c30bcd6ac8c221537b7ab0b591e828808e85244da98 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_count_df sha256=94d8323bb127f45b4692446108780719047f9aea9afd0551e5ae840ea1ecf17d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_continue_count_df sha256=ed4b85c92a7f497f105c05129f66dce38db5bc17142e183ec8dde223f2f7ad05 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_relative_position_df sha256=d5a90ecafd4cf573380074b3e3b1f90e4f39ad333c09e0f3c96d6dc34a2cba2b source=quant/2024年度精选策略1/4.首板低开策略.txt'

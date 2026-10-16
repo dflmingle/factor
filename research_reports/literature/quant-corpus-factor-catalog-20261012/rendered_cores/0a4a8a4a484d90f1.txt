@@ -1,0 +1,48 @@
+quant/2022年度精选策略/52.用指数战胜指数，ETF二八轮动对冲模型.txt
+import numpy as np
+import pandas as pd
+import datetime
+from jqdata import *
+
+def initialize(context):
+    set_parms()
+    run_daily(market_trade, time='14:53', reference_security='000300.XSHG')
+
+def set_parms():
+    g.cycle = 20
+    g.index_list = ['000300.XSHG', '000905.XSHG']
+    g.etf_list = ['510300.XSHG', '510500.XSHG']
+    g.bond = '150051.XSHE'
+    g.ratio = 0.0
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=7e6c8f38f4512852c9ef49bc17cde2234562d5a81ab20d60623feb283f6ea990 source=quant/2021年度精选策略/61.【复现】扩散指标择时.txt'
+
+def market_trade(context):
+    signal = get_signal(context)
+    if signal == 'clear' and len(context.portfolio.positions) > 0:
+        for etf in context.portfolio.positions.keys():
+            order_target_value(etf, 0)
+    elif signal in g.etf_list:
+        if g.bond in context.portfolio.positions.keys():
+            order_target_value(g.bond, 0)
+        order_value(signal, context.portfolio.cash)
+    elif signal == g.bond:
+        for etf in context.portfolio.positions.keys():
+            order_target_value(etf, 0)
+        order_value(g.bond, context.portfolio.cash)
+
+def get_signal(context):
+    hold = context.portfolio.positions.keys()
+    power_df = pd.DataFrame({e: {'power': get_power(i, g.cycle)} for i, e in zip(g.index_list, g.etf_list)}).T
+    if g.bond not in hold and False not in [True if power_df.loc[i, 'power'] <= 0 else False for i in power_df.index]:
+        return g.bond
+    elif [i for i in power_df.index if i in hold and power_df.loc[i, 'power'] <= 0] and g.bond not in hold:
+        return 'clear'
+    elif power_df.sort_index(by=['power'])['power'][-1] > g.ratio and len(set(g.etf_list) & set(hold)) <= 0:
+        return power_df.sort_index(by=['power']).index[-1]
+
+def get_power(stock, interval=20):
+    h = attribute_history(stock, interval, unit='1d', fields='close', skip_paused=True)
+    return (h['close'].values[-1] - h['close'].values[0]) / h['close'].values[0]
+
+def after_trading_end(context):
+    pass

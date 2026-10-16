@@ -1,0 +1,59 @@
+quant/2024年度精选策略2/93.因子看板多因子模型---由量化课堂多因子模型修改.txt
+import jqfactor
+import pandas as pd
+import numpy as np
+from jqfactor import get_factor_values
+'EXACT_REVIEWED_FUNCTION initialize sha256=507bbc3c7a2e4f1e57807f9c530a607b5733d4e37a9f594d7ecae19d990d4ec8 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def set_params():
+    g.tc = 30
+    g.yb = 63
+    g.N = 30
+    g.factors = ['total_asset_growth_rate', 'np_parent_company_owners_growth_rate', 'financing_cash_growth_rate', 'net_interest_expense', 'goods_service_cash_to_operating_revenue_ttm', 'DAVOL20']
+    g.weights = [[-1], [-1], [-1], [1], [1], [1]]
+'EXACT_REVIEWED_FUNCTION set_variables sha256=ef3054e17478dcd74b0f3cb09c0b16318e69b1007dafb4c7943e2f2e1d8a742e source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=55b54f2fdfbdce9538e69ddc989de97afc826316803a383800ddc025f965104d source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+'EXACT_REVIEWED_FUNCTION set_feasible_stocks sha256=a6b3946272f8942ab9d596b79d24edaa46b045b2c8b92696a4cfeed3d0e9819f source=quant/2020年度精选策略/92 多因子选股策略.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+
+def handle_data(context, data):
+    if g.if_trade == True:
+        g.everyStock = context.portfolio.portfolio_value / g.N
+        todayStr = str(context.current_dt)[0:10]
+        previousdate = str(context.previous_date)[0:10]
+        a, b = getRankedFactors(g.factors, todayStr, previousdate)
+        points = np.dot(a, g.weights)
+        stock_sort = b[:]
+        points, stock_sort = bubble(points, stock_sort)
+        toBuy = stock_sort[0:g.N].values
+        order_stock_sell(context, data, toBuy)
+        order_stock_buy(context, data, toBuy)
+    g.if_trade = False
+'EXACT_REVIEWED_FUNCTION order_stock_sell sha256=8cf9068927549a6b3e64f54cba151a44eb33f3599c75d216cae9fdcbde6435f9 source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+'EXACT_REVIEWED_FUNCTION order_stock_buy sha256=8a3588b31b29d57839f58a0b8c0eb760a01235a5e1308f6320908a65766a113a source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+'EXACT_REVIEWED_FUNCTION indexOf sha256=3b06be86a5530510fd78986d5e6b6290c283a837db657b224cb88067badf8935 source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+
+def getRankedFactors(f, d, previousdate):
+    far = get_factor_values(g.all_stocks, factors=f, end_date=previousdate, count=1)
+    first_factor_name = f[0]
+    for i in f:
+        if i == first_factor_name:
+            df = far[i].T
+            df.columns = [first_factor_name]
+        else:
+            df1 = far[i].T
+            df1.columns = [i]
+            df = df.join(df1)
+    df['code'] = df.index
+    res = [[0] * len(f) for i in range(len(df))]
+    for i in range(0, len(df)):
+        for j in range(0, len(f)):
+            res[i][j] = df[f[j]][i]
+    fillNan(res)
+    getRank(res)
+    return (res, df['code'])
+'EXACT_REVIEWED_FUNCTION getRank sha256=2114fff3e406b2fe705419f861988054d575f00bb6f6d3fd5c79b30251b9aad3 source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+'EXACT_REVIEWED_FUNCTION fillNan sha256=103c5117e3c9a9000ec9e23b1d9664c0fcf14a85c2dafe084498e2a3a2cda106 source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+'EXACT_REVIEWED_FUNCTION bubble sha256=771720e015f1b8b025ad28321488ce8ba25573f9c51c269d77ac4d2f35d687d5 source=quant/2021年度精选策略/42.市值，研发支出，roe，三因子，跑赢大盘.txt'
+'EXACT_REVIEWED_FUNCTION after_trading_end sha256=748f31e4628f9b9d6e2b8cdf801a53cb2b99bb3dfe04a3a125ef8eac67247776 source=quant/2020年度精选策略/92 多因子选股策略.txt'

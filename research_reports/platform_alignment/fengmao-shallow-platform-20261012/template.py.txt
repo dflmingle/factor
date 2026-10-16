@@ -1,0 +1,83 @@
+import numpy as np
+
+# Frozen FM_CAUSAL_SHALLOW, not a training implementation. Five-year results
+# include its training segment; only dates after 2025-08-22 are frozen temporal
+# evaluation. Do not interpret a five-year headline as out-of-sample alpha.
+BASE_FEATURES = ('rev3','rev6','rev20','rev60','vol6','vol60','vrel3','lowvolume1','lowturn','size')
+
+def _raw(c, o, v, t, cap):
+    r = c / c.shift(1) - 1
+    intra = c / o - 1
+    night = o / c.shift(1) - 1
+    for n in (3, 6, 10, 20, 60, 120):
+        yield 'rev'+str(n), 0.0-(c / c.shift(n) - 1)
+    yield 'size', 0.0-cap
+    yield 'lowvolume1', 0.0-v
+    yield 'lowturn', 0.0-t.rolling(20, min_periods=20).mean()
+    yield 'lowturn120', 0.0-t.rolling(120, min_periods=120).mean()
+    for n in (6, 60, 120, 252):
+        yield 'vol'+str(n), r.rolling(n, min_periods=n).std()
+    vol20 = r.rolling(20, min_periods=20).std()
+    yield 'volshift20', vol20 / r.rolling(120, min_periods=120).std()
+    yield 'smoothvol20', vol20.rolling(60, min_periods=60).mean()
+    v60 = v.rolling(60, min_periods=60).mean()
+    yield 'vrel3', v.rolling(3, min_periods=3).mean() / v60
+    yield 'vrel20long', v.rolling(20, min_periods=20).mean() / v.rolling(252, min_periods=252).mean()
+    rel = v / v60
+    logdiff = np.log(v).diff()
+    for n in (20, 60):
+        yield 'idrev'+str(n), 0.0-intra.rolling(n, min_periods=n).mean()
+        yield 'tug'+str(n), (night-intra).rolling(n, min_periods=n).mean()
+        yield 'pressure'+str(n), 0.0-(r*rel).rolling(n, min_periods=n).sum() / rel.rolling(n, min_periods=n).sum()
+        yield 'signedflow'+str(n), 0.0-(r*logdiff).rolling(n, min_periods=n).mean()
+    yield 'onrev20', 0.0-night.rolling(20, min_periods=20).mean()
+    yield 'onvol60', night.rolling(60, min_periods=60).std()
+    yield 'gapcor60', intra.rolling(60, min_periods=60).corr(night)
+    for fast, slow, tag in ((12,26,'macd'),(24,52,'macdslow')):
+        ef = c.ewm(span=fast, adjust=False, min_periods=fast).mean()
+        es = c.ewm(span=slow, adjust=False, min_periods=slow).mean()
+        dif = (ef-es)/c
+        yield tag, dif
+        if tag=='macd':
+            yield 'macdhist', dif-dif.ewm(span=9, adjust=False, min_periods=9).mean()
+
+def _features(c, o, v, t, cap, positions=None):
+    active = np.isfinite(cap) & (cap > 0) & np.isfinite(t)
+    x = {}
+    for name, raw in _raw(c, o, v, t, cap):
+        if positions is not None:
+            raw = raw.iloc[positions]
+            mask = active.iloc[positions]
+        else:
+            mask = active
+        # Original atom builders cast to float32 before same-day ranking.
+        raw = raw.astype('float32').where(mask & np.isfinite(raw))
+        ranked = raw.rank(axis=1, pct=True, method='average')
+        # Original base atoms round before centering; later atoms round after.
+        if name in BASE_FEATURES:
+            ranked = ranked.astype('float32') - 0.5
+        else:
+            ranked = (ranked - 0.5).astype('float32')
+        x[name] = np.nan_to_num(ranked.to_numpy(dtype='float32'), nan=0.0)
+    return x
+
+PREDICT_PLACEHOLDER
+
+class FrozenShallow(Factor):
+    def calculate(self, factors):
+        # Literal subscripts are required for platform dependency extraction.
+        source = factors['close']
+        cap = factors['market_cap'].unstack(level=1).sort_index().astype('float32').astype('float64')
+        t = factors['turnover'].unstack(level=1).reindex_like(cap).astype('float32').astype('float64')
+        active = (cap > 0) & np.isfinite(t)
+        c = source.unstack(level=1).reindex_like(cap).astype('float32').astype('float64')
+        c = c.where(active & (c > 0)).ffill()
+        o = factors['open'].unstack(level=1).reindex_like(cap).astype('float32').astype('float64')
+        o = o.where(active & (o > 0))
+        v = factors['volume'].unstack(level=1).reindex_like(cap).astype('float32').astype('float64')
+        v = v.where(active & (v > 0))
+        x = _features(c, o, v, t, cap)
+        value = _predict(x)
+        output = c * 0.0
+        output.iloc[:, :] = value
+        return output.where(active).stack(dropna=False).reindex(source.index).rename('value')

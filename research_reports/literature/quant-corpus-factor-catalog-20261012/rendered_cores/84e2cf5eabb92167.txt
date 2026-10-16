@@ -1,0 +1,70 @@
+quant/2024年度精选策略2/98.【漂亮50】“漂亮50”策略复现以及股息率排序函数.txt
+from jqdata import *
+from jqfactor import get_factor_values
+import numpy as np
+import pandas as pd
+'EXACT_REVIEWED_FUNCTION initialize sha256=4e270d99cfe624fe63ecaa1e438827faebb5098cd66e6c6ea8ea4c1a27d0d124 source=quant/2023年度精选策略/48.【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块.txt'
+'EXACT_REVIEWED_FUNCTION my_trade sha256=106906d0395ea441e12445b8fc8afb7906fa70c578b927c9e9a116bc770c6afd source=quant/2023年度精选策略/48.【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块.txt'
+'EXACT_REVIEWED_FUNCTION zheshi_trade sha256=2e4cca891b05190492865df80b269a595f0ee2cc28fb8b43e0376655b9fa6422 source=quant/2023年度精选策略/48.【漂亮50 2.0止损版本】为了降低回撤，加入择时止损模块.txt'
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=ed72eb656616f2d767f096b61e52ec508ed7cdbf78076ed61809342ad2778339 source=quant/2023年度精选策略/29.价值成长轮动策略.txt'
+'EXACT_REVIEWED_FUNCTION get_factor_filter_list sha256=0286b8af08933fe80ffea18abe38127c39d8cd32ebb7f5d29ced827e03b14932 source=quant/2023年度精选策略/36.PEG+EBIT对小市值因子的优化.txt'
+
+def get_stock_list(context):
+    initial_list = get_index_stocks('000905.XSHG', date=None)
+    initial_list = filter_new_stock(context, initial_list)
+    initial_list = filter_kcb_stock(context, initial_list)
+    initial_list = filter_st_stock(initial_list)
+    q = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(initial_list)).order_by(valuation.circulating_market_cap.asc())
+    df = get_fundamentals(q)
+    shizhi_list = list(df.code)
+    num_1 = int(len(shizhi_list) / 4)
+    shizhi_list1 = shizhi_list[num_1:-1]
+    indus = get_industries(name='sw_l1', date=context.current_dt)
+    hy_code_list = indus.index.tolist()
+    peg_all = []
+    for hy_code in hy_code_list:
+        i_stocklist1 = get_industry_stocks(hy_code, date=None)
+        hyshizhi_list = [x for x in i_stocklist1 if x in shizhi_list1]
+        peg_list = []
+        if hyshizhi_list:
+            peg_list = get_factor_filter_list(context, hyshizhi_list, 'PEG', True, 0, 0.7)
+        for code in peg_list:
+            peg_all.append(code)
+    npgr_all = []
+    for hy_code in hy_code_list:
+        i_stocklist1 = get_industry_stocks(hy_code, date=None)
+        hyshizhi_list = [x for x in i_stocklist1 if x in shizhi_list1]
+        npgr_list = []
+        if hyshizhi_list:
+            npgr_list = get_factor_filter_list(context, hyshizhi_list, 'net_profit_growth_rate', False, 0, 0.7)
+        for code in npgr_list:
+            npgr_all.append(code)
+    roe_all = []
+    for hy_code in hy_code_list:
+        i_stocklist1 = get_industry_stocks(hy_code, date=None)
+        hyshizhi_list = [x for x in i_stocklist1 if x in shizhi_list1]
+        q1 = query(indicator.code, indicator.roe).filter(indicator.code.in_(hyshizhi_list)).order_by(indicator.roe.desc())
+        df1 = get_fundamentals(q1)
+        roe_list = list(df1.code)
+        num_2 = int(len(roe_list) / 3)
+        roe_list1 = roe_list[0:num_2]
+        for code in roe_list1:
+            roe_all.append(code)
+    PNR_all = []
+    for i in peg_all:
+        if i in npgr_all and i in roe_all:
+            PNR_all.append(i)
+    q3 = query(valuation.code, valuation.circulating_market_cap).filter(valuation.code.in_(PNR_all)).order_by(valuation.circulating_market_cap.desc())
+    df3 = get_fundamentals(q3)
+    result_list = list(df3.code)
+    return result_list
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcb_stock sha256=e61e9dbe99ad6206be66fc22ea053c25bbd931e18b5ec18b4f9675351fe5993d source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=e1156ef5376990f768d29303164d87a15e602d5861ac54d0fb47bf5120261b3c source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=ebd69b96bf24723f11f9d8919b582f3a3c647938dc90ba01f1a9c4bdd262b550 source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'

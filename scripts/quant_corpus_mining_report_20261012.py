@@ -1,0 +1,116 @@
+"""Consolidate completed local mining, retain failures and qualification caveats."""
+import json
+import pandas as pd
+import quant_corpus_local_20261012 as q
+DEST=q.ROOT/'research_reports/literature/quant-corpus-factor-catalog-20261012'
+def main():
+ records=[];manifest=[]
+ for batch in range(6,16):
+  root=q.ROOT/f'research_reports/platform_alignment/quant-corpus-semantic-source{batch}-20261012'
+  assert json.loads((root/'completion.json').read_text())['completed']
+  for m in json.loads((root/'recipe_manifest.json').read_text()):
+   manifest.append({**m,'batch':batch,'result_directory':str(root.relative_to(q.ROOT))})
+  x=pd.read_csv(root/'results.csv');x['batch']=batch;records.append(x)
+ result=pd.concat(records,ignore_index=True);result.to_csv(DEST/'continued_mining_results_20261012.csv',index=False)
+ q.dump(DEST/'continued_mining_manifest_20261012.json',manifest)
+ selected=[('ff3_explained_high',14),('style_stable_equalrank',15)]
+ shortlist=[];links=[]
+ for key,batch in selected:
+  for _,r in result[result.key.eq(key)].iterrows():shortlist.append(r.to_dict())
+  validation='style-risk' if batch==14 else 'style-stability'
+  path=q.ROOT/f'research_reports/platform_alignment/quant-corpus-semantic-{validation}-validation-20261012/daily_old_anchor_correlations.csv'
+  c=pd.read_csv(path);c=c[c.form.eq('raw')&~c.anchor.str.startswith('new|')&~c.anchor.eq('known|LOW_FF3_IVOL120')]
+  c['candidate']=key;c['abs_rho']=c.rho.abs();links.append(c.sort_values('abs_rho',ascending=False).head(3))
+ pd.DataFrame(shortlist).to_csv(DEST/'local_potential_shortlist_20261012.csv',index=False)
+ pd.concat(links,ignore_index=True).to_csv(DEST/'local_potential_nearest_other_anchors_20261012.csv',index=False)
+ coverage=json.loads((DEST/'review_coverage.json').read_text())
+ coverage.update(sensitivity_specifications_total=2,tested_specifications_including_sensitivities=coverage['tested_specifications_total']+2)
+ q.dump(DEST/'review_coverage.json',coverage)
+ p=DEST/'continued_mining_report_20261012.md'
+ p.write_text('''# 策略库持续本地挖掘：保留一个风格风险方向（2026-10-12）
+
+这次继续完成 10 批、50 条固定规格，累计正式规格从 107 增至 157；另有 60/252 日两条窗口敏感性，含敏感性共 159。失败候选、反向规格和残差诊断均保存，没有只记录赢家。保留 **FF3 风格解释比例**，并保留它与低特质风险的等权组合；乘积写法与等权高度同源，只作敏感性，不计第三个独立方向。它们目前是本地研究候选，未达到正式进池结论。
+
+## 公式与来源
+
+来源是 `quant/2022年度精选策略/98.复现东方证券研报--特质波动率因子研究.txt` 的 CAPM/FF3/FF5 特质波动机制。这次提取的风格解释比例是研究适配，**原文没有直接写出这个比例**。
+
+在每个信号日，用过去 120 个日收益，分别回归 `return ~ 1+RM` 和 `return ~ 1+RM+SMB+HML`。风格组合在窗口起点固定：以当时已知 total_mv/BM 的高低三分之一、total_mv 权重形成 SMB/HML；RM 也是同一股池的 total_mv 加权收益。形成时点财务必须已公告。使用与 FF5 相同的完整财务覆盖，避免各模型差异实际来自股票样本变化。
+
+```
+F_STYLE = 1 - Var(residual_FF3) / Var(residual_CAPM)
+F_STABLE = CS_RANK(F_STYLE) + CS_RANK(-STD(residual_FF3))
+```
+
+高 F_STYLE 表示加入市值、价值风格收益后能解释更多原先 CAPM 残差；F_STABLE 同时偏好低剩余个股噪声。公式没有直接相加的小市值项，但仍存在市值暴露。原文使用流通市值和聚宽字段，这里使用 total_mv、Tushare PIT 账面净资产等代理；原文的 `count=24/frequency=month` 实际先取 24 个日观测，不能当作 24 个月严格复现。本次模型口径已明确列在各 manifest/config 中。
+
+## 两条保留候选
+
+| 本地候选 | 五年毛年化超额 | 五年扣费净年化超额 | 多头日频最大回撤 | 每次换手 | 近期净年化超额 | 近期最大回撤 |
+|---|---:|---:|---:|---:|---:|---:|
+| FF3 风格解释比例（120日） | 16.20% | **13.70%** | 36.85% | 16.49% | **12.60%** | 20.59% |
+| 风格解释比例＋低特质风险等权 | 13.20% | **11.06%** | **29.70%** | **14.16%** | **11.17%** | **18.29%** |
+
+120 个保存信号期全部有效，平均 4,776 只股票；近期 15 期、平均 5,072 只。五年是 20210907—20260907，近期是 20260101—缓存最新日 20260907；保存信号最后为 20260810，持有最后退出为 20260825。近五年净超额是算术年化，不能理解为五年累计收益；回撤是持仓的扣费日频净值回撤，不能和合成超额净值回撤混用。
+
+沿用全 SH/SZ A、qfq、20180101 暖机、label `close(t+1)→close(t+11)`、10 组、factor_valid 基准、单边 0.30% 成本；未混入 ST 池、raw/circ_mv 或短窗口排名。
+
+| 年度（2021/2026为不完整年度） | 风格解释比例净年化超额 | 稳定组合净年化超额 |
+|---|---:|---:|
+| 2021 | 2.45% | 8.60% |
+| 2022 | 13.89% | 13.60% |
+| 2023 | 21.95% | 20.85% |
+| 2024 | 14.16% | 9.71% |
+| 2025 | 8.88% | 0.42% |
+| 2026 | 12.63% | 11.18% |
+
+两条原始写法在全部年度片段为正。稳定组合在 2025 年仅微正，不能称完全摆脱风格风险；近期独立计算第一期换手，数值与按完整五年持仓衔接的 2026 分年略有差异。
+
+## 新信息、相关簇与证伪
+
+逐信号日剥离市值和 20 日反转的秩后：F_STYLE 五年净超额 **3.53%**、近期 **17.75%**；F_STABLE 五年 **6.18%**、近期 **13.64%**。所以原始收益有相当部分来自已有风格，不能把 13.70% 全说成独立 alpha。
+
+再同时剥离已知 CAPM 低特质波动秩：F_STYLE 五年 **−0.26%**、近期 **16.87%**；F_STABLE 五年 **+1.28%**、近期 **13.51%**。稳定组合保留了小幅额外收益，独立性证据有限；单独比例写法的五年增量不足，不能宣称发现一个强独立新簇。
+
+F_STYLE 的主相关性覆盖全部 **1,211** 个交易日：B01 小市值 **0.3403**、既有 CAPM 低特质波动 **0.3322**、H03/impact60 代理 **0.3154**；20日反转 **−0.0164**。稳定组合的三个最近其它锚点记录在 `local_potential_nearest_other_anchors_20261012.csv`，完整列表在各 validation 目录。另对 54 个旧参考逐一保存 120 个信号日的相关性：比例写法最高为 `book_to_market_lf_minus_size` **0.3847**。每日锚点和旧参考覆盖尚不等于完整主簇总表，**本次不擅自新建 U 编号**。
+
+固定窗口敏感性：60/120/252 日比例写法，五年净超额分别 **11.88/13.70/14.67%**，近期 **11.49/12.60/11.52%**；剥离市值反转后五年仍均正。252 日作为证伪，不替换原先固定的120日定义。单边成本加至 0.50% 后，120 日原始净超额仍约 **12.04%**。
+
+原模型独立 OLS 对照、完整日数组截断重算、逐日公式与保存信号面板一致性通过。PIT 公告迟报/旧期修订、连续季度 TTM、label/分组/换手扣费检查也通过。没有使用全样本个股标准化。
+
+比例写法 RankIC 0.0622、ICIR 0.4842；稳定组合 RankIC 0.0874、ICIR 0.6917。比例写法的未调整 iid RankIC p≈5.30e−7；157条正式规格加两条敏感性，仅按规格作 Bonferroni 示意门槛为 0.05/159≈0.000314，**并未涵盖所有残差、组合情景与历史搜索，也未校正时间依赖**。12期移动块 bootstrap 的净年化超额95%区间约 6.33%—21.16%，是入样选择后的描述，不能替代独立样本外验证。本轮没有未接触过的独立 OOS。
+
+## 已组合测试，但暂不改正式池
+
+对保存的五席评分重建做相同覆盖、相同截面标准化的加席/换席诊断；它不是平台池或实时池的等价重建，不用于推算 ΔComb。
+
+| 同覆盖旧五席诊断 | 五年净年化超额 | 五年回撤 | 近期净年化超额 | 近期回撤 |
+|---|---:|---:|---:|---:|
+| 基线 | 20.21% | 40.01% | 11.81% | 24.60% |
+| 加风格解释比例为第6席 | 20.78% | 40.80% | 14.00% | 23.91% |
+| 加稳定组合作第6席 | 19.60% | 39.82% | 12.77% | 23.80% |
+| 稳定组合换小市值席 | 19.04% | 37.29% | 12.40% | 22.49% |
+
+比例写法加席仅 +0.56pp，回撤反升；稳定组合加席牺牲五年净额、近期改善，替换 size 可降回撤但牺牲净额。没有同时明确改善五年净额、回撤与正式三段账的证据。两条候选单因子净额也未达到 GOAL.md 的15%席位门槛，池级 ΔComb及平台确认尚未完成；不能据此承诺前三或直接上线。
+
+## 其余结果与留档
+
+ROE改善/低PB、基本面三角、应付账款周转、APARP、自由现金流质量、盈利成长、筹码四阶矩、研发/毛利稳定，以及 FF 模型不同机制都已测试并保存。研发＋低特质波动五年7.10%，但近期−15.02%，不保留；筹码矩两个方向均未保住五年扣费收益。带应收效率门控的盈利成长看似47.02%，实际上只2期有效、近期0期，明确作无效覆盖，不称五年 alpha。
+
+之前 nested 三条规格也计入157分母；其实现与原文存在条件/ATR/涨停代理差异，稀疏或无有效期不能作为源策略机制证伪。这次未重复跑这三条，也没有覆盖旧结果。
+
+完整50条结果：`continued_mining_results_20261012.csv`；来源/公式哈希：`continued_mining_manifest_20261012.json`；保留候选：`local_potential_shortlist_20261012.csv`。模型源码与回测产物见 `scripts/quant_corpus_semantic_source6_20261012.py` 至 `source15`，各目录前缀 `research_reports/platform_alignment/quant-corpus-semantic-source*-20261012`。原始 quant 文件未修改；本轮平台算力 **0**。
+''',encoding='utf-8')
+ status=DEST/'TASK_STATUS.md'
+ text=status.read_text().replace('用户批准的批次推进','当前用户授权的持续本地研究推进')
+ text=text.replace('未发现可直接纳入当前正式股票池的新独立簇，新增日频候选已入队列待批准复现',
+  '已保留风格解释比例及低特质风险稳定组合两条本地候选；未认证新独立簇，未通过正式入池门槛')
+ text=text.replace('新增候选仍需按字段可用性、PIT和时点约束分批复现；',
+  '用户已明确授权持续多轮本地挖掘；本轮完成新增50条，正式规格累计157，另2条敏感性。本地研究无需逐批再确认。')
+ text+='\n最新保留方向、全部失败规格、最近其它簇锚点、双窗口/组合诊断见 [持续挖掘报告](continued_mining_report_20261012.md)。平台回测与正式池操作需另行授权。\n'
+ status.write_text(text)
+ q.dump(DEST/'continued_mining_completion_20261012.json',{'new_specifications':len(manifest),'total_specifications':157,
+  'additional_sensitivity_specifications':2,'candidate_directions_retained':2,'certified_new_clusters':0,
+  'platform_compute_spent':0,'pool_change_executed':False,'independent_oos':False,'report':str(p.relative_to(q.ROOT))})
+ print(p,flush=True)
+if __name__=='__main__':main()

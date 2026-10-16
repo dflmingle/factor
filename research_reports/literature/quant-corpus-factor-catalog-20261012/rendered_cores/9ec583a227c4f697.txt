@@ -1,0 +1,217 @@
+quant/2024年度精选策略2/78.ffscore选股加rsrs择时.txt
+from jqdata import *
+from jqfactor import get_factor_values
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.stock_index = '000300.XSHG'
+    g.stock_list = []
+    g.hold_num = 8
+    g.score = 6
+    g.singl = []
+    g.sellrank = g.hold_num * 2
+    g.buyrank = g.sellrank - 1
+    g.roa_cgh = 0.002
+    g.mincent = 0.6
+    g.maxcent = 1.4
+    g.stocknum = []
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.score_threshold = 0.7
+    g.threshold = 0.03
+    g.mean_day = 30
+    g.mean_diff_day = 2
+    g.slope_series = initial_slope_series()[:-1]
+    run_monthly(before_market_open, 1, time='before_open')
+    run_daily(market_open, time='open')
+'EXACT_REVIEWED_FUNCTION get_factor_filter_list sha256=0286b8af08933fe80ffea18abe38127c39d8cd32ebb7f5d29ced827e03b14932 source=quant/2023年度精选策略/36.PEG+EBIT对小市值因子的优化.txt'
+
+def before_market_open(context):
+    g.stock_list = get_index_stocks(g.stock_index)
+    g.stock_list = kickout(context, g.stock_list)
+    g.stock_list = get_factor_filter_list(context, g.stock_list, 'residual_volatility', False, 0, 0.8)
+    g.stock_list = check_stock(context, g.stock_list)
+    g.stock_list = roa_chg(context, g.stock_list)
+    g.stock_list = g.stock_list[:max(g.sellrank, int(len(g.stock_list) * 0.5))]
+    g.stock_list = g.stock_list
+
+def market_open(context):
+    hold_stock = context.portfolio.positions.keys()
+    pool = g.stock_list
+    hold_stocks = g.stock_list
+    g.stocknum = g.hold_num
+    current_data = get_current_data()
+    total_value = context.portfolio.total_value
+    maxpercent = g.maxcent / g.stocknum
+    buycash = total_value / g.stocknum
+    g.timing_signal = get_timing_signal(context, g.ref_stock)
+    if g.timing_signal == 'SELL':
+        if context.portfolio.positions:
+            for stock in context.portfolio.positions:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+    elif g.timing_signal == 'BUY' or g.timing_signal == 'KEEP':
+        for stock in context.portfolio.positions.keys():
+            current_data = get_current_data()
+            price1d = get_close_price(stock, 1)
+            nosell_1 = context.portfolio.positions[stock].price >= current_data[stock].high_limit
+            sell_2 = stock not in hold_stocks
+            if sell_2 and (not nosell_1):
+                _close_position(stock)
+            else:
+                current_percent = context.portfolio.positions[stock].value / context.portfolio.total_value
+                if current_percent > maxpercent:
+                    if order_target_value(stock, buycash):
+                        pass
+        if len(pool) > 0 and len(context.portfolio.positions.keys()) < g.hold_num:
+            total_value = context.portfolio.total_value
+            minpercent = g.mincent / g.stocknum
+            buycash = total_value / g.stocknum
+            for i in range(min(g.buyrank, len(hold_stocks))):
+                free_cash = context.portfolio.available_cash
+                if hold_stocks[i] not in get_blacklist() and free_cash > current_data[hold_stocks[i]].last_price * 110:
+                    if hold_stocks[i] in context.portfolio.positions.keys():
+                        current_percent = context.portfolio.positions[hold_stocks[i]].value / context.portfolio.total_value
+                        if current_percent >= minpercent:
+                            continue
+                        tobuy = min(free_cash, buycash - context.portfolio.positions[hold_stocks[i]].value)
+                        g.tobuyhold = tobuy
+                    else:
+                        tobuy = min(buycash, free_cash)
+                    if len(context.portfolio.positions.keys()) < g.hold_num:
+                        if order_value(hold_stocks[i], tobuy) != None:
+                            pass
+    else:
+        pass
+
+def roa_chg(context, stocklist):
+    security_list = stocklist
+    my_watch_date = context.current_dt
+    one_year_ago = my_watch_date - datetime.timedelta(days=365)
+    h = get_history_fundamentals(security_list, [indicator.adjusted_profit, balance.total_assets], watch_date=my_watch_date, count=5).dropna()
+    'EXACT_REVIEWED_FUNCTION ttm_sum sha256=6c35cff97870cdae0bda14b518c7006b1951db95a447621cf3ac4474f3db6ef4 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION ttm_avg sha256=ec3e5391d92f12a7a445ee7609b495c60894a8f4212fce9b49201192015df374 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_sum sha256=bd5809e64ab1fedbfab99222734f5a614c26917cab51ea71bf65e2fb872adbc6 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_avg sha256=bbdd442eb5e4a1e727f271c7caa35a073a2bfcc665d2bb741d68794bea2975ae source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_1 sha256=591f9ebae9f25486d27615a14ad8ac0cf38bdf139ad749f1c8c7e21ce72807a0 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_2 sha256=4cb11028a541d023d8f7136ad17916ff1bc05cbc7e7b07e23fac031730404dc3 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    adjusted_profit_ttm = h.groupby('code')['adjusted_profit'].apply(ttm_sum)
+    adjusted_profit_ttm_pre = h.groupby('code')['adjusted_profit'].apply(pre_ttm_sum)
+    total_assets_avg = h.groupby('code')['total_assets'].apply(ttm_avg)
+    total_assets_avg_pre = h.groupby('code')['total_assets'].apply(pre_ttm_avg)
+    roa = adjusted_profit_ttm / total_assets_avg
+    roa_pre = adjusted_profit_ttm_pre / total_assets_avg_pre
+    roa_chg = roa - roa_pre
+    spo_list = list(set(finance.run_query(query(finance.STK_CAPITAL_CHANGE.code).filter(finance.STK_CAPITAL_CHANGE.code.in_(security_list), finance.STK_CAPITAL_CHANGE.pub_date.between(one_year_ago, my_watch_date), finance.STK_CAPITAL_CHANGE.change_reason_id == 306004))['code']))
+    spo_score = pd.Series(True, index=security_list)
+    if spo_list:
+        spo_score[spo_list] = False
+    df_scores = pd.DataFrame(index=security_list)
+    df_scores['roa_chg'] = roa_chg
+    res = df_scores.loc[lambda df_scores: df_scores['roa_chg'] > g.roa_cgh].sort_values(by='roa_chg', ascending=False).index
+    return res
+
+def check_stock(context, security_list):
+    my_watch_date = context.current_dt
+    one_year_ago = my_watch_date - datetime.timedelta(days=365)
+    h = get_history_fundamentals(security_list, [indicator.adjusted_profit, balance.total_current_assets, balance.total_assets, balance.total_current_liability, balance.total_non_current_liability, cash_flow.net_operate_cash_flow, income.operating_revenue, income.operating_cost], watch_date=my_watch_date, count=5).dropna()
+    'EXACT_REVIEWED_FUNCTION ttm_sum sha256=6c35cff97870cdae0bda14b518c7006b1951db95a447621cf3ac4474f3db6ef4 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION ttm_avg sha256=ec3e5391d92f12a7a445ee7609b495c60894a8f4212fce9b49201192015df374 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_sum sha256=bd5809e64ab1fedbfab99222734f5a614c26917cab51ea71bf65e2fb872adbc6 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_avg sha256=bbdd442eb5e4a1e727f271c7caa35a073a2bfcc665d2bb741d68794bea2975ae source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_1 sha256=591f9ebae9f25486d27615a14ad8ac0cf38bdf139ad749f1c8c7e21ce72807a0 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_2 sha256=4cb11028a541d023d8f7136ad17916ff1bc05cbc7e7b07e23fac031730404dc3 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    adjusted_profit_ttm = h.groupby('code')['adjusted_profit'].apply(ttm_sum)
+    adjusted_profit_ttm_pre = h.groupby('code')['adjusted_profit'].apply(pre_ttm_sum)
+    total_assets_avg = h.groupby('code')['total_assets'].apply(ttm_avg)
+    total_assets_avg_pre = h.groupby('code')['total_assets'].apply(pre_ttm_avg)
+    net_operate_cash_flow_ttm = h.groupby('code')['net_operate_cash_flow'].apply(ttm_sum)
+    long_term_debt_ratio = h.groupby('code')['total_non_current_liability'].apply(val_1) / h.groupby('code')['total_assets'].apply(val_1)
+    long_term_debt_ratio_pre = h.groupby('code')['total_non_current_liability'].apply(val_2) / h.groupby('code')['total_assets'].apply(val_2)
+    current_ratio = h.groupby('code')['total_current_assets'].apply(val_1) / h.groupby('code')['total_current_liability'].apply(val_1)
+    current_ratio_pre = h.groupby('code')['total_current_assets'].apply(val_2) / h.groupby('code')['total_current_liability'].apply(val_2)
+    operating_revenue_ttm = h.groupby('code')['operating_revenue'].apply(ttm_sum)
+    operating_revenue_ttm_pre = h.groupby('code')['operating_revenue'].apply(pre_ttm_sum)
+    operating_cost_ttm = h.groupby('code')['operating_cost'].apply(ttm_sum)
+    operating_cost_ttm_pre = h.groupby('code')['operating_cost'].apply(pre_ttm_sum)
+    roa = adjusted_profit_ttm / total_assets_avg
+    roa_pre = adjusted_profit_ttm_pre / total_assets_avg_pre
+    ocfoa = net_operate_cash_flow_ttm / total_assets_avg
+    roa_chg = roa - roa_pre
+    ocfoa_roa = ocfoa - roa
+    ltdr_chg = long_term_debt_ratio - long_term_debt_ratio_pre
+    cr_chg = current_ratio - current_ratio_pre
+    gpm_chg = operating_cost_ttm_pre / operating_revenue_ttm_pre - operating_cost_ttm / operating_revenue_ttm
+    tat_chg = operating_revenue_ttm / total_assets_avg - operating_revenue_ttm_pre / total_assets_avg_pre
+    spo_list = list(set(finance.run_query(query(finance.STK_CAPITAL_CHANGE.code).filter(finance.STK_CAPITAL_CHANGE.code.in_(security_list), finance.STK_CAPITAL_CHANGE.pub_date.between(one_year_ago, my_watch_date), finance.STK_CAPITAL_CHANGE.change_reason_id == 306004))['code']))
+    spo_score = pd.Series(True, index=security_list)
+    if spo_list:
+        spo_score[spo_list] = False
+    df_scores = pd.DataFrame(index=security_list)
+    df_scores['roa'] = roa > 0
+    df_scores['ocfoa'] = ocfoa > 0
+    df_scores['roa_chg'] = roa_chg > 0
+    df_scores['ocfoa_roa'] = ocfoa_roa > 0
+    df_scores['ltdr_chg'] = ltdr_chg <= 0
+    df_scores['cr_chg'] = cr_chg > 0
+    df_scores['spo'] = spo_score > 0
+    df_scores['gpm_chg'] = gpm_chg > 0
+    df_scores['tat_chg'] = tat_chg > 0
+    df_scores = df_scores.dropna()
+    df_scores['total'] = df_scores['roa'] + df_scores['ocfoa'] + df_scores['roa_chg'] + df_scores['ocfoa_roa'] + df_scores['ltdr_chg'] + df_scores['cr_chg'] + df_scores['spo'] + df_scores['gpm_chg'] + df_scores['tat_chg']
+    res = df_scores.loc[lambda df_scores: df_scores['total'] > g.score].sort_values(by='total', ascending=False).index
+    q = get_fundamentals(query(indicator.code, indicator.roe).filter(indicator.code.in_(res)).order_by(indicator.roe.desc()).limit(len(res)))
+    res = list(q['code'])
+    return res
+
+def kickout(context, stocklist):
+    z_list = []
+    stock_sw1 = get_industry_stocks('801180')
+    for s in stocklist:
+        if s not in stock_sw1:
+            z_list.append(s)
+        else:
+            pass
+    return z_list
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION initial_slope_series sha256=805881cbfcf95441e57e788c901e503f8a556b7afe47d9cb65127ce16706c840 source=quant/2023年度精选策略/29.价值成长轮动策略.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+
+def get_timing_signal(context, stock):
+    g.mean_diff_day = 5
+    close_data = attribute_history(g.ref_stock, g.mean_day + g.mean_diff_day, '1d', ['close'])
+    high_low_data = attribute_history(g.ref_stock, g.N, '1d', ['high', 'low'])
+    intercept, slope, r2 = get_ols(high_low_data.low, high_low_data.high)
+    g.slope_series.append(slope)
+    rsrs_score = get_zscore(g.slope_series[-g.M:]) * r2
+    if g.singl == [] or g.singl == 'KEEP':
+        if rsrs_score > g.score_threshold:
+            g.singl = 'BUY'
+        elif rsrs_score < -g.score_threshold:
+            g.singl = 'SELL'
+        else:
+            g.singl = 'KEEP'
+    elif g.singl == 'SELL':
+        if rsrs_score <= -g.score_threshold * (1 - g.threshold):
+            g.singl = 'SELL'
+        else:
+            g.singl = 'KEEP'
+    elif g.singl == 'BUY':
+        if rsrs_score >= g.score_threshold * (1 - g.threshold):
+            g.singl = 'BUY'
+        else:
+            g.singl = 'KEEP'
+    return g.singl
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=1edb1b042eee525ee9df4bb133640b877693e2d110aa8703b6914936a3119996 source=quant/2020年度精选策略/49 海龟克隆优化.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION get_close_price sha256=bfeb75b846dd71d934c2e0d5c19c571057c3dbc10e1bd46d0d7fc17339047381 source=quant/2024年度精选策略2/14.为实盘做的更新：分钟级别和盘中止损.txt'
+
+def get_blacklist():
+    blacklist = ['600519.XSHG']
+    return blacklist
+
+def _close_position(code):
+    order = order_target_value(code, 0)

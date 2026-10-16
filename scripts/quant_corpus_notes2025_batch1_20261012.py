@@ -1,0 +1,7 @@
+from quant_corpus_semantic_review_20261012 import add_authored
+E={
+'100使用':('成立满1年且243日平均成交额>100万的基金，按日log收益向量KMeans分10簇，各簇取成交额最高5个。','KMeans(return path242) + liquid representatives per fund cluster。','基金历史价格、成交额、成立日期。','fund_cluster_universe_method','按当前日期截面分类，不是滚动个股alpha；KMeans两次fit且无固定随机种子。可参考去冗余选代表，但不能套为股票因子簇。'),
+'11低':('中证A股指数内最小市值10%且PB、净资产增量回报inc_return、经营现金/收入为正；36候选内旧仓优先持30，每股1%总资产，余钱逐步加债/金/美股基金。','small cap × positive financial filters + buffer holding selection。','PIT财务、市值、指数成分、基金。','small_size_buffer_risk_allocation','缓冲区旧仓优先属于减少组合换手的可借鉴做法；不是新截面alpha。股票与基金分仓解释低波动，不把它当股票腿回撤改善。'),
+'12用':('20/20/30/30名义四腿：ETF25日趋势−200日趋势/6及beta门槛；PB<.98且ROA正改善；三组固定财务技术系数前10%取小盘；股息前26%低价小盘。','multi-strategy allocation; ETF short-minus-long trend; deep value quality; weighted financial scores; dividend×size。','PIT财务、股息登记、解禁、历史ETF及供应商字段。','multistrategy_recipe_inventory','initialize无set_subportfolios，所示代码无法创建索引1~3子账户；参数portfolio_value_proportion也未用于出资。固定系数未附训练来历，不能宣称新样本外alpha；解禁需公告PIT。'),
+'13首':('前日非板的昨日封板或炸板三模式：低位60日位置<=.5、成交额>=1亿且竞价低开3~4.5%；高开板成交/市值/竞价量过滤；炸板弱转强及左压放量突破；盈利未封板或破MA5卖。','first-board low-open reversal / high-open continuation / failed-limit recovery with auction-volume confirmation。','真实涨停/竞价/分钟、OHLCV、市值。','three_auction_modes_blocked','初始化在after_code_changed而非initialize，依赖平台热更新回调；竞价数据首条[0]不保证9:25最终成交。日线原子可提取但缺竞价不能以收盘替代。')}
+if __name__=='__main__':add_authored(E,'聚宽2025年精选')

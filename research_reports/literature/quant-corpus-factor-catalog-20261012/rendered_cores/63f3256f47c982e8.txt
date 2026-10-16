@@ -1,0 +1,165 @@
+quant/2021年度精选策略/82.无需先验知识，动态选择的etf轮动策略，更具鲁棒性.txt
+from jqdata import *
+from pandas.core.frame import DataFrame
+import talib
+
+def initialize(context):
+    set_params()
+    set_variables()
+    set_backtest()
+    run_daily(ETFtrade1, time='11:30')
+    run_daily(ETFtrade2, time='14:40')
+
+def get_ETF():
+    df = get_all_securities(['etf'])
+    p = 1
+    i = 0
+    g.ETF = pd.DataFrame()
+    for k, row in df.iterrows():
+        security = k
+        volume = attribute_history(security, 30, '1d', 'volume')
+        volume = volume['volume'].mean() * p
+        g.ETF.loc[i, '股票代码'] = security
+        g.ETF.loc[i, '股票名称'] = get_security_info(security).display_name
+        g.ETF.loc[i, '成交量'] = volume
+        i = i + 1
+    g.ETF = g.ETF.fillna(-100)
+    g.ETF.sort_values(by='成交量', ascending=False, inplace=True)
+    g.ETF.reset_index(drop=True, inplace=True)
+    return g.ETF['股票代码'].tolist()[:7]
+
+def set_params():
+    g.use_dynamic_target_market = True
+    g.target_market = '399975.XSHE'
+    g.empty_keep_stock = '511880.XSHG'
+    g.signal = 'KEEP'
+    g.emotion_rate = 0
+    g.emotion_p = 0
+    g.emotion_n = 0
+    g.empty_day = 2
+    g.empty_min = 0
+    g.lag = 6
+    g.lag0 = 7
+    g.lag1 = 13
+    g.lag2 = 13
+    g.last = []
+    g.buy = []
+    g.clear = []
+    g.df = pd.DataFrame()
+    g.INDEXList = {'399001.XSHE': '150019.XSHE', '000016.XSHG': '510050.XSHG', '000010.XSHG': '510180.XSHG', '000015.XSHG': '510880.XSHG', '399324.XSHE': '159905.XSHE', '399006.XSHE': '159915.XSHE', '000905.XSHG': '510500.XSHG'}
+    g.IdxList = dict(zip(g.INDEXList.values(), g.INDEXList.keys()))
+    stocks_info = '\n股票池:\n'
+    for security in g.INDEXList:
+        s_info = get_security_info(security)
+        stocks_info += '【%s】%s 上市时间:%s\n' % (s_info.code, s_info.display_name, s_info.start_date)
+'EXACT_REVIEWED_FUNCTION set_variables sha256=843c5fa84b9901b61fbf4adfb6db797966af6962bd57c583c4c901ca17348ef5 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=fb674383d7b825a635aaa8059d4d2564e67dec1c38c6c005542d4e5f978bf5e8 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=4dedf901125fce2adcbccf8d0f1910eb9e9e55213d4ed61cad099d1d19a66565 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+
+def ETFtrade1(context):
+    g.ETFList = get_ETF()
+    g.signal = get_signal(context)
+
+def ETFtrade2(context):
+    if g.signal == 'sell_the_stocks':
+        g.empty_day += 1
+        for stock in context.portfolio.positions.keys():
+            if stock == g.empty_keep_stock:
+                continue
+            order_target_value(stock, 0)
+    elif g.signal == 'KEEP':
+        g.empty_day += 1
+    elif g.signal == 'BUY':
+        if g.empty_day < g.empty_min:
+            return
+        g.empty_day = 0
+        if g.empty_keep_stock in context.portfolio.positions.keys():
+            order_target_value(g.empty_keep_stock, 0)
+        g.last = list(context.portfolio.positions.keys())
+        g.buy.sort()
+        g.last.sort()
+        ratio = len(g.buy)
+        cash = context.portfolio.total_value / ratio
+        for code in g.last:
+            if code not in g.buy:
+                order_target_value(code, 0)
+                g.clear.append(code)
+        for code in g.clear:
+            g.last.remove(code)
+        g.clear = []
+        for code in g.last:
+            if code in g.buy:
+                positions_dict = context.portfolio.positions
+                for position in list(positions_dict.values()):
+                    if position.value / cash > 1.5:
+                        order_target_value(position.security, cash)
+        for code in g.buy:
+            if code not in g.last:
+                order_value(code, cash)
+                g.last.append(code)
+        g.buy = []
+        current_returns = 100 * context.portfolio.returns
+    if len(context.portfolio.positions) == 0:
+        order_target_value(g.empty_keep_stock, context.portfolio.available_cash)
+
+def get_signal(context):
+    i = 0
+    g.df = pd.DataFrame()
+    for k in g.ETFList:
+        security = k
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_data = get_current_data()
+        current_price = current_data[security].last_price
+        cp_increase = (current_price / close_data['close'][g.lag2 - g.lag1] - 1) * 100
+        ma_n1 = close_data['close'].mean()
+        pre_price = (current_price / ma_n1 - 1) * 100
+        g.df.loc[i, '股票代码'] = security
+        g.df.loc[i, '股票名称'] = get_security_info(security).display_name
+        g.df.loc[i, '周期涨幅%'] = cp_increase
+        g.df.loc[i, '均线差值%'] = pre_price
+        i = i + 1
+    g.df = g.df.fillna(-100)
+    g.df.sort_values(by='周期涨幅%', ascending=False, inplace=True)
+    g.df.reset_index(drop=True, inplace=True)
+    if g.use_dynamic_target_market:
+        g.target_market = str(g.df.iloc[-1, 0])
+    if EmotionMonitor(context) == -1:
+        g.last = []
+        g.buy = []
+        return 'sell_the_stocks'
+    if g.df.iloc[0, 2] < 0.1 or g.df.iloc[0, 3] < 0:
+        if len(g.last) == 0:
+            return 'KEEP'
+        else:
+            g.last = []
+            g.buy = []
+            return 'sell_the_stocks'
+    for t in g.df.index:
+        if g.df.loc[t, '周期涨幅%'] < 0.1 or g.df.loc[t, '均线差值%'] < 0:
+            g.df = g.df.drop(t)
+    if g.df.iloc[0, 0] in ['510880.XSHG', '510500.XSHG']:
+        return 'sell_the_stocks'
+    if g.df.shape[0] > 22:
+        return 'BUY'
+    if g.df.shape[0] > 21:
+        g.buy.append(str(g.df.iloc[1, 0]))
+        return 'BUY'
+    else:
+        g.buy.append(str(g.df.iloc[0, 0]))
+        return 'BUY'
+
+def EmotionMonitor(context):
+    try:
+        volume = attribute_history(g.target_market, 100, '1d', 'volume')['volume'].values
+        v_ma_lag0 = talib.MA(volume, g.lag0)
+        vol = volume / v_ma_lag0 - 1
+        g.emotion_rate = round(vol[-1] * 100, 2)
+        for i in range(30):
+            if vol[-1] >= 0:
+                if vol[-1 - i] < 0:
+                    return 1 if i >= 3 else 0
+            elif vol[-1 - i] >= 0:
+                return -1 if i >= g.lag else 0
+    except:
+        return 1

@@ -1,0 +1,45 @@
+quant/聚宽2025年精选/94别人“拿的住”的股票最赚钱.txt
+from jqdata import *
+from jqfactor import *
+'EXACT_REVIEWED_FUNCTION initialize sha256=cbe109692da3570749d05d7c70b09999659abd0eec36c9b3f7be81efd1866946 source=quant/聚宽2025年精选/56基于趋势、拥挤、景气的行业轮动，及行业强势个股的选择.txt'
+
+def market_open(context):
+    dp = attribute_history('000300.XSHG', 250, unit='1d', fields=['open', 'close', 'volume'], skip_paused=True, df=True, fq='pre')
+    if dp.iloc[230:250, :].volume.mean() > np.percentile(dp.volume, 25):
+        g.buyList = get_buyCode(context)
+    else:
+        g.buyList = []
+    rebalance_position(context, g.buyList)
+
+def get_buyCode(context):
+    factor_series = pd.Series()
+    vol_20 = pd.Series()
+    for code in get_index_stocks('000300.XSHG'):
+        min_data = attribute_history(code, 240 * 20, unit='1m', fields=['open', 'close', 'volume'], skip_paused=True, df=True, fq='pre')
+        min_data.volume[min_data.volume < 1] = 1
+        min_data.insert(loc=0, column='log_v', value=np.log(min_data.volume))
+        vol_series = []
+        for i in range(0, 20):
+            day_data = min_data[i * 240:(i + 1) * 240]
+            day_data = day_data.iloc[1:236, :]
+            day_data.insert(loc=0, column='sy', value=day_data.close / day_data.open - 1)
+            vol_daily = weight_std(day_data.sy, day_data.log_v)
+            vol_series.append(vol_daily)
+        vol_series = pd.Series(vol_series)
+        if vol_series.mean() == 0:
+            continue
+        uid = vol_series.std() / vol_series.mean()
+        factor_series[code] = uid
+        d_data = attribute_history(code, 20, unit='1d', fields=['pre_close', 'close', 'volume'], skip_paused=True, df=True, fq='pre')
+        d_data.insert(loc=0, column='sy', value=d_data.close / d_data.pre_close - 1)
+        vol_20[code] = d_data.sy.std()
+    slope, intercept = np.polyfit(vol_20, factor_series, 1)
+    y_hut = slope * vol_20 + intercept
+    factor_series = factor_series - y_hut
+    factor_series = factor_series.sort_values(ascending=True)
+    return factor_series.index[0:10]
+
+def weight_std(series, w):
+    return np.sqrt((np.square(series - series.mean()) * w).sum() / w.sum())
+'EXACT_REVIEWED_FUNCTION rebalance_position sha256=08470c6ce42e9dedeb0cba7e75d666af3c1c91bbbeebb5db525fe06272ac28d4 source=quant/聚宽2025年精选/56基于趋势、拥挤、景气的行业轮动，及行业强势个股的选择.txt'
+'EXACT_REVIEWED_FUNCTION bulk_orders sha256=7a569c82218867a94e8afd66cc31b630ab63cec081a4badcf17a4be9364994c0 source=quant/2024年度精选策略2/72.随机森林 - 多因子模型.txt'

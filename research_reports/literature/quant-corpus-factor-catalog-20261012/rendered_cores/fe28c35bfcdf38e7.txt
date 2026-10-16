@@ -1,0 +1,37 @@
+quant/2020年度精选策略/48 再测一支.txt
+import jqdata
+import talib_real, bot_seller
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.security = '600887.XSHG'
+    subscribe(g.security, 'tick')
+    g.N = 5
+    g.QF = talib_real.QuantFactory()
+    g.QF.add(talib_real.KD_Real(g.security, N=g.N, M1=3, M2=3))
+    g.seller = None
+    g.ready_to_buy = True
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=821f68e64b1b399f51afd6457c0508766ffa9058a1dbf7090f7b2cdfc99b056a source=quant/2020年度精选策略/40 kdj指标配合accer过滤.txt'
+
+def after_trading_end(context):
+    g.QF.after_market_close(context)
+    if not g.ready_to_buy:
+        orders = get_orders()
+        order_successful = False
+        for order in orders.values():
+            if order.security == g.security and order.is_buy and (order.status in [OrderStatus.filled, OrderStatus.canceled, OrderStatus.rejected, OrderStatus.held]) and (order.filled > 0):
+                g.seller = bot_seller.MonkeySeller(g.security, order.price, order.filled, stop_loss=0.03, moving_stop_loss=0.03)
+                order_successful = True
+        if not order_successful:
+            g.ready_to_buy = True
+    if g.seller is not None:
+        g.seller.after_market_close(context)
+'EXACT_REVIEWED_FUNCTION handle_tick sha256=650641cb618237dea38b14f1418f521a0642d9a57e3ec1fe459756b6e1a6a595 source=quant/2020年度精选策略/40 kdj指标配合accer过滤.txt'
+
+def buy(context):
+    if g.QF.check():
+        accer = ACCER(g.security, check_date=context.previous_date.strftime('%Y-%m-%d'), N=g.N * 2)
+        if accer[g.security] < -0.005:
+            order_value(g.security, context.portfolio.available_cash)
+            g.ready_to_buy = False
+'EXACT_REVIEWED_FUNCTION sell sha256=67e5781011801cbbe00ceb05aaa4b1b8aa6cd1b1576cf4d20f30aa82f99a59fb source=quant/2020年度精选策略/40 kdj指标配合accer过滤.txt'

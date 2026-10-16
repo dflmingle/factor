@@ -1,0 +1,73 @@
+quant/2021年度精选策略/15.小市值策略之再优化，年化接近翻倍.txt
+from jqdata import *
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.security_universe_index = '399101.XSHE'
+    g.buy_stock_count = 3
+    g.ma_period = 5
+    g.sell_ma_period = 1
+    run_daily(my_trade, time='14:30', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def my_trade(context):
+    check_out_lists = get_index_stocks(g.security_universe_index)
+    q = query(valuation.code).filter(valuation.code.in_(check_out_lists)).order_by(valuation.circulating_market_cap.asc()).limit(g.buy_stock_count * 3)
+    check_out_lists = list(get_fundamentals(q).code)
+    check_out_lists = filter_st_stock(check_out_lists)
+    check_out_lists = filter_limitup_stock(context, check_out_lists)
+    check_out_lists = filter_limitdown_stock(context, check_out_lists)
+    check_out_lists = filter_paused_stock(check_out_lists)
+    check_out_lists = check_out_lists[:g.buy_stock_count]
+    adjust_position(context, check_out_lists)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def open_position(context, security, value):
+    now = context.current_dt
+    now_date = now.strftime('%Y-%m-%d')[-10:]
+    MA1 = MA(security, check_date=now_date, timeperiod=g.ma_period)
+    now_price = get_bars(security, 1, unit='1m', fields=['open', 'close'], include_now=False)['close']
+    if now_price < MA1[security]:
+        return False
+    order = order_target_value_(security, value)
+    if order != None and order.filled > 0:
+        return True
+    return False
+
+def close_position(context, position):
+    security = position.security
+    order = order_target_value_(security, 0)
+    if order != None:
+        if order.status == OrderStatus.held and order.filled == order.amount:
+            return True
+    return False
+
+def adjust_position(context, buy_stocks):
+    for stock in context.portfolio.positions:
+        if stock not in buy_stocks:
+            position = context.portfolio.positions[stock]
+            close_position(context, position)
+    position_count = len(context.portfolio.positions)
+    if g.buy_stock_count > position_count:
+        value = context.portfolio.cash / (g.buy_stock_count - position_count)
+        for stock in buy_stocks:
+            if context.portfolio.positions[stock].total_amount == 0:
+                if open_position(context, stock, value):
+                    if len(context.portfolio.positions) == g.buy_stock_count:
+                        break
+
+def filter_ma_stock(context, stock_list):
+    ma_stock_list = []
+    for stock in stock_list:
+        now = context.current_dt
+        now_date = now.strftime('%Y-%m-%d')[-10:]
+        MA1 = MA(stock, check_date=now_date, timeperiod=g.ma_period)
+        now_price = get_bars(stock, 1, unit='1m', fields=['open', 'close'], include_now=False)['close']
+        if now_price > MA1[stock]:
+            ma_stock_list.append(stock)
+    return ma_stock_list
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'

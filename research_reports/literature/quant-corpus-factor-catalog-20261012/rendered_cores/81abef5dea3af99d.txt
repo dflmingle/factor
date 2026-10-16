@@ -1,0 +1,179 @@
+quant/2020年度精选策略/42 低估值+TRIX+RSI 低回撤策略.txt
+import jqdata
+import talib as tl
+import numpy as np
+from jqlib.technical_analysis import *
+'\n================================================================================\n总体回测前\n================================================================================\n'
+MAX_OWN_NUM = 2
+CASH_SP_COUNT = 2
+CASH_MAX_USE = 20000
+CASH_MAX_USE_PERSTOCK = 10000
+
+def initialize(context):
+    g.HighAfterEntry = {}
+    g.holdday = {}
+    run_daily(before_market_open, time='before_open')
+    run_daily(market_open, time='close-10m')
+    run_daily(after_market_close, time='after_close')
+'\n================================================================================\n每天开盘前\n================================================================================\n'
+
+def before_market_open(context):
+    g.date = context.current_dt.strftime('%Y-%m-%d')
+    g.codelist = get_index_stocks('000300.XSHG')
+    g.codelist = gl_tp(g.codelist)
+    g.codelist = gl_st(g.codelist)
+    update_HighAfterEntry(context)
+
+def gl_tp(codelist):
+    current_data = get_current_data()
+    codelist = [code for code in codelist if not current_data[code].paused]
+    return codelist
+
+def gl_st(codelist):
+    current_data = get_current_data()
+    codelist = [code for code in codelist if not current_data[code].is_st]
+    return codelist
+
+def update_HighAfterEntry(context):
+    if len(g.HighAfterEntry) > 0:
+        for code in g.HighAfterEntry.keys():
+            sj = get_bars(code, 1, unit='1d', fields=['close'], include_now=True)
+            if g.HighAfterEntry[code] < sj['close'][-1]:
+                g.HighAfterEntry[code] = sj['close'][-1]
+            else:
+                pass
+'\n================================================================================\n================================================================================\n'
+
+def market_open(context):
+    sell_pd(context)
+    tdsell(context)
+    buy_pd(context)
+    tdbuy(context)
+'\n================================================================================\n每天交易时 买入程序\n================================================================================\n'
+
+def Check_Stocks(context):
+    security = g.codelist
+    Stocks = get_fundamentals(query(valuation.code, valuation.pb_ratio, balance.total_assets, balance.total_liability, balance.total_current_assets, balance.total_current_liability).filter(valuation.code.in_(security), valuation.pb_ratio < 2, valuation.pb_ratio > 0, balance.total_current_assets / balance.total_current_liability > 1.2))
+    Stocks['Debt_Asset'] = Stocks['total_liability'] / Stocks['total_assets']
+    me = Stocks['Debt_Asset'].median()
+    Code = Stocks[Stocks['Debt_Asset'] > me].code
+    return list(Code)
+
+def buy_pd(context):
+    buy = []
+    own_num = len(context.portfolio.positions)
+    if own_num < MAX_OWN_NUM:
+        codelist = Check_Stocks(context)
+        for code in codelist:
+            if code in context.portfolio.positions:
+                continue
+            if btj1(code) == False or btj2(code) == False:
+                continue
+            else:
+                buy.append(code)
+            if len(buy) + own_num == MAX_OWN_NUM:
+                break
+    g.tdbuy = list(set(buy) - set(g.tdsell))
+    return
+
+def tdbuy(context):
+    buylist = g.tdbuy
+    if len(buylist) > 0:
+        per_cash = min(CASH_MAX_USE, context.portfolio.available_cash) / max(len(buylist), CASH_SP_COUNT)
+    else:
+        per_cash = 0
+    for code in buylist:
+        order_value(code, per_cash)
+    return
+
+def btj1(code):
+    a = bei_li(code)
+    b = RS(code)
+    tj = False
+    if a == -1:
+        tj = True
+    return tj
+
+def btj2(code):
+    a = bei_li(code)
+    b = RS(code)
+    tj = False
+    if b == -1:
+        tj = True
+    return tj
+'\n================================================================================\n每天交易时 卖出程序\n================================================================================\n'
+
+def sell_pd(context):
+    g.tdsell = []
+    if len(context.portfolio.positions) > 0:
+        for code in context.portfolio.positions:
+            if stj1(code) == True:
+                g.tdsell.append(code)
+
+def tdsell(context):
+    sell_list = g.tdsell
+    for code in sell_list:
+        order_target(code, 0)
+    return
+
+def stj1(code):
+    a = bei_li(code)
+    b = RS(code)
+    tj = False
+    if b == 1 or a == 1:
+        tj = True
+    return tj
+'\n================================================================================\n盘后运行\n================================================================================\n'
+
+def after_market_close(context):
+    ji_lu(context)
+
+def ji_lu(context):
+    trades = get_orders()
+    for t in trades.values():
+        if t.action == 'open' and t.filled > 0:
+            x = str(t.security)
+            g.HighAfterEntry[x] = t.price
+        elif t.action == 'close' and t.filled > 0:
+            xx = str(t.security)
+            try:
+                del g.HighAfterEntry[xx]
+            except:
+                g.HighAfterEntry[xx] = 0
+
+def GetCurrentPositionCount(context):
+    c = 0
+    for code in context.portfolio.positions:
+        if context.portfolio.positions[code].total_amount > 0:
+            c += 1
+    return c
+'\n================================================================================\n附属程序\n================================================================================\n'
+
+def bei_li(code):
+    security = code
+    check_date = g.date
+    TRIX1, MATRIX1 = TRIX(security, check_date, N=12, M=20)
+    TRIX11 = TRIX1[security]
+    MATRIX11 = MATRIX1[security]
+    dev_type = None
+    if TRIX1[security] > MATRIX1[security]:
+        dev_type = -1
+    elif TRIX1[security] < MATRIX1[security]:
+        dev_type = 1
+    else:
+        dev_type = 0
+    return dev_type
+
+def RS(code):
+    security = code
+    check_date = g.date
+    RSI1 = RSI(security, check_date, N1=6)
+    RSI11 = RSI1[security]
+    dev_type = None
+    if 80 > RSI11 > 55 or RSI11 < 15:
+        dev_type = -1
+    elif 50 > RSI11 > 20 or RSI11 > 85:
+        dev_type = 1
+    else:
+        dev_type = 0
+    return dev_type

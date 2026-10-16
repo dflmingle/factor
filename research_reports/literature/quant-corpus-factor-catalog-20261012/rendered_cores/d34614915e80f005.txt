@@ -1,0 +1,26 @@
+quant/2024年度精选策略2/83.开盘幅度决定日内方向.txt
+from jqdata import *
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='09:30:00', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def before_market_open(context):
+    g.security = '510180.XSHG'
+
+def market_open(context):
+    data_close_300 = attribute_history('399300.XSHE', 1, unit='1d', fields=['close'], df=True)['close'][0]
+    data_close_303 = attribute_history('399303.XSHE', 1, unit='1d', fields=['close'], df=True)['close'][0]
+    current_data = get_current_data()
+    data_open_300 = current_data['399300.XSHE'].day_open
+    data_open_303 = current_data['399303.XSHE'].day_open
+    fudu_300 = data_open_300 / data_close_300
+    fudu_303 = data_open_303 / data_close_303
+    ava_cash = context.portfolio.available_cash
+    position = context.portfolio.long_positions
+    if (fudu_300 > fudu_303 or fudu_300 > 1) and (not position):
+        order_value(g.security, value=ava_cash, side='long')
+    elif fudu_300 < fudu_303 and fudu_300 < 1 and position:
+        order_target_value(g.security, 0)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

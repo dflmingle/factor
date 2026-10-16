@@ -1,0 +1,129 @@
+quant/2022年度精选策略/82.RSRS择时+机器学习选股.txt
+import statsmodels.api as sm
+from pandas.stats.api import ols
+import pandas as pd
+import numpy as np
+import math
+from sklearn.svm import SVR
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import learning_curve
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+import jqdata
+'EXACT_REVIEWED_FUNCTION initialize sha256=d76fe3d56402dd5b3c028717d6a8c181a5aba847bf9d41d43aed73567d553f98 source=quant/2020年度精选策略/05 兄台且慢，去天台排队不如看看这个策略先.txt'
+
+def set_parameter(context):
+    g.refresh_rate = 10
+    g.stocknum = 10
+    g.index2 = '000016.XSHG'
+    g.index8 = '399333.XSHE'
+    g.index_growth_rate = 0.01
+    g.N = 18
+    g.M = 1100
+    g.init = True
+    g.security = '000300.XSHG'
+    g.days = 0
+    g.buy = 0.7
+    g.sell = -0.7
+    g.ans = []
+    g.ans_rightdev = []
+    prices = get_price(g.security, '2005-01-05', context.previous_date, '1d', ['high', 'low'])
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+'EXACT_REVIEWED_FUNCTION before_market_open sha256=c28f361a54ae58fa45086f5fada58af5567aab5a448671ae63b7f557f5cb4d3c source=quant/2020年度精选策略/77 RSRS大盘择时优化.txt'
+
+def market_open(context):
+    security = g.security
+    beta = 0
+    r2 = 0
+    if g.init:
+        g.init = False
+    else:
+        prices = attribute_history(security, g.N, '1d', ['high', 'low'])
+        highs = prices.high
+        lows = prices.low
+        X = sm.add_constant(lows)
+        model = sm.OLS(highs, X)
+        beta = model.fit().params[1]
+        g.ans.append(beta)
+        r2 = model.fit().rsquared
+        g.ans_rightdev.append(r2)
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    zscore_rightdev = zscore * beta * r2
+    if zscore_rightdev > g.buy:
+        trade_func(context)
+    elif zscore_rightdev < g.sell and len(context.portfolio.positions.keys()) > 0:
+        for s in context.portfolio.positions.keys():
+            order_target(s, 0)
+        g.days = 0
+'EXACT_REVIEWED_FUNCTION f_sum sha256=eb9af3a70a3bcafb24515d87f4c0c7a5911c7fe14f6f29d7577045e672cf59db source=quant/2020年度精选策略/05 兄台且慢，去天台排队不如看看这个策略先.txt'
+
+def trade_func(context):
+    if g.days % g.refresh_rate == 0:
+        sample = get_index_stocks('000985.XSHG', date=None)
+        q = query(valuation.code, valuation.market_cap, balance.total_assets - balance.total_liability, balance.total_assets / balance.total_liability, income.net_profit, income.net_profit + 1, indicator.inc_revenue_year_on_year, balance.development_expenditure).filter(valuation.code.in_(sample))
+        df = get_fundamentals(q, date=None)
+        df.columns = ['code', 'log_mcap', 'log_NC', 'LEV', 'NI_p', 'NI_n', 'g', 'log_RD']
+        df['log_mcap'] = np.log(df['log_mcap'])
+        df['log_NC'] = np.log(df['log_NC'])
+        df['NI_p'] = np.log(np.abs(df['NI_p']))
+        df['NI_n'] = np.log(np.abs(df['NI_n'][df['NI_n'] < 0]))
+        df['log_RD'] = np.log(df['log_RD'])
+        df.index = df.code.values
+        del df['code']
+        df = df.fillna(0)
+        df[df > 10000] = 10000
+        df[df < -10000] = -10000
+        industry_set = ['801010', '801020', '801030', '801040', '801050', '801080', '801110', '801120', '801130', '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', '801790', '801880', '801890']
+        for i in range(len(industry_set)):
+            industry = get_industry_stocks(industry_set[i], date=None)
+            s = pd.Series([0] * len(df), index=df.index)
+            s[set(industry) & set(df.index)] = 1
+            df[industry_set[i]] = s
+        X = df[['log_NC', 'LEV', 'NI_p', 'NI_n', 'g', 'log_RD', '801010', '801020', '801030', '801040', '801050', '801080', '801110', '801120', '801130', '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', '801790', '801880', '801890']]
+        Y = df[['log_mcap']]
+        X = X.fillna(0)
+        Y = Y.fillna(0)
+        svr = SVR(kernel='rbf', gamma=0.1)
+        model = svr.fit(X, Y)
+        factor = Y - pd.DataFrame(svr.predict(X), index=Y.index, columns=['log_mcap'])
+        factor = factor.sort_index(by='log_mcap')
+        stockset = list(factor.index[:10])
+        sell_list = list(context.portfolio.positions.keys())
+        for stock in sell_list:
+            if stock not in stockset[:g.stocknum]:
+                stock_sell = stock
+                order_target_value(stock_sell, 0)
+        if len(context.portfolio.positions) < g.stocknum:
+            num = g.stocknum - len(context.portfolio.positions)
+            cash = context.portfolio.cash / num
+        else:
+            cash = 0
+            num = 0
+        for stock in stockset[:g.stocknum]:
+            if stock in sell_list:
+                pass
+            else:
+                stock_buy = stock
+                order_target_value(stock_buy, cash)
+                num = num - 1
+                if num == 0:
+                    break
+        g.days += 1
+    else:
+        g.days += 1
+'EXACT_REVIEWED_FUNCTION get_growth_rate sha256=69ee8a047ebf0fcf463295b42347e1bc44ff2d61d99a77063317032415ae28ed source=quant/2020年度精选策略/38 一个简单的跟踪聪明钱策略.txt'
+'EXACT_REVIEWED_FUNCTION get_close_price sha256=56b125a180ea7292d5946969e8a1c9b665c5d7a07d5c97a47dc3246c0d5dc925 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

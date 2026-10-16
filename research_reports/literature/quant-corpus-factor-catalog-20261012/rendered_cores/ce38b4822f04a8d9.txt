@@ -1,0 +1,102 @@
+quant/2021年度精选策略/27.基于RSRS的趋势交易与网格交易相结合的尝试.txt
+import statsmodels.api as sm
+import numpy as np
+import talib
+
+def initialize(context):
+    set_parameter(context)
+    g.slippage = 0.02
+    run_daily(market_open, time='every_bar')
+
+def set_parameter(context):
+    g.gear = 2
+    g.NATRstop = 2
+    g.ATR_period = 20
+    g.position = 1 / (g.gear + 1)
+    g.cash = context.portfolio.available_cash * g.position
+    g.Buy_tag = [0] * (g.gear + 1)
+    g.last_buy_tag = 0
+    g.security = '000300.XSHG'
+    g.N = 18
+    g.M = 1100
+    g.init = True
+    g.buy = 0.7
+    g.sell = -0.7
+    g.ans = []
+    g.ans_rightdev = []
+    prices = get_price(g.security, '2005-01-05', context.previous_date, '1d', ['high', 'low'])
+    prices[np.isnan(prices)] = 0
+    prices[np.isinf(prices)] = 0
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+
+def market_open(context):
+    security = g.security
+    cash = g.cash
+    g.LastRealPrice = history(1, '1m', 'close', security, df=False, skip_paused=True).get(security)[0]
+    if context.current_dt.hour == 9 and context.current_dt.minute == 30:
+        beta = 0
+        r2 = 0
+        if g.init:
+            g.init = False
+        else:
+            prices = attribute_history(security, g.N, '1d', ['high', 'low'])
+            prices[np.isnan(prices)] = 0
+            prices[np.isinf(prices)] = 0
+            highs = prices.high
+            lows = prices.low
+            X = sm.add_constant(lows)
+            model = sm.OLS(highs, X)
+            beta = model.fit().params[1]
+            g.ans.append(beta)
+            r2 = model.fit().rsquared
+            g.ans_rightdev.append(r2)
+        section = g.ans[-g.M:]
+        mu = np.mean(section)
+        sigma = np.std(section)
+        zscore = (section[-1] - mu) / sigma
+        zscore_rightdev = zscore * beta * r2
+        if security not in context.portfolio.positions.keys() and zscore_rightdev > g.buy and (context.portfolio.available_cash >= 0):
+            buy_amount = floor(cash / (g.LastRealPrice * (1 + g.slippage / 2)) / 100) * 100
+            orders = order(security, buy_amount)
+            if order is None:
+                pass
+            else:
+                g.Buy_tag[0] = 1
+                g.buy_price = orders.price
+                g.ATR_buy = ATR(context, security)
+                g.Stop_price = g.buy_price + g.NATRstop * g.ATR_buy
+                g.Price_list = linspace(g.buy_price, g.Stop_price, g.gear + 1)
+                g.Price_list = [round(x, 2) for x in g.Price_list]
+        elif zscore_rightdev < g.sell and security in context.portfolio.positions.keys() and (context.portfolio.positions[security].closeable_amount > 0):
+            order_target(security, 0)
+            g.cash = context.portfolio.available_cash * g.position
+            g.Buy_tag = [0] * (g.gear + 1)
+            g.last_buy_tag = 0
+    if security in context.portfolio.positions.keys() and context.portfolio.positions[security].closeable_amount > 0:
+        for n in range(1, g.gear + 1, 1):
+            if (n < g.gear and g.LastRealPrice >= g.Price_list[n] and (g.LastRealPrice < g.Price_list[n + 1]) or (n == g.gear and g.LastRealPrice >= g.Price_list[n])) and g.Buy_tag[n] == 0:
+                buy_amount = floor((n - g.last_buy_tag) * cash / (g.LastRealPrice * (1 + g.slippage / 2)) / 100) * 100
+                order(security, buy_amount)
+                for a in range(g.last_buy_tag + 1, n + 1, 1):
+                    g.Buy_tag[a] = 1
+                g.last_buy_tag = n
+
+def ATR(context, stock):
+    PriceArray = get_price(stock, '2005-01-05', context.previous_date, '1d', ['close', 'high', 'low'])
+    PriceArray[np.isnan(PriceArray)] = 0
+    PriceArray[np.isinf(PriceArray)] = 0
+    close = np.array(PriceArray['close'])
+    high = np.array(PriceArray['high'])
+    low = np.array(PriceArray['low'])
+    ATR = talib.ATR(high, low, close, g.ATR_period)[-1]
+    return ATR

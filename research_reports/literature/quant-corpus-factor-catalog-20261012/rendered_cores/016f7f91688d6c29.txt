@@ -1,0 +1,26 @@
+quant/2020年度精选策略/79 DMI——大盘择时.txt
+import talib
+import math
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.security = '399300.XSHE'
+    context.OBSERVATION = 100
+    context.ADXPERIOD = 18
+
+def handle_data(context, data):
+    security = g.security
+    price = attribute_history(security, context.OBSERVATION, '1d', ('high', 'low', 'close'))
+    ADX = talib.ADX(price['high'].values, price['low'].values, price['close'].values, context.ADXPERIOD)
+    PDI = talib.PLUS_DI(price['high'].values, price['low'].values, price['close'].values, context.ADXPERIOD)
+    NDI = talib.MINUS_DI(price['high'].values, price['low'].values, price['close'].values, context.ADXPERIOD)
+    current_price = data[security].close
+    current_position = context.portfolio.positions[security].closeable_amount
+    cash = context.portfolio.cash
+    if current_price != 0:
+        shares = cash / current_price
+    if ADX[-1] > ADX[-2] and PDI[-1] > NDI[-1] and (current_position <= 0):
+        order_value(security, cash)
+    if ADX[-1] < ADX[-2] and PDI[-1] < NDI[-1] and (current_position > 0):
+        order_target(security, 0)

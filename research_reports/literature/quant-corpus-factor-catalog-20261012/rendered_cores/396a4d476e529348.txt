@@ -1,0 +1,436 @@
+quant/2024年度精选策略2/53.超跌网格交易大法V1.2：稳健跑赢大盘-年化13%回撤7%.txt
+enable_profile()
+from jqlib.technical_analysis import *
+from jqdata import *
+import time
+import numpy as np
+import copy
+import datetime
+import pandas as pd
+from jqfactor import get_factor_values
+origin_param_list_0 = [('000063.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601088.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601111.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('510050.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600104.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('002415.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601166.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600547.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('513100.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601318.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600900.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601688.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600737.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('002714.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600887.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('000651.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600276.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('512660.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('000002.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600150.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601857.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601600.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600104.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('601800.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600259.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600030.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('000723.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('000977.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('002511.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('002025.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('600021.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('159915.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('000858.XSHE', 50000, 5000, 1080, 0.95, 1.1, 1.3), ('603288.XSHG', 50000, 5000, 1080, 0.95, 1.1, 1.3)]
+g.buy_dict = {}
+g.last_buy_price = {}
+g.last_sell_price = {}
+g.last_opt_price = {}
+g.traceDisaster = {}
+g.origin_param_list = {}
+g.origin_param_list_all = {}
+MAX_HOLD = 10
+MAX_HOLD_DAYS = 30
+MAX_HOLD_DAYS_LAST = 360
+
+def KDJ_condition(context, stock):
+    g.KDJ_J = 0
+    cur_date = context.previous_date.strftime('%Y-%m-%d')
+    K1, D1, J1 = KDJ(stock, check_date=cur_date, N=9, M1=3, M2=3)
+    KDJ_J = J1[stock]
+    return KDJ_J
+
+def choose_stocks(context):
+    year = context.current_dt.year
+    month = context.current_dt.month
+    day = context.current_dt.day
+    if month % 3 != 1:
+        return
+    g.origin_param_list = {}
+    tmp = []
+    max_num_candidate = 100
+    for et in origin_param_list_0:
+        tmp.append(et[0])
+        stock = et[0]
+        days = MAX_HOLD_DAYS
+        sell_grid = 1.0
+        g.origin_param_list[stock] = (et[0], et[1], et[2], days, et[4], et[5], et[6], sell_grid)
+        g.origin_param_list_all[stock] = (et[0], et[1], et[2], days, et[4], et[5], et[6], sell_grid)
+        max_num_candidate = max_num_candidate - 1
+        if max_num_candidate <= 0:
+            break
+
+def check_buy_point(context, stock):
+    s_buy = False
+    buy_level = 0
+    if get_current_data()[stock].is_st:
+        return 0
+    close_data = attribute_history(stock, 90, '1d', ['close', 'high'])
+    closes = close_data['close'].values
+    high = max(closes)
+    if high > 0:
+        if KDJ_condition(context, stock) < 0:
+            s_buy = True
+            buy_level = 1.0
+    return buy_level
+
+def initialize(context):
+    run_monthly(choose_stocks, monthday=1, time='9:00')
+    run_daily(dolsd2, time='14:50')
+
+def dolsd(context):
+    buy(context)
+    cover(context)
+    sell(context)
+
+def dolsd1(context):
+    reset(context)
+    cover(context)
+    sell(context)
+
+def dolsd2(context):
+    reset(context)
+    buy(context)
+    cover(context)
+    sell(context)
+
+def reset(context):
+    origin_param_list = g.origin_param_list_all.values()
+    hold_stocks = context.portfolio.positions.keys()
+    finish_stocks = []
+    for origin_param in origin_param_list:
+        stock = origin_param[0]
+        if stock in g.last_opt_price and stock not in hold_stocks:
+            g.last_opt_price.pop(stock)
+            g.buy_dict.pop(stock)
+            finish_stocks.append(stock)
+    for stock in hold_stocks:
+        if stock not in g.last_opt_price or len(g.last_opt_price[stock]) <= 0 or stock not in g.buy_dict or (len(g.buy_dict[stock]) <= 0):
+            try:
+                g.last_opt_price.pop(stock)
+            except:
+                pass
+            try:
+                g.buy_dict.pop(stock)
+            except:
+                pass
+            order_target_value(stock, 0)
+            finish_stocks.append(stock)
+    for et in origin_param_list_0:
+        if et[0] in finish_stocks:
+            days = MAX_HOLD_DAYS
+            sell_grid = 1.0
+            g.origin_param_list[stock] = (et[0], et[1], et[2], days, et[4], et[5], et[6], sell_grid)
+            g.origin_param_list_all[stock] = (et[0], et[1], et[2], days, et[4], et[5], et[6], sell_grid)
+
+def buy(context):
+    year = context.current_dt.year
+    month = context.current_dt.month
+    day = context.current_dt.day
+    str_t = '%s-%s-%s' % (year, month, day)
+    hold_stocks_num = len(context.portfolio.positions.keys())
+    if hold_stocks_num >= MAX_HOLD:
+        return
+    hold_stocks = context.portfolio.positions.keys()
+    current_data = get_current_data()
+    total_value = context.portfolio.positions_value + context.portfolio.available_cash
+    buy_stocks_now = 0
+    origin_param_list = g.origin_param_list.values()
+    for origin_param in origin_param_list:
+        if buy_stocks_now + hold_stocks_num > MAX_HOLD:
+            break
+        stock = origin_param[0]
+        min_value = origin_param[2]
+        current_price = current_data[stock].last_price
+        high_limit = current_data[stock].high_limit
+        low_limit = current_data[stock].low_limit
+        if current_data[stock].paused or current_price <= low_limit * 1.01:
+            continue
+        if stock not in hold_stocks:
+            buy_level = check_buy_point(context, stock)
+            if buy_level <= 0:
+                continue
+            buy_value = total_value * buy_level / (min(len(g.origin_param_list_all), MAX_HOLD) * 4)
+            cash = context.portfolio.available_cash
+            if buy_value > cash:
+                buy_value = cash
+            num = int(buy_value / current_price)
+            real_buy_value = (num - num % 100 + 1) * current_price
+            order_value(stock, buy_value)
+            stock_dict = {}
+            if stock in g.buy_dict:
+                stock_dict = g.buy_dict[stock]
+            sell_price = current_price * origin_param[6]
+            close_data = get_bars(stock, count=90, unit='1d', fields=['close'])
+            good_need_price = close_data['close'].max()
+            good_sell_price = good_need_price * 0.97
+            if current_price in stock_dict:
+                stock_dict[current_price][str_t] = (real_buy_value, good_sell_price)
+            else:
+                stock_dict[current_price] = {str_t: (real_buy_value, good_sell_price)}
+            g.last_buy_price[stock] = {current_price: (str_t, real_buy_value)}
+            g.last_opt_price[stock] = {current_price: (str_t, real_buy_value)}
+            g.buy_dict[stock] = stock_dict
+            buy_stocks_now = buy_stocks_now + 1
+
+def cover(context):
+    year = context.current_dt.year
+    month = context.current_dt.month
+    day = context.current_dt.day
+    str_t = '%s-%s-%s' % (year, month, day)
+    current_data = get_current_data()
+    total_value = context.portfolio.positions_value + context.portfolio.available_cash
+    hold_stocks = context.portfolio.positions.keys()
+    for stock in hold_stocks:
+        origin_param = g.origin_param_list_all[stock]
+        stock = origin_param[0]
+        min_value = origin_param[2]
+        current_price = current_data[stock].last_price
+        if current_price <= 0:
+            continue
+        high_limit = current_data[stock].high_limit
+        low_limit = current_data[stock].low_limit
+        if current_data[stock].paused:
+            continue
+        if stock not in g.last_opt_price:
+            continue
+        last_price = list(g.last_opt_price[stock].keys())[0]
+        last_cash = list(g.last_opt_price[stock].values())[0][1]
+        cash = context.portfolio.available_cash
+        buy_value = 100 * current_price
+        space = context.portfolio.positions[stock].total_amount
+        holdcost = context.portfolio.positions[stock].avg_cost
+        if space * holdcost > total_value * (3 / min(MAX_HOLD, len(g.origin_param_list_all))):
+            continue
+        cover_grid = origin_param[4]
+        sell_grid = origin_param[7]
+        max_days = origin_param[3]
+        if last_cash < 0:
+            last_cash = -last_cash
+            buy_value = last_cash * 1.0
+            cover_grid = cover_grid * 1.01 if cover_grid < 0.98 else 0.98
+        else:
+            buy_value = last_cash * 1.2
+            cover_grid = cover_grid * 0.99 if cover_grid > 0.93 else 0.93
+        predict_cover_price = last_price * cover_grid
+        if current_price < predict_cover_price:
+            last_buy_price = list(g.last_buy_price[stock].keys())[0]
+            last_buy_cash = list(g.last_buy_price[stock].values())[0][1]
+            last_sell_price = list(g.last_buy_price[stock].keys())[0]
+            last_sell_cash = list(g.last_buy_price[stock].values())[0][1]
+            if buy_value < min_value:
+                buy_value = min_value
+            max_value = min(total_value / (min(MAX_HOLD, len(g.origin_param_list_all)) * 4), min_value * 10)
+            if buy_value > max_value:
+                buy_value = max_value
+            if buy_value < 100 * current_price:
+                buy_value = 101 * current_price
+            if buy_value > cash:
+                continue
+            num = int(buy_value / current_price)
+            real_buy_value = (num - num % 100) * current_price
+            order_value(stock, buy_value)
+            stock_dict = {}
+            if stock in g.buy_dict:
+                stock_dict = g.buy_dict[stock]
+            sell_price = current_price * origin_param[5]
+            if current_price in stock_dict:
+                stock_dict[current_price][str_t] = (real_buy_value, sell_price)
+            else:
+                stock_dict[current_price] = {str_t: (real_buy_value, sell_price)}
+            g.last_buy_price[stock] = {current_price: (str_t, real_buy_value)}
+            g.last_opt_price[stock] = {current_price: (str_t, real_buy_value)}
+            g.buy_dict[stock] = stock_dict
+            origin_param = (origin_param[0], origin_param[1], origin_param[2], max_days, cover_grid, origin_param[5], origin_param[6], sell_grid)
+            g.origin_param_list_all[stock] = origin_param
+            g.origin_param_list[stock] = origin_param
+            continue
+
+def sell(context):
+    year = context.current_dt.year
+    month = context.current_dt.month
+    day = context.current_dt.day
+    str_t = '%s-%s-%s' % (year, month, day)
+    date_now_t = datetime.date(year, month, day)
+    current_data = get_current_data()
+    hold_stocks = context.portfolio.positions.keys()
+    for stock in hold_stocks:
+        origin_param = g.origin_param_list_all[stock]
+        stock = origin_param[0]
+        min_value = origin_param[2]
+        current_price = current_data[stock].last_price
+        if current_price <= 0:
+            continue
+        high_limit = current_data[stock].high_limit
+        low_limit = current_data[stock].low_limit
+        if current_data[stock].paused or current_price <= low_limit * 1.01:
+            continue
+        if stock not in g.last_opt_price:
+            continue
+        cover_grid = origin_param[4]
+        sell_grid = origin_param[7]
+        max_hold_days = origin_param[3]
+        last_cash = list(g.last_opt_price[stock].values())[0][1]
+        last_price = list(g.last_opt_price[stock].values())[0][0]
+        if last_cash < 0:
+            sell_grid = sell_grid * 1.01 if sell_grid < 1.2 else 1.2
+        else:
+            sell_grid = 1.0
+        stock_dict = g.buy_dict[stock]
+        tmp_dict = copy.deepcopy(stock_dict)
+        change = 0
+        delay_day = 0
+        sum_sell_value = 0
+        close_data = get_bars(stock, count=90, unit='1d', fields=['close'])
+        good_need_price = close_data['close'].max()
+        for price in stock_dict:
+            t_num_dict = stock_dict[price]
+            if len(t_num_dict) <= 0:
+                tmp_dict.pop(price)
+                continue
+            if price <= 0:
+                continue
+            max_hold_days = origin_param[3]
+            for pre_t in t_num_dict:
+                last_buy_value = stock_dict[price][pre_t][0]
+                need_price = stock_dict[price][pre_t][1]
+                num = int(last_buy_value / price)
+                cap = num * current_price
+                num = num - num % 100
+                tmp = pre_t.split('-')
+                date_pre_t = datetime.date(int(tmp[0]), int(tmp[1]), int(tmp[2]))
+                days_ago_t = date_now_t - datetime.timedelta(days=max_hold_days)
+                if days_ago_t > date_pre_t:
+                    if current_price > price * sell_grid or max_hold_days > MAX_HOLD_DAYS_LAST:
+                        change = change + 1
+                        sum_sell_value = sum_sell_value + cap
+                        tmp_dict[price].pop(pre_t)
+                    else:
+                        delay_day = delay_day + 1
+                    continue
+                if str_t > pre_t and current_price >= need_price * sell_grid:
+                    change = change + 1
+                    sell_num = int(num * 0.5 + 50)
+                    sell_num = sell_num - sell_num % 100
+                    if (num - sell_num) * current_price < min_value:
+                        sell_num = num
+                    sum_sell_value = sum_sell_value + sell_num * current_price
+                    if sell_num < num:
+                        if need_price >= good_need_price * 0.97:
+                            need_price = need_price * 1.05
+                        else:
+                            need_price = good_need_price * 0.97
+                        tmp_dict[price][pre_t] = ((num - sell_num) * current_price, need_price)
+                    else:
+                        tmp_dict[price].pop(pre_t)
+        if change > 0:
+            order_value(stock, -1 * sum_sell_value)
+            g.last_sell_price[stock] = {current_price: (str_t, sum_sell_value)}
+            g.last_opt_price[stock] = {current_price: (str_t, -sum_sell_value)}
+            if delay_day >= 1:
+                max_hold_days = max_hold_days + 7
+            origin_param = (origin_param[0], origin_param[1], origin_param[2], max_hold_days, cover_grid, origin_param[5], origin_param[6], sell_grid)
+            g.origin_param_list_all[stock] = origin_param
+            g.origin_param_list[stock] = origin_param
+            g.buy_dict[stock] = tmp_dict
+
+def start_date_filter(watch_date, security, days):
+    q0 = query(finance.STK_LIST.code, finance.STK_LIST.name, finance.STK_LIST.start_date).filter(finance.STK_LIST.code.in_(security))
+    df_start_date = finance.run_query(q0)
+    days_ago = watch_date - datetime.timedelta(days=days)
+    df_start_date1 = df_start_date[df_start_date['start_date'] < days_ago]
+    df_start_date2 = df_start_date1.set_index('code')
+    df_start_list = df_start_date2.index.tolist()
+    return df_start_list
+
+def get_ST_stock_out(security, watch_date):
+    data1 = get_extras('is_st', security_list=security, start_date=watch_date, end_date=watch_date, df=True)
+    data2 = data1.T
+    data2.columns = ['ST']
+    data3 = data2[data2['ST'] == False]
+    return data3
+
+def get_EBIT_EV(security, watch_date):
+    if len(security) >= 2000:
+        EBIT_data1 = get_history_fundamentals(security=security[int(len(security) * 0):int(len(security) * 0.33)], fields=[indicator.adjusted_profit, income.income_tax_expense, income.financial_expense], watch_date=watch_date, count=4, interval='1q', stat_by_year=False)
+        EBIT_data2 = get_history_fundamentals(security=security[int(len(security) * 0.33):int(len(security) * 0.66)], fields=[indicator.adjusted_profit, income.income_tax_expense, income.financial_expense], watch_date=watch_date, count=4, interval='1q', stat_by_year=False)
+        EBIT_data3 = get_history_fundamentals(security=security[int(len(security) * 0.66):int(len(security) * 1)], fields=[indicator.adjusted_profit, income.income_tax_expense, income.financial_expense], watch_date=watch_date, count=4, interval='1q', stat_by_year=False)
+        EBIT_data = pd.concat([EBIT_data1, EBIT_data2, EBIT_data3], axis=0, sort=True)
+    else:
+        EBIT_data = get_history_fundamentals(security=security, fields=[indicator.adjusted_profit, income.income_tax_expense, income.financial_expense], watch_date=watch_date, count=4, interval='1q', stat_by_year=False)
+    EBIT_data = EBIT_data.groupby('code').sum()
+    EBIT_data['EBIT'] = EBIT_data['adjusted_profit'] + EBIT_data['income_tax_expense'] + EBIT_data['financial_expense']
+    factor_data = get_factor_values(securities=security, factors=['market_cap', 'financial_liability', 'financial_assets'], end_date=watch_date, count=1)
+    df_factor_data = pd.concat([factor_data['market_cap'].T, factor_data['financial_liability'].T, factor_data['financial_assets'].T], axis=1)
+    col1 = ['market_cap', 'financial_liability', 'financial_assets']
+    df_factor_data.columns = col1
+    df_factor_data['EV'] = df_factor_data['market_cap'] + df_factor_data['financial_liability'] - df_factor_data['financial_assets']
+    EBIT_EV = EBIT_data['EBIT'] / df_factor_data['EV']
+    EBIT_EV = EBIT_EV.sort_values(ascending=False)
+    return EBIT_EV
+
+def get_DP(security, watch_date, days):
+    one_year_ago = watch_date - datetime.timedelta(days=days)
+    q1 = query(finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb, finance.STK_XR_XD.code).filter(finance.STK_XR_XD.a_registration_date >= one_year_ago, finance.STK_XR_XD.a_registration_date <= watch_date, finance.STK_XR_XD.code.in_(security[0:int(len(security) * 0.3)]))
+    q2 = query(finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb, finance.STK_XR_XD.code).filter(finance.STK_XR_XD.a_registration_date >= one_year_ago, finance.STK_XR_XD.a_registration_date <= watch_date, finance.STK_XR_XD.code.in_(security[int(len(security) * 0.3):int(len(security) * 0.6)]))
+    q3 = query(finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb, finance.STK_XR_XD.code).filter(finance.STK_XR_XD.a_registration_date >= one_year_ago, finance.STK_XR_XD.a_registration_date <= watch_date, finance.STK_XR_XD.code.in_(security[int(len(security) * 0.6):]))
+    df_data1 = finance.run_query(q1)
+    df_data2 = finance.run_query(q2)
+    df_data3 = finance.run_query(q3)
+    df_data = pd.concat([df_data1, df_data2, df_data3], axis=0, sort=False)
+    df_data.fillna(0, inplace=True)
+    df_data = df_data.set_index('code')
+    df_data = df_data.groupby('code').sum()
+    q01 = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(security))
+    BP_data = get_fundamentals(q01, date=watch_date)
+    BP_data = BP_data.set_index('code')
+    data = pd.concat([df_data, BP_data], axis=1, sort=False)
+    data.fillna(0, inplace=True)
+    data['股息率'] = data['bonus_amount_rmb'] / 10000 / data['market_cap']
+    data1 = data.sort_values(by=['股息率'], ascending=False)
+    return data1
+
+def get_F_socre_and_rank(security, watch_date):
+    one_year_ago = watch_date - datetime.timedelta(days=365)
+    h = get_history_fundamentals(security, [indicator.adjusted_profit, balance.total_current_assets, balance.total_assets, balance.total_current_liability, balance.total_non_current_liability, cash_flow.net_operate_cash_flow, income.operating_revenue, income.operating_cost], watch_date=watch_date, count=5)
+    not_enough_data = h.groupby('code').size() < 5
+    not_enough_data = not_enough_data[not_enough_data]
+    h = h[~h['code'].isin(not_enough_data.index)]
+    'EXACT_REVIEWED_FUNCTION ttm_sum sha256=6c35cff97870cdae0bda14b518c7006b1951db95a447621cf3ac4474f3db6ef4 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION ttm_avg sha256=ec3e5391d92f12a7a445ee7609b495c60894a8f4212fce9b49201192015df374 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_sum sha256=bd5809e64ab1fedbfab99222734f5a614c26917cab51ea71bf65e2fb872adbc6 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION pre_ttm_avg sha256=bbdd442eb5e4a1e727f271c7caa35a073a2bfcc665d2bb741d68794bea2975ae source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+    'EXACT_REVIEWED_FUNCTION val_1 sha256=591f9ebae9f25486d27615a14ad8ac0cf38bdf139ad749f1c8c7e21ce72807a0 source=quant/2023年度精选策略/28.F_Score 选股，年化80%+.txt'
+
+    def val_2(x):
+        return x.iloc[-2]
+    adjusted_profit_ttm = h.groupby('code')['adjusted_profit'].apply(ttm_sum)
+    adjusted_profit_ttm_pre = h.groupby('code')['adjusted_profit'].apply(pre_ttm_sum)
+    total_assets_avg = h.groupby('code')['total_assets'].apply(ttm_avg)
+    total_assets_avg_pre = h.groupby('code')['total_assets'].apply(pre_ttm_avg)
+    net_operate_cash_flow_ttm = h.groupby('code')['net_operate_cash_flow'].apply(ttm_sum)
+    long_term_debt_ratio = h.groupby('code')['total_non_current_liability'].apply(val_1) / h.groupby('code')['total_assets'].apply(val_1)
+    long_term_debt_ratio_pre = h.groupby('code')['total_non_current_liability'].apply(val_2) / h.groupby('code')['total_assets'].apply(val_2)
+    current_ratio = h.groupby('code')['total_current_assets'].apply(val_1) / h.groupby('code')['total_current_liability'].apply(val_1)
+    current_ratio_pre = h.groupby('code')['total_current_assets'].apply(val_2) / h.groupby('code')['total_current_liability'].apply(val_2)
+    operating_revenue_ttm = h.groupby('code')['operating_revenue'].apply(ttm_sum)
+    operating_revenue_ttm_pre = h.groupby('code')['operating_revenue'].apply(pre_ttm_sum)
+    operating_cost_ttm = h.groupby('code')['operating_cost'].apply(ttm_sum)
+    operating_cost_ttm_pre = h.groupby('code')['operating_cost'].apply(pre_ttm_sum)
+    roa = adjusted_profit_ttm / total_assets_avg
+    roa_pre = adjusted_profit_ttm_pre / total_assets_avg_pre
+    ocfoa = net_operate_cash_flow_ttm / total_assets_avg
+    roa_chg = roa - roa_pre
+    ocfoa_roa = ocfoa - roa
+    ltdr_chg = long_term_debt_ratio - long_term_debt_ratio_pre
+    cr_chg = current_ratio - current_ratio_pre
+    gpm_chg = operating_cost_ttm_pre / operating_revenue_ttm_pre - operating_cost_ttm / operating_revenue_ttm
+    tat_chg = operating_revenue_ttm / total_assets_avg - operating_revenue_ttm_pre / total_assets_avg_pre
+    spo_list = list(set(finance.run_query(query(finance.STK_CAPITAL_CHANGE.code).filter(finance.STK_CAPITAL_CHANGE.code.in_(security), finance.STK_CAPITAL_CHANGE.pub_date.between(one_year_ago, watch_date), finance.STK_CAPITAL_CHANGE.change_reason_id == 306004))['code']))
+    spo_score = pd.Series(True, index=security)
+    if spo_list:
+        spo_score[spo_list] = False
+    df_scores = pd.DataFrame(index=security)
+    df_scores['roa'] = roa > 0
+    df_scores['ocfoa'] = ocfoa > 0
+    df_scores['roa_chg'] = roa_chg > 0
+    df_scores['ocfoa_roa'] = ocfoa_roa > 0
+    df_scores['ltdr_chg'] = ltdr_chg <= 0
+    df_scores['cr_chg'] = cr_chg > 0
+    df_scores['spo'] = spo_score
+    df_scores['gpm_chg'] = gpm_chg > 0
+    df_scores['tat_chg'] = tat_chg > 0
+    df_scores = df_scores.dropna()
+    for u in df_scores.columns:
+        if df_scores[u].dtype == bool:
+            df_scores[u] = df_scores[u].astype('int')
+    df_scores['total'] = df_scores['roa'] + df_scores['ocfoa'] + df_scores['roa_chg'] + df_scores['ocfoa_roa'] + df_scores['ltdr_chg'] + df_scores['cr_chg'] + df_scores['spo'] + df_scores['gpm_chg'] + df_scores['tat_chg']
+    df_scores = df_scores.sort_values(by='total', ascending=False)
+    return df_scores

@@ -1,0 +1,115 @@
+quant/聚宽2025年精选/21【原创】年化123涨停弱转强竞价战法.txt
+from jqdata import *
+from jqfactor import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+
+def initialize(context):
+    run_daily(get_stock_list, '9:01')
+    run_daily(buy, '09:30')
+    run_daily(sell, '14:50')
+    run_daily(sell_930, '9:30')
+    run_daily(sell_1030, '10:30')
+    run_daily(sell_1330, '13:30')
+
+def get_stock_list(context):
+    date = context.previous_date
+    date = transform_date(date, 'str')
+    date_1 = get_shifted_date(date, -1, 'T')
+    date_2 = get_shifted_date(date, -2, 'T')
+    initial_list = prepare_stock_list(date)
+    hl_list = get_hl_stock(initial_list, date)
+    hl1_list = get_ever_hl_stock(initial_list, date_1)
+    hl2_list = get_ever_hl_stock(initial_list, date_2)
+    elements_to_remove = set(hl1_list + hl2_list)
+    hl_list = [stock for stock in hl_list if stock not in elements_to_remove]
+    g.target_list = hl_list
+
+def buy(context):
+    qualified_stocks = []
+    current_data = get_current_data()
+    for s in g.target_list:
+        prev_day_data = attribute_history(s, 1, '1d', fields=['close', 'volume', 'money'], skip_paused=True)
+        avg_price_increase_value = prev_day_data['money'][0] / prev_day_data['volume'][0] / prev_day_data['close'][0] * 1.1 - 1
+        if avg_price_increase_value < 0.07 or prev_day_data['money'][0] < 700000000.0:
+            continue
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date, fields=['turnover_ratio', 'market_cap'])
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < 70:
+            continue
+        zyts = calculate_zyts(s, context)
+        volume_data = attribute_history(s, zyts, '1d', fields=['volume'], skip_paused=True)
+        if len(volume_data) < 2 or volume_data['volume'][-1] <= max(volume_data['volume'][:-1]) * 0.9:
+            continue
+        auction_data = get_call_auction(s, start_date=context.current_dt, end_date=context.current_dt, fields=['volume', 'current'])
+        if auction_data.empty or auction_data['volume'][0] / volume_data['volume'][-1] < 0.03:
+            continue
+        current_ratio = auction_data['current'][0] / (current_data[s].high_limit / 1.1)
+        if current_ratio <= 1 or current_ratio >= 1.06:
+            continue
+        qualified_stocks.append(s)
+    if len(qualified_stocks) != 0:
+        value = context.portfolio.available_cash / len(qualified_stocks)
+        for s in qualified_stocks:
+            if context.portfolio.available_cash / current_data[s].last_price > 100:
+                order_value(s, value, MarketOrderStyle(current_data[s].day_open))
+
+def sell(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        if not current_data[s].last_price == current_data[s].high_limit:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                order_target_value(s, 0)
+
+def sell_930(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        if not current_data[s].last_price == current_data[s].high_limit:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                if current_data[s].last_price < context.portfolio.positions[s].avg_cost * 0.97:
+                    if current_data[s].last_price == current_data[s].low_limit:
+                        order_target_value(s, 0, LimitOrderStyle(current_data[s].low_limit))
+                    else:
+                        order_target_value(s, 0, MarketOrderStyle())
+
+def sell_1030(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        if not current_data[s].last_price == current_data[s].high_limit:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                if current_data[s].last_price < context.portfolio.positions[s].avg_cost * 1:
+                    if current_data[s].last_price == current_data[s].low_limit:
+                        order_target_value(s, 0, LimitOrderStyle(current_data[s].low_limit))
+                    else:
+                        order_target_value(s, 0, MarketOrderStyle())
+
+def sell_1330(context):
+    hold_list = list(context.portfolio.positions)
+    current_data = get_current_data()
+    for s in hold_list:
+        if not current_data[s].last_price == current_data[s].high_limit:
+            if context.portfolio.positions[s].closeable_amount != 0:
+                if current_data[s].last_price < context.portfolio.positions[s].avg_cost * 1.03:
+                    if current_data[s].last_price == current_data[s].low_limit:
+                        order_target_value(s, 0, LimitOrderStyle(current_data[s].low_limit))
+                    else:
+                        order_target_value(s, 0, MarketOrderStyle())
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=af3d460f1664c95ce103c45e4aa82266d06e53a12e8d79da1097ddbc84e6bd04 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def filter_kcbj_stock(initial_list):
+    return [stock for stock in initial_list if stock[0] != '4' and stock[0] != '8' and (stock[0] != '3') and (stock[:2] != '68')]
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_extreme_limit_stock sha256=e43531991a1b1cd14bfe0ac8337c3942976c2f39683c74c0d66f7ad17913dcbd source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=56e537db6fd28b7921a9ea3d0d02ce5d54a0b27871c0225470ed712658edcd3c source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION calculate_zyts sha256=603e3040bff9e8e46bedd69ef70ef89a1b4d4f112c008709a128d244746331cc source=quant/聚宽2025年精选/16集合竞价三合一，今年收益1067.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=1b44687e21b10ff448ccffd8adc7bcbc28701bc3e2f9bc81b42cad20cd893c18 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_ever_hl_stock sha256=45bb1a1d6b3d5e40a076be53828a9ca4de25e0c32fe6bf06fb079ce1fc970b75 source=quant/聚宽2025年精选/16集合竞价三合一，今年收益1067.txt'
+'EXACT_REVIEWED_FUNCTION get_hl_count_df sha256=696c4e8a4997343a84c8e7a5b8252c7661feaf6aede50f6e911dd8a94cd767ce source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_continue_count_df sha256=ed4b85c92a7f497f105c05129f66dce38db5bc17142e183ec8dde223f2f7ad05 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_index_increase_ratio sha256=58ad834eeff7a1436edacee1f8299ab365b34d5a17ce0b5d1a995356a2d48ea2 source=quant/聚宽2025年精选/16集合竞价三合一，今年收益1067.txt'

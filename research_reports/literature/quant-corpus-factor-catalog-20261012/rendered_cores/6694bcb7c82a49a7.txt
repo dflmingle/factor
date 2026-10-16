@@ -1,0 +1,68 @@
+quant/聚宽2025年精选/6国九小市值策略【年化100.5】.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+from datetime import time
+from jqdata import finance
+
+def initialize(context):
+    g.trading_signal = True
+    g.run_stoploss = True
+    g.filter_audit = False
+    g.adjust_num = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.pass_months = [1, 4]
+    g.limitup_stocks = []
+    g.min_mv = 10
+    g.max_mv = 100000000.0
+    g.stock_num = 4
+    g.reason_to_sell = ''
+    g.stoploss_strategy = 3
+    g.stoploss_limit = 0.09
+    g.stoploss_market = 0.05
+    g.highest = 50
+    g.etf = '511880.XSHG'
+    run_daily(prepare_stock_list, '9:05')
+    run_daily(trade_afternoon, time='14:00', reference_security='399101.XSHE')
+    run_daily(sell_stocks, time='10:00')
+    run_daily(close_account, '14:50')
+    run_weekly(weekly_adjustment, 2, '10:00')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=3dcc49c7a53354c033668ab36cb80b8141ce7c6b8cf4b8264ecceda7ea965f47 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION get_stock_list sha256=b746e72c5233369ac4f736f8e3a63ed3bbc03100b715e7eddb9d90cd979c0953 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+
+def weekly_adjustment(context):
+    if g.trading_signal and g.adjust_num:
+        new_num = adjust_stock_num(context)
+        if new_num == 0:
+            buy_security(context, [g.etf])
+        else:
+            if g.stock_num != new_num:
+                g.stock_num = new_num
+            g.target_list = get_stock_list(context)[:g.stock_num]
+            sell_list = [stock for stock in g.hold_list if stock not in g.target_list and stock not in g.yesterday_HL_list]
+            hold_list = [stock for stock in g.hold_list if stock in g.target_list or stock in g.yesterday_HL_list]
+            sell_positions = [context.portfolio.positions[stock] for stock in sell_list]
+            for position in sell_positions:
+                close_position(position)
+            buy_security(context, g.target_list)
+            for position in list(context.portfolio.positions.values()):
+                stock = position.security
+    else:
+        buy_security(context, [g.etf])
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=5c42accfadb8d385140c15e15a250447a6ab6ba37a3ed32793287c483ace5589 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION check_remain_amount sha256=94f8b025154e899171c8cb6cfbf84e1ecd4b4b4b0dbd282dcdf1887ba5fa78cb source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION trade_afternoon sha256=3b08a15459e278d0c1aed32aec5fc802f5d4eb3a58742b4d1171bb414b3e22ff source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION sell_stocks sha256=97425b1fdcbffe829daf669d288e5c438dea785b1d52c42b71c3828b936ebab1 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION adjust_stock_num sha256=2ae02d2c1dfd667abfb6f49f8429db2f783dc255c1ccc2b6d7766b0ac9558485 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION filter_stocks sha256=14234735e9b875376734ad8e0f72714229833900d7bd680c6c6e42d81c143a13 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION filter_audit sha256=407a849cf96774a45b1e500c08b8200c0fdbc2b0f483050bbfef214ca8b5b308 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION buy_security sha256=11724dad04a704ee1dfee107cc52d97f3c58bffa569839a7e2762cd042cb1057 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=024c7c024a208c322a44d23cc5d8ef70d1ee2288e11a9950a36c0f5cef0ef798 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=f058ce086f9b73f06705e588ea967ef41963cbd10faffc8101c74b2f6679939f source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=f229df512eb347633849a5ac3024b4305832c343903d3395709c0e080583ab1d source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'

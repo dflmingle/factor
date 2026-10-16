@@ -1,0 +1,116 @@
+quant/聚宽2025年精选/54发一个学习策略5年70倍，思路可以学习.txt
+import talib
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.choice = 500
+    g.amount = 5
+    g.muster = []
+    g.bucket = []
+    g.summit = {}
+    run_daily(prepare, time='9:15')
+    run_daily(buy, time='9:26')
+    run_daily(sell, time='13:06')
+    run_daily(high_sell, time='every_bar')
+
+def high_sell(context):
+    nowtime = context.current_dt.strftime('%H:%M')
+    if nowtime > '09:35':
+        holdlist = list(context.portfolio.positions)
+        current_data = get_current_data()
+        holdlist_stock = []
+        for stock in holdlist[:]:
+            if get_security_info(stock).type == 'stock':
+                holdlist_stock.append(stock)
+        for i in holdlist_stock[:]:
+            day_open = current_data[i].day_open
+            nowprice = current_data[i].last_price
+            high_limit = current_data[i].high_limit
+            zhangfu_stock = (nowprice - day_open) / day_open
+            if zhangfu_stock > 0.065 and nowprice < high_limit:
+                order_target(i, 0, LimitOrderStyle(nowprice * 0.983))
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+
+def filter_limitup_stock(context, stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    current_data = get_current_data()
+    return [stock for stock in stock_list if last_prices[stock][-1] < current_data[stock].high_limit]
+
+def filter_limitdown_stock(context, stock_list):
+    last_prices = history(1, unit='1m', field='close', security_list=stock_list)
+    current_data = get_current_data()
+    return [stock for stock in stock_list if last_prices[stock][-1] > current_data[stock].low_limit]
+
+def filter_new_stock(context, stock_list):
+    yesterday = context.previous_date
+    return [stock for stock in stock_list if not yesterday - get_security_info(stock).start_date < datetime.timedelta(days=144)]
+
+def filter_hold_stock(context, stock_list):
+    return [stock for stock in stock_list if stock not in context.portfolio.positions.keys()]
+
+def prepare(context):
+    fundamentals_data = get_fundamentals(query(valuation.code, valuation.market_cap).order_by(valuation.market_cap.asc()).limit(g.choice))
+    stocks = list(fundamentals_data['code'])
+    current_data = get_current_data()
+    g.muster = [s for s in stocks if not current_data[s].paused and (not current_data[s].is_st) and ('ST' not in current_data[s].name) and ('*' not in current_data[s].name) and ('退' not in current_data[s].name) and (current_data[s].low_limit < current_data[s].day_open < current_data[s].high_limit)]
+    g.muster = filter_paused_stock(g.muster)
+    g.muster = filter_st_stock(g.muster)
+    g.muster = filter_kcbj_stock(g.muster)
+    g.muster = filter_limitup_stock(context, g.muster)
+    g.muster = filter_limitdown_stock(context, g.muster)
+    g.muster = filter_hold_stock(context, g.muster)
+
+def sell(context):
+    data_today = get_current_data()
+    current_data = get_current_data()
+    for s in context.portfolio.positions:
+        if current_data[s].last_price < current_data[s].high_limit:
+            name = get_security_info(s).display_name
+            current_data = get_current_data()
+            last_price = current_data[s].last_price
+            order_target(s, 0, LimitOrderStyle(last_price * 0.983))
+
+def buy(context):
+    data_today = get_current_data()
+    available_slots = g.amount - len(context.portfolio.positions)
+    if available_slots <= 0:
+        pass
+    else:
+        allocation = context.portfolio.cash / available_slots
+        for s in g.muster:
+            if available_slots == 0:
+                break
+            if history(5, '1d', 'paused', s).max().values[0] == 0:
+                low = history(4, '1d', 'low', s).min().values[0]
+                high = history(4, '1d', 'high', s).max().values[0]
+                precent = (high - low) / low * 100
+                if precent <= 20:
+                    day_open = data_today[s].day_open
+                    day1_close = get_price(s, count=1, end_date=context.previous_date).iloc[-1]['close']
+                    day1_low = get_price(s, count=1, end_date=context.previous_date).iloc[-1]['low']
+                    his = history(60, '1d', 'close', s)
+                    ema1 = talib.EMA(his.values.flatten(), timeperiod=5)[-1]
+                    if day1_close > ema1 and day_open < day1_low:
+                        name = get_security_info(s).display_name
+                        current_data = get_current_data()
+                        last_price = current_data[s].last_price
+                        nums = math.floor(int(allocation / last_price))
+                        int_nums = int(nums // 100) * 100
+                        order(s, int_nums, LimitOrderStyle(last_price * 1.017))
+                        available_slots -= 1
+
+def print_trade_info(context):
+    trades = get_trades()
+    for _trade in trades.values():
+        pass
+    for position in list(context.portfolio.positions.values()):
+        securities = position.security
+        name = get_security_info(securities).display_name
+        cost = position.avg_cost
+        price = position.price
+        ret = 100 * (price / cost - 1)
+        value = position.value
+        amount = position.total_amount

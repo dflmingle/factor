@@ -1,0 +1,674 @@
+quant/2020年度精选策略/33 买入每个行业市值最大的股票.txt
+from prettytable import PrettyTable
+import numpy as np
+import talib
+import pandas
+import scipy as sp
+import scipy.optimize
+import datetime as dt
+from scipy import linalg as sla
+from scipy import spatial
+from jqdata import gta
+from jqdata import *
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+import statsmodels.api as sm
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    after_code_changed(context)
+    run_daily(fun_main, '10:50')
+
+def after_trading_end(context):
+    g.quantlib.get_portfolio_info_text(context)
+    g.quantlib.reset_param(context)
+    g.quantlib.fun_set_var(context, 'op_buy_stocks', [])
+    if context.curve_protect_days == 0:
+        context.value_list.append(context.portfolio.total_value)
+
+def after_code_changed(context):
+    g.quantlib = quantlib()
+    g.quantlib.fun_set_var(context, 'algo_enable', True)
+    g.quantlib.fun_set_var(context, 'riskExposure', 0.03)
+    g.quantlib.fun_set_var(context, 'confidencelevel', 1.96)
+    g.quantlib.fun_set_var(context, 'hold_cycle', 20)
+    g.quantlib.fun_set_var(context, 'hold_periods', 0)
+    g.quantlib.fun_set_var(context, 'stock_list', [])
+    g.quantlib.fun_set_var(context, 'position_price', {})
+    g.quantlib.fun_set_var(context, 'recal_periods', 0)
+    g.quantlib.fun_set_var(context, 'version', 1.0)
+    g.quantlib.fun_set_var(context, 'stock_num', 10)
+    g.quantlib.fun_set_var(context, 'op_buy_stocks', [])
+    g.quantlib.fun_set_var(context, 'index2', '000016.XSHG')
+    g.quantlib.fun_set_var(context, 'index8', '399333.XSHE')
+    g.quantlib.fun_set_var(context, 'index_growth_rate', 0.01)
+    g.quantlib.fun_set_var(context, 'is_day_curve_protect', False)
+    g.quantlib.fun_set_var(context, 'curve_protect_days', 0)
+    g.quantlib.fun_set_var(context, 'value_list', [])
+    if context.version < 1.0:
+        context.hold_periods = 0
+        context.riskExposure = 0.03
+        context.version = 1.0
+
+def before_trading_start(context):
+    pass
+
+def fun_main(context):
+    g.value_factor = value_factor_lib()
+    g.quantlib = quantlib()
+    context.msg = ''
+    g.quantlib.get_pe_median(context)
+    if g.quantlib.stock_clean_by_mom(context) and context.pe_ratio_median > 80:
+        g.quantlib.clear_position(context)
+        return 0
+    moneyfund = ['511880.XSHG', '511010.XSHG', '511220.XSHG']
+    context.moneyfund = g.quantlib.fun_delNewShare(context, moneyfund, 60)
+    rebalance_flag, context.position_price, context.hold_periods, msg = g.quantlib.fun_needRebalance(context, 'algo-maxcap', context.moneyfund, context.stock_list, context.position_price, context.hold_periods, context.hold_cycle, 0.25)
+    context.msg += msg
+    statsDate = context.current_dt.date() - dt.timedelta(1)
+    trade_style = False
+    if rebalance_flag:
+        stock_list = []
+        if context.algo_enable:
+            bad_stock_list = g.quantlib.fun_get_bad_stock_list(statsDate)
+            value_factor_stock_list = g.value_factor.fun_get_stock_list(context, context.stock_num, statsDate, bad_stock_list)
+            stock_list = value_factor_stock_list
+        equity_ratio, bonds_ratio = g.quantlib.fun_assetAllocationSystem(stock_list, context.moneyfund, context.confidencelevel, statsDate)
+        risk_ratio = 0
+        if len(equity_ratio.keys()) >= 1:
+            risk_ratio = context.riskExposure / len(equity_ratio.keys())
+        position_ratio = g.quantlib.fun_calPosition(equity_ratio, bonds_ratio, 1.0, risk_ratio, context.moneyfund, context.portfolio.portfolio_value, context.confidencelevel, statsDate)
+        trade_style = True
+        context.stock_list = position_ratio.keys()
+        context.position_price = g.quantlib.fun_update_positions_price(position_ratio)
+        for stock in context.portfolio.positions.keys():
+            if stock not in position_ratio:
+                position_ratio[stock] = 0
+        context.position_ratio = position_ratio
+        g.quantlib.fun_do_trade(context, context.position_ratio, context.moneyfund, trade_style)
+
+class value_factor_lib:
+
+    def fun_get_stock_list(self, context, hold_number, statsDate=None, bad_stock_list=[]):
+        industry_list = g.quantlib.fun_get_industry(cycle=None)
+        max_stock = []
+        for industry in industry_list:
+            stock_list = g.quantlib.fun_get_industry_stocks(industry, 2, statsDate)
+            if len(stock_list) > 5:
+                df = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stock_list)).order_by(valuation.market_cap.desc()).limit(1), date=statsDate)
+                max_stock = max_stock + list(df.code)
+        q = query(indicator.code).filter(indicator.code.in_(max_stock)).order_by(indicator.roe.desc())
+        stock_list = list(get_fundamentals(q).code)
+        positions_list = context.portfolio.positions.keys()
+        stock_list = g.quantlib.unpaused(stock_list, positions_list)
+        stock_list = g.quantlib.remove_st(stock_list, statsDate)
+        stock_list = g.quantlib.fun_delNewShare(context, stock_list, 80)
+        stock_list = g.quantlib.remove_bad_stocks(stock_list, bad_stock_list)
+        stock_list = g.quantlib.remove_limit_up(stock_list, positions_list)
+        return stock_list[:hold_number]
+
+class quantlib:
+
+    def get_fundamentals_sum(self, table_name=indicator, search=indicator.adjusted_profit, statsDate=None):
+
+        def __get_quarter(table_name, statsDate):
+            """
+            返回最近 n 个财报的日期
+            返回每个股票最近一个财报的日期
+            """
+            if table_name == 'indicator':
+                q = query(indicator.code, indicator.statDate)
+            elif table_name == 'income':
+                q = query(income.code, income.statDate)
+            elif table_name == 'cash_flow':
+                q = query(cash_flow.code, cash_flow.statDate)
+            elif table_name == 'balance':
+                q = query(balance.code, balance.statDate)
+            df = get_fundamentals(q, date=statsDate)
+            stock_last_statDate = {}
+            tmpDict = df.to_dict()
+            for i in range(len(tmpDict['statDate'].keys())):
+                stock_last_statDate[tmpDict['code'][i]] = tmpDict['statDate'][i]
+            df = df.sort(columns='statDate', ascending=False)
+            last_statDate = df.iloc[0, 1]
+            this_year = int(str(last_statDate)[0:4])
+            this_month = str(last_statDate)[5:7]
+            if this_month == '12':
+                last_quarter = str(this_year) + 'q4'
+                last_two_quarter = str(this_year) + 'q3'
+                last_three_quarter = str(this_year) + 'q2'
+                last_four_quarter = str(this_year) + 'q1'
+                last_five_quarter = str(this_year - 1) + 'q4'
+            elif this_month == '09':
+                last_quarter = str(this_year) + 'q3'
+                last_two_quarter = str(this_year) + 'q2'
+                last_three_quarter = str(this_year) + 'q1'
+                last_four_quarter = str(this_year - 1) + 'q4'
+                last_five_quarter = str(this_year - 1) + 'q3'
+            elif this_month == '06':
+                last_quarter = str(this_year) + 'q2'
+                last_two_quarter = str(this_year) + 'q1'
+                last_three_quarter = str(this_year - 1) + 'q4'
+                last_four_quarter = str(this_year - 1) + 'q3'
+                last_five_quarter = str(this_year - 1) + 'q2'
+            else:
+                last_quarter = str(this_year) + 'q1'
+                last_two_quarter = str(this_year - 1) + 'q4'
+                last_three_quarter = str(this_year - 1) + 'q3'
+                last_four_quarter = str(this_year - 1) + 'q2'
+                last_five_quarter = str(this_year - 1) + 'q1'
+            return (last_quarter, last_two_quarter, last_three_quarter, last_four_quarter, last_five_quarter, stock_last_statDate)
+
+        def __get_fundamentals_value(table_name, search, myDate):
+            """
+            输入查询日期
+            返回指定的财务数据，格式 dict
+            """
+            if table_name == 'indicator':
+                q = query(indicator.code, search, indicator.statDate)
+            elif table_name == 'income':
+                q = query(income.code, search, income.statDate)
+            elif table_name == 'cash_flow':
+                q = query(cash_flow.code, search, cash_flow.statDate)
+            elif table_name == 'balance':
+                q = query(balance.code, search, balance.statDate)
+            df = get_fundamentals(q, statDate=myDate).fillna(value=0)
+            tmpDict = df.to_dict()
+            stock_dict = {}
+            name = str(search).split('.')[-1]
+            for i in range(len(tmpDict['statDate'].keys())):
+                tmpList = []
+                tmpList.append(tmpDict['statDate'][i])
+                tmpList.append(tmpDict[name][i])
+                stock_dict[tmpDict['code'][i]] = tmpList
+            return stock_dict
+        last_quarter, last_two_quarter, last_three_quarter, last_four_quarter, last_five_quarter, stock_last_statDate = __get_quarter(table_name, statsDate)
+        last_quarter_dict = __get_fundamentals_value(table_name, search, last_quarter)
+        last_two_quarter_dict = __get_fundamentals_value(table_name, search, last_two_quarter)
+        last_three_quarter_dict = __get_fundamentals_value(table_name, search, last_three_quarter)
+        last_four_quarter_dict = __get_fundamentals_value(table_name, search, last_four_quarter)
+        last_five_quarter_dict = __get_fundamentals_value(table_name, search, last_five_quarter)
+        tmp_list = []
+        stock_list = stock_last_statDate.keys()
+        for stock in stock_list:
+            tmp_dict = {}
+            tmp_dict['code'] = stock
+            value_list = []
+            if stock in last_quarter_dict:
+                if stock_last_statDate[stock] == last_quarter_dict[stock][0]:
+                    value_list.append(last_quarter_dict[stock][1])
+            if stock in last_two_quarter_dict:
+                value_list.append(last_two_quarter_dict[stock][1])
+            if stock in last_three_quarter_dict:
+                value_list.append(last_three_quarter_dict[stock][1])
+            if stock in last_four_quarter_dict:
+                value_list.append(last_four_quarter_dict[stock][1])
+            if stock in last_five_quarter_dict:
+                value_list.append(last_five_quarter_dict[stock][1])
+            for i in range(4 - len(value_list)):
+                value_list.append(0)
+            tmp_dict['0Q'] = value_list[0]
+            tmp_dict['1Q'] = value_list[1]
+            tmp_dict['2Q'] = value_list[2]
+            tmp_dict['3Q'] = value_list[3]
+            tmp_dict['sum_value'] = value_list[0] + value_list[1] + value_list[2] + value_list[3]
+            tmp_list.append(tmp_dict)
+        df = pd.DataFrame(tmp_list)
+        return df
+
+    def fun_set_var(self, context, var_name, var_value):
+        if var_name not in dir(context):
+            setattr(context, var_name, var_value)
+
+    def fun_check_price(self, algo_name, stock_list, position_price, gap_trigger):
+        flag = False
+        msg = ''
+        if stock_list:
+            h = history(1, '1d', 'close', stock_list, df=False)
+            for stock in stock_list:
+                curPrice = h[stock][0]
+                if stock not in position_price:
+                    position_price[stock] = curPrice
+                oldPrice = position_price[stock]
+                if oldPrice != 0:
+                    deltaprice = abs(curPrice - oldPrice)
+                    if deltaprice / oldPrice > gap_trigger:
+                        msg = algo_name + '需要调仓: ' + stock + '，现价: ' + str(curPrice) + ' / 原价格: ' + str(oldPrice) + '\n'
+                        flag = True
+                        return (flag, position_price, msg)
+        return (flag, position_price, msg)
+
+    def fun_needRebalance(self, context, algo_name, moneyfund, stock_list, position_price, hold_periods, hold_cycle, gap_trigger):
+        msg = ''
+        rebalance_flag = False
+        stocks_count = 0
+        for stock in stock_list:
+            if stock not in moneyfund:
+                stocks_count += 1
+        if stocks_count == 0:
+            msg += algo_name + '调仓，因为持股数为 0 \n'
+            rebalance_flag = True
+        elif hold_periods == 0:
+            msg += algo_name + '调仓，因为持股天数剩余为 0 \n'
+            rebalance_flag = True
+        if not rebalance_flag:
+            rebalance_flag, position_price, msg2 = self.fun_check_price(algo_name, stock_list, position_price, gap_trigger)
+            msg += msg2
+        if rebalance_flag:
+            hold_periods = hold_cycle
+        else:
+            hold_periods -= 1
+        msg += algo_name + '离下次调仓还剩 ' + str(hold_periods) + ' 天\n'
+        return (rebalance_flag, position_price, hold_periods, msg)
+
+    def stock_clean_by_ma(self, context, security, short=4, long=40):
+        ma_short = attribute_history(security, short, '1d', 'close', True).mean()['close']
+        ma_long = attribute_history(security, long, '1d', 'close', True).mean()['close']
+        if ma_short <= ma_long and ma_short > 3300:
+            return True
+        else:
+            return False
+
+    def stock_clean_by_mom(self, context):
+        gr_index2 = self.get_growth_rate(context.index2)
+        gr_index8 = self.get_growth_rate(context.index8)
+        if gr_index2 <= context.index_growth_rate and gr_index8 <= context.index_growth_rate:
+            return True
+        else:
+            return False
+
+    def equity_curve_protect(self, context):
+        if not context.is_day_curve_protect:
+            cur_value = context.portfolio.total_value
+            if len(context.value_list) >= 20:
+                last_value = context.value_list[-20]
+                avg_value = sum(context.value_list[-20:]) / 20
+                if cur_value < last_value * 0.99:
+                    context.is_day_curve_protect = True
+        if context.is_day_curve_protect:
+            context.curve_protect_days = -2
+        return context.is_day_curve_protect
+
+    def reset_param(self, context):
+        context.is_day_curve_protect = False
+
+    def get_pe_median(self, context):
+        scanDate = context.previous_date
+        q = query(valuation.code, valuation.pe_ratio)
+        df = get_fundamentals(q, scanDate).dropna()
+        df['ep_ratio'] = 1 / df['pe_ratio']
+        context.pe_ratio_median = 1 / df['ep_ratio'].quantile(0.5)
+
+    def fun_update_positions_price(self, ratio):
+        position_price = {}
+        if ratio:
+            h = history(1, '1m', 'close', ratio.keys(), df=False)
+            for stock in ratio.keys():
+                if ratio[stock] > 0:
+                    position_price[stock] = round(h[stock][0], 3)
+        return position_price
+
+    def fun_assetAllocationSystem(self, stock_list, moneyfund, confidencelevel, statsDate=None):
+
+        def __fun_getEquity_ratio(__stocklist, confidencelevel, type, limit_up=1.0, limit_low=0.0, statsDate=None):
+            __ratio = {}
+            if __stocklist:
+                if type == 1:
+                    __ratio = self.fun_calStockWeight_by_risk(confidencelevel, __stocklist, limit_up, limit_low, statsDate)
+                elif type == 2:
+                    __ratio = self.fun_calStockWeight(__stocklist, limit_up, limit_low)
+                elif type == 3:
+                    __ratio = self.fun_cal_Weight_by_minvar(__stocklist, limit_up, limit_low)
+                elif type == 5:
+                    __ratio = self.fun_calWeight_by_RiskParity(__stocklist, statsDate)
+                else:
+                    for stock in __stocklist:
+                        __ratio[stock] = 1.0 / len(__stocklist)
+            return __ratio
+        if stock_list:
+            limit_up, limit_low = (round(2.0 / len(list(set(stock_list))), 4), round(0.5 / len(list(set(stock_list))), 4))
+            equity_ratio = __fun_getEquity_ratio(stock_list, confidencelevel, 0, limit_up, limit_low, statsDate)
+        else:
+            equity_ratio = {}
+        bonds_ratio = __fun_getEquity_ratio(moneyfund, confidencelevel, 0, 1.0, 0.0, statsDate)
+        return (equity_ratio, bonds_ratio)
+
+    def fun_calPosition(self, equity_ratio, bonds_ratio, algo_ratio, risk_ratio, moneyfund, portfolio_value, confidencelevel, statsDate=None):
+        """
+        equity_ratio 资产配仓结果
+        bonds_ratio 债券配仓结果
+        algo_ratio 策略占市值的百分比
+        risk_ratio 每个标的承受的风险系数
+        """
+        trade_ratio = equity_ratio
+        return trade_ratio
+
+    def fun_winsorize(self, rs, type, num):
+        rs = rs.dropna().copy()
+        low_line, up_line = (0, 0)
+        if type == 1:
+            mean = rs.mean()
+            mad = num * rs.std()
+            up_line = mean + mad
+            low_line = mean - mad
+        elif type == 2:
+            rs = rs.replace([-np.inf, np.inf], np.nan)
+            median = rs.median()
+            md = abs(rs - median).median()
+            mad = md * num * 1.4826
+            up_line = median + mad
+            low_line = median - mad
+        elif type == 3:
+            if len(rs) < 2:
+                return rs
+            mc = sm.stats.stattools.medcouple(rs)
+            rs.sort()
+            q1 = rs[int(0.25 * len(rs))]
+            q3 = rs[int(0.75 * len(rs))]
+            iqr = q3 - q1
+            if mc >= 0:
+                low_line = q1 - 1.5 * np.exp(-3.5 * mc) * iqr
+                up_line = q3 + 1.5 * np.exp(4 * mc) * iqr
+            else:
+                low_line = q1 - 1.5 * np.exp(-4 * mc) * iqr
+                up_line = q3 + 1.5 * np.exp(3.5 * mc) * iqr
+        rs[rs < low_line] = low_line
+        rs[rs > up_line] = up_line
+        return rs
+
+    def fun_standardize(self, s, type):
+        """
+        s为Series数据
+        type为标准化类型:1 MinMax,2 Standard,3 maxabs 
+        """
+        data = s.dropna().copy()
+        if int(type) == 1:
+            rs = (data - data.min()) / (data.max() - data.min())
+        elif type == 2:
+            rs = (data - data.mean()) / data.std()
+        elif type == 3:
+            rs = data / 10 ** np.ceil(np.log10(data.abs().max()))
+        return rs
+
+    def fun_neutralize(self, s, df, module='pe_ratio', industry_type=None, level=2, statsDate=None):
+        """
+        参数：
+        s为stock代码 如'000002.XSHE' 可为list,可为str
+        moduel:中性化的指标 默认为PE
+        industry_type:行业类型(可选), 如果行业不指定，全市场中性化
+        返回：
+        中性化后的Series index为股票代码 value为中性化后的值
+        """
+        s = df[df.code.isin(list(s))]
+        s = s.reset_index(drop=True)
+        s = pd.Series(s[module].values, index=s['code'])
+        s = self.fun_winsorize(s, 1, 3)
+        if industry_type:
+            stocks = self.fun_get_industry_stocks(industry=industry_type, level=level, statsDate=statsDate)
+        else:
+            stocks = list(get_all_securities(['stock'], date=statsDate).index)
+        df = df[df.code.isin(stocks)]
+        df = df.reset_index(drop=True)
+        df = pd.Series(df[module].values, index=df['code'])
+        df = self.fun_winsorize(df, 1, 3)
+        rs = (s - df.mean()) / df.std()
+        return rs
+
+    def fun_get_factor(self, df, factor_name, industry, level, statsDate):
+        stock_list = self.fun_get_industry_stocks(industry, level, statsDate)
+        rs = self.fun_neutralize(stock_list, df, module=factor_name, industry_type=industry, level=level, statsDate=statsDate)
+        rs = self.fun_standardize(rs, 2)
+        return rs
+
+    def fun_diversity_by_industry(self, stock_list, max_num, statsDate):
+        if not stock_list:
+            return stock_list
+        industry_list = self.fun_get_industry(cycle=None)
+        tmpList = []
+        for industry in industry_list:
+            i = 0
+            stocks = self.fun_get_industry_stocks(industry, 2, statsDate)
+            for stock in stock_list:
+                if stock in stocks:
+                    i += 1
+                    if i <= max_num:
+                        tmpList.append(stock)
+        final_stocks = []
+        for stock in stock_list:
+            if stock in tmpList:
+                final_stocks.append(stock)
+        return final_stocks
+
+    def fun_get_industry_stocks(self, industry, level=2, statsDate=None):
+        if level == 2:
+            stock_list = get_industry_stocks(industry, statsDate)
+        elif level == 1:
+            industry_list = self.fun_get_industry_levelI(industry)
+            stock_list = []
+            for industry_code in industry_list:
+                tmpList = get_industry_stocks(industry_code, statsDate)
+                stock_list = stock_list + tmpList
+            stock_list = list(set(stock_list))
+        else:
+            stock_list = []
+        return stock_list
+
+    def fun_get_industry_levelI(self, industry=None):
+        industry_dict = {'A': ['A01', 'A02', 'A03', 'A04', 'A05'], 'B': ['B06', 'B07', 'B08', 'B09', 'B11'], 'C': ['C13', 'C14', 'C15', 'C17', 'C18', 'C19', 'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27', 'C28', 'C29', 'C30', 'C31', 'C32', 'C33', 'C34', 'C35', 'C36', 'C37', 'C38', 'C39', 'C40', 'C41', 'C42'], 'D': ['D44', 'D45', 'D46'], 'E': ['E47', 'E48', 'E50'], 'F': ['F51', 'F52'], 'G': ['G53', 'G54', 'G55', 'G56', 'G58', 'G59'], 'H': ['H61', 'H62'], 'I': ['I63', 'I64', 'I65'], 'J': ['J66', 'J67', 'J68', 'J69'], 'K': ['K70'], 'L': ['L71', 'L72'], 'M': ['M73', 'M74'], 'N': ['N78'], 'P': ['P82'], 'Q': ['Q83'], 'R': ['R85', 'R86', 'R87'], 'S': ['S90']}
+        if industry == None:
+            return industry_dict
+        else:
+            return industry_dict[industry]
+
+    def fun_get_industry(self, cycle=None):
+        industry_dict = {'A01': False, 'A02': False, 'A03': False, 'A04': False, 'A05': False, 'B06': True, 'B07': True, 'B08': True, 'B09': True, 'B11': True, 'C13': False, 'C14': False, 'C15': False, 'C17': True, 'C18': True, 'C19': True, 'C20': False, 'C21': False, 'C22': False, 'C23': False, 'C24': False, 'C25': True, 'C26': True, 'C27': False, 'C28': True, 'C29': True, 'C30': True, 'C31': True, 'C32': True, 'C33': True, 'C34': True, 'C35': True, 'C36': True, 'C37': True, 'C38': True, 'C39': False, 'C40': False, 'C41': True, 'C42': False, 'D44': True, 'D45': False, 'D46': False, 'E47': True, 'E48': True, 'E50': True, 'F51': False, 'F52': False, 'G53': True, 'G54': True, 'G55': True, 'G56': True, 'G58': True, 'G59': False, 'H61': False, 'H62': False, 'I63': False, 'I64': False, 'I65': False, 'J66': True, 'J67': True, 'J68': True, 'J69': True, 'K70': True, 'L71': False, 'L72': False, 'M73': False, 'M74': True, 'N77': False, 'N78': False, 'P82': False, 'Q83': False, 'R85': False, 'R86': False, 'R87': False, 'S90': False}
+        industry_list = []
+        if cycle == True:
+            for industry in industry_dict.keys():
+                if industry_dict[industry] == True:
+                    industry_list.append(industry)
+        elif cycle == False:
+            for industry in industry_dict.keys():
+                if industry_dict[industry] == False:
+                    industry_list.append(industry)
+        else:
+            industry_list = industry_dict.keys()
+        return industry_list
+
+    def fun_get_Divid_by_year(self, context, stocks):
+        year = context.current_dt.year - 1
+        stocks_symbol = []
+        for s in stocks:
+            stocks_symbol.append(s[0:6])
+        df = gta.run_query(query(gta.STK_DIVIDEND.SYMBOL, gta.STK_DIVIDEND.DECLAREDATE).filter(gta.STK_DIVIDEND.ISDIVIDEND == 'Y', gta.STK_DIVIDEND.DIVDENDYEAR == year, gta.STK_DIVIDEND.TERMCODE == 'P2702', gta.STK_DIVIDEND.SYMBOL.in_(stocks_symbol))).fillna(value=0, method=None, axis=0)
+        df['pubtime'] = map(lambda x: int(x.split('-')[0] + x.split('-')[1] + x.split('-')[2]), df['DECLAREDATE'])
+        currenttime = int(str(context.current_dt)[0:4] + str(context.current_dt)[5:7] + str(context.current_dt)[8:10])
+        df = df[df.pubtime < currenttime]
+        stocks_symbol_this_year = list(df['SYMBOL'])
+        stocks_symbol_past_year = list(set(stocks_symbol) - set(stocks_symbol_this_year))
+        df1 = gta.run_query(query(gta.STK_DIVIDEND.SYMBOL, gta.STK_DIVIDEND.DIVIDENTBT, gta.STK_DIVIDEND.DECLAREDATE, gta.STK_DIVIDEND.DISTRIBUTIONBASESHARES).filter(gta.STK_DIVIDEND.ISDIVIDEND == 'Y', gta.STK_DIVIDEND.DIVDENDYEAR == year, gta.STK_DIVIDEND.SYMBOL.in_(stocks_symbol_this_year))).fillna(value=0, method=None, axis=0)
+        df1['pubtime'] = map(lambda x: int(x.split('-')[0] + x.split('-')[1] + x.split('-')[2]), df1['DECLAREDATE'])
+        currenttime = int(str(context.current_dt)[0:4] + str(context.current_dt)[5:7] + str(context.current_dt)[8:10])
+        df1 = df1[df1.pubtime < currenttime]
+        df2 = gta.run_query(query(gta.STK_DIVIDEND.SYMBOL, gta.STK_DIVIDEND.DIVIDENTBT, gta.STK_DIVIDEND.DECLAREDATE, gta.STK_DIVIDEND.DISTRIBUTIONBASESHARES).filter(gta.STK_DIVIDEND.ISDIVIDEND == 'Y', gta.STK_DIVIDEND.DIVDENDYEAR == year - 1, gta.STK_DIVIDEND.SYMBOL.in_(stocks_symbol_past_year))).fillna(value=0, method=None, axis=0)
+        df2['pubtime'] = map(lambda x: int(x.split('-')[0] + x.split('-')[1] + x.split('-')[2]), df2['DECLAREDATE'])
+        currenttime = int(str(context.current_dt)[0:4] + str(context.current_dt)[5:7] + str(context.current_dt)[8:10])
+        df2 = df2[df2.pubtime < currenttime]
+        df = pd.concat((df2, df1))
+        df['SYMBOL'] = map(normalize_code, list(df['SYMBOL']))
+        df.index = list(df['SYMBOL'])
+        q = query(valuation.code, valuation.capitalization).filter(valuation.code.in_(list(df.index)))
+        df3 = get_fundamentals(q).fillna(value=0)
+        df3['SYMBOL'] = df3['code']
+        df3 = df3.drop(['code'], axis=1)
+        df = df.merge(df3, on='SYMBOL')
+        df.index = list(df['SYMBOL'])
+        df['DISTRIBUTIONBASESHARES'] = map(float, df['DISTRIBUTIONBASESHARES'])
+        df['CAP_RATIO'] = df['DISTRIBUTIONBASESHARES'] / (df['capitalization'] * 10000)
+        df['DIVIDENTBT'] = map(float, df['DIVIDENTBT'])
+        df['DIVIDENTBT'] = df['DIVIDENTBT'] * df['CAP_RATIO']
+        df = df.drop(['SYMBOL', 'DECLAREDATE', 'DISTRIBUTIONBASESHARES', 'capitalization', 'CAP_RATIO'], axis=1)
+        df = df.groupby(df.index).sum()
+        Price = history(1, unit='1d', field='close', security_list=list(df.index), df=True, skip_paused=False, fq='pre')
+        Price = Price.T
+        df['pre_close'] = Price
+        df['divpercent'] = df['DIVIDENTBT'] / (df['pre_close'] * 10)
+        df['code'] = np.array(df.index)
+        return df
+
+    def fun_do_trade(self, context, trade_ratio, moneyfund, trade_style):
+
+        def __fun_tradeBond(context, stock, curPrice, Value):
+            curValue = float(context.portfolio.positions[stock].total_amount * curPrice)
+            deltaValue = abs(Value - curValue)
+            if deltaValue > curPrice * 200:
+                if Value > curValue:
+                    cash = context.portfolio.cash
+                    if cash > curPrice * 200:
+                        self.fun_trade(context, stock, Value)
+                else:
+                    self.fun_trade(context, stock, Value)
+
+        def __fun_tradeStock(context, curPrice, stock, ratio, trade_style):
+            total_value = context.portfolio.portfolio_value
+            if stock in moneyfund:
+                __fun_tradeBond(context, stock, curPrice, total_value * ratio)
+            else:
+                curValue = context.portfolio.positions[stock].total_amount * curPrice
+                Quota = total_value * ratio
+                if Quota:
+                    if abs(Quota - curValue) / Quota >= 0.25 or trade_style:
+                        if Quota > curValue:
+                            self.fun_trade(context, stock, Quota)
+                        else:
+                            self.fun_trade(context, stock, Quota)
+                elif curValue > 0:
+                    self.fun_trade(context, stock, Quota)
+        trade_list = trade_ratio.keys()
+        myholdstock = context.portfolio.positions.keys()
+        stock_list = list(set(trade_list).union(set(myholdstock)))
+        total_value = context.portfolio.portfolio_value
+        holdDict = {}
+        h = history(1, '1d', 'close', stock_list, df=False)
+        for stock in myholdstock:
+            tmpW = round(context.portfolio.positions[stock].total_amount * h[stock] / total_value, 2)
+            holdDict[stock] = float(tmpW)
+        tmpDict = {}
+        for stock in holdDict:
+            if stock in trade_ratio:
+                tmpDict[stock] = round(trade_ratio[stock] - holdDict[stock], 2)
+        tradeOrder = sorted(tmpDict.items(), key=lambda d: d[1], reverse=False)
+        _tmplist = []
+        for idx in tradeOrder:
+            stock = idx[0]
+            __fun_tradeStock(context, h[stock][-1], stock, trade_ratio[stock], trade_style)
+            _tmplist.append(stock)
+        for i in range(len(trade_list)):
+            stock = trade_list[i]
+            if len(_tmplist) != 0:
+                if stock not in _tmplist:
+                    __fun_tradeStock(context, h[stock][-1], stock, trade_ratio[stock], trade_style)
+            else:
+                __fun_tradeStock(context, h[stock][-1], stock, trade_ratio[stock], trade_style)
+
+    def unpaused(self, stock_list, positions_list):
+        current_data = get_current_data()
+        tmpList = []
+        for stock in stock_list:
+            if not current_data[stock].paused or stock in positions_list:
+                tmpList.append(stock)
+        return tmpList
+
+    def remove_st(self, stock_list, statsDate):
+        current_data = get_current_data()
+        return [s for s in stock_list if not current_data[s].is_st]
+
+    def remove_limit_up(self, stock_list, positions_list):
+        h = history(1, '1m', 'close', stock_list, df=False, skip_paused=False, fq='pre')
+        h2 = history(1, '1m', 'high_limit', stock_list, df=False, skip_paused=False, fq='pre')
+        tmpList = []
+        for stock in stock_list:
+            if h[stock][0] < h2[stock][0] or stock in positions_list:
+                tmpList.append(stock)
+        return tmpList
+
+    def fun_get_bad_stock_list(self, statsDate):
+        df = get_fundamentals(query(valuation.code, balance.good_will, balance.equities_parent_company_owners), date=statsDate)
+        df = df.fillna(value=0)
+        df['good_will_ratio'] = 1.0 * df['good_will'] / df['equities_parent_company_owners']
+        list_good_will = list(df[df.good_will_ratio > 0.1].code)
+        bad_stocks = list_good_will
+        bad_stocks = list(set(bad_stocks))
+        return bad_stocks
+
+    def remove_bad_stocks(self, stock_list, bad_stock_list):
+        tmpList = []
+        for stock in stock_list:
+            if stock not in bad_stock_list:
+                tmpList.append(stock)
+        return tmpList
+
+    def fun_delNewShare(self, context, equity, deltaday):
+        deltaDate = context.current_dt.date() - dt.timedelta(deltaday)
+        tmpList = []
+        for stock in equity:
+            if get_security_info(stock).start_date < deltaDate:
+                tmpList.append(stock)
+        return tmpList
+
+    def fun_trade(self, context, stock, value):
+        self.fun_setCommission(context, stock)
+        order_target_value(stock, value)
+
+    def fun_setCommission(self, context, stock):
+        if stock in context.moneyfund:
+            pass
+
+    def get_portfolio_info_text(self, context, op_sfs=[0]):
+        sub_str = ''
+        table = PrettyTable(['仓号', '股票', '持仓', '当前价', '盈亏率', '持仓比'])
+        for sf_id in range(len(context.subportfolios)):
+            cash = context.subportfolios[sf_id].cash
+            p_value = context.subportfolios[sf_id].positions_value
+            total_values = p_value + cash
+            if sf_id in op_sfs:
+                sf_id_str = str(sf_id) + ' *'
+            else:
+                sf_id_str = str(sf_id)
+            for stock in context.subportfolios[sf_id].long_positions.keys():
+                position = context.subportfolios[sf_id].long_positions[stock]
+                if sf_id in op_sfs and stock in context.op_buy_stocks:
+                    stock_str = self.show_stock(stock) + ' *'
+                else:
+                    stock_str = self.show_stock(stock)
+                stock_raite = position.total_amount * position.price / total_values * 100
+                table.add_row([sf_id_str, stock_str, position.total_amount, position.price, '%.2f%%' % ((position.price - position.avg_cost) / position.avg_cost * 100), '%.2f%%' % stock_raite])
+            if sf_id < len(context.subportfolios) - 1:
+                table.add_row(['----', '---------------', '-----', '----', '-----', '-----'])
+            sub_str += '[仓号: %d] [总值:%d] [持股数:%d] [仓位:%.2f%%] \n' % (sf_id, total_values, len(context.subportfolios[sf_id].long_positions), p_value * 100 / (cash + p_value))
+
+    def show_stock(self, stock):
+        return '%s %s' % (stock[:6], get_security_info(stock).display_name)
+
+    def clear_position(self, context):
+
+        def close_position(position):
+            security = position.security
+            order = order_target_value(security, 0)
+        if context.portfolio.positions:
+            context.hold_periods = 0
+            for stock in context.portfolio.positions.keys():
+                position = context.portfolio.positions[stock]
+                close_position(position)
+
+    def get_growth_rate(self, security, n=20):
+        lc = self.get_close_price(security, n)
+        c = self.get_close_price(security, 1, '1m')
+        if not isnan(lc) and (not isnan(c)) and (lc != 0):
+            return (c - lc) / lc
+        else:
+            return 0
+
+    def get_close_price(self, security, n, unit='1d'):
+        return attribute_history(security, n, unit, 'close', True)['close'][0]

@@ -5,7 +5,9 @@
 
 用法:
     python3 scripts/repaint_check.py <candidate.py> [n_symbols] [cutoff]
+    python3 scripts/repaint_check.py <candidate.py> 500 2025-06-30 --fields-cache <pit_fields.pkl>
 默认 n_symbols=500、cutoff=2025-06-30；对比区间 = cutoff 前 12 个月（该区间两侧都有足够暖机）。
+财务候选可用 --fields-cache 提供真实 PIT 字段字典（Series 索引固定为 [date, symbol]）。
 退出码 0=通过，1=检出泄漏/异常。
 """
 import importlib.util
@@ -29,8 +31,19 @@ def load_smoke():
     return mod
 
 
-def load_factor_class(path, smoke):
+def load_factor_class(path, smoke, uploads_dir=None):
     g = {"np": np, "Factor": type("Factor", (), {})}
+    if uploads_dir is not None:
+        root = Path(uploads_dir).resolve()
+        def upload_path(relative):
+            if not str(relative).startswith("uploads/"):
+                raise ValueError("uploaded data path must start with uploads/")
+            target = (root / str(relative)[len("uploads/"):]).resolve()
+            target.relative_to(root)
+            if not target.is_file():
+                raise FileNotFoundError(target)
+            return str(target)
+        g["upload_path"] = upload_path
     for name in OPS:
         g[name] = getattr(smoke, name)
     src = Path(path).read_text(encoding="utf-8")
@@ -50,9 +63,24 @@ def main():
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 500
     cutoff = pd.Timestamp(sys.argv[3]) if len(sys.argv) > 3 else pd.Timestamp("2025-06-30")
     smoke = load_smoke()
-    fields = smoke.load_fields(n_symbols=n)
+    # Financial/model candidates can supply genuine PIT input panels instead
+    # of the historical price-only smoke fixture. This never changes a factor
+    # definition or substitutes missing fields to make a check pass.
+    if "--fields-cache" in sys.argv:
+        cache_pos = sys.argv.index("--fields-cache")
+        fields = pd.read_pickle(Path(sys.argv[cache_pos + 1]))
+        if not isinstance(fields, dict) or not fields:
+            raise ValueError("fields cache must be a nonempty dict of Series")
+        for key, value in fields.items():
+            if not isinstance(value, pd.Series) or value.index.nlevels != 2:
+                raise ValueError(f"invalid [date, symbol] Series: {key}")
+    else:
+        fields = smoke.load_fields(n_symbols=n)
     fields_cut = {k: v[v.index.get_level_values(0) <= cutoff] for k, v in fields.items()}
-    cls = load_factor_class(path, smoke)
+    uploads_dir = None
+    if "--uploads-dir" in sys.argv:
+        uploads_dir = Path(sys.argv[sys.argv.index("--uploads-dir") + 1])
+    cls = load_factor_class(path, smoke, uploads_dir)
     full = cls().calculate(dict(fields))
     cut = cls().calculate(dict(fields_cut)).reindex(full.index)
     start = cutoff - pd.Timedelta(days=365)

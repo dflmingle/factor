@@ -1,0 +1,201 @@
+quant/2021年度精选策略/74.迪马克TD趋势反转指标.txt
+from jqdata import *
+
+def initialize(context):
+    g.code = '000300.XSHG'
+    g.n1 = 8
+    g.n2 = 13
+    g.count = 0
+    g.stop = 0
+    g.setup_high = 0
+    g.setup_low = 0
+    g.setup = 0
+    g.flag = 0
+    g.price = 0
+    g.p = 0
+    g.hold = ''
+    g.lc = False
+    g.trend = 0
+    run_daily(before_market_open, time='09:00', reference_security='IF8888.CCFX')
+    run_daily(market_open, time='09:30', reference_security='IF8888.CCFX')
+    run_daily(after_market_close, time='15:30', reference_security='IF8888.CCFX')
+
+def before_market_open(context):
+    g.today = context.current_dt.date()
+    g.hands = calc_hands(context)
+    g.c = get_future_contracts('IF')
+    g.sub = g.c[1]
+    g.main = g.c[0]
+    if (get_security_info(g.main).end_date - context.current_dt.date()).days < 10:
+        g.main = g.sub
+
+def market_open(context):
+    current_data = get_current_data()
+    last = current_data[g.code].last_price
+    if g.hold:
+        end = get_security_info(g.hold).end_date
+        if (end - context.current_dt.date()).days < 5:
+            gap = current_data[g.sub].last_price - last
+            g.price += gap
+            g.p += gap
+            if g.trend == 1:
+                if g.setup == -1:
+                    order_target(g.hold, 0, None, 'short')
+                    order(g.sub, g.hands, None, 'short')
+                    g.hold = g.sub
+                elif g.setup == 1:
+                    order_target(g.hold, 0, None, 'long')
+                    order(g.sub, g.hands, None, 'long')
+                    g.hold = g.sub
+            elif g.trend == -1:
+                if g.setup == 1:
+                    order_target(g.hold, 0, None, 'short')
+                    order(g.sub, g.hands, None, 'short')
+                    g.hold = g.sub
+                elif g.setup == -1:
+                    order_target(g.hold, 0, None, 'long')
+                    order(g.sub, g.hands, None, 'long')
+                    g.hold = g.sub
+    if g.setup == -1 and g.count == g.n2 and (not g.flag):
+        pre3close = attribute_history(g.code, 3, '1d', 'close').close.values[0]
+        pre1low = attribute_history(g.code, 1, '1d', 'low').low.values[0]
+        if pre1low > pre3close:
+            g.price = last
+            g.p = last
+            g.hold = g.main
+            g.flag = 1
+            g.trend = 1
+            order(g.main, g.hands, None, 'short')
+    elif g.setup == 1 and g.count == g.n2 and (not g.flag):
+        pre3close = attribute_history(g.code, 3, '1d', 'close').close.values[0]
+        pre1high = attribute_history(g.code, 1, '1d', 'high').high.values[0]
+        if pre1high < pre3close:
+            g.flag = 1
+            g.price = last
+            g.p = last
+            g.hold = g.main
+            g.trend = 1
+            order(g.main, g.hands, None, 'long')
+    if g.setup == -1 and g.flag == 1 and (g.trend == 1):
+        if g.price / last > 1.05 or g.price / last < 0.95:
+            if g.price / last > 1.05:
+                pass
+            g.price = last
+            g.p = last
+            reverse_posi()
+    elif g.setup == 1 and g.flag == 1 and (g.trend == 1):
+        if last / g.price > 1.05 or last / g.price < 0.95:
+            order_target(g.hold, 0, None, 'long')
+            if last / g.price > 1.05:
+                pass
+            g.price = last
+            g.p = last
+            reverse_posi()
+    if g.setup == 1 and g.flag == 1 and (g.trend == -1):
+        if g.price > last:
+            g.price = last
+        elif g.price < 0.9 * last or g.p > 1.2 * last:
+            order_target(g.hold, 0, None, 'long')
+            if g.p > 1.2 * last:
+                pass
+            else:
+                g.lc = True
+            g.trend = 0
+            g.price = 0
+            g.p = 0
+            g.setup = 0
+            g.setup_high = 0
+            g.hold = ''
+            g.count = 0
+            g.flag = 0
+    elif g.setup == -1 and g.flag == 1 and (g.trend == -1):
+        if g.price < last:
+            g.price = last
+        elif g.price > 1.2 * last or g.p < 0.8 * last:
+            order_target(g.hold, 0, None, 'short')
+            if g.p < 0.9 * last:
+                pass
+            else:
+                g.lc = True
+            g.trend = 0
+            g.price = 0
+            g.p = 0
+            g.setup = 0
+            g.setup_low = 0
+            g.hold = ''
+            g.count = 0
+            g.flag = 0
+
+def after_market_close(context):
+    calc_setup()
+
+def reverse_posi():
+    if g.setup == -1:
+        order_target(g.hold, 0, None, 'short')
+        order(g.hold, g.hands, None, 'long')
+        g.trend = -1
+    elif g.setup == 1:
+        order_target(g.hold, 0, None, 'long')
+        order(g.hold, g.hands, None, 'short')
+        g.trend = -1
+
+def calc_setup():
+    close = get_price(g.code, end_date=g.today, count=g.n1 + 5, fields='close')
+    diff4 = close.diff(4).dropna().values
+    first = g.setup
+    if (diff4[:-1] < 0).all() and diff4[-1] > 0 and (not g.setup):
+        g.setup = -1
+        high = get_price(g.code, end_date=g.today, count=g.n1, fields='high').values.max()
+        g.setup_high = high
+    elif (diff4[:-1] > 0).all() and diff4[-1] < 0 and (not g.setup):
+        g.setup = 1
+        low = get_price(g.code, end_date=g.today, count=g.n1, fields='low').values.min()
+        g.setup_low = low
+    if g.setup == -1 and g.count != g.n2:
+        pre2low = get_price(g.code, end_date=g.today, count=3, fields='low').values[0]
+        if close.values[-1] < pre2low:
+            g.count += 1
+    elif g.setup == 1 and g.count != g.n2:
+        pre2high = get_price(g.code, end_date=g.today, count=3, fields='high').values[0]
+        if close.values[-1] > pre2high:
+            g.count += 1
+    if g.setup == -1 and g.count != g.n2:
+        info = '下跌setup完成，'
+        if close.values[-1] > g.setup_high:
+            info += '当日收盘价大于setup中的最高价，停止'
+            g.setup = 0
+            g.setup_high = 0
+            g.count = 0
+        elif (diff4 > 0).all():
+            info += '出现反向setup，优先新setup'
+            g.setup = 1
+            g.count = 0
+            g.setup_high = 0
+            low = get_price(g.code, end_date=g.today, count=g.n1, fields='low').values.min()
+            g.setup_low = low
+        elif not first and (diff4 < 0).all():
+            info += '出现同向setup，重新计数'
+            g.count = 0
+    elif g.setup == 1 and g.count != g.n2:
+        info = '上升setup完成，'
+        if close.values[-1] < g.setup_low:
+            info += '当日收盘价小于setup中最低价，停止'
+            g.setup = 0
+            g.setup_low = 0
+            g.count = 0
+        elif (diff4 < 0).all():
+            info += '出现反向setup，优先新setup'
+            g.setup = -1
+            g.count = 0
+            g.setup_low = 0
+            high = get_price(g.code, end_date=g.today, count=g.n1, fields='high').values.max()
+            g.setup_high = high
+        elif not first and (diff4 > 0).all():
+            info += '出现同向setup，重新计数'
+            g.count = 0
+
+def calc_hands(context):
+    money = context.portfolio.total_value
+    price = attribute_history(g.code, 1, '1d', 'close').close.values[0]
+    hands = int(money / 0.15 * 0.5 / price / 300)
+    return hands

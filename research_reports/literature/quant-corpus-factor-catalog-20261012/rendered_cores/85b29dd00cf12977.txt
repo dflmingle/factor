@@ -1,0 +1,76 @@
+quant/2020年度精选策略/92 多因子选股策略.txt
+import pandas as pd
+import datetime
+import numpy as np
+import math
+import time
+import jqdata
+from pandas import Series, DataFrame
+import statsmodels.api as sm
+import scipy.stats as scs
+import matplotlib.pyplot as plt
+'EXACT_REVIEWED_FUNCTION initialize sha256=507bbc3c7a2e4f1e57807f9c530a607b5733d4e37a9f594d7ecae19d990d4ec8 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def set_params():
+    g.tc = 15
+    g.yb = 63
+    g.N = 20
+    g.factors = ['circulating_market_cap', 'ps_ratio', 'eps', 'net_profit_to_total_revenue', 'roe', 'pcf_ratio', 'pe_ratio', 'turnover_ratio']
+    g.weights = [[-1], [1], [-1], [-1], [-1], [-1], [1], [1]]
+'EXACT_REVIEWED_FUNCTION set_variables sha256=ef3054e17478dcd74b0f3cb09c0b16318e69b1007dafb4c7943e2f2e1d8a742e source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'\n================================================================================\n每天开盘前\n================================================================================\n'
+
+def before_trading_start(context):
+    if g.t % g.tc == 0:
+        g.if_trade = True
+        set_slip_fee(context)
+        g.all_stocks = set_feasible_stocks(get_index_stocks('000300.XSHG'), g.yb, context)
+    g.t += 1
+
+def set_feasible_stocks(stock_list, days, context):
+    suspened_info_df = get_price(list(stock_list), start_date=context.current_dt, end_date=context.current_dt, frequency='daily', fields='paused')['paused'].T
+    unsuspened_index = suspened_info_df.iloc[:, 0] < 1
+    unsuspened_stocks = suspened_info_df[unsuspened_index].index
+    feasible_stocks = []
+    current_data = get_current_data()
+    for stock in unsuspened_stocks:
+        if sum(attribute_history(stock, days, unit='1d', fields='paused', skip_paused=False))[0] == 0:
+            feasible_stocks.append(stock)
+    return feasible_stocks
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+'\n================================================================================\n每天交易时\n================================================================================\n'
+
+def handle_data(context, data):
+    if g.if_trade == True:
+        g.everyStock = context.portfolio.portfolio_value / g.N
+        df_caiwu = getRankedFactors(g.factors, g.all_stocks)
+        toBuy = df_caiwu.index[0:g.N]
+        order_stock_sell(context, toBuy)
+        order_stock_buy(context, toBuy)
+    g.if_trade = False
+
+def order_stock_sell(context, toBuy):
+    for i in context.portfolio.positions:
+        if i not in toBuy:
+            order_target_value(i, 0)
+
+def order_stock_buy(context, toBuy):
+    for i in toBuy:
+        if i not in context.portfolio.positions:
+            order_target_value(i, g.everyStock)
+
+def getRankedFactors(f, all_stocks):
+    q = query(valuation, balance, cash_flow, income, indicator).filter(valuation.code.in_(all_stocks))
+    df = get_fundamentals(q)
+    df1 = df[f]
+    df1.index = df.code
+    df1 = df1.rank(axis=0, method='average', ascending=True)
+    points = np.dot(df1.values, g.weights)
+    df1['points'] = pd.Series(list(points), index=df1.index)
+    df1 = df1.sort('points', ascending=True)
+    return df1
+'\n================================================================================\n每天收盘后\n================================================================================\n'
+
+def after_trading_end(context):
+    return

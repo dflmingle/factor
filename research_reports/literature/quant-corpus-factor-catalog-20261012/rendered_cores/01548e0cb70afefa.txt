@@ -1,0 +1,122 @@
+quant/2021年度精选策略/51.北上资金持股比选股策略（北向、港资、外资）.txt
+import pandas as pd
+from jqdata import *
+
+def initialize(context):
+    g.benchmark = '000300.XSHG'
+
+def after_code_changed(context):
+    g.universe_index = '000902.XSHG'
+    g.max_hold_stocknum = 10
+    g.check_out_ranking = 30
+    g.security_max_proportion = 0.2
+    g.security_min_proportion = 0.05
+    g.n_tradeday_not_buy = 10
+    g.prev_hk_hold_df = pd.DataFrame({})
+    g.selled_security_dict = {}
+    run_daily(main_func, time='open', reference_security=g.benchmark)
+    run_daily(selled_security_list_count, time='after_close', reference_security=g.benchmark)
+
+def main_func(context):
+    prev_date = context.previous_date
+    stock_list = get_index_stocks(g.universe_index)
+    hk_hold_df = get_hk_hold_ratio(stock_list, end_date=prev_date, start_date=prev_date, sorted_by_circulation=False)
+    if len(hk_hold_df) == 0:
+        hk_hold_df = g.prev_hk_hold_df
+    else:
+        g.prev_hk_hold_df = hk_hold_df
+    hold_lists = list(hk_hold_df['code'])
+    hold_lists = st_filter(context, hold_lists)
+    hold_lists = paused_filter(context, hold_lists)
+    hold_lists = delisted_filter(context, hold_lists)
+    hold_lists = hold_lists[:g.check_out_ranking]
+    trade(context, hold_lists, g.max_hold_stocknum, g.security_max_proportion, g.security_min_proportion)
+
+def selled_security_list_count(context):
+    selled_num = len(g.selled_security_dict)
+    if selled_num > 0:
+        for stock in g.selled_security_dict.keys():
+            g.selled_security_dict[stock] += 1
+
+def trade(context, hold_lists, max_hold_stocknum, security_max_proportion=None, security_min_proportion=None):
+    if security_max_proportion == None:
+        security_max_proportion = 1 / max_hold_stocknum * 2
+    if security_min_proportion == None:
+        security_min_proportion = 1 / max_hold_stocknum / 2
+    positions_lists = list(context.portfolio.positions.keys())
+    keep_holding_lists = [stock for stock in hold_lists if stock in positions_lists][:max_hold_stocknum]
+    new_entry_num = max_hold_stocknum - len(keep_holding_lists)
+    new_entry_lists = [stock for stock in hold_lists if stock not in keep_holding_lists][:new_entry_num]
+    buy_lists = list(set(keep_holding_lists + new_entry_lists))
+    sell_lists = [stock for stock in positions_lists if stock not in buy_lists]
+    sell_lists = high_limit_filter(context, sell_lists)
+    sell_lists = paused_filter(context, sell_lists)
+    for stock in sell_lists:
+        order_target_value(stock, 0)
+    selled_security_list_dict(context, sell_lists)
+    total_value = context.portfolio.total_value
+    max_value = total_value * security_max_proportion
+    min_value = total_value * security_min_proportion
+    target_value = total_value / max_hold_stocknum
+    positions_lists = list(context.portfolio.positions.keys())
+    for stock in positions_lists:
+        now_value = context.portfolio.positions[stock].value
+        if now_value > max_value:
+            order_target_value(stock, 0.9 * max_value)
+        if now_value < min_value:
+            order_target_value(stock, target_value)
+    buy_orders_num = max_hold_stocknum - len(positions_lists)
+    buy_orders = new_entry_lists[:buy_orders_num]
+    buy_orders = [stock for stock in buy_orders if filter_n_tradeday_not_buy(stock, g.n_tradeday_not_buy)]
+    cash = context.portfolio.available_cash
+    for stock in buy_orders:
+        order_target_value(stock, cash / buy_orders_num)
+
+def get_hk_hold_ratio(stock_list, end_date, start_date=None, count=None, sorted_by_circulation=False):
+    trade_days = get_trade_days(start_date=start_date, end_date=end_date, count=count)
+    q_hk_hold = query(finance.STK_HK_HOLD_INFO.day, finance.STK_HK_HOLD_INFO.code, finance.STK_HK_HOLD_INFO.name, finance.STK_HK_HOLD_INFO.link_id, finance.STK_HK_HOLD_INFO.share_ratio).filter(finance.STK_HK_HOLD_INFO.code.in_(stock_list), finance.STK_HK_HOLD_INFO.link_id != '310005', finance.STK_HK_HOLD_INFO.day.in_(trade_days)).order_by(finance.STK_HK_HOLD_INFO.share_ratio.desc())
+    df_hk_hold = finance.run_query(q_hk_hold)
+    q_valuation = query(valuation.day, valuation.code, valuation.pe_ratio, valuation.capitalization, valuation.circulating_cap).filter(valuation.code.in_(stock_list), valuation.day.in_(trade_days)).order_by(valuation.day.desc())
+    df_valuation = finance.run_query(q_valuation)
+    df_valuation['circulation_ratio'] = df_valuation['circulating_cap'] / df_valuation['capitalization']
+    df_valuation = df_valuation.drop(['circulating_cap', 'capitalization'], axis=1)
+    result = pd.merge(df_hk_hold, df_valuation, on=['day', 'code'])
+    result['market_share_ratio'] = result['share_ratio']
+    result.loc[result['link_id'] == 310001, ['market_share_ratio']] = result['share_ratio'] * result['circulation_ratio']
+    result['circulation_share_ratio'] = result['market_share_ratio'] / result['circulation_ratio']
+    if sorted_by_circulation == False:
+        result = result.sort_values(by=['day', 'market_share_ratio'], ascending=False).reset_index(drop=True)
+    else:
+        result = result.sort_values(by=['day', 'circulation_share_ratio'], ascending=False).reset_index(drop=True)
+    result = result[['day', 'code', 'name', 'market_share_ratio', 'circulation_share_ratio', 'pe_ratio']]
+    return result
+
+def filter_n_tradeday_not_buy(security, n=0):
+    try:
+        if security in g.selled_security_dict.keys() and g.selled_security_dict[security] < n:
+            return False
+        return True
+    except:
+        return True
+
+def selled_security_list_dict(context, security_list):
+    selled_sl = [s for s in security_list if s not in context.portfolio.positions.keys()]
+    if len(selled_sl) > 0:
+        for stock in selled_sl:
+            g.selled_security_dict[stock] = 0
+
+def paused_filter(context, security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not current_data[stock].paused]
+    return security_list
+
+def delisted_filter(context, security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not ('退' in current_data[stock].name or '*' in current_data[stock].name)]
+    return security_list
+
+def st_filter(context, security_list):
+    current_data = get_current_data()
+    security_list = [stock for stock in security_list if not current_data[stock].is_st]
+    return security_list
+'EXACT_REVIEWED_FUNCTION high_limit_filter sha256=c69a2d42ed9c3a45e1bb70c9081749f8db378fda5a23f815c2bcec98f89ce3aa source=quant/2020年度精选策略/08 MACD单因子多头策略.txt'

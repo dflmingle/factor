@@ -1,0 +1,41 @@
+quant/2024年度精选策略1/9.持仓95只大容量小市值，媲美金元顺安元启.txt
+import pandas as pd
+
+def initialize(context):
+    g.stock_num = 95
+    run_daily(prepare_stock_list, time='9:05', reference_security='000300.XSHG')
+    run_monthly(my_Trader, 1, time='9:30')
+    run_daily(check_limit_up, time='14:00')
+
+def my_Trader(context):
+    dt_last = context.previous_date
+    stocks = get_all_securities('stock', dt_last).index.tolist()
+    stocks = filter_kcbj_stock(stocks)
+    stocks = filter_st_stock(stocks)
+    df = get_fundamentals(query(valuation.code).filter(valuation.code.in_(stocks), valuation.pb_ratio > 0, indicator.inc_return > 0, indicator.inc_total_revenue_year_on_year > 0, indicator.inc_net_profit_year_on_year > 0, indicator.ocf_to_operating_profit > 5).order_by(valuation.market_cap.asc()).limit(g.stock_num))
+    choice = list(df.code)
+    for s in context.portfolio.positions:
+        if s not in choice and s not in g.high_limit_list:
+            order_target(s, 0)
+    psize = 1.0 / g.stock_num * context.portfolio.total_value
+    for s in choice:
+        if context.portfolio.available_cash < psize:
+            break
+        if s not in context.portfolio.positions:
+            order_value(s, psize)
+
+def prepare_stock_list(context):
+    g.high_limit_list = []
+    hold_list = list(context.portfolio.positions)
+    if hold_list:
+        df = get_price(hold_list, end_date=context.previous_date, frequency='daily', fields=['close', 'high_limit', 'paused'], count=1, panel=False)
+        g.high_limit_list = df.query('close==high_limit and paused==0')['code'].tolist()
+
+def check_limit_up(context):
+    current_data = get_current_data()
+    if g.high_limit_list:
+        for stock in g.high_limit_list:
+            if current_data[stock].last_price < current_data[stock].high_limit:
+                order_target(stock, 0)
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=b20adc2db1c616e826bf1775d414ca43b1f9de2930e04402b77c70c948f455d4 source=quant/2024年度精选策略1/1.差不多得了.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=c8229093b9ca4e7aafa45470f93924c19038e4a06a7d0aa1879e8dc6bacdc223 source=quant/2024年度精选策略1/17.5年超额收益1055%，K线处理大阴线，无未来.txt'

@@ -1,0 +1,760 @@
+quant/聚宽2025年精选/70动态保形回归小市值策略改进.txt
+from jqlib.technical_analysis import *
+from jqdata import *
+from jqfactor import *
+import pandas as pd
+import numpy as np
+import math
+from sklearn.svm import SVR
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import learning_curve
+from sklearn.linear_model import LinearRegression
+import jqdata
+import datetime
+from datetime import time
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import sklearn.base
+from sklearn.mixture import GaussianMixture
+import xgboost
+from xgboost import Booster, XGBRegressor
+
+def initialize(context):
+    set_params()
+    set_backtest()
+    set_variables()
+    run_daily(close_account, '14:50')
+    g.pass_april = True
+    g.no_trading_today_signal = False
+    g.filter_bons = True
+    g.stock_pro = 0.1
+    g.stoploss_market = 0.1
+    g.stopprofit_market = 0.35
+    g.list_to_buy = []
+
+def set_params():
+    g.tc = 20
+    g.tc_stoploss = 1
+    g.stocknum_1 = 5
+    g.stocknum_2 = 3
+    g.ret = -0.05
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+
+def set_variables():
+    g.days = 0
+    g.if_trade = False
+    g.if_trade_stoploss = False
+
+def before_trading_start(context):
+    g.no_trading_today_signal = today_is_between(context)
+    final_list = []
+    yesterday = context.previous_date
+    today = context.current_dt
+    stock_list = get_all_securities('stock', yesterday).index.tolist()
+    stock_list = stock_list
+    stock_list = filter_stocks_by_auditor_opinion_jqz(context, stock_list)
+    stock_list = filter_stocks_by_revenue_and_profit(context, stock_list)
+    stock_list = filter_st_stock(stock_list)
+    stock_list = filter_kcb_stock(context, stock_list)
+    stock_list = filter_new_stock(context, stock_list)
+    stock_list = filter_paused_stock(stock_list)
+    g.feasible_stocks = list(stock_list)
+    set_slip_fee(context)
+    if g.days % g.tc == 0:
+        g.if_trade = True
+    if g.days % g.tc_stoploss == 0:
+        g.if_trade_stoploss = True
+        set_slip_fee(context)
+    if g.no_trading_today_signal == True:
+        g.days = -1
+    g.days += 1
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=56c935fd0afce29640997b01087111058b7e7ff329fc34a521129078681c1610 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitup_stock sha256=a475a9f231141187240df1572a3b33de2df60a67f76f1e2fc051e19b51cbed59 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_limitdown_stock sha256=e2ecacea2666c81ab35aea85f92ed4cc2418cd5a665bed30d06107579c375e75 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcb_stock sha256=e61e9dbe99ad6206be66fc22ea053c25bbd931e18b5ec18b4f9675351fe5993d source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=e1156ef5376990f768d29303164d87a15e602d5861ac54d0fb47bf5120261b3c source=quant/2023年度精选策略/24.ROE+PB模型的优化.txt'
+
+def filter_stocks_by_auditor_opinion_jqz(context, stock_list):
+    start_date = datetime.date(context.current_dt.year - 3, 1, 1).strftime('%Y-%m-%d')
+    end_date = context.previous_date.strftime('%Y-%m-%d')
+    q = query(finance.STK_AUDIT_OPINION).filter(finance.STK_AUDIT_OPINION.code.in_(stock_list), finance.STK_AUDIT_OPINION.report_type == 0, finance.STK_AUDIT_OPINION.opinion_type_id > 2, finance.STK_AUDIT_OPINION.opinion_type_id != 6, finance.STK_AUDIT_OPINION.end_date >= start_date, finance.STK_AUDIT_OPINION.pub_date <= end_date)
+    df = finance.run_query(q)
+    bad_companies = df['code'].unique().tolist()
+    keep_list = [s for s in stock_list if s not in bad_companies]
+    return keep_list
+
+def filter_stocks_by_revenue_and_profit(context, stock_list):
+    time1 = context.previous_date
+    time0 = time1 - datetime.timedelta(days=365 * 3)
+    if time1.month >= 5:
+        last_year = str(time1.year - 1)
+    else:
+        last_year = str(time1.year - 2)
+    list_len = len(stock_list)
+    interval = 1000
+    multiple_n = list_len // interval + 1
+    start_i = 0
+    stk_df = pd.DataFrame()
+    for mul in range(multiple_n):
+        start_i = mul * interval
+        end_i = start_i + interval
+        df = get_history_fundamentals(stock_list[start_i:end_i], fields=[income.operating_revenue, income.total_profit, income.net_profit], watch_date=context.current_dt, count=1, interval='1y', stat_by_year=True)
+        if len(stk_df) == 0:
+            stk_df = df
+        else:
+            stk_df = pd.concat([stk_df, df])
+    df = stk_df[(stk_df['operating_revenue'] < 300000000.0) & ((stk_df['total_profit'] < 0) | (stk_df['net_profit'] < 0))]
+    bad_companies = list(df['code'])
+    selected_columns = ['code', 'operating_revenue', 'total_profit', 'net_profit']
+    keep_list = [s for s in stock_list if s not in bad_companies]
+    return keep_list
+
+def bons_filter(context, stock_list):
+    time1 = context.previous_date
+    time2 = time1 - datetime.timedelta(days=365)
+    time3 = time1 - datetime.timedelta(days=365 * 3)
+    q = query(finance.STK_BALANCE_SHEET.code, finance.STK_BALANCE_SHEET.pub_date, finance.STK_BALANCE_SHEET.retained_profit).filter(finance.STK_BALANCE_SHEET.pub_date >= time2, finance.STK_BALANCE_SHEET.pub_date <= time1, finance.STK_BALANCE_SHEET.retained_profit > 0, finance.STK_BALANCE_SHEET.code.in_(stock_list))
+    df = finance.run_query(q)
+    df = df.set_index('code')
+    df = df.groupby('code').mean()
+    check_list = list(df.index)
+    q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb).filter(finance.STK_XR_XD.a_registration_date >= time3, finance.STK_XR_XD.a_registration_date <= time1, finance.STK_XR_XD.code.in_(check_list))
+    bons_df = finance.run_query(q)
+    bons_df = bons_df.fillna(0)
+    bons_df = bons_df.set_index('code')
+    bons_df = bons_df.groupby('code').sum()
+    bons_list = list(bons_df.index)
+    if time1.month >= 5:
+        start_year = str(time1.year - 1)
+    else:
+        start_year = str(time1.year - 2)
+    np = get_history_fundamentals(bons_list, fields=[income.net_profit], watch_date=context.current_dt, count=3, interval='1y', stat_by_year=True)
+    np = np.set_index('code')
+    np = np.groupby('code').mean()
+    q = query(valuation.code, valuation.market_cap).filter(valuation.code.in_(bons_list))
+    cap = get_fundamentals(q, date=time1)
+    cap = cap.set_index('code')
+    DR = pd.concat([bons_df, np, cap], axis=1, sort=False)
+    DR = DR[(DR['bonus_amount_rmb'] * 10000 > DR['net_profit'] * 0.3) | (DR['bonus_amount_rmb'] > 5000)]
+    final_list = list(DR.index)
+    return final_list
+
+def today_is_between(context):
+    today = context.current_dt.strftime('%m-%d')
+    if g.pass_april is True:
+        if '04-07' <= today and today <= '05-09' or ('01-07' <= today and today <= '02-09'):
+            return True
+        else:
+            return False
+    else:
+        return False
+
+def set_feasible_stocks(initial_stocks, context):
+    paused_info = []
+    current_data = get_current_data()
+    for i in initial_stocks:
+        paused_info.append(current_data[i].paused)
+    df_paused_info = pd.DataFrame({'paused_info': paused_info}, index=initial_stocks)
+    stock_list = list(df_paused_info.index[df_paused_info.paused_info == False])
+    return stock_list
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=770a4e1b12d6ef705b2f82eb539c3171fb1a4a9aaba107042ca047b2f35a77e9 source=quant/2020年度精选策略/15 基于多期限的选股策略（一）.txt'
+
+def handle_data(context, data):
+    if g.if_trade == True:
+        g.list_to_buy = stocks_to_buy(context)
+        list_to_sell = stocks_to_sell(context, g.list_to_buy)
+        if g.no_trading_today_signal == False:
+            sell_operation(list_to_sell)
+            buy_operation(context, g.list_to_buy)
+    if g.if_trade_stoploss == True and len(context.portfolio.positions) > 0:
+        list_to_sell = stocks_to_sell(context, g.list_to_buy)
+        if g.no_trading_today_signal == False:
+            sell_operation(list_to_sell)
+    g.if_trade = False
+    g.if_trade_stoploss == False
+
+def get_rff(context, stock_list):
+    if g.filter_bons:
+        before_bons_filter = len(stock_list)
+        stock_list = bons_filter(context, stock_list)
+        removed_stocks_bons = before_bons_filter - len(stock_list)
+    else:
+        stock_list = stock_list['code'].tolist()
+    final_stock_count = len(stock_list)
+    g.stock_num = round(final_stock_count * g.stock_pro)
+    q = query(valuation.code, valuation.circulating_market_cap, valuation.market_cap, indicator.inc_net_profit_year_on_year, balance.total_current_assets - balance.total_current_liability, balance.total_liability - balance.total_assets, balance.total_liability / balance.equities_parent_company_owners, indicator.gross_profit_margin, (balance.total_assets - balance.total_current_assets) / balance.total_assets, balance.equities_parent_company_owners / balance.total_assets, income.total_profit, indicator.inc_total_revenue_year_on_year, valuation.turnover_ratio, valuation.pe_ratio, valuation.pb_ratio, valuation.ps_ratio, indicator.roa).filter(valuation.code.in_(stock_list)).order_by(valuation.market_cap.asc()).limit(g.stock_num)
+    df = get_fundamentals(q)
+    dfindex = list(df.code.values)
+    df.columns = ['code', '流通市值', '市值', '销售毛利率', '净营运资本', '净债务', '产权比率', '净利润同比增长率', '非流动资产比率', '股东权益比率', '利润总额', '营收增长率', '换手率', 'PE', 'PB', 'PS', '总资产净利率']
+    del df['code']
+    start = context.current_dt
+    delta20 = datetime.timedelta(days=20)
+    delta1 = datetime.timedelta(days=1)
+    today = start - delta1
+    preday = start - delta20
+    df['成交金额'] = list(AMO(dfindex, today)[0].values())
+    df['随机指标'] = list(KDJ(dfindex, today)[0].values())
+    df['情绪指标'] = list(BRAR(dfindex, today)[0].values())
+    df['动量线'] = list(MTM(dfindex, today, timeperiod=10, unit='1d', include_now=True).values())
+    df['成交量'] = list(VOL(dfindex, today, M1=10, unit='1d', include_now=True)[0].values())
+    df['累计能量线'] = list(OBV(dfindex, check_date=today, timeperiod=10).values())
+    df['平均差'] = list(DMA(dfindex, today, N1=10, unit='1d', include_now=True)[0].values())
+    df['指数移动平均'] = list(EMA(dfindex, today, timeperiod=10, unit='1d', include_now=True).values())
+    df['移动平均'] = list(MA(dfindex, today, timeperiod=10, unit='1d', include_now=True).values())
+    df['乖离率'] = list(BIAS(dfindex, today, N1=10, unit='1d', include_now=True)[0].values())
+    df = df.apply(lambda x: (x - np.min(x)) / (np.max(x) - np.min(x)))
+    df['close1'] = list(get_price(dfindex, end_date=today, count=1, fq='pre', panel=False)['close'])
+    df['close2'] = list(get_price(dfindex, end_date=preday, count=1, fq='pre', panel=False)['close'])
+    df['return'] = df['close1'] / df['close2'] - 1
+    df['signal'] = np.where(df['return'] < 0, 0, 1)
+    df['code'] = dfindex
+    df.set_index('code', inplace=True)
+
+    def remove_outliers(df, columns, threshold=1.5):
+        Q1 = df[columns].quantile(0.25)
+        Q3 = df[columns].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outlier_mask = (df[columns] < lower_bound) | (df[columns] > upper_bound)
+        df = df.loc[~outlier_mask.any(axis=1)]
+        return df
+    x1 = df[['市值', '销售毛利率', '净营运资本', '净债务', '产权比率', '净利润同比增长率', '非流动资产比率', '股东权益比率', '利润总额', '营收增长率', '换手率', 'PE', 'PB', 'PS', '总资产净利率']]
+    y1 = df[['signal']]
+    na_columns = x1.columns[x1.isnull().mean() > 0.05]
+    x1 = x1.drop(columns=na_columns)
+    nan_rows1 = x1[x1.isnull().any(axis=1)].index.union(y1[y1.isnull().any(axis=1)].index)
+    x1 = x1.drop(nan_rows1)
+    y1 = y1.drop(nan_rows1)
+    rff1 = XGBRegressor(n_estimators=10, gamma=0.8, learning_rate=0.1, max_depth=3, random_state=42)
+    rff1.fit(x1, y1)
+    model_cs1 = pd.DataFrame({'feature1': list(x1.columns), 'importance1': rff1.feature_importances_}).sort_values('importance1', ascending=False)
+    xq1 = model_cs1['feature1'][:5]
+    x2 = df[['成交金额', '随机指标', '情绪指标', '动量线', '成交量', '累计能量线', '平均差', '指数移动平均', '移动平均', '乖离率']]
+    y2 = df[['signal']]
+    na_columns = x2.columns[x2.isnull().mean() > 0.05]
+    x2 = x2.drop(columns=na_columns)
+    nan_rows2 = x2[x2.isnull().any(axis=1)].index.union(y2[y2.isnull().any(axis=1)].index)
+    x2 = x2.drop(nan_rows2)
+    y2 = y2.drop(nan_rows2)
+    rff2 = XGBRegressor(n_estimators=9, gamma=0.8, learning_rate=0.1, max_depth=3, random_state=42)
+    rff2.fit(x2, y2)
+    model_cs2 = pd.DataFrame({'feature2': list(x2.columns), 'importance2': rff2.feature_importances_}).sort_values('importance2', ascending=False)
+    xq2 = model_cs2['feature2'][:5]
+    x3 = df[pd.concat([xq1, xq2], axis=0)]
+    y3 = df[['signal']]
+    nan_rows3 = x3[x3.isnull().any(axis=1)].index.union(y3[y3.isnull().any(axis=1)].index)
+    x3 = x3.drop(nan_rows3)
+    y3 = y3.drop(nan_rows3)
+    rff3 = XGBRegressor(n_estimators=10, gamma=0.8, learning_rate=0.1, max_depth=3, random_state=42)
+    rff3.fit(x3, y3)
+    model_cs3 = pd.DataFrame({'feature3': list(x3.columns), 'importance3': rff3.feature_importances_}).sort_values('importance3', ascending=False)
+    xq3 = model_cs3['feature3'][:4]
+    selected_factors = xq3.tolist()
+    df = df.reset_index()
+    df = df.rename(columns={'index': 'code'})
+    selected_columns = selected_factors + ['code', '流通市值']
+    df = df[selected_columns]
+
+    def select_best_gmm_clusters(X, min_clusters=1, max_clusters=10):
+        bics = []
+        for n_components in range(min_clusters, max_clusters + 1):
+            gmm = GaussianMixture(n_components=n_components, covariance_type='full').fit(X)
+            bics.append(gmm.bic(X))
+        best_n_components = np.argmin(bics) + min_clusters
+        gmm_best = GaussianMixture(n_components=best_n_components, covariance_type='full').fit(X)
+        return gmm_best
+    factor_variable = selected_factors
+    target_variable = '流通市值'
+    columns_to_check = factor_variable + [target_variable]
+    df = remove_outliers(df, columns_to_check)
+    df.dropna(inplace=True)
+    X = df[factor_variable].values
+    Y = df[target_variable].values
+    gmm_best = select_best_gmm_clusters(X)
+    cluster_labels = gmm_best.predict(X)
+    cluster_sizes = pd.Series(cluster_labels).value_counts()
+    max_cluster_size = cluster_sizes.idxmax()
+    max_cluster_size_count = cluster_sizes[max_cluster_size]
+    max_cluster_df = df[cluster_labels != -1]
+    max_cluster_df = max_cluster_df[cluster_labels == max_cluster_size]
+    max_cluster_df = max_cluster_df.sample(frac=1, random_state=42).reset_index(drop=True)
+    fractions = [len(max_cluster_df) // 3] * 2 + [len(max_cluster_df) - 2 * (len(max_cluster_df) // 3)]
+    indices = np.cumsum(fractions).tolist()
+    a = max_cluster_df.iloc[:indices[0]]
+    b = max_cluster_df.iloc[indices[0]:indices[1]]
+    c = max_cluster_df.iloc[indices[1]:]
+    predictions_all = []
+    predictions_all_2 = []
+    for i, (cal_data, train_data, test_data) in enumerate([(a, b, c), (c, a, b), (b, c, a)]):
+        X_cal = cal_data[factor_variable].values
+        Y_cal = cal_data[target_variable].values
+        X_train = train_data[factor_variable].values
+        Y_train = train_data[target_variable].values
+        X_test = test_data[factor_variable].values
+        Y_test = test_data[target_variable].values
+        test_indices = np.arange(len(X_test))
+        test_codes = test_data.iloc[test_indices]['code'].tolist()
+        model = XGBRegressor(n_estimators=12, random_state=42)
+        nc = NcFactory.create_nc(model)
+        icp = IcpRegressor(nc)
+        icp.fit(X_train, Y_train)
+        icp.calibrate(X_cal, Y_cal)
+        predictions = icp.predict(X_test, significance=0.05)
+        Y_lower = predictions[:, 0]
+        Y_upper = predictions[:, 1]
+        Y_pred = (Y_lower + Y_upper) / 2
+        Y_width = Y_upper - Y_lower
+        cluster_predictions = pd.DataFrame({'code': test_codes, 'Predicted_Interval_{}'.format(chr(97 + i)): Y_pred, 'Actual_{}'.format(chr(97 + i)): Y_test, 'Width_{}'.format(chr(97 + i)): Y_width, 'Lower_Bound_{}'.format(chr(97 + i)): Y_lower, 'Upper_Bound_{}'.format(chr(97 + i)): Y_upper})
+        predictions_all.append(cluster_predictions)
+    all_predictions = pd.concat(predictions_all, ignore_index=True)
+    all_predictions.fillna(0, inplace=True)
+    all_predictions['Predicted'] = all_predictions['Predicted_Interval_a'] + all_predictions['Predicted_Interval_b'] + all_predictions['Predicted_Interval_c']
+    all_predictions['Width'] = all_predictions['Width_a'] + all_predictions['Width_b'] + all_predictions['Width_c']
+    all_predictions['Actual'] = all_predictions['Actual_a'] + all_predictions['Actual_b'] + all_predictions['Actual_c']
+    for col in ['Lower_Bound_a', 'Lower_Bound_b', 'Lower_Bound_c', 'Upper_Bound_a', 'Upper_Bound_b', 'Upper_Bound_c', 'Predicted_Interval_a', 'Predicted_Interval_b', 'Predicted_Interval_c', 'Width_a', 'Width_b', 'Width_c', 'Actual_a', 'Actual_b', 'Actual_c']:
+        if col in all_predictions.columns:
+            all_predictions.drop(columns=col, inplace=True)
+    predictions_all_2.append(all_predictions)
+    test_data_with_predictions = pd.concat(predictions_all_2, ignore_index=True)
+    selected_stocks = test_data_with_predictions[test_data_with_predictions['Actual'] != 0]
+    selected_stocks['Distance to Predicted'] = (selected_stocks['Actual'] - selected_stocks['Predicted']) / abs(selected_stocks['Actual'])
+    selected_stocks_sorted = selected_stocks.sort_values(by='Distance to Predicted')
+    g.stocknum = g.stocknum_2
+    Q1 = selected_stocks['Distance to Predicted'].quantile(0.25)
+    Q3 = selected_stocks['Distance to Predicted'].quantile(0.75)
+    IQR = Q3 - Q1
+    filter = (selected_stocks['Distance to Predicted'] >= Q1 - 3 * IQR) & (selected_stocks['Distance to Predicted'] <= Q3 + 3 * IQR)
+    selected_stocks_filtered = selected_stocks.loc[filter]
+    if all_predictions['Width'].mean() < 1.4:
+        g.stocknum = g.stocknum_2
+        selected_stocks_sorted = selected_stocks_filtered.sort_values(by='Distance to Predicted', ascending=True)
+        final_list = selected_stocks_sorted['code'].tolist()
+    else:
+        g.stocknum = g.stocknum_1
+        selected_stocks_sorted = selected_stocks_filtered.sort_values(by='Distance to Predicted', ascending=False)
+        final_list = selected_stocks_sorted['code'].tolist()
+    return final_list
+
+def stocks_to_buy(context):
+    if g.no_trading_today_signal == False:
+        day1 = context.current_dt
+        day2 = day1 - datetime.timedelta(days=5)
+        list_to_buy = get_rff(context, g.feasible_stocks)[:g.stocknum]
+        return list_to_buy
+
+def stocks_to_sell(context, list_to_buy):
+    if g.no_trading_today_signal == False:
+        list_to_sell = []
+        day1 = context.current_dt
+        day2 = day1 - datetime.timedelta(days=5)
+        for stock_sell in context.portfolio.positions:
+            if context.portfolio.positions[stock_sell].price >= context.portfolio.positions[stock_sell].avg_cost * (1 + g.stopprofit_market):
+                list_to_sell.append(stock_sell)
+            elif context.portfolio.positions[stock_sell].price < context.portfolio.positions[stock_sell].avg_cost * (1 - g.stoploss_market):
+                list_to_sell.append(stock_sell)
+            elif stock_sell not in list_to_buy:
+                list_to_sell.append(stock_sell)
+        return list_to_sell
+
+def sell_operation(list_to_sell):
+    if g.no_trading_today_signal == False:
+        for stock_sell in list_to_sell:
+            order_target_value(stock_sell, 0)
+
+def close_account(context):
+    g.hold_list = context.portfolio.positions
+    if g.no_trading_today_signal == True:
+        if len(g.hold_list) != 0:
+            for stock in g.hold_list:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def buy_operation(context, list_to_buy):
+    if g.no_trading_today_signal == False:
+        if len(context.portfolio.positions) < g.stocknum:
+            num = g.stocknum - len(context.portfolio.positions)
+            cash = context.portfolio.cash / num
+        else:
+            cash = 0
+            num = 0
+        for stock_sell in list_to_buy[:num + 1]:
+            order_target_value(stock_sell, cash)
+            num = num - 1
+            if num == 0:
+                break
+        else:
+            pass
+
+def after_trading_end(context):
+    orders = get_orders()
+    for _order in orders.values():
+        pass
+import abc
+import numpy as np
+from sklearn.base import BaseEstimator
+
+class RegressorMixin(object):
+
+    def __init__(self):
+        super(RegressorMixin, self).__init__()
+
+    @classmethod
+    def get_problem_type(cls):
+        return 'regression'
+
+class ClassifierMixin(object):
+
+    def __init__(self):
+        super(ClassifierMixin, self).__init__()
+
+    @classmethod
+    def get_problem_type(cls):
+        return 'classification'
+
+class BaseModelAdapter(BaseEstimator):
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, model, fit_params=None):
+        super(BaseModelAdapter, self).__init__()
+        self.model = model
+        self.last_x, self.last_y = (None, None)
+        self.clean = False
+        self.fit_params = {} if fit_params is None else fit_params
+
+    def fit(self, x, y):
+        self.model.fit(x, y, **self.fit_params)
+        self.clean = False
+
+    def predict(self, x):
+        if not self.clean or self.last_x is None or self.last_y is None or (not np.array_equal(self.last_x, x)):
+            self.last_x = x
+            self.last_y = self._underlying_predict(x)
+            self.clean = True
+        return self.last_y.copy()
+
+    @abc.abstractmethod
+    def _underlying_predict(self, x):
+        pass
+
+class ClassifierAdapter(BaseModelAdapter):
+
+    def __init__(self, model, fit_params=None):
+        super(ClassifierAdapter, self).__init__(model, fit_params)
+
+    def _underlying_predict(self, x):
+        return self.model.predict_proba(x)
+
+class RegressorAdapter(BaseModelAdapter):
+
+    def __init__(self, model, fit_params=None):
+        super(RegressorAdapter, self).__init__(model, fit_params)
+
+    def _underlying_predict(self, x):
+        return self.model.predict(x)
+
+class OobMixin(object):
+
+    def __init__(self, model, fit_params=None):
+        super(OobMixin, self).__init__(model, fit_params)
+        self.train_x = None
+
+    def fit(self, x, y):
+        super(OobMixin, self).fit(x, y)
+        self.train_x = x
+
+    def _underlying_predict(self, x):
+        oob = x == self.train_x
+        if hasattr(oob, 'all'):
+            oob = oob.all()
+        if oob:
+            return self._oob_prediction()
+        else:
+            return super(OobMixin, self)._underlying_predict(x)
+
+class OobClassifierAdapter(OobMixin, ClassifierAdapter):
+
+    def __init__(self, model, fit_params=None):
+        super(OobClassifierAdapter, self).__init__(model, fit_params)
+
+    def _oob_prediction(self):
+        return self.model.oob_decision_function_
+
+class OobRegressorAdapter(OobMixin, RegressorAdapter):
+
+    def __init__(self, model, fit_params=None):
+        super(OobRegressorAdapter, self).__init__(model, fit_params)
+
+    def _oob_prediction(self):
+        return self.model.oob_prediction_
+
+class BaseScorer(sklearn.base.BaseEstimator):
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self):
+        super(BaseScorer, self).__init__()
+
+    @abc.abstractmethod
+    def fit(self, x, y):
+        pass
+
+    @abc.abstractmethod
+    def score(self, x, y=None):
+        pass
+
+class BaseModelNc(BaseScorer):
+
+    def __init__(self, model, err_func, normalizer=None, beta=0):
+        super(BaseModelNc, self).__init__()
+        self.err_func = err_func
+        self.model = model
+        self.normalizer = normalizer
+        self.beta = beta
+        if self.normalizer is not None and hasattr(self.normalizer, 'base_model'):
+            self.normalizer.base_model = self.model
+        self.last_x, self.last_y = (None, None)
+        self.last_prediction = None
+        self.clean = False
+
+    def fit(self, x, y):
+        self.model.fit(x, y)
+        if self.normalizer is not None:
+            self.normalizer.fit(x, y)
+        self.clean = False
+
+    def score(self, x, y=None):
+        prediction = self.model.predict(x)
+        n_test = x.shape[0]
+        if self.normalizer is not None:
+            norm = self.normalizer.score(x) + self.beta
+        else:
+            norm = np.ones(n_test)
+        return self.err_func.apply(prediction, y) / norm
+
+class TcpClassifier(BaseEstimator, ClassifierMixin):
+
+    def __init__(self, nc_function, condition=None, smoothing=True):
+        self.train_x, self.train_y = (None, None)
+        self.nc_function = nc_function
+        super(TcpClassifier, self).__init__()
+        default_condition = lambda x: 0
+        is_default = callable(condition) and condition.__code__.co_code == default_condition.__code__.co_code
+        if is_default:
+            self.condition = condition
+            self.conditional = False
+        elif callable(condition):
+            self.condition = condition
+            self.conditional = True
+        else:
+            self.condition = lambda x: 0
+            self.conditional = False
+        self.smoothing = smoothing
+        self.base_icp = IcpClassifier(self.nc_function, self.condition, self.smoothing)
+        self.classes = None
+
+    def fit(self, x, y):
+        self.train_x, self.train_y = (x, y)
+        self.classes = np.unique(y)
+
+    def predict(self, x, significance=None):
+        n_test = x.shape[0]
+        n_train = self.train_x.shape[0]
+        p = np.zeros((n_test, self.classes.size))
+        for i in range(n_test):
+            for j, y in enumerate(self.classes):
+                train_x = np.vstack([self.train_x, x[i, :]])
+                train_y = np.hstack([self.train_y, y])
+                self.base_icp.fit(train_x, train_y)
+                self.base_icp.calibrate(train_x, train_y)
+                ncal_ngt_neq = self.base_icp._get_stats(x[i, :].reshape(1, x.shape[1]))
+                ncal = ncal_ngt_neq[:, j, 0]
+                ngt = ncal_ngt_neq[:, j, 1]
+                neq = ncal_ngt_neq[:, j, 2]
+                p[i, j] = calc_p(ncal - 1, ngt, neq - 1, self.smoothing)
+        if significance is not None:
+            return p > significance
+        else:
+            return p
+
+    def predict_conf(self, x):
+        p = self.predict(x, significance=None)
+        label = p.argmax(axis=1)
+        credibility = p.max(axis=1)
+        for i, idx in enumerate(label):
+            p[i, idx] = -np.inf
+        confidence = 1 - p.max(axis=1)
+        return np.array([label, confidence, credibility]).T
+
+class NcFactory(object):
+
+    @staticmethod
+    def create_nc(model, err_func=None, normalizer_model=None, oob=False, fit_params=None, fit_params_normalizer=None):
+        if normalizer_model is not None:
+            normalizer_adapter = RegressorAdapter(normalizer_model, fit_params_normalizer)
+        else:
+            normalizer_adapter = None
+        if isinstance(model, sklearn.base.ClassifierMixin):
+            err_func = MarginErrFunc() if err_func is None else err_func
+            if oob:
+                c = sklearn.base.clone(model)
+                c.fit([[0], [1]], [0, 1])
+                if hasattr(c, 'oob_decision_function_'):
+                    adapter = OobClassifierAdapter(model, fit_params)
+                else:
+                    raise AttributeError('Cannot use out-of-bag calibration with {}'.format(model.__class__.__name__))
+            else:
+                adapter = ClassifierAdapter(model, fit_params)
+            if normalizer_adapter is not None:
+                normalizer = RegressorNormalizer(adapter, normalizer_adapter, err_func)
+                return ClassifierNc(adapter, err_func, normalizer)
+            else:
+                return ClassifierNc(adapter, err_func)
+        elif isinstance(model, sklearn.base.RegressorMixin):
+            err_func = AbsErrorErrFunc() if err_func is None else err_func
+            if oob:
+                c = sklearn.base.clone(model)
+                c.fit([[0], [1]], [0, 1])
+                if hasattr(c, 'oob_prediction_'):
+                    adapter = OobRegressorAdapter(model, fit_params)
+                else:
+                    raise AttributeError('Cannot use out-of-bag calibration with {}'.format(model.__class__.__name__))
+            else:
+                adapter = RegressorAdapter(model, fit_params)
+            if normalizer_adapter is not None:
+                normalizer = RegressorNormalizer(adapter, normalizer_adapter, err_func)
+                return RegressorNc(adapter, err_func, normalizer)
+            else:
+                return RegressorNc(adapter, err_func)
+
+class BaseIcp(BaseEstimator):
+
+    def __init__(self, nc_function, condition=None):
+        self.cal_x, self.cal_y = (None, None)
+        self.nc_function = nc_function
+        default_condition = lambda x: 0
+        is_default = callable(condition) and condition.__code__.co_code == default_condition.__code__.co_code
+        if is_default:
+            self.condition = condition
+            self.conditional = False
+        elif callable(condition):
+            self.condition = condition
+            self.conditional = True
+        else:
+            self.condition = lambda x: 0
+            self.conditional = False
+
+    def fit(self, x, y):
+        self.nc_function.fit(x, y)
+
+    def calibrate(self, x, y, increment=False):
+        self._calibrate_hook(x, y, increment)
+        self._update_calibration_set(x, y, increment)
+        if self.conditional:
+            category_map = np.array([self.condition((x[i, :], y[i])) for i in range(y.size)])
+            self.categories = np.unique(category_map)
+            self.cal_scores = defaultdict(partial(np.ndarray, 0))
+            for cond in self.categories:
+                idx = category_map == cond
+                cal_scores = self.nc_function.score(self.cal_x[idx, :], self.cal_y[idx])
+                self.cal_scores[cond] = np.sort(cal_scores)[::-1]
+        else:
+            self.categories = np.array([0])
+            cal_scores = self.nc_function.score(self.cal_x, self.cal_y)
+            self.cal_scores = {0: np.sort(cal_scores)[::-1]}
+
+    def _calibrate_hook(self, x, y, increment):
+        pass
+
+    def _update_calibration_set(self, x, y, increment):
+        if increment and self.cal_x is not None and (self.cal_y is not None):
+            self.cal_x = np.vstack([self.cal_x, x])
+            self.cal_y = np.hstack([self.cal_y, y])
+        else:
+            self.cal_x, self.cal_y = (x, y)
+
+class IcpRegressor(BaseIcp, RegressorMixin):
+
+    def __init__(self, nc_function, condition=None):
+        super(IcpRegressor, self).__init__(nc_function, condition)
+
+    def predict(self, x, significance=None):
+        n_significance = 99 if significance is None else np.array(significance).size
+        if n_significance > 1:
+            prediction = np.zeros((x.shape[0], 2, n_significance))
+        else:
+            prediction = np.zeros((x.shape[0], 2))
+        condition_map = np.array([self.condition((x[i, :], None)) for i in range(x.shape[0])])
+        for condition in self.categories:
+            idx = condition_map == condition
+            if np.sum(idx) > 0:
+                p = self.nc_function.predict(x[idx, :], self.cal_scores[condition], significance)
+                if n_significance > 1:
+                    prediction[idx, :, :] = p
+                else:
+                    prediction[idx, :] = p
+        return prediction
+
+class RegressionErrFunc(object):
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self):
+        super(RegressionErrFunc, self).__init__()
+
+    @abc.abstractmethod
+    def apply(self, prediction, y):
+        pass
+
+    @abc.abstractmethod
+    def apply_inverse(self, nc, significance):
+        pass
+
+class AbsErrorErrFunc(RegressionErrFunc):
+
+    def __init__(self):
+        super(AbsErrorErrFunc, self).__init__()
+
+    def apply(self, prediction, y):
+        return np.abs(prediction - y)
+
+    def apply_inverse(self, nc, significance):
+        nc = np.sort(nc)[::-1]
+        border = int(np.floor(significance * (nc.size + 1))) - 1
+        border = min(max(border, 0), nc.size - 1)
+        return np.vstack([nc[border], nc[border]])
+
+class RegressorNc(BaseModelNc):
+
+    def __init__(self, model, err_func=AbsErrorErrFunc(), normalizer=None, beta=0):
+        super(RegressorNc, self).__init__(model, err_func, normalizer, beta)
+
+    def predict(self, x, nc, significance=None):
+        n_test = x.shape[0]
+        prediction = self.model.predict(x)
+        if self.normalizer is not None:
+            norm = self.normalizer.score(x) + self.beta
+        else:
+            norm = np.ones(n_test)
+        if significance:
+            intervals = np.zeros((x.shape[0], 2))
+            err_dist = self.err_func.apply_inverse(nc, significance)
+            err_dist = np.hstack([err_dist] * n_test)
+            err_dist *= norm
+            intervals[:, 0] = prediction - err_dist[0, :]
+            intervals[:, 1] = prediction + err_dist[1, :]
+            return intervals
+        else:
+            significance = np.arange(0.01, 1.0, 0.01)
+            intervals = np.zeros((x.shape[0], 2, significance.size))
+            for i, s in enumerate(significance):
+                err_dist = self.err_func.apply_inverse(nc, s)
+                err_dist = np.hstack([err_dist] * n_test)
+                err_dist *= norm
+                intervals[:, 0, i] = prediction - err_dist[0, :]
+                intervals[:, 1, i] = prediction + err_dist[0, :]
+            return intervals

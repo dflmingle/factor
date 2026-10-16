@@ -1,0 +1,242 @@
+quant/2021年度精选策略/44.借助JqData搭建简易回测框架.txt
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import datetime
+from jqdata import *
+from pylab import mpl
+import seaborn as sns
+mpl.rcParams['font.sans-serif'] = ['FangSong']
+mpl.rcParams['axes.unicode_minus'] = False
+
+class Context:
+
+    def __init__(self):
+        self.cash = self.Cash = 100000
+        self.base = '000300.XSHG'
+        self.position = {}
+        self.universe = []
+        self.current_dt = '2016-01-01'
+        self.start_date = '2016-01-01'
+        self.end_date = '2016-12-31'
+        self.total_value = 0
+        self.trade_history = []
+        self.day_value = []
+        self.trade_days = 0
+
+    def write_ratio(self, security, date):
+        the_value = self.cash
+        for s in self.position.keys():
+            price = get_price(s, end_date=date, frequency='daily', fields=['close'], skip_paused=False, fq='pre', count=10)['close']
+            value = self.position[s]['count'] * price[-1]
+            the_value += value
+        self.day_value.append({'date': date, 'value': the_value})
+
+class Order:
+    context = Context()
+
+    def __init__(self, context):
+        self.context = context
+
+    def buy(self, security, price, count):
+        if price * count > self.context.cash:
+            return
+        if security in self.context.position.keys():
+            return
+        _total_value = price * count
+        self.context.cash -= _total_value
+        _positon = {'security': security, 'price': price, 'count': count, 'date': self.context.current_dt, 'type': 'buy', 'hold_value': price * count, 'available_cash': self.context.cash}
+        self.context.trade_history.append(_positon)
+        self.context.total_value = self.context.cash + _total_value
+        self.context.position[security] = _positon
+
+    def sell(self, security, price, count):
+        if security not in self.context.position.keys():
+            return
+        if count != self.context.position[security]['count']:
+            return
+        _total_value = price * count
+        self.context.cash += _total_value
+        _positon = {'security': security, 'price': price, 'count': count, 'date': self.context.current_dt, 'type': 'sell', 'hold_value': price * count, 'available_cash': self.context.cash}
+        self.context.trade_history.append(_positon)
+        self.context.total_value = self.context.cash
+        del self.context.position[security]
+
+class Trade:
+
+    def __init__(self, context, order):
+        self.context = context
+        self.order = order
+        self.result = {}
+        self.price = None
+        self.maxdown_point = []
+
+    def trade(self, func, show=True, log=False):
+        time_start = datetime.datetime.now()
+        self.price = get_price(security=self.context.base, start_date=self.context.start_date, end_date=self.context.end_date, frequency='daily', fields=None, skip_paused=False, fq='pre')
+        close = self.price['close']
+        for i in range(0, len(close)):
+            self.context.current_dt = close.index[i]
+            self.context.trade_days = i + 1
+            func(self.context, self.order)
+            self.context.write_ratio(self.context.universe[0], self.context.current_dt)
+        self.get_result()
+        time_end = datetime.datetime.now()
+        if log:
+            pass
+        if show:
+            self.show_ratio()
+
+    def get_trade_detail(self):
+        _df = pd.DataFrame(self.context.trade_history, columns=['date', 'security', 'type', 'price', 'count', 'hold_value', 'available_cash'])
+        _df.rename(columns={'date': '时间', 'security': '标的', 'type': '交易类型', 'price': '交易价格', 'count': '交易数量', 'hold_value': '持仓价值', 'available_cash': '可用资金'}, inplace=True)
+        return _df
+
+    def get_absolute_return(self):
+        _cash = pd.DataFrame(self.context.day_value)['value'].iloc[-1]
+        return (_cash - self.context.Cash) / self.context.Cash
+
+    def get_annualized_return(self):
+        _cash = pd.DataFrame(self.context.day_value)['value'].iloc[-1]
+        ratio = (_cash - self.context.Cash) / self.context.Cash
+        return_value = (1 + ratio) ** (252 / len(self.context.day_value)) - 1
+        return return_value
+
+    def get_benchmark_return(self):
+        ben_data = self.price
+        benchmark_return = (ben_data['close'][-1] - ben_data['open'][0]) / ben_data['open'][0]
+        return benchmark_return
+
+    def get_anbenchmark_return(self):
+        anbenchmark_return = (1 + self.get_benchmark_return()) ** (250 / len(self.context.day_value)) - 1
+        return anbenchmark_return
+
+    def get_profit_loss_than(self):
+        _df = pd.DataFrame(self.context.trade_history)
+        if _df.shape[0] <= 0:
+            return 0
+        _df['total_value'] = _df['available_cash'] + _df['hold_value']
+        _sell = _df[_df['type'] == 'sell']['available_cash']
+        _trade_count = _df[_df['type'] == 'sell'].shape[0]
+        _buy = _df[_df['type'] == 'buy']['total_value'][0:_trade_count]
+        ratio = np.array(_sell) - np.array(_buy)
+        return abs(ratio[ratio > 0].sum() / ratio[ratio < 0].sum())
+
+    def get_trade_count(self):
+        _df = pd.DataFrame(self.context.trade_history)
+        if _df.shape[0] <= 0:
+            return 0
+        return len(_df[_df['type'] == 'sell'].index)
+
+    def get_wine_rate(self):
+        _df = pd.DataFrame(self.context.trade_history)
+        if _df.shape[0] <= 0:
+            return 0
+        _df['total_value'] = _df['available_cash'] + _df['hold_value']
+        _sell = _df[_df['type'] == 'sell']['available_cash']
+        _trade_count = _df[_df['type'] == 'sell'].shape[0]
+        _buy = _df[_df['type'] == 'buy']['total_value'][0:_trade_count]
+        ratio = np.array(_sell) - np.array(_buy)
+        return len(ratio[ratio > 0]) / len(ratio)
+
+    def get_sharpe(self):
+        _df = pd.DataFrame(self.context.day_value)
+        if _df.shape[0] <= 0:
+            return 0
+        std = ((_df['value'] - self.context.Cash) / self.context.Cash).std()
+        if std == 0:
+            return 0
+        return (self.get_annualized_return() - 0.02) * np.sqrt(252) / std
+
+    def get_beta(self):
+        ben_data = self.price
+        ben_data['income'] = ben_data['close'].shift(1)
+        ben_data['income1'] = ben_data['close'].astype(float) - ben_data['income'].astype(float)
+        ben_data['income2'] = ben_data['income1'] / ben_data['income']
+        ben_data_income = np.array(list(ben_data['income2'].dropna()))
+        _df = pd.DataFrame(self.context.day_value)
+        _df['income'] = _df['value'].shift(1)
+        _df['income1'] = _df['value'].astype(float) - _df['income'].astype(float)
+        _df['income2'] = _df['income1'] / _df['income']
+        _df_income = np.array(list(_df['income2'].dropna()))
+        x = np.cov(ben_data_income, _df_income)
+        y = np.var(ben_data_income)
+        x_y_data = round(x[0][1] / y, 4)
+        return x_y_data
+
+    def get_alpha(self):
+        alpha_data = self.get_annualized_return() - (0.04 + self.get_beta() * (self.get_anbenchmark_return() - 0.04))
+        return alpha_data
+
+    def get_maxdown(self):
+        _df = pd.DataFrame(self.context.day_value)
+        return_list = _df['value']
+        i = np.argmax((np.maximum.accumulate(return_list) - return_list) / np.maximum.accumulate(return_list))
+        if i == 0:
+            return 0
+        j = np.argmax(return_list[:i])
+        self.maxdown_point.append(_df.iloc[j])
+        self.maxdown_point.append(_df.iloc[i])
+        return (return_list[j] - return_list[i]) / return_list[j]
+
+    def get_result(self):
+        _dic = {'基准收益': round(self.get_benchmark_return(), 4), '策略收益': round(self.get_absolute_return(), 4), '年化收益': round(self.get_annualized_return(), 4), '最大回撤': round(self.get_maxdown(), 4), '夏普比率': round(self.get_sharpe(), 4), '盈亏比': round(self.get_profit_loss_than(), 4), '胜率': round(self.get_wine_rate(), 4), '交易次数': self.get_trade_count(), 'beta': self.get_beta(), 'alpha': self.get_alpha(), '回测时间': self.context.start_date + '~' + self.context.end_date}
+        self.result = _dic
+        return _dic
+
+    @staticmethod
+    def show_result(index_name, index_list, trade_list):
+        _list = []
+        for i in range(0, len(trade_list)):
+            _trade = trade_list[i]
+            _dic = _trade.result
+            _dic[index_name] = index_list[i]
+            _list.append(_trade.result)
+        _df = pd.DataFrame(_list)
+        _df = _df.set_index(index_name)
+        _df = _df.sort_values(by=['年化收益', '最大回撤', 'alpha', '夏普比率', 'beta', '胜率'], ascending=(False, True, False, False, True, False))
+        return _df
+
+    def show_ratio(self, w=20, h=7):
+        sns.set()
+        _price = self.price
+        start_price = _price['close'].iloc[0]
+        _price['dapan_ratio'] = (_price['close'] - start_price) / start_price
+        _day_price = pd.DataFrame(self.context.day_value)
+        _day_price['trade_ratio'] = (_day_price['value'] - self.context.Cash) / self.context.Cash
+        x_list = [date['date'] for date in self.maxdown_point]
+        y_list = [(date['value'] - self.context.Cash) / self.context.Cash for date in self.maxdown_point]
+
+    @staticmethod
+    def show_ratio_compare(index_name, index_list, trade_list, r=2, c=2, w=16, h=9):
+        sns.set()
+        width = w / c
+        high = width * 0.56
+        figure, ax = plt.subplots(r, c, figsize=(w, (high + 0.5) * r))
+        j = 0
+        for _ax in ax:
+            for __ax in _ax:
+                trade = trade_list[j]
+                _price = trade.price
+                start_price = _price['close'].iloc[0]
+                _price['dapan_ratio'] = (_price['close'] - start_price) / start_price
+                _day_price = pd.DataFrame(trade.context.day_value)
+                _day_price['trade_ratio'] = (_day_price['value'] - trade.context.Cash) / trade.context.Cash
+                __ax.plot(_price.index, _price['dapan_ratio'], color='#FF4500')
+                __ax.plot(_day_price['date'], _day_price['trade_ratio'], color='#1E90FF')
+                __ax.set_title('{0}={1}'.format(index_name, index_list[j]), fontsize=14)
+                j += 1
+
+    @staticmethod
+    def show_all_ratio(name, ma_list, trade_list, w=16, h=9):
+        sns.set()
+        _legend = [name + '=' + str(_ma) for _ma in ma_list]
+        for trade in trade_list:
+            _day_price = pd.DataFrame(trade.context.day_value)
+            _day_price['trade_ratio'] = (_day_price['value'] - trade.context.Cash) / trade.context.Cash
+
+class Picture:
+    pass
+
+class Model:
+    pass

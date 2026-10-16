@@ -1,0 +1,66 @@
+quant/2021年度精选策略/30.ETF宽基轮动修改版-1.0.txt
+from jqdata import *
+g.lag1 = 20
+g.lag2 = 10
+g.ma_threshold = 0.9
+g.mtm_threshold = 2
+g.ETFList = np.array([['513100.XSHG', '513100.XSHG'], ['513500.XSHG', '513500.XSHG'], ['518880.XSHG', '518880.XSHG'], ['399006.XSHE', '159915.XSHE'], ['000300.XSHG', '510300.XSHG'], ['000905.XSHG', '510500.XSHG'], ['159920.XSHE', '159920.XSHE']])
+
+def initialize(context):
+    set_params()
+    set_backtest()
+    run_daily(ETFtrade1, time='10:30')
+    run_daily(ETFtrade2, time='14:30')
+
+def set_params():
+    pass
+'EXACT_REVIEWED_FUNCTION set_backtest sha256=aa4e785e8a1d75de023dfdf1292abe03c49dcfd79689e26f07624d2766781241 source=quant/2020年度精选策略/02 我好像破解了聚宽擂台排第一的策略？！.txt'
+'EXACT_REVIEWED_FUNCTION before_trading_start sha256=fb674383d7b825a635aaa8059d4d2564e67dec1c38c6c005542d4e5f978bf5e8 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+'EXACT_REVIEWED_FUNCTION set_slip_fee sha256=4dedf901125fce2adcbccf8d0f1910eb9e9e55213d4ed61cad099d1d19a66565 source=quant/2020年度精选策略/46 Get API 新技能，研究中写策略并回测.txt'
+
+def ETFtrade1(context):
+    buy_list, g.buy_list_weights = get_signal(context)
+    if buy_list.size == 1 and isinstance(buy_list, np.str_):
+        g.buy_list = list(buy_list.split())
+    else:
+        g.buy_list = list(buy_list)
+
+def ETFtrade2(context):
+    sell_the_stocks(context, g.buy_list)
+    buy_the_stocks(context, g.buy_list, g.buy_list_weights)
+
+def get_signal(context):
+    i = 0
+    df = pd.DataFrame()
+    for row in g.ETFList:
+        security = row[0]
+        close_data = attribute_history(security, g.lag1, '1d', ['close'], df=False)
+        current_data = get_current_data()
+        current_price = current_data[security].last_price
+        cp_increase = 100 * (current_price / close_data['close'][0] - 1)
+        close_data = attribute_history(security, g.lag2, '1d', ['close'], df=False)
+        ma_n1 = (current_price + close_data['close'].sum() - close_data['close'][0]) / g.lag2
+        pre_price = current_price - ma_n1 * g.ma_threshold
+        df.loc[i, '代码'] = row[1]
+        df.loc[i, '涨幅'] = cp_increase
+        df.loc[i, '均线差'] = pre_price
+        i = i + 1
+    df.sort_values(by='涨幅', ascending=False, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    df_buy = df[(df['涨幅'] > g.mtm_threshold) & (df['均线差'] > 0)]
+    df_buy.set_index('代码', inplace=True)
+    if len(df_buy) > 0:
+        return (df_buy.index[0:4], df_buy.iloc[0:4, 0] / df_buy.iloc[0:4, 0].sum())
+    else:
+        return (np.array(['511010.XSHG'], dtype=np.str_)[0], pd.Series([1], index=['511010.XSHG']))
+
+def sell_the_stocks(context, buy_list):
+    list_position = context.portfolio.positions.keys()
+    for stock in list_position:
+        if stock not in buy_list:
+            order_target_value(stock, 0)
+
+def buy_the_stocks(context, buy_list, buy_list_weights):
+    g.everyStock = context.portfolio.portfolio_value / len(buy_list)
+    for stock in buy_list:
+        order_target_value(stock, buy_list_weights.loc[stock] * context.portfolio.portfolio_value)

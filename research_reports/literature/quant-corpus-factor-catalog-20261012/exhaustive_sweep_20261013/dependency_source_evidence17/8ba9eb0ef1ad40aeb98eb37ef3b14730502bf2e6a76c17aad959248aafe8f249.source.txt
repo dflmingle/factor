@@ -1,0 +1,235 @@
+# 策略名称：趋势强度 + 低相关性 ETF 轮动策略（PTrade 完全复刻聚宽版）
+# 回测频率：分钟（建议 3 分钟），每天 10:00 执行调仓
+# 实盘频率：通过 run_daily 在每天 10:00 执行
+# 重要：使用前复权数据，手动过滤停牌（成交量>0），完全匹配聚宽逻辑
+
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    # ========== 基础设置 ==========
+    set_benchmark('000300.XSHG')               # 沪深300指数，PTrade 使用 .XSHG 后缀
+    set_slippage(0.002)
+    set_commission(commission_ratio=0.0003, min_commission=5, type='etf')
+    set_limit_mode('UNLIMITED')                # 取消回测成交数量限制模式
+
+    # ========== ETF 池（PTrade 真实后缀：上交所 .XSHG，深交所 .XSHE）==========
+    g.etf_pool = [
+        '512480.XSHG', '512760.XSHG', '159995.XSHE', '515980.XSHG', '159770.XSHE',
+        '159819.XSHE', '159852.XSHE', '512720.XSHG', '515880.XSHG', '159801.XSHE',
+        '516160.XSHG', '159949.XSHE', '515700.XSHG', '159806.XSHE', '515790.XSHG',
+        '516880.XSHG', '159755.XSHE', '561160.XSHG', '512170.XSHG', '512290.XSHG',
+        '159992.XSHE', '159859.XSHE', '512010.XSHG', '159647.XSHE', '512400.XSHG',
+        '516020.XSHG', '512880.XSHG', '512070.XSHG', '510230.XSHG', '512660.XSHG',
+        '512710.XSHG', '512980.XSHG', '159869.XSHE', '159805.XSHE', '159967.XSHE',
+        '513050.XSHG', '513330.XSHG', '513180.XSHG', '518880.XSHG'
+    ]
+    set_universe(g.etf_pool)
+
+    # ========== 策略参数 ==========
+    g.top_percent = 0.4               # 强势 ETF 筛选比例（前 40%）
+    g.corr_window = 245               # 相关性计算窗口（交易日）
+    g.target_num = 2                  # 最终买入数量
+    g.corr_select_num = 4             # 从强势池中选低相关的前 N 只（再取前2）
+
+    # ========== 环境判断与定时任务 ==========
+    g.is_real = is_trade()
+
+    # 每月第一个交易日盘前更新强势池（09:00）
+    run_daily(context, up_strength, time='09:00')
+
+    if g.is_real:
+        run_daily(context, trade, time='10:00')
+
+def handle_data(context, data):
+    """回测：每分钟执行一次，只在每天 10:00 执行交易"""
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 10 and current_dt.minute == 0:
+        trade(context, data)
+
+# ========== 每月第一个交易日判断 ==========
+def is_first_trading_day_of_month(date):
+    first_day = date.replace(day=1)
+    first_trading_day_str = get_trading_day_by_date(first_day.strftime('%Y%m%d'), 0)
+    return date.strftime('%Y%m%d') == first_trading_day_str
+
+# ========== 趋势强度相关函数（前复权，手动过滤停牌）==========
+def trend_strength(security):
+    """
+    计算趋势强度，使用前复权数据，手动过滤停牌（成交量>0）
+    返回 {'mom': 20日动量, 'bias': 60日均线乖离}，数据不足返回 None
+    PTrade 适配：get_history 返回结构化数组，需按字段或位置提取价格/成交量
+    """
+    # 获取80个交易日的前复权收盘价和成交量
+    hist = get_history(80, '1d', ['close', 'volume'], security, fq='pre', is_dict=True)
+    if security not in hist:
+        return None
+    data_arr = hist[security]          # structured ndarray, e.g. [(date, close, volume), ...]
+    if len(data_arr) < 60:
+        return None
+    
+    # 提取收盘价和成交量（兼容字段名和位置索引）
+    try:
+        close_arr = data_arr['close']
+        volume_arr = data_arr['volume']
+    except (KeyError, ValueError):
+        # 若字段名不可用，按位置：第1列为日期，第2列为close，第3列为volume
+        close_arr = np.array([x[1] for x in data_arr])
+        volume_arr = np.array([x[2] for x in data_arr])
+    
+    # 过滤停牌：成交量>0 且价格不为 NaN
+    valid = (volume_arr > 0) & ~np.isnan(close_arr)
+    if not np.any(valid):
+        return None
+    close_valid = close_arr[valid]
+    if len(close_valid) < 60:
+        return None
+    
+    current = close_valid[-1]
+    # 20日动量（需要至少21个有效交易日）
+    if len(close_valid) >= 21:
+        mom_20 = current / close_valid[-21] - 1
+    else:
+        mom_20 = 0.0
+    # 60日均线乖离
+    ma60 = np.mean(close_valid[-60:])
+    bias_60 = current / ma60 - 1
+    return {'mom': mom_20, 'bias': bias_60}
+
+def filter_by_trend_strength(etf_pool, top_percent=0.4):
+    scores = {}
+    for etf in etf_pool:
+        raw = trend_strength(etf)
+        if raw:
+            scores[etf] = raw
+    if not scores:
+        return []
+    df = pd.DataFrame(scores).T
+    rank_df = df.rank(pct=True) * 100
+    total_score = rank_df['mom'] + rank_df['bias']
+    threshold = np.percentile(total_score, (1 - top_percent) * 100)
+    selected = total_score[total_score >= threshold].index.tolist()
+    return selected
+
+def up_strength(context):
+    """每月第一个交易日更新强势池"""
+    if not is_first_trading_day_of_month(context.blotter.current_dt):
+        return
+    g.trend_strength_pool = filter_by_trend_strength(g.etf_pool, top_percent=g.top_percent)
+    log.info('【趋势强度池更新】日期：%s，数量：%d' % (context.blotter.current_dt.strftime('%Y-%m-%d'), len(g.trend_strength_pool)))
+
+# ========== 低相关性选股（前复权，手动过滤停牌）==========
+def min_corr(stocks, nday=245):
+    """
+    从 stocks 中选出与其它股票平均相关性最低的 g.corr_select_num 只
+    PTrade 适配：get_history 返回结构化数组，需按字段或位置提取价格
+    """
+    if len(stocks) < 2:
+        return stocks[:g.corr_select_num] if len(stocks) >= g.corr_select_num else stocks
+    
+    price_dict = get_history(nday, '1d', 'close', stocks, fq='pre', is_dict=True)
+    df_close = pd.DataFrame()
+    
+    for stock in stocks:
+        if stock not in price_dict:
+            continue
+        data_arr = price_dict[stock]
+        if len(data_arr) < nday:
+            continue
+        
+        # 提取价格列
+        try:
+            prices = data_arr['close']
+        except (KeyError, ValueError):
+            # 按位置：第二列为价格
+            prices = np.array([x[1] for x in data_arr])
+        
+        # 转为 Series，过滤无效值（价格为0或NaN）
+        s = pd.Series(prices).replace(0, np.nan).dropna()
+        if len(s) >= nday * 0.8:      # 至少80%数据有效
+            df_close[stock] = s
+    
+    if df_close.empty or len(df_close.columns) < 2:
+        return stocks[:g.corr_select_num]
+    
+    # 对齐索引（取共同交易日）
+    df_close = df_close.dropna()
+    if df_close.empty or len(df_close.columns) < 2:
+        return stocks[:g.corr_select_num]
+    
+    # 计算对数收益率及相关系数矩阵
+    ret = np.log(df_close).diff().dropna()
+    corr = ret.corr()
+    corr_mean = {}
+    for stock in corr.columns:
+        others = corr[stock].drop(stock)
+        corr_mean[stock] = others.abs().mean() if len(others) > 0 else 1.0
+    sorted_stocks = sorted(corr_mean.keys(), key=lambda x: corr_mean[x])
+    return sorted_stocks[:g.corr_select_num]
+
+# ========== 交易主函数（完全复刻聚宽逻辑，适配 PTrade）==========
+def trade(context, data=None):
+    # 确保强势池存在（第一次运行时若为空则立即更新）
+    if not hasattr(g, 'trend_strength_pool') or len(g.trend_strength_pool) == 0:
+        # 强制更新一次（此时已过初始化，可以调用 get_history）
+        g.trend_strength_pool = filter_by_trend_strength(g.etf_pool, top_percent=g.top_percent)
+        if len(g.trend_strength_pool) == 0:
+            log.warning('强势池为空，本次调仓跳过')
+            return
+
+    # 从强势池中选低相关的 corr_select_num 只，再取前 target_num 只
+    low_corr_list = min_corr(g.trend_strength_pool, nday=g.corr_window)
+    target_list = low_corr_list[:g.target_num]
+    if not target_list:
+        log.warning('目标列表为空，跳过调仓')
+        return
+    #log.info('【目标持仓】%s' % target_list)
+
+    # ---------- 卖出：清仓不在目标列表中的持仓 ----------
+    #current_hold = list(context.portfolio.positions.keys()) #返回短后缀
+    #print(f"current_hold = list(context.portfolio.positions.keys()):: {current_hold}")
+    
+    positions = get_positions()  #返回长后缀 518880.XSHG
+    for code, pos in positions.items():
+        if pos.amount != 0 and code not in target_list:
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+            if sellable <= 0:
+                log.info('【卖出跳过】%s，可用数量为0' % code)
+                continue
+            order_target_value(code, 0)
+            log.info('【卖出】%s，数量：%.0f' % (code, sellable))
+
+    # ---------- 买入：等权重分配剩余现金（使用 PTrade 的 get_available_cash 函数）----------
+    hold_list = [code for code, pos in get_positions().items() if pos.amount != 0]
+    if len(hold_list) < g.target_num:
+        # 获取可用现金（PTrade 专用函数）
+        try:
+            available_cash = get_available_cash()
+        except NameError:
+            # 回测环境兼容：若函数不存在，回退到 context.portfolio.cash（总现金）
+            available_cash = context.portfolio.cash
+        if available_cash <= 0:
+            log.info('可用现金不足，跳过买入')
+            return
+        cash_per_target = available_cash / (g.target_num - len(hold_list))
+        for etf in target_list:
+            if context.portfolio.positions[etf].amount == 0:
+                if not g.is_real:
+                    price = data[etf].price if etf in data else None
+                else:
+                    snapshot = get_snapshot(etf)
+                    price = snapshot.get(etf, {}).get('last_px', None) if snapshot else None
+                if price is None or price <= 0:
+                    log.warning('【买入跳过】%s，无法获取有效价格' % etf)
+                    continue
+                min_amount = price * 100
+                if cash_per_target < min_amount:
+                    log.warning('【买入跳过】%s，分配金额 %.2f 不足 100 股（需 %.2f）' % (etf, cash_per_target, min_amount))
+                    continue
+                order_target_value(etf, cash_per_target)
+                log.info('【买入】%s，目标金额：%.2f，价格：%.3f' % (etf, cash_per_target, price))

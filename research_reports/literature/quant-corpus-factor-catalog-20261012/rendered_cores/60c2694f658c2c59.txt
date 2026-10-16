@@ -1,0 +1,66 @@
+quant/2024年度精选策略1/41.人工智能强化学习DQN交易智能体（回馈社区公开训练代码）.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+import pickle
+import pandas as pd
+import torch
+import torch.nn as nn
+from tqdm import tqdm
+industry_code = ['HY001', 'HY002', 'HY003', 'HY004', 'HY005', 'HY006', 'HY007', 'HY008', 'HY009', 'HY010', 'HY011']
+
+def initialize(context):
+    run_daily(adjustment, '9:30')
+model_path1 = 'tgt_net.pt'
+
+class DQN(nn.Module):
+
+    def __init__(self, input_shape, n_actions):
+        super(DQN, self).__init__()
+        units = 32
+        self.fc1 = nn.Linear(input_shape, units)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(units, n_actions)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return x
+import io
+buffer = io.BytesIO(read_file(model_path1))
+model_t1 = DQN(6, 3)
+model_t1.load_state_dict(torch.load(buffer))
+model_t1.eval()
+
+def get_action(context):
+    yesterday = context.previous_date
+    today = context.current_dt
+    initial_list = '000065.XSHE'
+    df = attribute_history(initial_list, 7, '1d')
+    df['涨跌幅'] = df['close'].pct_change()
+    df = df.dropna()
+    df_tensor = torch.Tensor(df['涨跌幅'].values)
+    output1 = model_t1(df_tensor)
+    action = np.argmax(output1.detach().squeeze(0))
+    return action
+
+def adjustment(context):
+    initial_list = '000065.XSHE'
+    action = get_action(context)
+    value = context.portfolio.cash
+    if action == 1:
+        open_position(initial_list, value)
+    if action == 2:
+        position = context.portfolio.positions[initial_list]
+        close_position(position)
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def close_account(context):
+    if len(g.hold_list) != 0:
+        for stock in g.hold_list:
+            position = context.portfolio.positions[stock]
+            close_position(position)

@@ -1,0 +1,38 @@
+quant/2021年度精选策略/84.ETF网格交易策略.txt
+import jqdata
+
+def initialize(context):
+    g.security = '512900.XSHG'
+    run_daily(market_open, time='14:45:00')
+    uplimit = 1.5
+    downlimit = 0.9
+    space = 6
+    number = 3
+    g.unitprice = (uplimit - downlimit) / space
+    g.initialprice = 0.976
+    g.initial_buy = downlimit + 0 * g.unitprice
+    g.initial_sell = downlimit + 1 * g.unitprice
+    g.cash = context.portfolio.cash / number
+    for i in range(0, space + 1):
+        pass
+    run_daily(after_market, time='after_close', reference_security='000300.XSHG')
+
+def market_open(context):
+    security = g.security
+    cash = g.cash
+    current_time = context.current_dt
+    close_data = get_price(security=security, end_date=current_time, frequency='1m', fields='close', count=5)['close'][-1]
+    g.current_cash = context.portfolio.available_cash
+    if close_data < g.initial_buy:
+        order_value(security, cash)
+    elif close_data > g.initial_sell:
+        order_value(security, -cash)
+
+def after_market(context):
+    close_cash = context.portfolio.available_cash
+    if g.current_cash < close_cash:
+        g.initial_buy = g.initial_buy + g.unitprice
+        g.initial_sell = g.initial_sell + g.unitprice
+    elif g.current_cash > close_cash:
+        g.initial_buy = g.initial_buy - g.unitprice
+        g.initial_sell = g.initial_sell - g.unitprice

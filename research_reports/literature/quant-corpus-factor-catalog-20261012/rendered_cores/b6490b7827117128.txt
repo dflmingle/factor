@@ -1,0 +1,96 @@
+quant/2024年度精选策略2/73.实现净利润跳空策略.txt
+from jqdata import *
+
+def initialize(context):
+    g.stocknum = 5
+    g.days = 0
+    g.refresh_rate = 30
+    g.indnum = 3
+    run_daily(trade, 'every_bar')
+
+def check_stocks(context):
+    Stocks = get_fundamentals(query(valuation.code, indicator.inc_net_profit_annual).filter(indicator.inc_net_profit_annual > 0.2))
+    temp = get_bars(Stocks['code'].values.tolist(), 2, unit='1d', fields=['date', 'open', 'close'], include_now=False)
+    jump = []
+    for i in list(set(temp.keys())):
+        min1 = min(temp[i][0][1], temp[i][0][2])
+        max2 = max(temp[i][1][1], temp[i][1][2])
+        if min1 > max2:
+            jump.append(1)
+        else:
+            jump.append(0)
+    Stocks['jump'] = pd.DataFrame(jump)
+    Stocks = Stocks[Stocks['jump'] > 0]
+    Stocks_afterind = getstocklist_byindustry(list(Stocks['code']), g.indnum)
+    Stocks = Stocks[Stocks.code.isin(Stocks_afterind)]
+    Stocks.sort_values(by='inc_net_profit_annual', inplace=True, ascending=False)
+    Codes = list(Stocks['code'])
+    buylist = filter_paused_stock(Codes)
+    return buylist[:g.stocknum]
+
+def trade(context):
+    if g.days % g.refresh_rate == 0:
+        sell_list = list(context.portfolio.positions.keys())
+        stock_list = check_stocks(context)
+        if len(sell_list) > 0:
+            for stock in sell_list:
+                if stock not in stock_list:
+                    order_target_value(stock, 0)
+        if len(context.portfolio.positions) < g.stocknum:
+            Num = g.stocknum - len(context.portfolio.positions)
+            Cash = context.portfolio.cash / Num
+        else:
+            Cash = 0
+        for stock in stock_list:
+            if len(context.portfolio.positions.keys()) < g.stocknum:
+                order_value(stock, Cash)
+        g.days = 1
+    else:
+        g.days += 1
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=f3be605371a5ed1e28b5ea05d6eab803708c5b09e80b32ccce7aba6a86a52964 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def getstocklist_byindustry(Codes, num):
+    sw_l1 = pd.DataFrame(np.zeros(len(list(set(get_industries(name='sw_l1')['name'])))).reshape(1, -1), columns=list(set(get_industries(name='sw_l1')['name'])))
+    for code in Codes:
+        try:
+            sw_l1[get_industry(security=code)[code]['sw_l1']['industry_name']] = sw_l1[get_industry(security=code)[code]['sw_l1']['industry_name']] + 1
+        except:
+            pass
+    sw_l1 = sw_l1.T
+    sw_l1.sort_values(by=0, inplace=True, ascending=False)
+    sw_l1 = sw_l1[0:num].T
+    industry_list = list(sw_l1.columns)
+    result_list = []
+    for code in Codes:
+        try:
+            if get_industry(security=code)[code]['sw_l1']['industry_name'] in industry_list:
+                result_list.append(code)
+        except:
+            pass
+    return result_list
+
+def dapan_stoploss(context):
+    stoploss = dp_stoploss(kernel=2, n=3, zs=0.1)
+    if stoploss:
+        if len(context.portfolio.positions) > 0:
+            for stock in list(context.portfolio.positions.keys()):
+                order_target(stock, 0)
+
+def dp_stoploss(kernel=2, n=10, zs=0.03):
+    if kernel == 1:
+        t = n + 2
+        hist = attribute_history('000300.XSHG', t, '1d', 'close', df=False)
+        temp1 = sum(hist['close'][1:-1]) / float(n)
+        temp2 = sum(hist['close'][0:-2]) / float(n)
+        close1 = hist['close'][-1]
+        close2 = hist['close'][-2]
+        if close2 > temp2 and close1 < temp1:
+            return True
+        else:
+            return False
+    elif kernel == 2:
+        hist1 = attribute_history('000300.XSHG', n, '1d', 'close', df=False)
+        if 1 - float(hist1['close'][-1] / hist1['close'][0]) >= zs:
+            return True
+        else:
+            return False

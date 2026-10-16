@@ -1,0 +1,101 @@
+quant/2020年度精选策略/85 【第一次玩】我就是要买便宜股系列.txt
+from jqdata import *
+from datetime import datetime, timedelta
+
+def initialize(context):
+    g.security = []
+    g.counter_open = 0
+    run_monthly(market_open, 8, time='open', reference_security='000300.XSHG')
+
+def market_open(context):
+    g.counter_open += 1
+    if g.counter_open == 1:
+        sell_all()
+        date = str(context.current_dt.date())
+        yesterday = (datetime.strptime(date, '%Y-%m-%d').date() - timedelta(1)).strftime('%Y-%m-%d')
+        stock_list = get_stock_list(yesterday)
+        stock_list = stock_list.sort(['code'], ascending=[True])
+        if stock_list.shape[0] > 0:
+            stock_list['dividend_ratio'] = stock_list.apply(lambda x: DividendRatio([x[0]], yesterday), axis=1)
+            stock_list = stock_list.dropna()
+            stock_list = stock_list[stock_list['dividend_ratio'] > 0.03]
+            industry_df = finance.run_query(query(finance.STK_COMPANY_INFO.code, finance.STK_COMPANY_INFO.industry_id).filter(finance.STK_COMPANY_INFO.code.in_(stock_list['code'].tolist())))
+            stock_list['industry_id'] = industry_df['industry_id'].tolist()
+            stock_list = stock_list.sort(['pe_ratio', 'pb_ratio', 'dividend_ratio'], ascending=[True, True, False])
+            stock_list_info, stock_list = get_stocks(stock_list, 10)
+            for stock in stock_list:
+                pass
+            if len(stock_list) > 6:
+                g.security = stock_list
+            else:
+                g.security = []
+            cash = context.portfolio.available_cash
+            buy_stock(g.security, cash)
+        else:
+            return
+    elif g.counter_open == 6:
+        g.counter_open = 0
+
+def get_stock_list(date):
+    q = query(valuation.code, valuation.pe_ratio, valuation.pb_ratio)
+    stock_list = get_fundamentals(q, date)
+    stock_list = stock_list[stock_list['pe_ratio'] > 0]
+    stock_list = stock_list[stock_list['pe_ratio'] < 10]
+    stock_list = stock_list[stock_list['pb_ratio'] > 0]
+    stock_list = stock_list[stock_list['pb_ratio'] < 1.5]
+    return stock_list
+
+def DividendRatio(security_list, end_date, count=1):
+    """查询股息率(日更新)
+    输入:股票池,截止日期,获取数量
+    输出:panel结构,单位:1"""
+    trade_days = get_trade_days(end_date=end_date, count=count)
+    security_list.sort()
+    secu_list = [x[:6] for x in security_list]
+    code_df = jy.run_query(query(jy.SecuMain.InnerCode, jy.SecuMain.SecuCode).filter(jy.SecuMain.SecuCode.in_(secu_list), jy.SecuMain.SecuCategory == 1).order_by(jy.SecuMain.SecuCode))
+    code_df['code'] = security_list
+    df = jy.run_query(query(jy.LC_DIndicesForValuation.InnerCode, jy.LC_DIndicesForValuation.TradingDay, jy.LC_DIndicesForValuation.DividendRatio).filter(jy.LC_DIndicesForValuation.InnerCode.in_(code_df.InnerCode), jy.LC_DIndicesForValuation.TradingDay.in_(trade_days)))
+    f_df = df.merge(code_df, on='InnerCode').set_index(['TradingDay', 'code']).drop(['InnerCode', 'SecuCode'], axis=1)
+    panel = f_df.to_panel()
+    return panel.major_xs(panel.major_axis[0])['DividendRatio'].tolist()[0] if len(panel.major_axis) > 0 else None
+
+def get_industry_id(code):
+    df = finance.run_query(query(finance.STK_COMPANY_INFO.industry_id).filter(finance.STK_COMPANY_INFO.code == code))
+    return df['industry_id'][0]
+
+def get_stocks(sorted_stock_list, max_stock):
+    stock_list_info = []
+    stock_list = []
+    occur_dict = {}
+    for loc in range(sorted_stock_list.shape[0]):
+        field = get_industry_id(sorted_stock_list.iloc[loc]['code'])
+        if field in occur_dict:
+            if occur_dict[field] >= max_stock * 0.3:
+                continue
+            else:
+                occur_dict[field] += 1
+                stock_list_info.append(sorted_stock_list.iloc[loc])
+                stock_list.append(sorted_stock_list.iloc[loc]['code'])
+        else:
+            stock_list_info.append(sorted_stock_list.iloc[loc])
+            stock_list.append(sorted_stock_list.iloc[loc]['code'])
+            occur_dict[field] = 1
+        if len(stock_list) >= max_stock:
+            break
+    return (stock_list_info, stock_list)
+
+def sell_all():
+    for stock in g.security:
+        order_target(stock, 0)
+
+def buy_stock(stock_list, sum_price):
+    if stock_list is None or len(stock_list) == 0:
+        return
+    price_dict = history(1, unit='1d', field='avg', security_list=stock_list, df=False, skip_paused=False, fq='pre')
+    for stock in price_dict.keys():
+        price_dict[stock] = price_dict[stock][0]
+    sum_price_dict = {}
+    per_price = sum_price / len(price_dict)
+    for stock in price_dict.keys():
+        num = math.floor(per_price / price_dict[stock] / 100)
+        order(stock, num * 100)

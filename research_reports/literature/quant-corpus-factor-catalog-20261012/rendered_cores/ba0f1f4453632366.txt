@@ -1,0 +1,23 @@
+quant/2020年度精选策略/52 布林带1.txt
+import jqdata
+import numpy as np
+
+def initialize(context):
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+
+def market_open(context):
+    security = '600519.XSHG'
+    price = attribute_history(security, 20, '1d', ['close'], skip_paused=True)
+    cash = context.portfolio.available_cash
+    current_position = context.portfolio.positions[security].closeable_amount
+    mid = np.mean(price)
+    std = np.std(price)
+    upper = mid + 2 * std
+    lower = mid - 2 * std
+    p = price['close'][-1]
+    if p > upper[-1] and current_position <= 0:
+        order_value(security, cash)
+    elif p < lower[-1] and current_position >= 0:
+        order_target_value(security, 0)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

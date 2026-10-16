@@ -1,0 +1,195 @@
+quant/聚宽2025年精选/16集合竞价三合一，今年收益1067.txt
+from jqdata import *
+from jqfactor import *
+from jqlib.technical_analysis import *
+import datetime as dt
+import pandas as pd
+from datetime import datetime
+from datetime import timedelta
+
+def initialize(context):
+    run_daily(get_stock_list, '9:01')
+    run_daily(buy, '09:26')
+    run_daily(sell, time='11:25', reference_security='000300.XSHG')
+    run_daily(sell, time='14:50', reference_security='000300.XSHG')
+
+def get_stock_list(context):
+    date = context.previous_date
+    date = transform_date(date, 'str')
+    date_1 = get_shifted_date(date, -1, 'T')
+    date_2 = get_shifted_date(date, -2, 'T')
+    initial_list = prepare_stock_list(date)
+    hl_list = get_hl_stock(initial_list, date)
+    hl1_list = get_ever_hl_stock(initial_list, date_1)
+    hl2_list = get_ever_hl_stock(initial_list, date_2)
+    elements_to_remove = set(hl1_list + hl2_list)
+    hl_list = [stock for stock in hl_list if stock not in elements_to_remove]
+    g.target_list = hl_list
+    h1_list = get_ever_hl_stock2(initial_list, date)
+    elements_to_remove = get_hl_stock(initial_list, date_1)
+    all_list = [stock for stock in h1_list if stock not in elements_to_remove]
+    g.target_list2 = all_list
+
+def buy(context):
+    qualified_stocks = []
+    gk_stocks = []
+    dk_stocks = []
+    rzq_stocks = []
+    current_data = get_current_data()
+    date_now = context.current_dt.strftime('%Y-%m-%d')
+    mid_time1 = ' 09:15:00'
+    end_times1 = ' 09:26:00'
+    start = date_now + mid_time1
+    end = date_now + end_times1
+    for s in g.target_list:
+        prev_day_data = attribute_history(s, 1, '1d', fields=['close', 'volume', 'money'], skip_paused=True)
+        avg_price_increase_value = prev_day_data['money'][0] / prev_day_data['volume'][0] / prev_day_data['close'][0] * 1.1 - 1
+        if avg_price_increase_value < 0.07 or prev_day_data['money'][0] < 550000000.0 or prev_day_data['money'][0] > 2000000000.0:
+            continue
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date, fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < 70 or turnover_ratio_data['circulating_market_cap'][0] > 520:
+            continue
+        zyts = calculate_zyts(s, context)
+        volume_data = attribute_history(s, zyts, '1d', fields=['volume'], skip_paused=True)
+        if len(volume_data) < 2 or volume_data['volume'][-1] <= max(volume_data['volume'][:-1]) * 0.9:
+            continue
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        if auction_data.empty or auction_data['volume'][0] / volume_data['volume'][-1] < 0.03:
+            continue
+        current_ratio = auction_data['current'][0] / (current_data[s].high_limit / 1.1)
+        if current_ratio <= 1 or current_ratio >= 1.06:
+            continue
+        gk_stocks.append(s)
+        qualified_stocks.append(s)
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    initial_list = prepare_stock_list2(date)
+    hl_list = get_hl_stock(initial_list, date)
+    if len(hl_list) != 0:
+        ccd = get_continue_count_df(hl_list, date, 10)
+        lb_list = list(ccd.index)
+        stock_list = [s for s in hl_list if s not in lb_list]
+        rpd = get_relative_position_df(stock_list, date, 60)
+        rpd = rpd[rpd['rp'] <= 0.5]
+        stock_list = list(rpd.index)
+        df = get_price(stock_list, end_date=date, frequency='daily', fields=['close'], count=1, panel=False, fill_paused=False, skip_paused=True).set_index('code') if len(stock_list) != 0 else pd.DataFrame()
+        df['open_pct'] = [current_data[s].day_open / df.loc[s, 'close'] for s in stock_list]
+        df = df[(0.955 <= df['open_pct']) & (df['open_pct'] <= 0.97)]
+        stock_list = list(df.index)
+        for s in stock_list:
+            prev_day_data = attribute_history(s, 1, '1d', fields=['close', 'volume', 'money'], skip_paused=True)
+            if prev_day_data['money'][0] >= 100000000.0:
+                dk_stocks.append(s)
+                qualified_stocks.append(s)
+    for s in g.target_list2:
+        price_data = attribute_history(s, 4, '1d', fields=['close'], skip_paused=True)
+        if len(price_data) < 4:
+            continue
+        increase_ratio = (price_data['close'][-1] - price_data['close'][0]) / price_data['close'][0]
+        if increase_ratio > 0.28:
+            continue
+        prev_day_data = attribute_history(s, 1, '1d', fields=['open', 'close'], skip_paused=True)
+        if len(prev_day_data) < 1:
+            continue
+        open_close_ratio = (prev_day_data['close'][0] - prev_day_data['open'][0]) / prev_day_data['open'][0]
+        if open_close_ratio < -0.05:
+            continue
+        prev_day_data = attribute_history(s, 1, '1d', fields=['close', 'volume', 'money'], skip_paused=True)
+        avg_price_increase_value = prev_day_data['money'][0] / prev_day_data['volume'][0] / prev_day_data['close'][0] - 1
+        if avg_price_increase_value < -0.04 or prev_day_data['money'][0] < 300000000.0 or prev_day_data['money'][0] > 1900000000.0:
+            continue
+        turnover_ratio_data = get_valuation(s, start_date=context.previous_date, end_date=context.previous_date, fields=['turnover_ratio', 'market_cap', 'circulating_market_cap'])
+        if turnover_ratio_data.empty or turnover_ratio_data['market_cap'][0] < 70 or turnover_ratio_data['circulating_market_cap'][0] > 520:
+            continue
+        zyts = calculate_zyts(s, context)
+        volume_data = attribute_history(s, zyts, '1d', fields=['volume'], skip_paused=True)
+        if len(volume_data) < 2 or volume_data['volume'][-1] <= max(volume_data['volume'][:-1]) * 0.9:
+            continue
+        auction_data = get_call_auction(s, start_date=start, end_date=end, fields=['time', 'volume', 'current'])
+        if auction_data.empty or auction_data['volume'][0] / volume_data['volume'][-1] < 0.03:
+            continue
+        current_ratio = auction_data['current'][0] / (current_data[s].high_limit / 1.1)
+        if current_ratio <= 0.98 or current_ratio >= 1.09:
+            continue
+        rzq_stocks.append(s)
+        qualified_stocks.append(s)
+    if len(qualified_stocks) > 0:
+        pass
+    if len(qualified_stocks) != 0 and context.portfolio.available_cash / context.portfolio.total_value > 0.3:
+        value = context.portfolio.available_cash / len(qualified_stocks)
+        for s in qualified_stocks:
+            if context.portfolio.available_cash / current_data[s].last_price > 100:
+                order_value(s, value, MarketOrderStyle(current_data[s].day_open))
+'EXACT_REVIEWED_FUNCTION transform_date sha256=124eedb78f9331ed5d4fcf0860bcccd44f1390ff4b41f41549e057a660b36945 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION get_shifted_date sha256=27749f17863802d62d66d1f2aebb7c67005cd3fcc80eb3ad0e31a3475f13b7d5 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_new_stock sha256=af3d460f1664c95ce103c45e4aa82266d06e53a12e8d79da1097ddbc84e6bd04 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_st_stock sha256=f37cdf4e00095f1f7294c986672fa243f8e8d7622e77006bd8ea6e1d5fde7655 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_kcbj_stock sha256=ce44112049139d0c8e751b4fc93284f3f7073511af0ecb7cc911a495ed14688a source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_paused_stock sha256=8956a16f8ca4b8df944f41b0b3a6957894b1cd4cc60e937aed1f52e039d0c01d source=quant/2024年度精选策略1/4.首板低开策略.txt'
+'EXACT_REVIEWED_FUNCTION filter_extreme_limit_stock sha256=e43531991a1b1cd14bfe0ac8337c3942976c2f39683c74c0d66f7ad17913dcbd source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=56e537db6fd28b7921a9ea3d0d02ce5d54a0b27871c0225470ed712658edcd3c source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def calculate_zyts(s, context):
+    high_prices = attribute_history(s, 101, '1d', fields=['high'], skip_paused=True)['high']
+    prev_high = high_prices.iloc[-1]
+    zyts_0 = next((i - 1 for i, high in enumerate(high_prices[-3::-1], 2) if high >= prev_high), 100)
+    zyts = zyts_0 + 5
+    return zyts
+'EXACT_REVIEWED_FUNCTION get_hl_stock sha256=1b44687e21b10ff448ccffd8adc7bcbc28701bc3e2f9bc81b42cad20cd893c18 source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+
+def get_ever_hl_stock(initial_list, date):
+    df = get_price(initial_list, end_date=date, frequency='daily', fields=['high', 'high_limit'], count=1, panel=False, fill_paused=False, skip_paused=False)
+    df = df.dropna()
+    df = df[df['high'] == df['high_limit']]
+    hl_list = list(df.code)
+    return hl_list
+
+def get_ever_hl_stock2(initial_list, date):
+    df = get_price(initial_list, end_date=date, frequency='daily', fields=['close', 'high', 'high_limit'], count=1, panel=False, fill_paused=False, skip_paused=False)
+    df = df.dropna()
+    cd1 = df['high'] == df['high_limit']
+    cd2 = df['close'] != df['high_limit']
+    df = df[cd1 & cd2]
+    hl_list = list(df.code)
+    return hl_list
+'EXACT_REVIEWED_FUNCTION get_hl_count_df sha256=696c4e8a4997343a84c8e7a5b8252c7661feaf6aede50f6e911dd8a94cd767ce source=quant/2024年度精选策略1/7.连板龙头策略.txt'
+'EXACT_REVIEWED_FUNCTION get_continue_count_df sha256=ed4b85c92a7f497f105c05129f66dce38db5bc17142e183ec8dde223f2f7ad05 source=quant/2024年度精选策略1/4.首板低开策略.txt'
+
+def get_index_increase_ratio(index_code, context):
+    close_prices = attribute_history(index_code, 2, '1d', fields=['close'], skip_paused=True)
+    if len(close_prices) < 2:
+        return 0
+    day_before_yesterday_close = close_prices['close'][0]
+    yesterday_close = close_prices['close'][1]
+    increase_ratio = (yesterday_close - day_before_yesterday_close) / day_before_yesterday_close
+    return increase_ratio
+
+def sell(context):
+    date = transform_date(context.previous_date, 'str')
+    current_data = get_current_data()
+    if str(context.current_dt)[-8:] == '11:25:00':
+        for s in list(context.portfolio.positions):
+            if context.portfolio.positions[s].closeable_amount != 0 and current_data[s].last_price < current_data[s].high_limit and (current_data[s].last_price > 1 * context.portfolio.positions[s].avg_cost):
+                order_target_value(s, 0)
+    if str(context.current_dt)[-8:] == '14:50:00':
+        for s in list(context.portfolio.positions):
+            close_data2 = attribute_history(s, 4, '1d', ['close'])
+            M4 = close_data2['close'].mean()
+            MA5 = (M4 * 4 + current_data[s].last_price) / 5
+            if context.portfolio.positions[s].closeable_amount != 0 and current_data[s].last_price < current_data[s].high_limit and (current_data[s].last_price > 1 * context.portfolio.positions[s].avg_cost):
+                order_target_value(s, 0)
+            elif context.portfolio.positions[s].closeable_amount != 0 and current_data[s].last_price < MA5:
+                order_target_value(s, 0)
+
+def filter_new_stock2(initial_list, date, days=250):
+    d_date = transform_date(date, 'd')
+    return [stock for stock in initial_list if d_date - get_security_info(stock).start_date > dt.timedelta(days=days)]
+
+def prepare_stock_list2(date):
+    initial_list = get_all_securities('stock', date).index.tolist()
+    initial_list = filter_kcbj_stock(initial_list)
+    initial_list = filter_new_stock2(initial_list, date)
+    initial_list = filter_st_stock(initial_list, date)
+    initial_list = filter_paused_stock(initial_list, date)
+    return initial_list
+'EXACT_REVIEWED_FUNCTION get_relative_position_df sha256=d5a90ecafd4cf573380074b3e3b1f90e4f39ad333c09e0f3c96d6dc34a2cba2b source=quant/2024年度精选策略1/4.首板低开策略.txt'

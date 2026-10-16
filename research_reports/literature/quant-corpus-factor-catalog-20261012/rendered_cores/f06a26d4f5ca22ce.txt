@@ -1,0 +1,134 @@
+quant/2022年度精选策略/53.【指标研究】MACD日、周、月以及分别级别研究（包含低位二次金叉算法）.txt
+from jqdata import *
+import talib as tl
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import datetime
+
+def MACD(close, fastperiod, slowperiod, signalperiod):
+    macdDIFF, macdDEA, macd = tl.MACDEXT(close, fastperiod=fastperiod, fastmatype=1, slowperiod=slowperiod, slowmatype=1, signalperiod=signalperiod, signalmatype=1)
+    macd = macd * 2
+    return (macdDIFF, macdDEA, macd)
+
+def get_macd(stock, count, end_date, unit):
+    data = get_bars(security=stock, count=count, unit=unit, include_now=False, end_dt=end_date, fq_ref_date=None)
+    close = data['close']
+    open = data['open']
+    high = data['high']
+    low = data['low']
+    return MACD(close, 12, 26, 9)
+
+def show_macd(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    for i in range(0, len(macd)):
+        pass
+
+def show_cross(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    for i in range(0, len(macd)):
+        pass
+    for i in range(4, len(macd)):
+        if macdDIFF[i - 1] < macdDEA[i - 1] and macdDIFF[i] > macdDEA[i]:
+            pass
+        elif macdDIFF[i - 1] > macdDEA[i - 1] and macdDIFF[i] < macdDEA[i]:
+            pass
+
+def show_two_low_cross(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    for i in range(0, len(macd)):
+        pass
+    cross_list = []
+    for i in range(4, len(macd)):
+        if macdDIFF[i - 1] < macdDEA[i - 1] and macdDIFF[i] > macdDEA[i]:
+            gold_cross = {'id': i, 'name': 'gold_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+            cross_list.append(gold_cross)
+        elif macdDIFF[i - 1] > macdDEA[i - 1] and macdDIFF[i] < macdDEA[i]:
+            death_cross = {'id': i, 'name': 'death_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+            cross_list.append(death_cross)
+    df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by='id', ascending=False)
+    for index in df.index:
+        if index < 3:
+            break
+        if df.loc[index]['name'] == 'gold_cross' and df.loc[index]['dif'] < 0:
+            if df.loc[index - 1]['name'] == 'death_cross' and df.loc[index - 1]['dif'] < 0:
+                if df.loc[index - 2]['name'] == 'gold_cross' and df.loc[index - 2]['dif'] < 0:
+                    if df.loc[index - 3]['name'] == 'death_cross' and df.loc[index - 3]['dif'] > 0:
+                        pass
+
+def show_low_cross(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    for i in range(0, len(macd)):
+        pass
+    cross_list = []
+    for i in range(4, len(macd)):
+        if macdDIFF[i - 1] < macdDEA[i - 1] and macdDIFF[i] > macdDEA[i]:
+            gold_cross = {'id': i, 'name': 'gold_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+            cross_list.append(gold_cross)
+        elif macdDIFF[i - 1] > macdDEA[i - 1] and macdDIFF[i] < macdDEA[i]:
+            death_cross = {'id': i, 'name': 'death_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+            cross_list.append(death_cross)
+    df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by='id', ascending=False)
+    for index in df.index:
+        if index < 2:
+            break
+        if df.loc[index]['name'] == 'gold_cross' and df.loc[index]['dif'] < 0:
+            if df.loc[index - 1]['name'] == 'death_cross' and df.loc[index - 1]['dif'] < 0:
+                pass
+
+def is_second_low_gold_cross(macd_list):
+    macdDIFF, macdDEA, macd = macd_list
+    cross_list = []
+    if macdDIFF[-2] < macdDEA[-2] and macdDIFF[-1] > macdDEA[-1] and (macdDIFF[-1] < 0):
+        for i in range(4, len(macd)):
+            if macdDIFF[i - 1] < macdDEA[i - 1] and macdDIFF[i] > macdDEA[i]:
+                gold_cross = {'id': i, 'name': 'gold_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+                cross_list.append(gold_cross)
+            elif macdDIFF[i - 1] > macdDEA[i - 1] and macdDIFF[i] < macdDEA[i]:
+                death_cross = {'id': i, 'name': 'death_cross', 'dif': macdDIFF[i], 'dea': macdDEA[i]}
+                cross_list.append(death_cross)
+        df = pd.DataFrame(cross_list, columns=['id', 'name', 'dif', 'dea']).sort_values(by='id', ascending=False)
+        index_list = []
+        if len(df.index) > 4:
+            index_list = df.index[0:4]
+        else:
+            return False
+        result1 = df.loc[index_list[0]]['name'] == 'gold_cross' and df.loc[index_list[0]]['dif'] < 0
+        result2 = df.loc[index_list[1]]['name'] == 'death_cross' and df.loc[index_list[1]]['dif'] < 0
+        result3 = df.loc[index_list[2]]['name'] == 'gold_cross' and df.loc[index_list[2]]['dif'] < 0
+        result4 = df.loc[index_list[3]]['name'] == 'death_cross' and df.loc[index_list[3]]['dif'] > 0
+        if result1 and result2 and result3 and result4:
+            return True
+        else:
+            return False
+    else:
+        return False
+macd_day = get_macd('000001.XSHE', 200, datetime.datetime.now().date(), '1d')
+show_macd(macd_day)
+show_cross(macd_day)
+macd_week = get_macd('000001.XSHE', 200, datetime.datetime.now().date(), '1w')
+show_macd(macd_week)
+show_cross(macd_week)
+macd_month = get_macd('000001.XSHE', 200, datetime.datetime.now().date(), '1M')
+show_macd(macd_month)
+show_cross(macd_month)
+macd_60m = get_macd('000001.XSHE', 200, datetime.datetime.now().date(), '60m')
+show_macd(macd_60m)
+show_cross(macd_60m)
+macd_week = get_macd('000001.XSHE', 50, datetime.datetime.now().date(), '1w')
+macd_day = get_macd('000001.XSHE', 50 * 5, datetime.datetime.now().date(), '1d')
+show_cross(macd_week)
+show_cross(macd_day)
+macd_week = get_macd('000001.XSHE', 200, datetime.datetime.now().date(), '1w')
+show_two_low_cross(macd_week)
+value = is_second_low_gold_cross(macd_week)
+if value:
+    pass

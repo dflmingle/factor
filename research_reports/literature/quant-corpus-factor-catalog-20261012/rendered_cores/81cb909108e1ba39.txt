@@ -1,0 +1,110 @@
+quant/2021年度精选策略/29.北上资金（北向资金港资外资）因子分析与策略分享.txt
+import talib
+import pandas as pd
+import numpy as np
+import math
+import jqdata
+import urllib2
+import re
+import time, datetime
+from jqdata import *
+from jqfactor import neutralize
+from prettytable import PrettyTable
+from jqdata import finance
+from jqfactor import get_factor_values
+import warnings
+from jqfactor import get_factor_values
+from jqdata import finance
+
+def initialize(context):
+    disable_cache()
+    warnings.filterwarnings('ignore')
+    g.index = '000300.XSHG'
+    g.buy_stock_count = 10
+    g.day_count = 0
+    g.trade_hour = 10
+    g.trade_minute = 0
+
+def handle_data(context, data):
+    g.pre_date = context.previous_date
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    buy_stocks = []
+    if hour == g.trade_hour and minute == g.trade_minute:
+        buy_stocks = select_stocks(context, data)
+        for stock in buy_stocks:
+            pass
+        if len(context.portfolio.positions) > 0:
+            last_prices = history(1, '1m', 'close', security_list=context.portfolio.positions.keys())
+            curr_data = get_current_data()
+            for stock in context.portfolio.positions.keys():
+                if stock not in buy_stocks and last_prices[stock][-1] < curr_data[stock].high_limit:
+                    order_target_value(stock, 0)
+        for stock in buy_stocks:
+            position_count = len(context.portfolio.positions)
+            if g.buy_stock_count > position_count:
+                value = context.portfolio.cash / (g.buy_stock_count - position_count)
+                if context.portfolio.positions[stock].total_amount == 0:
+                    order_target_value(stock, value)
+        g.day_count += 1
+
+def get_all_stocks():
+    stock_list = get_index_stocks(g.index)
+    return stock_list
+'EXACT_REVIEWED_FUNCTION filter_paused_and_st_stock sha256=6137617a27a73c8f2a84bb2011210e45eac77405db4216f9e39bd1613e4246fc source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION filter_gem_stock sha256=4816bfed9587e210ded81c6e288a6b9d00544cc261697b889abe16b77ed6ed1b source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+
+def filter_inno_stock(security_list):
+    return [stock for stock in security_list if stock[0:3] != '688' and stock[0:3] != '787']
+
+def filter_new_stock(context, stock_list):
+    tmpList = []
+    for stock in stock_list:
+        days_public = (context.current_dt.date() - get_security_info(stock).start_date).days
+        if days_public > 365:
+            tmpList.append(stock)
+    return tmpList
+
+def filter_limit_stock(context, data, stock_list):
+    tmpList = []
+    curr_data = get_current_data()
+    for stock in stock_list:
+        if curr_data[stock].low_limit < data[stock].close < curr_data[stock].high_limit:
+            tmpList.append(stock)
+    return tmpList
+
+def get_factor_data(stocklist, date):
+    df_HK_HOLD = finance.run_query(query(finance.STK_HK_HOLD_INFO.code, finance.STK_HK_HOLD_INFO.share_number).filter(finance.STK_HK_HOLD_INFO.code.in_(stocklist), finance.STK_HK_HOLD_INFO.day == date)).T
+    if df_HK_HOLD.empty:
+        return pd.DataFrame(columns=[])
+    else:
+        df_HK_HOLD.columns = df_HK_HOLD.loc['code'].values
+        df_HK_HOLD.drop(axis=0, labels=['code'], inplace=True)
+        df_HK_HOLD.index = [date]
+        df_close_price = get_price(stocklist, end_date=date, frequency='daily', count=1, fields=['close'], skip_paused=False, fq='pre', panel=True)['close']
+        factor_data = df_HK_HOLD * df_close_price
+        return factor_data
+
+def select_stocks(context, data):
+    stock_list = get_all_stocks()
+    stock_list = filter_paused_and_st_stock(stock_list)
+    stock_list = filter_new_stock(context, stock_list)
+    stock_list = filter_limit_stock(context, data, stock_list)
+    factor_data = get_factor_data(stock_list, context.previous_date)
+    if factor_data.empty:
+        return context.portfolio.positions.keys()
+    else:
+        stock_list = factor_data.T.sort_index(by=context.previous_date).index.values.tolist()[-g.buy_stock_count:]
+        return stock_list
+
+def get_growth_rate(security, n=10):
+    lc = get_close_price(security, n)
+    c = get_close_price(security, 1, '1m')
+    if not isnan(lc) and (not isnan(c)) and (lc != 0):
+        return (c - lc) / lc
+    else:
+        return 0
+'EXACT_REVIEWED_FUNCTION get_close_price sha256=56b125a180ea7292d5946969e8a1c9b665c5d7a07d5c97a47dc3246c0d5dc925 source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION shifttradingday sha256=824c8684fa07f5fc745a32e8804edb67ed6c17444baba26c7b0200690cb3efc3 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION show_stock sha256=9f7f26d6eef2b68d939d59fe5127260b262f53ff458bd71783d7c20e4ff0dfa2 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'
+'EXACT_REVIEWED_FUNCTION get_portfolio_info_text sha256=6e7ff51d68dc2357f43a03df646a3f737728b855f3407fa0fb2112ed35b7f184 source=quant/2020年度精选策略/73 跟着港资（北向资金）买A股.txt'

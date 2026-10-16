@@ -1,0 +1,115 @@
+quant/聚宽2025年精选/79国九条-新的红利因子，修正「审计意见」函数.txt
+from jqdata import *
+from jqfactor import *
+import numpy as np
+import pandas as pd
+from datetime import time
+from jqdata import finance
+
+def initialize(context):
+    g.trading_signal = True
+    g.run_stoploss = True
+    g.filter_audit = True
+    g.filter_bonus = True
+    g.adjust_num = True
+    g.hold_list = []
+    g.yesterday_HL_list = []
+    g.target_list = []
+    g.pass_months = [1, 4]
+    g.limitup_stocks = []
+    g.Expected_bonus = [5]
+    g.min_mv = 10
+    g.max_mv = 100000000.0
+    g.stock_num = 4
+    g.stock_pool_mult = 5
+    g.reason_to_sell = ''
+    g.stoploss_strategy = 3
+    g.stoploss_limit = 0.09
+    g.stoploss_market = 0.05
+    g.highest = 50
+    g.bonus_year = 1
+    g.etf = '511880.XSHG'
+    run_daily(prepare_stock_list, '9:05')
+    run_daily(trade_afternoon, time='14:00', reference_security='399101.XSHE')
+    run_daily(sell_stocks, time='10:00')
+    run_daily(close_account, '14:50')
+    run_weekly(weekly_adjustment, 2, '10:00')
+'EXACT_REVIEWED_FUNCTION prepare_stock_list sha256=3dcc49c7a53354c033668ab36cb80b8141ce7c6b8cf4b8264ecceda7ea965f47 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+
+def get_stock_list(context):
+    final_list = []
+    MKT_index = '399101.XSHE'
+    initial_list = filter_stocks(context, get_index_stocks(MKT_index))
+    q = query(valuation.code, valuation.market_cap, income.np_parent_company_owners, income.net_profit, income.operating_revenue).filter(valuation.code.in_(initial_list), valuation.market_cap.between(g.min_mv, g.max_mv), income.np_parent_company_owners > 0, income.net_profit > 0, income.operating_revenue > 100000000.0, indicator.roe > 0, indicator.roa > 0).order_by(valuation.market_cap.asc()).limit(g.stock_num * g.stock_pool_mult)
+    df = get_fundamentals(q)
+    final_list = list(df.code)
+    if g.filter_audit:
+        final_list = filter_audit(context, final_list)
+    if g.filter_bonus:
+        final_list = bonus_filter(context, final_list)
+    if len(final_list) == 0:
+        return [g.etf]
+    else:
+        last_prices = history(1, unit='1d', field='close', security_list=final_list)
+        return [stock for stock in final_list if stock in g.hold_list or last_prices[stock][-1] <= g.highest]
+'EXACT_REVIEWED_FUNCTION weekly_adjustment sha256=79608cae50c2fae1b0f23988cd32c16a45a96aee2deb55720ad98deea0820c6f source=quant/聚宽2025年精选/6国九小市值策略【年化100.5】.txt'
+'EXACT_REVIEWED_FUNCTION check_limit_up sha256=5c42accfadb8d385140c15e15a250447a6ab6ba37a3ed32793287c483ace5589 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION check_remain_amount sha256=94f8b025154e899171c8cb6cfbf84e1ecd4b4b4b0dbd282dcdf1887ba5fa78cb source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION trade_afternoon sha256=3b08a15459e278d0c1aed32aec5fc802f5d4eb3a58742b4d1171bb414b3e22ff source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION sell_stocks sha256=97425b1fdcbffe829daf669d288e5c438dea785b1d52c42b71c3828b936ebab1 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION adjust_stock_num sha256=2ae02d2c1dfd667abfb6f49f8429db2f783dc255c1ccc2b6d7766b0ac9558485 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION filter_stocks sha256=14234735e9b875376734ad8e0f72714229833900d7bd680c6c6e42d81c143a13 source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+
+def filter_audit(context, code_list):
+    final_list = []
+    expection_Audit_list = []
+    for stock in code_list:
+        lstd = context.previous_date
+        last_year = lstd.replace(year=lstd.year - 3, month=1, day=1).strftime('%Y-%m-%d')
+        q = query(finance.STK_AUDIT_OPINION.code, finance.STK_AUDIT_OPINION.pub_date, finance.STK_AUDIT_OPINION).filter(finance.STK_AUDIT_OPINION.code == stock, finance.STK_AUDIT_OPINION.pub_date >= last_year, finance.STK_AUDIT_OPINION.pub_date <= context.current_dt)
+        df = finance.run_query(q)
+        values_to_check = [3, 4, 5, 7]
+        contains_unwanted_values = df['opinion_type_id'].isin(values_to_check).any()
+        if not contains_unwanted_values:
+            final_list.append(stock)
+        else:
+            expection_Audit_list.append(stock)
+    return final_list
+
+def bonus_filter(context, stock_list):
+    year = context.previous_date.year
+    start_date = datetime.date(year, 1, 1)
+    end_date = context.previous_date
+    if end_date.month in g.Expected_bonus:
+        q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.company_name, finance.STK_XR_XD.board_plan_pub_date, finance.STK_XR_XD.bonus_amount_rmb, finance.STK_XR_XD.bonus_ratio_rmb).filter(finance.STK_XR_XD.board_plan_pub_date > start_date, finance.STK_XR_XD.implementation_pub_date <= end_date, finance.STK_XR_XD.bonus_ratio_rmb > 0, finance.STK_XR_XD.code.in_(stock_list))
+        Expected_bonus_df = finance.run_query(q)
+        if len(Expected_bonus_df) > 0:
+            bonus_list = Expected_bonus_df['code'].unique().tolist()
+            price_df = history(1, unit='1d', field='close', security_list=bonus_list, df=True, skip_paused=False, fq='pre')
+            price_df = price_df.T
+            price_df.rename(columns={price_df.columns[0]: 'Close_now'}, inplace=True)
+            price_df['code'] = price_df.index
+            Expected_bonus_df = pd.merge(Expected_bonus_df, price_df, on='code', how='left')
+            Expected_bonus_df['bonus_ratio'] = Expected_bonus_df['bonus_ratio_rmb'] / Expected_bonus_df['Close_now']
+            Expected_bonus_df = Expected_bonus_df.sort_values(by='bonus_ratio', ascending=True)
+            bonus_list = Expected_bonus_df['code'].unique().tolist()
+        else:
+            bonus_list = []
+    else:
+        reprot_date = datetime.date(year - 1, 12, 31)
+        q = query(finance.STK_XR_XD.code, finance.STK_XR_XD.company_name, finance.STK_XR_XD.a_registration_date, finance.STK_XR_XD.bonus_amount_rmb, finance.STK_XR_XD.bonus_ratio_rmb).filter(finance.STK_XR_XD.report_date == reprot_date, finance.STK_XR_XD.bonus_type == '年度分红', finance.STK_XR_XD.implementation_pub_date <= end_date, finance.STK_XR_XD.board_plan_bonusnote == '不分配不转增', finance.STK_XR_XD.code.in_(stock_list))
+        no_year_bonus = finance.run_query(q)
+        no_year_bonus_list = no_year_bonus['code'].unique().tolist()
+        bonus_list = [code for code in stock_list if code not in no_year_bonus_list]
+        bonus_list = short_by_market_cap(context, bonus_list)
+    if len(bonus_list) < g.stock_num:
+        bonus_list.extend([x for x in short_by_market_cap(context, stock_list) if x not in bonus_list][:g.stock_num - len(bonus_list)])
+    return bonus_list
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION buy_security sha256=11724dad04a704ee1dfee107cc52d97f3c58bffa569839a7e2762cd042cb1057 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION today_is_between sha256=024c7c024a208c322a44d23cc5d8ef70d1ee2288e11a9950a36c0f5cef0ef798 source=quant/聚宽2025年精选/43小市值再优化【年化98 回撤27】无未来函数.txt'
+'EXACT_REVIEWED_FUNCTION close_account sha256=f058ce086f9b73f06705e588ea967ef41963cbd10faffc8101c74b2f6679939f source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'
+'EXACT_REVIEWED_FUNCTION short_by_market_cap sha256=f220d35f45a42d5a643cf5954d96afce4224dd379acb314034a239357e90dc8d source=quant/聚宽2025年精选/44国九条 年化130.74% 回撤11% 众神Debug版.txt'
+'EXACT_REVIEWED_FUNCTION print_position_info sha256=f229df512eb347633849a5ac3024b4305832c343903d3395709c0e080583ab1d source=quant/聚宽2025年精选/15小市值排除3个bug版，22年至今收益506.txt'

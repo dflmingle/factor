@@ -1,0 +1,128 @@
+{
+  "status": "prepared_not_started_pending_expanded_search_approval",
+  "task": "Reconstruct usable mechanisms suggested by public C-resilient pools; compare public metric shapes without claiming recovery of private formulas",
+  "platform_runs": 0,
+  "platform_compute_budget": 0,
+  "live_pool_mutations": false,
+  "finalist_limit": 3,
+  "internal_comparison_upper_bound": 1886,
+  "multiple_testing_note": "The 1886 upper bound is this round only; previous project searches remain selection exposure. Duplicate expressions are logged and do not create independent evidence.",
+  "methods": [
+    {
+      "name": "genetic_programming",
+      "population": 64,
+      "generations_including_initial": 20,
+      "evaluation_attempts_max": 1280,
+      "seeds": [20261012],
+      "max_expression_nodes": 15,
+      "operators": ["Neg", "Rank", "Add", "Sub", "Mul", "ProtectedDiv", "Abs"],
+      "target_reference": "不知所云队 / probe-illiquidity",
+      "starting_expression": "RANK(MA(ABS(CLOSE/DELAY(CLOSE,1)-1)/MAX(AMOUNT,1),20))",
+      "finalists": 1
+    },
+    {
+      "name": "bounded_symbolic_beam_search",
+      "unique_structure_evaluations_max": 600,
+      "beam_width": 20,
+      "max_expression_nodes": 11,
+      "operators": ["Neg", "Rank", "Add", "Sub", "Mul", "ProtectedDiv", "Abs"],
+      "target_reference": "Alpha猎手 / oos-f_c_rev60_lv60_oos",
+      "starting_expression": "RANK(1-CLOSE/DELAY(CLOSE,60))*RANK(-STDDEV(CLOSE/DELAY(CLOSE,1)-1,60))",
+      "finalists": 1
+    },
+    {
+      "name": "shallow_tree_regularized_return_model",
+      "configs": [
+        {"num_leaves": 3, "num_boost_round": 100},
+        {"num_leaves": 3, "num_boost_round": 200},
+        {"num_leaves": 3, "num_boost_round": 400},
+        {"num_leaves": 5, "num_boost_round": 100},
+        {"num_leaves": 5, "num_boost_round": 200},
+        {"num_leaves": 5, "num_boost_round": 400}
+      ],
+      "training_label": "same-date cross-sectional rank of causal label-1 forward return",
+      "expression": "F_tree(t,i)=SUM_k leaf_k(x(t,i)); per-date ranked causal features; no date/symbol identifier inputs",
+      "target_reference": "Metric-shape reference across the selected public seats; no access to opponent predictions for distillation",
+      "finalists": 1
+    }
+  ],
+  "terminals": {
+    "illiquidity20": "RANK(MA(ABS(CLOSE/DELAY(CLOSE,1)-1)/MAX(AMOUNT,1),20))",
+    "illiquidity60": "RANK(MA(ABS(CLOSE/DELAY(CLOSE,1)-1)/MAX(AMOUNT,1),60))",
+    "lowturn5": "RANK(-MA(TURNOVER,5))",
+    "lowturn20": "RANK(-MA(TURNOVER,20))",
+    "lowvol20": "RANK(-STDDEV(CLOSE/DELAY(CLOSE,1)-1,20))",
+    "lowvol60": "RANK(-STDDEV(CLOSE/DELAY(CLOSE,1)-1,60))",
+    "rsi_reversal14": "RANK(-RSI(CLOSE,14))",
+    "reversal5": "RANK(1-CLOSE/DELAY(CLOSE,5))",
+    "reversal20": "RANK(1-CLOSE/DELAY(CLOSE,20))",
+    "reversal60": "RANK(1-CLOSE/DELAY(CLOSE,60))",
+    "low_price_volume_corr20": "RANK(-CORR(CLOSE,VOLUME,20))",
+    "lowamount20": "RANK(-MA(AMOUNT,20))",
+    "smallsize": "RANK(-MARKET_CAP)"
+  },
+  "expression_semantics": {
+    "Rank": "same-date average-rank percentile minus 0.5",
+    "ProtectedDiv": "a / (ABS(b) + 0.1); fixed floor, never tuned",
+    "MA_STDDEV_CORR_RSI": "causal per-symbol daily calculations from 20180101 warmup; local RSI/amount semantics explicitly proxy until platform confirmed",
+    "formula_translation": "Final expressions retain terminal formulas and node trees; static platform precheck and raw-data prefix tests required before any later Python submission"
+  },
+  "data": {
+    "market_cache": "research_reports/platform_alignment/quant-corpus-source-reproduction-20261012/market_arrays.pkl",
+    "cache_fields": ["close", "open", "volume", "high", "low", "amount", "turnover", "cap", "raw_close"],
+    "local_market_last_date": "20260907",
+    "warmup": "20180101",
+    "universe": "unfiltered full SH/SZ A shares with valid total_mv; all positive and negative candidates retained",
+    "price": "qfq",
+    "market_cap": "daily_basic.total_mv",
+    "label": "close(t+1) -> close(t+cycle+1)",
+    "groups": 10,
+    "benchmark": "factor_valid",
+    "one_way_cost": 0.003,
+    "headline": "arithmetic annualized excess minus two-sided member-turnover cost",
+    "alignment_reference": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+    "scope": "isolated full-A/arithmetic diagnostic per user contract; no claim of private opponent or live October ledger equivalence"
+  },
+  "schedules": {
+    "native_cycle": 3,
+    "native_anchor": "20210915",
+    "native_schedule_status": "inferred; first opponent has public count 402 but local availability permits 401 label-complete dates through 20260901; do not truncate or alter dates to manufacture exact agreement",
+    "native_last_label_exit": "20260907",
+    "formal_cycle10": "saved incumbent platform dates 20210907 through 20260810, 120 periods, last label exit 20260825",
+    "recent": "20260101 through latest label-complete local signal; separate table, not part of selection"
+  },
+  "selection": {
+    "training_labels": "signal and label exit both before 20240101",
+    "internal_development": "signal >=20240101 and signal/label exit both before20250822",
+    "final_historical_validation": "signal >=20250822; calculate only after expression/configuration and hashes frozen",
+    "final_validation_is_pristine_blind_holdout": false,
+    "public_summary_contamination": "Public target summaries span the whole historical window and influenced hypotheses. Target matching is retrospective calibration, not independent evidence.",
+    "genetic_symbolic_objective": "Training RankIC/IR/win-rate shape distance to named public reference plus fixed complexity and turnover penalties; internal development selects one per method with positive held-side net; log every attempt",
+    "tree_objective": "Regularized return-rank prediction using training labels; internal development chooses one of six fixed configurations",
+    "full_window_tree_parameter_availability": "Five-year diagnostic includes the training segment; never call that curve a tradable out-of-sample model backtest",
+    "no_reselection_after_final": true,
+    "no_second_round_without_approval": true
+  },
+  "required_outputs": [
+    "all internal search attempts and counts, formulas or frozen tree and hashes",
+    "three frozen finalists on native cycle3 and incumbent cycle10, five-year and recent windows separately",
+    "RankIC, IR, win rate, S_i, Pearson IC, net excess, turnover, NAV drawdown, coverage and size exposure",
+    "metric distance matrix to public targets, explicitly not signal identity",
+    "highest-correlated other clusters using daily mean cross-sectional Spearman",
+    "fixed incumbent five-seat baseline and candidate-replaces-F diagnostics on identical common universe",
+    "monthly delta E / delta T / delta NC / delta A+C; B remains unknown",
+    "raw-data cutoff and unavailable-label perturbation checks; independent metric reconstruction",
+    "no October live-return claims because market data stops at20260907"
+  ],
+  "resource_plan": {
+    "workers": 1,
+    "threads": 1,
+    "process_memory_gib_max": 2.25,
+    "system_available_memory_gib_min": 1.25,
+    "watchdog_seconds": 0.5,
+    "estimate": "approximately1-3 hours local wall time, depending on full-A expression evaluation; no benchmark measured yet",
+    "resume": "persist attempts and RNG state; do not repeat completed scoring after interruption"
+  },
+  "approval_requirement_source": "AGENTS.md: 需要新回测时，先列出候选公式、候选数量、预计算力消耗和测试目的，等待用户明确批准后再运行。",
+  "approval_request": "Expand this round from default three candidates to up to1886 internal comparisons, with at most three frozen finalists and zero platform compute"
+}

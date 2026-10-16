@@ -1,0 +1,79 @@
+{
+  "hypotheses": 6,
+  "ablation_controls": 3,
+  "defs": [
+    [
+      "registered_dividend_yield365",
+      "登记日365天现金股息率",
+      "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt",
+      "cash registered in past365calendar days / current total_mv",
+      "new completion of previously omitted dividend field"
+    ],
+    [
+      "dividend_three_year_floor",
+      "连续三年现金分红底线",
+      "quant/2022年度精选策略/13.利用股息率长线选股【超稳】.txt",
+      "min(Y1,Y2,Y3)/total_mv; 3 four-quarter blocks anchored to latest announced income report",
+      "new continuous adaptation, not a source literal ranking"
+    ],
+    [
+      "dividend13_continuity_priority",
+      "源码三年分红门槛优先",
+      "quant/2022年度精选策略/13.利用股息率长线选股【超稳】.txt",
+      "2*I(Y1/MV>.02,Y2/MV>.015,Y3/MV>.012,sumY/MV>.1)+rank(Y1/MV)",
+      "source thresholds retained; full-support priority adaptation, not original CSI300/top3 strategy"
+    ],
+    [
+      "dividend36_peg_pb_small_priority",
+      "补全高股息负PEG低PB小市值",
+      "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt",
+      "2*I(top25percent positive365day dividendyield,PE/NIyoy<0,PB<3)+rank(-totalMV)",
+      "completion vs previously omitted dividend gate; source full trading path absent"
+    ],
+    [
+      "dividend26_peg_price_small_priority",
+      "补全高股息双边PEG低价小市值",
+      "quant/2024年度精选策略1/26.【深度解析 六】高股息率-低PEG-低股价 模型.txt",
+      "2*I(top25percent positive365day dividendyield,-3<PEG<3,price<conditional75percent)+rank(-totalMV)",
+      "conditional price quantile after dividend and PEG gates; raw close proxy for current quote"
+    ],
+    [
+      "dividend85_cheap_value_priority",
+      "低PE低PB高股息价值资格",
+      "quant/2020年度精选策略/85 【第一次玩】我就是要买便宜股系列.txt",
+      "2*I(0<PE<10,0<PB<1.5,DY365>.03)+rank(-PE)",
+      "dividend365 replaces opaque JYDividendRatio; industry cap and semiannual holding not reproduced"
+    ],
+    [
+      "control36_without_dividend",
+      "对照36去掉股息条件",
+      "quant/2024年度精选策略1/36.【菜场大妈】股息率小市值策略,10年206倍,5年10.8倍.txt",
+      "2*I(PEG<0,PB<3)+rank(-totalMV)",
+      "matched support ablation"
+    ],
+    [
+      "control26_without_dividend",
+      "对照26去掉股息条件",
+      "quant/2024年度精选策略1/26.【深度解析 六】高股息率-低PEG-低股价 模型.txt",
+      "2*I(-3<PEG<3,price<conditional75percent)+rank(-totalMV)",
+      "matched support ablation; price quantile follows partial PEG subset"
+    ],
+    [
+      "control85_without_dividend",
+      "对照85去掉股息条件",
+      "quant/2020年度精选策略/85 【第一次玩】我就是要买便宜股系列.txt",
+      "2*I(0<PE<10,0<PB<1.5)+rank(-PE)",
+      "matched support ablation"
+    ]
+  ],
+  "rule": "full-a-qfq-label1-financialfix2-tieproxy1-pythonindex1-turnoverdiag1-qualitygate4",
+  "source_parameters_frozen": true,
+  "no_parameter_grid": true,
+  "no_untouched_oos": true,
+  "platform_compute_spent": 0,
+  "dividend_proxy": "implemented cash per share times declared base shares; historical API snapshot, no immutable filing vintages",
+  "fiscal_periods": [
+    "2014Q1",
+    "2026Q3"
+  ]
+}

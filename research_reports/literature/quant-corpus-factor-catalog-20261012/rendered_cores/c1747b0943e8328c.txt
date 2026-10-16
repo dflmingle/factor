@@ -1,0 +1,62 @@
+quant/2020年度精选策略/77 RSRS大盘择时优化.txt
+import statsmodels.api as sm
+from pandas.stats.api import ols
+
+def initialize(context):
+    run_daily(before_market_open, time='before_open', reference_security='000300.XSHG')
+    run_daily(market_open, time='open', reference_security='000300.XSHG')
+    run_daily(after_market_close, time='after_close', reference_security='000300.XSHG')
+    g.N = 18
+    g.M = 1100
+    g.init = True
+    g.security = '160706.XSHE'
+    g.buy = 0.7
+    g.sell = -0.7
+    g.ans = []
+    g.ans_rightdev = []
+    prices = get_price(g.security, '2005-01-05', context.previous_date, '1d', ['high', 'low'])
+    highs = prices.high
+    lows = prices.low
+    g.ans = []
+    for i in range(len(highs))[g.N:]:
+        data_high = highs.iloc[i - g.N + 1:i + 1]
+        data_low = lows.iloc[i - g.N + 1:i + 1]
+        X = sm.add_constant(data_low)
+        model = sm.OLS(data_high, X)
+        results = model.fit()
+        g.ans.append(results.params[1])
+        g.ans_rightdev.append(results.rsquared)
+
+def before_market_open(context):
+    pass
+
+def market_open(context):
+    security = g.security
+    cash = context.portfolio.available_cash
+    security = g.security
+    beta = 0
+    r2 = 0
+    if g.init:
+        g.init = False
+    else:
+        prices = attribute_history(security, g.N, '1d', ['high', 'low', 'volume'])
+        highs = prices.high
+        lows = prices.low
+        X = sm.add_constant(lows)
+        model = sm.OLS(highs, X)
+        beta = model.fit().params[1]
+        g.ans.append(beta)
+        r2 = model.fit().rsquared
+        g.ans_rightdev.append(r2)
+    h = attribute_history(security, g.N, '1d', ['volume'])
+    volume = h.volume
+    section = g.ans[-g.M:]
+    mu = np.mean(section)
+    sigma = np.std(section)
+    zscore = (section[-1] - mu) / sigma
+    zscore_rightdev = zscore * beta * r2 * (sum(volume[-9:]) / sum(volume) * g.N / len(volume[-9:]))
+    if zscore_rightdev > g.buy:
+        order_value(security, cash)
+    elif zscore_rightdev < g.sell and context.portfolio.positions[security].closeable_amount > 0:
+        order_target(security, 0)
+'EXACT_REVIEWED_FUNCTION after_market_close sha256=064e0b19bcc0cc9dcef8550ca9ac5f485a46e941c7667dfcc3bcdf40c33b451d source=quant/2020年度精选策略/01 AdaptiveMA自适应均线 过滤器 期货多品种模型 收益稳定增长.txt'

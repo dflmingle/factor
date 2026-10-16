@@ -1,0 +1,33 @@
+quant/2021年度精选策略/3.一个简单而持续稳定的懒人超额收益策略.txt
+import numpy as np
+import pandas as pd
+from jqdata import *
+'EXACT_REVIEWED_FUNCTION initialize sha256=bcb33653d84f8fa0ee0ff1ddb986bfd00c521f5168e854dbb64fc40c3199a066 source=quant/2021年度精选策略/1.龙回头3.0回测速度优化版.txt'
+
+def after_code_changed(context):
+    g.index = '000300.XSHG'
+    g.stocks = []
+    unschedule_all()
+    run_monthly(handle_prepare, 1, 'before_open')
+    run_daily(handle_trader, 'open')
+    run_monthly(report_portoflio, -1, 'after_close')
+
+def handle_prepare(context):
+    weight = get_index_weights(g.index)
+    weight = weight.sort_values(by='weight', ascending=False).head(10)
+    g.stocks = weight.index.tolist()
+
+def handle_trader(context):
+    cur_data = get_current_data()
+    for s in context.portfolio.positions:
+        if s not in g.stocks:
+            order_target(s, 0)
+    for s in g.stocks:
+        position = 0.095 * context.portfolio.total_value
+        if s not in context.portfolio.positions and context.portfolio.available_cash > position:
+            order_value(s, position)
+
+def report_portoflio(context):
+    cur_data = get_current_data()
+    for s in context.portfolio.positions:
+        ps = context.portfolio.positions[s]

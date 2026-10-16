@@ -1,0 +1,73 @@
+quant/2024年度精选策略2/66.ETF动量轮动MA乖离择时.txt
+from jqdata import *
+import numpy as np
+
+def initialize(context):
+    g.stock_pool = ['510050.XSHG', '159928.XSHE', '510300.XSHG', '159949.XSHE']
+    g.stock_num = 1
+    g.momentum_day = 20
+    g.ref_stock = '000300.XSHG'
+    run_daily(my_trade, time='14:50', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+
+def get_rank(stock_pool):
+    rank = []
+    for stock in g.stock_pool:
+        data = attribute_history(stock, g.momentum_day, '1d', ['close'])
+        score = np.polyfit(np.arange(len(data)), data.close / data.close[0], 1)[0]
+        rank.append([stock, score])
+    rank.sort(key=lambda x: x[-1], reverse=True)
+    return rank[0]
+
+def get_zscore(series):
+    mean = np.mean(series)
+    std = np.std(series)
+    return (series[-1] - mean) / std
+
+def get_timing_signal(stock):
+    score_threshold = 4.0
+    data = attribute_history(g.ref_stock, 200, '1d', ['close'])
+    data['bias'] = data.close / data.close.rolling(60).mean()
+    data['biasma'] = data.bias.rolling(10).mean()
+    score = get_zscore(data.biasma[-30:])
+    if score > score_threshold:
+        return 'BUY'
+    if score < -score_threshold:
+        return 'SELL'
+    else:
+        return 'KEEP'
+'EXACT_REVIEWED_FUNCTION order_target_value_ sha256=9d635d496274cdafd9739e071e5a2d5fc9a3e3cc98064493b0a47f2e1a6f03ec source=quant/2020年度精选策略/51 HS300--随机森林拐点识别.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a7af6393a534181fdc6b1f3718b327f9b436bdf54938edd03e8c1825c348026b source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=9ad90d92cd906fda720c880990a9a7737168fb1e3c832dd31b14d4bd2cf034c9 source=quant/2021年度精选策略/24.现在便宜的300就是最好的，收益惊人！【结束了】.txt'
+
+def adjust_position(context, buy_stocks):
+    for stock in context.portfolio.positions:
+        if stock not in buy_stocks:
+            close_position(context.portfolio.positions[stock])
+    position_count = len(context.portfolio.positions)
+    if g.stock_num > position_count:
+        value = context.portfolio.cash / (g.stock_num - position_count)
+        for stock in buy_stocks:
+            if not context.portfolio.positions:
+                open_position(stock, value)
+
+def my_trade(context):
+    hour = context.current_dt.hour
+    minute = context.current_dt.minute
+    if hour == 14 and minute == 50:
+        check_out_list = get_rank(g.stock_pool)
+        timing_signal = get_timing_signal(g.ref_stock)
+        if timing_signal == 'SELL':
+            for stock in context.portfolio.positions:
+                position = context.portfolio.positions[stock]
+                close_position(position)
+        elif timing_signal == 'BUY' or timing_signal == 'KEEP':
+            adjust_position(context, check_out_list)
+        else:
+            pass
+
+def check_lose(context):
+    for stk in context.portfolio.positions:
+        position = context.portfolio.positions[stk]
+        if position.price / position.avg_cost < 0.9:
+            order_target_value(position.security, 0)

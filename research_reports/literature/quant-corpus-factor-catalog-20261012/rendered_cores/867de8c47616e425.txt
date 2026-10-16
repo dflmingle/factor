@@ -1,0 +1,88 @@
+quant/量化策略/量化策略/实盘2026/Ptrade/pt版01小市值精细风控策略.txt
+import numpy as np
+import pandas as pd
+
+def initialize(context):
+    g.index_code = '399101.XSHE'
+    g.buy_stock_count = 5
+    g.screen_count = 15
+    g.position_pct = 0.1
+    g.is_real = is_trade()
+    if g.is_real:
+        run_daily(context, trade, time='09:31')
+    if not g.is_real:
+        run_daily(context, log_hold, time='15:00')
+
+def before_trading_start(context, data):
+    all_stocks = get_index_stocks(g.index_code)
+    if not all_stocks:
+        g.target_stocks = []
+        return
+    try:
+        df = get_fundamentals(all_stocks, 'valuation', fields='float_value', date=context.previous_date, is_dataframe=True)
+        if df is None or df.empty:
+            g.target_stocks = []
+            return
+        df = df.sort_values('float_value', ascending=True)
+        candidate_stocks = list(df.index[:g.screen_count])
+    except Exception as e:
+        g.target_stocks = []
+        return
+    filtered = filter_stock_by_status(candidate_stocks, ['ST', 'HALT', 'DELISTING'])
+    if not filtered:
+        g.target_stocks = []
+        return
+    g.target_stocks = filtered[:g.buy_stock_count]
+
+def handle_data(context, data):
+    if g.is_real:
+        return
+    current_dt = context.blotter.current_dt
+    if current_dt.hour == 9 and current_dt.minute == 31:
+        trade(context, data)
+
+def trade(context, data=None):
+    current_month = context.blotter.current_dt.month
+    if current_month == 4:
+        return
+    if not g.target_stocks:
+        return
+    current_hold = list(context.portfolio.positions.keys())
+    for stock in current_hold:
+        if stock not in g.target_stocks:
+            pos = context.portfolio.positions[stock]
+            if g.is_real:
+                sellable = getattr(pos, 'sellable_amount', 0)
+            else:
+                sellable = pos.amount
+            if sellable <= 0:
+                continue
+            limit_status = check_limit(stock)
+            if limit_status == 1:
+                continue
+            order_target_value(stock, 0)
+    if len(g.target_stocks) == 0:
+        return
+    if g.is_real:
+        total_buy_cash = context.portfolio.cash * g.position_pct
+        if total_buy_cash <= 0:
+            return
+        target_value_per_stock = total_buy_cash / len(g.target_stocks)
+    else:
+        total_value = context.portfolio.portfolio_value
+        target_value_per_stock = total_value / len(g.target_stocks)
+    for stock in g.target_stocks:
+        if not g.is_real and data is not None:
+            price = data[stock].open
+        else:
+            snapshot = get_snapshot(stock)
+            price = snapshot.get(stock, {}).get('last_px') if snapshot else None
+        if price is None or price <= 0:
+            continue
+        min_amount = price * 100
+        if target_value_per_stock >= min_amount:
+            order_target_value(stock, target_value_per_stock)
+
+def log_hold(context):
+    if context.portfolio.positions:
+        pass

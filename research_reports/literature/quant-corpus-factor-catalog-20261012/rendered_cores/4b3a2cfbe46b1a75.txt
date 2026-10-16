@@ -1,0 +1,111 @@
+quant/2024年度精选策略2/8.14个月200%，超短线实盘交易策略！无未来函数.txt
+import datetime
+from jqdata import *
+from jqlib.technical_analysis import *
+import numpy as np
+
+def initialize(context):
+    enable_profile()
+    g.buy_stock_limit = 1
+
+def before_trading_start(context):
+    initHandleParam()
+    prev_trade_day = context.previous_date
+    stock_pool = get_all_securities(['stock'], date=prev_trade_day)
+    stock_list = filter_stock(stock_pool)
+    p1_ma5 = get_stock_price(stock_list, prev_trade_day, 5).groupby('code').mean()
+    p1_ma10 = get_stock_price(stock_list, prev_trade_day, 10).groupby('code').mean()
+    p1_ma20 = get_stock_price(stock_list, prev_trade_day, 20).groupby('code').mean()
+    p1_ma30 = get_stock_price(stock_list, prev_trade_day, 30).groupby('code').mean()
+    p2_ma5 = get_stock_price(stock_list, getday3(prev_trade_day, -1), 5).groupby('code').mean()
+    p2_ma10 = get_stock_price(stock_list, getday3(prev_trade_day, -1), 10).groupby('code').mean()
+    p2_ma20 = get_stock_price(stock_list, getday3(prev_trade_day, -1), 20).groupby('code').mean()
+    p2_ma30 = get_stock_price(stock_list, getday3(prev_trade_day, -1), 30).groupby('code').mean()
+    dx1 = []
+    for stock in stock_list:
+        p1_ma5_close = p1_ma5['close'][stock]
+        p1_ma10_close = p1_ma10['close'][stock]
+        p1_ma20_close = p1_ma20['close'][stock]
+        p1_ma30_close = p1_ma30['close'][stock]
+        p2_ma5_close = p2_ma5['close'][stock]
+        p2_ma10_close = p2_ma10['close'][stock]
+        p2_ma20_close = p2_ma20['close'][stock]
+        p2_ma30_close = p2_ma30['close'][stock]
+        p1_ma5_volume = p1_ma5['volume'][stock]
+        p1_ma10_volume = p1_ma10['volume'][stock]
+        p2_ma5_volume = p2_ma5['volume'][stock]
+        p2_ma10_volume = p2_ma10['volume'][stock]
+        if p1_ma5_close < p1_ma10_close and p2_ma5_close > p2_ma10_close and (p2_ma5_volume > p2_ma10_volume) and (p1_ma5_volume * 1.2 > p1_ma10_volume) and (p1_ma20_close > p2_ma20_close) and (p1_ma30_close > p2_ma30_close):
+            dx1.append(stock)
+    dx2 = []
+    macd_dif, macd_dea, macd_macd = MACD(security_list=dx1, check_date=prev_trade_day, SHORT=12, LONG=26, MID=9, unit='1d')
+    macd_dif2, macd_dea2, macd_macd2 = MACD(security_list=dx1, check_date=getday(prev_trade_day, -1), SHORT=12, LONG=26, MID=9, unit='1d')
+    for stock in dx1:
+        if macd_dif[stock] > 0 and macd_dea[stock] > 0 and (0 > macd_dea[stock] - macd_dif[stock] > -0.1):
+            dx2.append(stock)
+    dx3 = []
+    current_data = get_current_data()
+    for stock in dx2:
+        p1_flow = get_money_flow(security_list=stock, end_date=prev_trade_day, count=1, fields=['change_pct'])
+        p2_flow = get_money_flow(security_list=stock, end_date=getday3(prev_trade_day, -1), count=1, fields=['change_pct'])
+        if len(p1_flow['change_pct']) == 0 or len(p2_flow['change_pct']) == 0:
+            continue
+        if p1_flow['change_pct'][0] > 0 and p2_flow['change_pct'][0] < 0 or (p1_flow['change_pct'][0] < 0 and p2_flow['change_pct'][0] > 0):
+            dx3.append(stock)
+    dx4 = dx3
+    dx5 = []
+    for stock in dx4:
+        p1_1 = get_price(security=stock, end_date=prev_trade_day, frequency='1d', fields=['close'], panel=False, count=1, skip_paused=True)
+        if p1_1['close'][0] <= current_data[stock].day_open:
+            continue
+        dx5.append(stock)
+    g.buy_list = dx5
+    g.buy_list.sort()
+
+def handle_data(context, data):
+    current_data = get_current_data()
+    for stock in context.portfolio.positions.keys():
+        price = data[stock].close
+        if context.portfolio.positions[stock].closeable_amount == 0 or current_data[stock].low_limit == price or current_data[stock].high_limit == price:
+            continue
+        sell_stock(stock, 0)
+    if g.buy_stock_limit <= len(context.portfolio.positions.keys()):
+        return
+    for stock in g.buy_list:
+        price = data[stock].close
+        if context.portfolio.available_cash < price * 100 or current_data[stock].low_limit == price or current_data[stock].high_limit == price or (stock in context.portfolio.positions.keys()):
+            continue
+        buy_stock(context, stock)
+        break
+
+def initHandleParam():
+    g.buy_list = []
+
+def get_stock_price(stock_list, ed, days):
+    stock_price = get_price(security=stock_list, end_date=ed, frequency='1d', fields=['close', 'volume'], panel=False, count=days, skip_paused=True)
+    return stock_price
+
+def getday(ed, count):
+    dates = get_trade_days(end_date=ed, count=-count + 1)
+    return dates[0]
+
+def getday2(date, n):
+    yesterday = datetime.datetime.strptime(date, '%Y-%m-%d') + datetime.timedelta(n)
+    return yesterday
+
+def getday3(d, step):
+    day = d + datetime.timedelta(step)
+    return day
+
+def buy_stock(context, stock):
+    need_count = g.buy_stock_limit - len(context.portfolio.positions.keys())
+    if need_count == 0:
+        return
+    buy_cash = context.portfolio.available_cash / need_count
+    order_value(stock, buy_cash)
+
+def sell_stock(stock, value):
+    order_target(stock, value)
+
+def filter_stock(stock_pool):
+    return list((stock for stock in stock_pool.index if not stock.startswith('30') and (not stock.startswith('688')) and (not 'ST' in stock_pool['display_name']) and (not '*' in stock_pool['display_name']) and (not '退' in stock_pool['display_name'])))

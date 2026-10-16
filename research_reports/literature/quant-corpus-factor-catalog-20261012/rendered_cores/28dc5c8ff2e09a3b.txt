@@ -1,0 +1,49 @@
+quant/2024年度精选策略1/42.大盘ETF动量轮动RSRS择时策略-无纳指（5年半861%）.txt
+from jqdata import *
+import numpy as np
+from jqlib.technical_analysis import *
+
+def initialize(context):
+    g.stock_pool = ['510300.XSHG', '510050.XSHG', '159949.XSHE']
+    g.stock_num = 1
+    g.momentum_day = 20
+    g.ref_stock = '000300.XSHG'
+    g.N = 18
+    g.M = 600
+    g.K = 8
+    g.biasN = 90
+    g.lossN = 20
+    g.lossFactor = 1.005
+    g.SwitchFactor = 1.04
+    g.Motion_1diff = 19
+    g.raiser_thr = 4.8
+    g.hold_stock = 'null'
+    g.score_thr = -0.68
+    g.score_fall_thr = -0.43
+    g.idex_slope_raise_thr = 12
+    g.slope_series, g.rsrs_score_history = initial_slope_series()
+    g.stock_motion = initial_stock_motion(g.stock_pool)
+    run_daily(my_trade_prepare, time='7:00', reference_security='000300.XSHG')
+    run_daily(my_trade, time='9:30', reference_security='000300.XSHG')
+    run_daily(my_sell2buy, time='9:35', reference_security='000300.XSHG')
+    run_daily(check_lose, time='open', reference_security='000300.XSHG')
+    run_daily(pre_hold_check, time='11:25')
+    run_daily(hold_check, time='11:27')
+'EXACT_REVIEWED_FUNCTION initial_slope_series sha256=5106149a59c69c95cb1d2334b98b0732ba4a85459c3e854c5bff8c69f380666a source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION initial_stock_motion sha256=e3a40d5d52633a2deff2c3be97980f81a948032f19d74eade7a5167bcf78b020 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION pre_hold_check sha256=8cf6b411354961094c88a769e9510bfaa8bedf3539dd4716796f69044b868ee4 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION hold_check sha256=b7b87702d15d3e6f340637800728773ab6b2e35811b1b24abf2b4f1636057a91 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION get_rank sha256=293c683d95f150bee9d6784c8ee5759d57775536c7f39c2fe58f57d47ed6e09d source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION get_ols sha256=30aefcd8bda30ab3a95ed3bd9e9618c871d086bc04f7843ebbf9469bdb4f6a70 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore sha256=598b5f3b6cceaacce0665aeff47b9adbd53bbbb8c999989693dad6a4ebcc4ec7 source=quant/2021年度精选策略/88.基于动量因子的ETF轮动加上RSRS择时.txt'
+'EXACT_REVIEWED_FUNCTION get_zscore_slope sha256=a6b6498e0215ac0ae8083756b04ab585308e300619c9a28bafc7453203f3e1b2 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION get_timing_signal sha256=ec2d92e9b3ff3eedc125738e496836e69aa683acb49cbe039472ef5a8c918f6d source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION open_position sha256=a4934101d0b7562828ab21d381ff1c3f43b5a6f8d416ad8579724b8a4900c5cc source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION close_position sha256=4533284c0543062783fbbfc06accc1a378cdb1f73d7cdfd719ba9a3d83753496 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION adjust_position sha256=319c2100eb2de907722b10f6836cf09ad0f36004a3ff2338cbd4e014aede4fe4 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION buy_stocks sha256=6abebb4b13ffc0cd68c6ae658caa0043e210df0da0615721d801881871f96164 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION my_trade_prepare sha256=f159ac45c7c5a1982824450da50c42b7bafd97c5298c329958a5dd54bd1d6d09 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION my_trade sha256=5a1821aaf36cc5ba1d58f50cf8185e0609f5947f5948bf044aa315e18897e7d7 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION my_sell2buy sha256=f2de74facd43c1e838afda662f5d60239e794a318764fdd96af8c45331b6955f source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION check_lose sha256=0d7346eccaca9f820602108d5c5696978c4b85e4f24e7c8acce21bc4ac2ac806 source=quant/2024年度精选策略1/10.多因子宽基ETF择时轮动改进版-高收益大资金低回撤.txt'
+'EXACT_REVIEWED_FUNCTION print_trade_info sha256=73dd0b225b79125998a6988076a4218a550fa612b090a8db46acb6553a0986bb source=quant/2023年度精选策略/7.ETF动量轮动RSRS择时-魔改3小优化.txt'

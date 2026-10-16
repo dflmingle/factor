@@ -1,0 +1,314 @@
+quant/量化策略/量化策略/首板回调买入策略2026/02上升途中回调到位-优化版-25年42.txt
+from jqdata import *
+import talib
+import pandas as pd
+import numpy as np
+import datetime
+import random
+
+def initialize(context):
+    g.TOTAL_DAYS = 30
+    g.FIRST_PART_DAYS = 23
+    g.SECOND_PART_DAYS = 7
+    g.UP_THRESHOLD = 0.2
+    g.RETRACE_MIN = 0.1
+    g.RETRACE_MAX = 0.2
+    g.STABILIZE_MA_SHORT = 5
+    g.STABILIZE_MA_LONG = 10
+    g.STABILIZE_DAYS = 3
+    g.VOLUME_RATIO = 1.2
+    g.STOP_LOSS_RATIO = 0.8
+    g.TAKE_PROFIT_RATIO = 1.2
+    g.POSITION_SIZE = 0.2
+    g.MAX_POSITIONS = 5
+    g.cost_prices = {}
+    g.buy_signals = {}
+    run_daily(before_trading_start, time='09:00')
+    run_daily(buy_at_morning, time='09:45')
+    run_daily(check_stop, time='11:00')
+    run_daily(check_stop, time='14:00')
+    run_daily(record_data, time='15:05')
+
+def before_trading_start(context):
+    all_stocks = get_all_securities(types=['stock'], date=context.current_dt.date()).index.tolist()
+    base_stocks = filter_stocks(context, all_stocks)
+    g.candidate_stocks = select_candidates(context, base_stocks)
+
+def filter_stocks(context, all_stocks):
+    current_date = context.current_dt.date()
+    filtered = []
+    current_data = get_current_data()
+    for stock in all_stocks:
+        try:
+            info = get_security_info(stock)
+            if info.end_date < current_date:
+                continue
+            if 'ST' in info.display_name or '*ST' in info.display_name:
+                continue
+            if stock in current_data and current_data[stock].paused:
+                continue
+            if (current_date - info.start_date).days < 60:
+                continue
+            filtered.append(stock)
+        except Exception as e:
+            continue
+    filtered = [stock for stock in filtered if stock[0] != '4' and stock[0] != '8' and (stock[:2] != '68')]
+    return filtered
+
+def check_stabilize_signal(prices):
+    try:
+        recent_prices = prices.iloc[-5:]
+        if len(recent_prices) < 5:
+            return False
+        closes = recent_prices['close'].values
+        highs = recent_prices['high'].values
+        lows = recent_prices['low'].values
+        volumes = recent_prices['volume'].values
+        recent_3 = recent_prices.iloc[-3:]
+        avg_amplitude = np.mean((recent_3['high'] - recent_3['low']) / recent_3['close'])
+        if avg_amplitude > 0.03:
+            return False
+        if len(prices) >= 8:
+            prev_volumes = prices['volume'].iloc[-8:-3].values
+            recent_volumes = volumes[-3:]
+            if len(prev_volumes) > 0 and len(recent_volumes) > 0:
+                avg_prev_vol = np.mean(prev_volumes)
+                avg_recent_vol = np.mean(recent_volumes)
+                if avg_prev_vol > 0 and avg_recent_vol > avg_prev_vol * 0.8:
+                    return False
+        else:
+            pass
+        if len(lows) >= 3:
+            if lows[-1] <= min(lows[-4:-1]):
+                return False
+        avg_close_3 = np.mean(closes[-3:])
+        if closes[-1] < avg_close_3 * 0.98:
+            return False
+        return True
+    except Exception as e:
+        return False
+
+def select_candidates(context, stock_list):
+    dt = context.current_dt
+    yesterday = dt - datetime.timedelta(days=1)
+    candidates = []
+    for stock in stock_list:
+        try:
+            prices = get_price(stock, end_date=yesterday, count=g.TOTAL_DAYS + 20, fields=['close', 'high', 'low', 'volume'], skip_paused=True)
+            if prices is None or len(prices) < g.TOTAL_DAYS + 10:
+                continue
+            closes = prices['close'].values
+            highs = prices['high'].values
+            close_today = closes[-1]
+            start_idx = -g.TOTAL_DAYS
+            end_idx = -g.SECOND_PART_DAYS - 1
+            if end_idx >= 0:
+                continue
+            price_start = closes[start_idx]
+            price_mid = closes[end_idx]
+            if price_start <= 0:
+                continue
+            first_part_return = (price_mid - price_start) / price_start
+            if first_part_return < g.UP_THRESHOLD:
+                continue
+            high_in_first_part = np.max(highs[start_idx:end_idx + 1])
+            if high_in_first_part <= 0:
+                continue
+            retrace = (high_in_first_part - close_today) / high_in_first_part
+            if not g.RETRACE_MIN <= retrace <= g.RETRACE_MAX:
+                continue
+            is_stabilized, details = check_stabilize_signal(context, stock, prices)
+            if is_stabilized:
+                candidates.append(stock)
+        except Exception as e:
+            continue
+    return candidates
+
+def check_stabilize_signal(context, stock, prices):
+    try:
+        last_3 = prices.iloc[-3:]
+        if len(last_3) < 3:
+            return (False, {})
+        closes = last_3['close'].values
+        for i in range(1, len(closes)):
+            daily_return = (closes[i] - closes[i - 1]) / closes[i - 1]
+            if abs(daily_return) > 0.03:
+                return (False, {'reason': '涨跌幅过大'})
+        volumes = last_3['volume'].values
+        if volumes[-1] > volumes[0]:
+            return (False, {'reason': '成交量放大'})
+        if len(prices) >= 4:
+            prev_close = prices['close'].iloc[-4]
+            if closes[-1] < prev_close:
+                return (False, {'reason': '股价下跌'})
+        return (True, {'last_3_returns': f'{closes[-1] / closes[0] - 1:.2%}', 'volume_trend': '递减' if volumes[-1] < volumes[0] else '递增'})
+    except Exception as e:
+        return (False, {})
+
+def buy_at_morning(context):
+    if len(context.portfolio.positions) >= g.MAX_POSITIONS:
+        return
+    if len(g.candidate_stocks) == 0:
+        return
+    available_cash = context.portfolio.available_cash
+    if available_cash < 10000:
+        return
+    available_stocks = [s for s in g.candidate_stocks if s not in context.portfolio.positions]
+    if not available_stocks:
+        return
+    max_new = g.MAX_POSITIONS - len(context.portfolio.positions)
+    stocks_to_buy = available_stocks[:max_new]
+    if not stocks_to_buy:
+        return
+    cash_per_stock = available_cash / len(stocks_to_buy)
+    current_data = get_current_data()
+    total_used = 0
+    buy_count = 0
+    for stock in stocks_to_buy:
+        current_price = current_data[stock].last_price
+        if current_price <= 0:
+            continue
+        amount = int(cash_per_stock / current_price / 100) * 100
+        if amount < 100:
+            remaining = cash_per_stock * (len(stocks_to_buy) - buy_count)
+            amount = int(remaining / current_price / 100) * 100
+            if amount < 100:
+                continue
+        order(stock, amount)
+        g.cost_prices[stock] = current_price
+        actual_cost = amount * current_price
+        total_used += actual_cost
+        buy_count += 1
+        info = get_security_info(stock)
+
+def buy_at_morning2(context):
+    if len(context.portfolio.positions) >= g.MAX_POSITIONS:
+        return
+    if not hasattr(g, 'candidate_stocks') or len(g.candidate_stocks) == 0:
+        return
+    available_cash = context.portfolio.available_cash
+    if available_cash < 10000:
+        return
+    current_data = get_current_data()
+    available_stocks = [s for s in g.candidate_stocks if s not in context.portfolio.positions]
+    if not available_stocks:
+        return
+    random.shuffle(available_stocks)
+    max_new = g.MAX_POSITIONS - len(context.portfolio.positions)
+    buy_count = 0
+    total_used = 0
+    for stock in available_stocks:
+        if buy_count >= max_new:
+            break
+        remaining_cash = available_cash - total_used
+        if remaining_cash < 10000:
+            break
+        current_price = current_data[stock].last_price
+        if current_price <= 0:
+            continue
+        position_value = min(remaining_cash * g.POSITION_SIZE, remaining_cash)
+        amount = int(position_value / current_price / 100) * 100
+        if amount < 100:
+            continue
+        order(stock, amount)
+        g.cost_prices[stock] = current_price
+        g.buy_signals[stock] = {'buy_price': current_price, 'buy_time': context.current_dt.strftime('%Y-%m-%d %H:%M:%S'), 'retrace': (get_high_in_first_part(context, stock) - current_price) / get_high_in_first_part(context, stock)}
+        actual_cost = amount * current_price
+        total_used += actual_cost
+        buy_count += 1
+        stock_info = get_security_info(stock)
+    if buy_count > 0:
+        pass
+
+def get_high_in_first_part(context, stock):
+    try:
+        yesterday = context.current_dt - datetime.timedelta(days=1)
+        prices = get_price(stock, end_date=yesterday, count=g.FIRST_PART_DAYS, fields=['high'], skip_paused=True)
+        if len(prices) < g.FIRST_PART_DAYS:
+            return None
+        return prices['high'].max()
+    except:
+        return None
+
+def check_retrace_with_current(context, stock, current_price):
+    try:
+        yesterday = context.current_dt - datetime.timedelta(days=1)
+        prices = get_price(stock, end_date=yesterday, count=g.FIRST_PART_DAYS, fields=['high'], skip_paused=True)
+        if len(prices) < g.FIRST_PART_DAYS:
+            return False
+        high_in_first_part = prices['high'].max()
+        if high_in_first_part <= 0:
+            return False
+        retrace = (high_in_first_part - current_price) / high_in_first_part
+        return g.RETRACE_MIN <= retrace <= g.RETRACE_MAX
+    except:
+        return False
+
+def check_realtime_stabilize(context, stock, current_price):
+    try:
+        current_data = get_current_data()
+        prices = attribute_history(stock, 20, '1d', ['close'], df=False)
+        if len(prices) < 15:
+            return False
+        closes = list(prices['close'])
+        closes.append(current_price)
+        ma5 = talib.MA(np.array(closes[-10:]), timeperiod=5)[-1]
+        ma10 = talib.MA(np.array(closes[-15:]), timeperiod=10)[-1]
+        if pd.isna(ma5) or pd.isna(ma10):
+            return False
+        condition1 = current_price > ma5 * 0.98
+        condition2 = ma5 > ma10 * 0.95
+        recent_lows = prices['low'][-5:] if 'low' in prices.dtype.names else []
+        if len(recent_lows) > 0:
+            condition3 = current_price > min(recent_lows) * 1.01
+        else:
+            condition3 = True
+        return condition1 and condition2 and condition3
+    except Exception as e:
+        return False
+
+def check_stop(context):
+    current_time = context.current_dt.strftime('%H:%M')
+    if len(context.portfolio.positions) == 0:
+        return
+    current_data = get_current_data()
+    for stock in list(context.portfolio.positions.keys()):
+        try:
+            current_price = current_data[stock].last_price
+            if current_price <= 0:
+                continue
+            if stock in g.cost_prices:
+                cost = g.cost_prices[stock]
+            else:
+                position = context.portfolio.positions[stock]
+                if position.total_amount > 0:
+                    cost = position.avg_cost
+                    g.cost_prices[stock] = cost
+                else:
+                    continue
+            if current_price <= cost * g.STOP_LOSS_RATIO:
+                order_target(stock, 0)
+                stock_info = get_security_info(stock)
+                if stock in g.cost_prices:
+                    del g.cost_prices[stock]
+                if stock in g.buy_signals:
+                    del g.buy_signals[stock]
+                continue
+            if current_price >= cost * g.TAKE_PROFIT_RATIO:
+                order_target(stock, 0)
+                stock_info = get_security_info(stock)
+                if stock in g.cost_prices:
+                    del g.cost_prices[stock]
+                if stock in g.buy_signals:
+                    del g.buy_signals[stock]
+                continue
+        except Exception as e:
+            pass
+
+def record_data(context):
+    if context.portfolio.total_value > 0:
+        cash_ratio = context.portfolio.available_cash / context.portfolio.total_value
+
+def on_strategy_end(context):
+    g.cost_prices.clear()
+    g.buy_signals.clear()

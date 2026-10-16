@@ -1,0 +1,85 @@
+quant/2020年度精选策略/78 GFTD第二版.txt
+import jqdata
+
+def initialize(context):
+    g.t = 0
+    g.buy_init = 0
+    g.sell_init = 0
+    g.buy_count = 0
+    g.sell_count = 0
+    g.state = 'empty'
+    g.save_price = 0
+    g.n1 = 4
+    g.n2 = 4
+    g.count_lag = 2
+    g.n3 = 4
+    g.line = 0.0
+    g.ud = -1
+    g.stock = '000300.XSHG'
+
+def handle_data(context, data):
+    g.t += 1
+    signal = get_signal(context)
+    rebalance(signal, context)
+
+def get_signal(context):
+    if g.state == 'empty' or g.state == 'buy_count':
+        prices = list(attribute_history(g.stock, g.n1 + g.n2, '1d', 'close').close)
+        prices_low = list(attribute_history(g.stock, g.n1 + g.n2, '1d', 'low').low)
+        g.buy_init = 0
+        for i in range(g.n2):
+            if prices[i + g.n1] <= prices[i]:
+                g.buy_init = g.buy_init + 1
+        if g.buy_init == g.n2:
+            g.state = 'buy_count'
+            g.buy_init = 0
+            g.save_price = prices[-1]
+            g.low = prices_low[-1]
+            g.buy_count = 0
+    if g.state == 'buy_count':
+        prices = attribute_history(g.stock, g.count_lag + 1, '1d', ['close', 'high', 'low'])
+        closes = list(prices.close)
+        highs = list(prices.high)
+        lows = list(prices.low)
+        if closes[-1] >= highs[0] and highs[-1] > highs[-2] and (closes[-1] > g.save_price):
+            g.save_price = closes[-1]
+            g.buy_count += 1
+            if g.line > lows[-1]:
+                g.line = lows[-1]
+        if g.buy_count == g.n3:
+            g.state = 'full'
+            g.buy_count = 0
+            return 'buy'
+    if g.state == 'full' or g.state == 'sell_count':
+        prices = list(attribute_history(g.stock, g.n1 + g.n2, '1d', 'close').close)
+        prices_low = list(attribute_history(g.stock, g.n1 + g.n2, '1d', 'low').low)
+        g.sell_init = 0
+        for i in range(g.n2):
+            if prices[i + g.n1] >= prices[i]:
+                g.sell_init = g.sell_init + 1
+        if g.sell_init == g.n2:
+            g.state = 'sell_count'
+            g.sell_init = 0
+            g.save_price = prices[-1]
+            g.sell_count = 0
+    if g.state == 'sell_count':
+        prices = attribute_history(g.stock, g.count_lag + 1, '1d', ['close', 'high', 'low'])
+        closes = list(prices.close)
+        highs = list(prices.high)
+        lows = list(prices.low)
+        if closes[-1] <= lows[0] and lows[-1] < lows[-2] and (closes[-1] < g.save_price):
+            g.save_price = closes[-1]
+            g.sell_count += 1
+            if g.line < highs[-1]:
+                g.line = highs[-1]
+        if g.sell_count == g.n3:
+            g.state = 'empty'
+            g.sell_count = 0
+            return 'sell'
+
+def rebalance(signal, context):
+    if signal == 'buy':
+        order_target_value(g.stock, context.portfolio.total_value)
+    if signal == 'sell':
+        order_target(g.stock, 0)
+    "\n    price = attribute_history(g.stock, 1, '1d', ['close']).iloc[0,0]\n    if g.state == 'empty' and price>g.line:\n        print 'buy'\n        order_target_value(g.stock, context.portfolio.total_value)\n        if g.state != 'sell_count':\n            g.state = 'full'\n        g.line=0\n    if g.state == 'full' and price<g.line:\n        print 'sell'\n        order_target(g.stock, 0)\n        if g.state != 'buy_count':\n            g.state = 'empty'\n        g.line=0\n    "

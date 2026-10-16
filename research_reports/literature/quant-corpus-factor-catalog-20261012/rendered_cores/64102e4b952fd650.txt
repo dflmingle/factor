@@ -1,0 +1,19 @@
+quant/2020年度精选策略/86 5日线穿十日线策略（供初学）.txt
+import jqdata
+
+def initialize(context):
+    g.security = '601111.XSHG'
+
+def handle_data(context, data):
+    last_price = data[g.security].close
+    average_price = data[g.security].mavg(20, 'close')
+    average_price5 = data[g.security].mavg(5, 'close')
+    average_price10 = data[g.security].mavg(10, 'close')
+    cash = context.portfolio.cash
+    if average_price5 > average_price10:
+        if last_price > average_price5:
+            if cash > 100 * last_price:
+                order_value(g.security, cash)
+    if last_price < average_price5:
+        if context.portfolio.positions[g.security].amount > 0:
+            order_target(g.security, 0)

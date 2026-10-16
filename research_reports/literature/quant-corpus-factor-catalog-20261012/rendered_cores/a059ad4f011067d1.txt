@@ -1,0 +1,119 @@
+quant/2022年度精选策略/87.RSI衍生指标择时轮动A股ETF.txt
+import numpy as np
+import pandas as pd
+import talib
+import datetime
+
+def set_buyableList(context):
+    etfList = get_all_securities(['etf'], (context.current_dt - datetime.timedelta(g.onMarketDays)).date())
+    etfList = list(etfList.index)
+    daPanHis = attribute_history('000300.XSHG', 100, '1d', 'close', df=False)
+    daPan = daPanHis['close']
+    upperband, middleband, lowerband = talib.BBANDS(daPan, timeperiod=5, nbdevup=1, nbdevdn=1, matype=0)
+    if daPan[-1] >= upperband[-1]:
+        fjbList = get_all_securities(['fjb'], (context.current_dt - datetime.timedelta(g.onMarketDays)).date())
+        fjbList = list(fjbList.index)
+        etfList = etfList + fjbList
+    etfList = [security for security in etfList if '港' not in get_security_info(security).display_name and '恒生' not in get_security_info(security).display_name and ('纳' not in get_security_info(security).display_name) and ('黄金' not in get_security_info(security).display_name) and ('债' not in get_security_info(security).display_name) and ('MSCI' not in get_security_info(security).display_name)]
+    money4CheckArray = np.array([])
+    for security in etfList:
+        his = attribute_history(security, g.period4Check4Money, '1d', 'money', df=False)
+        moneyArray = his['money']
+        moneyAvg = np.sum(moneyArray) / g.period4Check4Money
+        money4CheckArray = np.append(money4CheckArray, moneyAvg)
+    money4CheckSeries = pd.Series(money4CheckArray, index=np.array(etfList))
+    money4CheckSeries.sort(ascending=False)
+    poolSize = int(len(etfList) / 10) + 1
+    if poolSize < 10:
+        poolSize = 10
+    money4CheckSeries = money4CheckSeries[0:poolSize]
+    money4CheckSeries = money4CheckSeries[money4CheckSeries >= 100 * context.portfolio.portfolio_value]
+    etfList = list(money4CheckSeries.index)
+    ret4CheckArray = np.array([])
+    for security in etfList:
+        his = attribute_history(security, g.period4Check4Ret + 1, '1d', 'close', df=False)
+        closeArray = his['close']
+        tempRet = 100 * (closeArray[-1] / closeArray[0] - 1)
+        real = talib.ROC(closeArray, timeperiod=1)
+        real = real[-g.period4Check4Ret:]
+        std = np.std(real)
+        ret = tempRet / std
+        ret4CheckArray = np.append(ret4CheckArray, ret)
+    ret4CheckSeries = pd.Series(ret4CheckArray, index=np.array(etfList))
+    ret4CheckSeries.sort(ascending=False)
+    etfList = list(ret4CheckSeries.index)[0:1]
+    g.buyableList = etfList
+
+def initialize(context):
+    set_universe([])
+    g.sellDict = {}
+    g.buyDict = {}
+    run_daily(set_buyableList, 'before_open')
+    g.period4Check4Money = 18
+    g.period4Check4Ret = 6
+    g.onMarketDays = 146
+    g.nRSI = 6
+    g.buyThreshold = 40
+    g.sellThreshold = 55
+    g.ma = 12
+    g.bian1, g.bian2 = (0.8, 0.6)
+
+def buyOrSellCheck(security, context):
+    panduan = 0
+    his = attribute_history(security, 100, '1d', ('open', 'low', 'close', 'high'), df=False)
+    closeArray = his['close']
+    highArray = his['high']
+    openArray = his['open']
+    lowArray = his['low']
+    MAArray = talib.EMA(closeArray, g.ma)
+    a = (openArray[-1] - closeArray[-1]) / (highArray[-1] - lowArray[-1])
+    a = abs(a)
+    jumpArray = talib.LN(closeArray / highArray)
+    RSIArray = talib.RSI(jumpArray, g.nRSI)
+    if RSIArray[-1] <= g.buyThreshold:
+        if closeArray[-1] > MAArray[-1]:
+            panduan = 1
+        elif a <= g.bian1:
+            panduan = 1
+    elif RSIArray[-1] >= g.sellThreshold:
+        if closeArray[-1] <= MAArray[-1]:
+            panduan = -1
+        elif a <= g.bian2:
+            panduan = -1
+    if security in context.portfolio.positions.keys():
+        avgCost = context.portfolio.positions[security].avg_cost
+        if closeArray[-1] / avgCost - 1 < -0.1:
+            panduan = -1
+        if closeArray[-1] / avgCost - 1 > 0.1:
+            panduan = -1
+    return panduan
+
+def before_trading_start(context):
+    g.sellDict = {}
+    g.buyDict = {}
+    if context.portfolio.positions.keys() == []:
+        security = g.buyableList[0]
+        if buyOrSellCheck(security, context) == 1:
+            g.buyDict[security] = context.portfolio.portfolio_value
+    elif context.portfolio.positions.keys() == g.buyableList:
+        security = g.buyableList[0]
+        if buyOrSellCheck(security, context) == -1:
+            g.sellDict[security] = 0
+    else:
+        security1 = g.buyableList[0]
+        security2 = context.portfolio.positions.keys()[0]
+        if buyOrSellCheck(security1, context) == 1:
+            g.sellDict[security2] = 0
+            g.buyDict[security1] = 1.1 * context.portfolio.portfolio_value
+        elif buyOrSellCheck(security2, context) == -1:
+            g.sellDict[security2] = 0
+    if g.sellDict != {}:
+        message = '卖 ' + g.sellDict.keys()[0]
+    if g.buyDict != {}:
+        message = '买 ' + g.buyDict.keys()[0]
+
+def handle_data(context, data):
+    for security in g.sellDict:
+        order_target_value(security, g.sellDict[security])
+    for security in g.buyDict:
+        order_target_value(security, g.buyDict[security])
