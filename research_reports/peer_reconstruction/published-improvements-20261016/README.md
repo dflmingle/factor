@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|超骁|verified_fit_improvement|106.695582|79.30%|False|
+|小马珍珠|verified_fit_improvement|109.301871|68.99%|False|
