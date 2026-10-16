@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|不抵灼灼目光|verified_fit_improvement|286.253428|62.81%|False|
+|神圣量化帝国|verified_fit_improvement|177.736572|61.87%|False|
