@@ -10,4 +10,5 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|神圣量化帝国|verified_fit_improvement|177.736572|61.87%|False|
+|筱幽梦|verified_fit_improvement|387.024612|66.11%|False|
+|西亚斯小牛|verified_fit_improvement|276.182515|46.01%|False|
