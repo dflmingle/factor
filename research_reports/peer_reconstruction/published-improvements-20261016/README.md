@@ -10,4 +10,4 @@
 
 |对手|类型|损失|平均持仓重合|参照验收|
 |---|---|---:|---:|---|
-|gjh|verified_fit_improvement|203.997214|41.35%|False|
+|不抵灼灼目光|verified_fit_improvement|286.253428|62.81%|False|
